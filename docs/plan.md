@@ -56,7 +56,8 @@
 ### 进度
 
 - [x] 阶段 1 实施计划已确定。
-- 下一步第一个动作：执行阶段 1 Step 1，建立 workspace 骨架并提交类型检查、lint、测试和依赖方向的最小可运行配置。
+- [x] Step 1 Workspace 骨架：pnpm workspace、Turbo 配置、strict TypeScript、lint、测试和依赖方向检查已可运行。
+- 下一步第一个动作：执行阶段 1 Step 2，定义 core 基础类型并实现牌集、可序列化 PRNG、牌墙和守恒/容器唯一性校验。
 
 ## 待办
 

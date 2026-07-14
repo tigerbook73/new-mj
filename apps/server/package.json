@@ -1,0 +1,12 @@
+{
+  "name": "@new-mj/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "dependencies": {
+    "@new-mj/ai": "workspace:*",
+    "@new-mj/core": "workspace:*",
+    "@new-mj/protocol": "workspace:*"
+  }
+}

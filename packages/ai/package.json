@@ -1,0 +1,9 @@
+{
+  "name": "@new-mj/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "node --test" },
+  "dependencies": { "@new-mj/core": "workspace:*" }
+}
