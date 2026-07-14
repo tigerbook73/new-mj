@@ -9,11 +9,11 @@
     "check:deps": "node tools/check-deps.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.15.0",
+    "@types/node": "^26.1.1",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
-    "eslint": "^9.27.0",
+    "eslint": "^10.7.0",
     "turbo": "^2.10.5",
-    "typescript": "^5.8.3"
+    "typescript": "^6.0.3"
   }
 }

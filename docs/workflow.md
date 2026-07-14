@@ -21,6 +21,12 @@
 - fuzz 失败：seed + action log 先固化为回归用例，再修复
 - 不追覆盖率指标；追不变量全时校验 + 胡牌/番型用例表全绿
 
+## 依赖维护
+
+- 新增或刷新依赖时优先使用 npm registry 的最新稳定版，不使用 prerelease。
+- 若最新版本违反现有工具链的 peer 约束，使用最新兼容稳定版，并在提交说明或计划中记录原因。
+- 依赖变更必须同步 `package.json` 与 `pnpm-lock.yaml`，并通过 typecheck、lint、test 后提交。
+
 ## 阶段验收
 
 可运行产物跑通 + 全量 fuzz 绿 + doc-map §4 吸纳仪式完成 = 阶段完成，打 tag。
