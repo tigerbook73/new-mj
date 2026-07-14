@@ -27,6 +27,19 @@
 - 若最新版本违反现有工具链的 peer 约束，使用最新兼容稳定版，并在提交说明或计划中记录原因。
 - 依赖变更必须同步 `package.json` 与 `pnpm-lock.yaml`，并通过 typecheck、lint、test 后提交。
 
+## 测试工具边界
+
+- 保持 pnpm 为唯一包管理器；测试运行时按包的生态选择，不要求全仓库使用同一个 runner。
+- `packages/core`、`packages/protocol`、`packages/ai` 优先使用 Vitest，便于 TypeScript、参数化用例和 fuzz 测试。
+- `apps/server` 使用 NestJS 时采用 Jest，遵循 NestJS 官方测试生态；server 测试不得因此把 Jest 依赖引入 core。
+- web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调度。
+
+## Core 类型与注释
+
+- 已导出的领域状态、事件和跨模块结果优先定义专门的 `type`/`interface`；这样可复用、可被契约引用，并减少后续接口调整时的漂移。
+- 仅在模块内部使用、语义一次性且不会成为跨包契约的简单结果，允许使用内联返回类型；不为形式统一而制造无意义类型名。
+- 注释只补充代码无法表达的算法、不变量、敏感性或边界语义；契约和规则正文仍以 `docs/` 为准，不在代码注释中复制整段规格。
+
 ## 阶段验收
 
 可运行产物跑通 + 全量 fuzz 绿 + doc-map §4 吸纳仪式完成 = 阶段完成，打 tag。

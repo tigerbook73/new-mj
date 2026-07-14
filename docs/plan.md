@@ -57,7 +57,8 @@
 
 - [x] 阶段 1 实施计划已确定。
 - [x] Step 1 Workspace 骨架：pnpm workspace、Turbo 配置、strict TypeScript、lint、测试和依赖方向检查已可运行。
-- 下一步第一个动作：执行阶段 1 Step 2，定义 core 基础类型并实现牌集、可序列化 PRNG、牌墙和守恒/容器唯一性校验。
+- [x] Step 2 Core 基础设施：牌集、TileId/TileKind、可序列化 PRNG、牌墙、事件序号和守恒/容器唯一性校验已完成；core 测试使用 Vitest。
+- 下一步第一个动作：执行阶段 1 Step 3，提交阶段表 RuleSet 接口、类型、空实现和预期失败的 happy-path 测试供接口评审。
 
 ## 待办
 
