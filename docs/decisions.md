@@ -26,3 +26,4 @@
 - **牌河墓碑模型（DiscardEntry.claimedBy）**：保留被声明牌的原位与完整弃牌历史；UI 渲染自由 + 日麻振听将来直接可用；守恒只计活跃条目。
 - **ack/事件关系**：查询=ack 给数据；命令=ack 给回执、事件给状态（广播含本人，幂等）；进新上下文=ack 给快照。
 - **BB1 血战标准配置**：阶段 1.5 采用大众线上川麻「血战到底 + 换三张」作为黄金路径：私下换三张/定缺、定缺优先出牌、一炮多响、三家胡或流局结束、4 番封顶、自摸加番、直杠 2/补杠各 1/暗杠各 2、呼叫转移、花猪→退税→查大叫。地方差异保留在 `BloodbattleConfig`，不在 server/client 复制规则。
+- **J 胡牌快照走 extraTiles 钩子**：`assertContainerUniqueness`/`assertTileConservation`（`packages/core/src/invariants.ts`）新增可选 `extraTiles(state)` 参数，供 RuleSet 把 variantState 内的胡牌快照等容器计入守恒与去重检查；默认空实现，垃圾胡调用点不变。避免在 GameState 顶层为血战新增专用字段，保持 D6 的 variantState 隔离。

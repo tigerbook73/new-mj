@@ -27,9 +27,16 @@ const addPhysical = (seen: Set<TileId>, id: TileId, tileSet: TileSet): void => {
 const seatHasMeldTile = (state: GameState, seat: SeatId, tile: TileId): boolean =>
   state.seats[seat]?.melds.some((meld) => meld.tiles.includes(tile)) ?? false;
 
+// extraTiles 供 RuleSet 声明 variantState 内的额外容器（如血战的胡牌快照），
+// 使其计入守恒与去重检查，而不必在 GameState 顶层新增专用字段。
+export type ExtraTiles = (state: GameState) => readonly TileId[];
+
+const noExtraTiles: ExtraTiles = () => [];
+
 export const assertContainerUniqueness = (
   state: GameState,
   tileSet: TileSet = STANDARD_TILE_SET,
+  extraTiles: ExtraTiles = noExtraTiles,
 ): void => {
   // claimed discard 是墓碑：物理归属已经转入 meld，只校验其对应副露存在，
   // 不把墓碑再次计入 physical 集合。
@@ -57,13 +64,15 @@ export const assertContainerUniqueness = (
       }
     });
   });
+  extraTiles(state).forEach((id) => addPhysical(physical, id, tileSet));
 };
 
 export const assertTileConservation = (
   state: GameState,
   tileSet: TileSet = STANDARD_TILE_SET,
+  extraTiles: ExtraTiles = noExtraTiles,
 ): void => {
-  assertContainerUniqueness(state, tileSet);
+  assertContainerUniqueness(state, tileSet, extraTiles);
   const physical = new Set<TileId>();
   state.wall.forEach((id) => physical.add(id));
   state.seats.forEach((seat) => {
@@ -73,6 +82,7 @@ export const assertTileConservation = (
       if (discard.claimedBy === undefined) physical.add(discard.tile);
     });
   });
+  extraTiles(state).forEach((id) => physical.add(id));
   if (physical.size !== tileSet.size) {
     throw new InvariantViolation(
       "TILE_CONSERVATION",
