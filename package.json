@@ -7,8 +7,8 @@
     "lint": "eslint .",
     "test": "pnpm --recursive --if-present test && node --test tools/*.test.mjs",
     "check:deps": "node tools/check-deps.mjs",
-    "cli:play": "node --experimental-strip-types packages/core/src/cli.ts play",
-    "fuzz": "node --experimental-strip-types packages/core/src/cli.ts fuzz"
+    "cli:play": "node packages/core/src/cli.ts play",
+    "fuzz": "node packages/core/src/cli.ts fuzz"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
