@@ -11,3 +11,4 @@ export * from "./rules/junk.ts";
 export * from "./win.ts";
 export * from "./engine.ts";
 export * from "./view-reducer.ts";
+export * from "./simulate.ts";

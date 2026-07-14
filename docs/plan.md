@@ -14,14 +14,14 @@
 | 阶段 | 内容                                                                 | 验收                      | 状态                         |
 | ---- | -------------------------------------------------------------------- | ------------------------- | ---------------------------- |
 | 0    | 规则与契约定义                                                       | 四份规格文档定稿          | ✅（血战为草案，1.5 前定稿） |
-| 1    | core 基建 + junk RuleSet + CLI fuzz                                  | CLI 整局 + 1 万局 fuzz 绿 | ⬅ 当前                       |
+| 1    | core 基建 + junk RuleSet + CLI fuzz                                  | CLI 整局 + 1 万局 fuzz 绿 | ✅                            |
 | 1.5  | bloodbattle RuleSet（允许一次接口调整）                              | 番型用例全绿 + fuzz       |                              |
 | 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk） | 4 模拟客户端整局          |                              |
 | 3    | web：登录/大厅/牌桌（先竖切）                                        | 浏览器真人对局            |                              |
 | 4    | 持久化：事件日志落 PG/战绩/重连/回放调试页                           |                           |                              |
 | 5    | mobile（Expo）                                                       |                           |                              |
 
-## 当前阶段：阶段 1（规划完成，待实现）
+## 阶段 1：已完成
 
 ### 目标与边界
 
@@ -60,7 +60,8 @@
 - [x] Step 2 Core 基础设施：牌集、TileId/TileKind、可序列化 PRNG、牌墙、事件序号和守恒/容器唯一性校验已完成；core 测试使用 Vitest。
 - [x] Step 3 RuleSet 接口评审：阶段表候选已确认；junk 空实现的预期失败测试已替换为真实 happy-path 测试。
 - [x] Step 4 Junk 完整流程：开局、摸打、声明窗口、吃碰杠、抢杠、自摸/点炮、流局、结算、视图和 1000 seed fuzz 冒烟完成；覆盖抢杠、头跳、一炮多响、TileId 泄漏和事件重建视图一致性。
-- 下一步第一个动作：执行阶段 1 Step 5，提供可传 seed/action log/config 的 `cli:play` 与独立 `fuzz` 命令。
+- [x] Step 5 CLI 与阶段验收：`cli:play` 支持 seed/config/action log，`fuzz` 支持随机 config；CLI 整局与 10000 局 fuzz 已通过。
+- 下一步第一个动作：阶段 1.5 开工前确认 `docs/rules-bloodbattle.md` 从草案转为定稿，并逐项建立血战 RuleSet 用例表。
 
 ## 待办
 

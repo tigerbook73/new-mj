@@ -4,14 +4,18 @@
 
 技术栈：TypeScript monorepo（pnpm + Turborepo）· 纯函数引擎（事件溯源）· NestJS + Socket.IO · React · Supabase(PG/OAuth) · Render。
 
-## Quickstart（阶段 1 落地后补齐命令）
+## Quickstart
 
 ```bash
 pnpm install
-pnpm test          # 全部测试
-pnpm fuzz -n 100   # 随机 AI 互打 100 局（占位，以实际脚本为准）
-pnpm cli:play      # CLI 观看一局（占位）
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm cli:play --seed 47
+pnpm fuzz --seed 47 --games 10000
 ```
+
+`cli:play` 输出可重放的 seed、config 与 action log；可用 `--config '<json>'` 和 `--actions '<json>'` 覆盖输入。`fuzz` 随机覆盖 junk config；失败时输出固化为回归用例所需的 seed/config/action log。
 
 ## 文档阅读路径
 
@@ -24,4 +28,4 @@ pnpm cli:play      # CLI 观看一局（占位）
 
 ## 状态
 
-阶段 1（引擎基建 + 垃圾胡 RuleSet）未开始。阶段路线见 `docs/plan.md`。
+阶段 1（引擎基建 + junk RuleSet + CLI fuzz）已完成。下一阶段是血战到底 RuleSet；阶段路线见 `docs/plan.md`。

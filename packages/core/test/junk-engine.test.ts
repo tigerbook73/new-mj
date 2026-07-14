@@ -10,6 +10,8 @@ import {
   createPrng,
   parseJunkConfig,
   rebuildPlayerView,
+  fuzzJunkGames,
+  playJunkGame,
   type GameState,
 } from "../src/index.ts";
 
@@ -130,6 +132,14 @@ test("public draw and concealed-gang events never contain a TileId", () => {
     if (payload.type === "TileDrawn" || payload.type === "GangReplacementDrawn") expect(payload.tile).toBeUndefined();
     if (payload.type === "GangMade" && payload.gangType === "anGang") expect(payload.tiles).toBeUndefined();
   }
+});
+
+test("action logs replay a complete game and fuzz reports no failure", () => {
+  const played = playJunkGame(31);
+  if ("error" in played) throw new Error(played.error);
+  const replayed = playJunkGame(31, {}, played.actions);
+  expect(replayed).toEqual(played);
+  expect(fuzzJunkGames(100, 41)).toBeUndefined();
 });
 
 test("illegal actions do not mutate state or consume event sequence", () => {

@@ -3,9 +3,12 @@ import type { TileSet } from "./tiles.ts";
 import { STANDARD_TILE_SET } from "./tiles.ts";
 
 export class InvariantViolation extends Error {
-  constructor(public readonly code: string, message = code) {
+  public readonly code: string;
+
+  constructor(code: string, message = code) {
     super(message);
     this.name = "InvariantViolation";
+    this.code = code;
   }
 }
 
