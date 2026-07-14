@@ -401,7 +401,13 @@ export const createJunkGame = (seed: number, config: unknown = {}): RuleSetApply
     variantState: {},
   };
   const events: GameEvent[] = [];
-  appendEvent(state, events, publicVisibility, { type: "GameStarted", config: state.config, dealer });
+  appendEvent(state, events, publicVisibility, {
+    type: "GameStarted",
+    config: state.config,
+    dealer,
+    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => seat === dealer ? 14 : 13),
+    wallCount: state.wall.length - 53,
+  });
   for (const seat of [0, 1, 2, 3] as SeatId[]) {
     const count = seat === dealer ? 14 : 13;
     for (let index = 0; index < count; index += 1) state.seats[seat]!.hand.push(state.wall.shift()!);

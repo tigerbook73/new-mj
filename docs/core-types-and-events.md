@@ -117,7 +117,7 @@ type GameEvent = {
 
 | # | 事件 | visibility | payload 要点 |
 |---|------|-----------|-------------|
-| 1 | GameStarted | public | config、座次、庄家 |
+| 1 | GameStarted | public | config、座次、庄家、各家初始手牌张数、牌墙余量 |
 | 2 | HandDealt | seat（各家各收自己的） | 该家 13/14 张手牌 |
 | 3 | TurnStarted | public | seat |
 | 4 | TileDrawn | **双版本**：seat 版含牌面；public 版仅"摸了一张" | seat, tile? |

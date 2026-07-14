@@ -9,6 +9,7 @@ import {
   allTileIds,
   createPrng,
   parseJunkConfig,
+  rebuildPlayerView,
   type GameState,
 } from "../src/index.ts";
 
@@ -90,6 +91,45 @@ test("views and event filtering do not expose another seat's concealed hand", ()
   expect(eventsVisibleTo(started.events, viewer).filter((event) =>
     (event.payload as { type?: string }).type === "HandDealt",
   )).toHaveLength(1);
+});
+
+test("filtered events rebuild the same initial player view as direct derivation", () => {
+  const started = createJunkGame(19);
+  if ("error" in started) throw new Error(started.error.code);
+  for (const seat of [0, 1, 2, 3] as const) {
+    expect(rebuildPlayerView(started.events, seat)).toEqual(getPlayerView(started.state, seat));
+  }
+});
+
+test("filtered event replay remains equal to direct views through gameplay", () => {
+  const started = createJunkGame(23);
+  if ("error" in started) throw new Error(started.error.code);
+  let state = started.state;
+  const events = [...started.events];
+  for (let step = 0; step < 30 && state.phase !== "finished"; step += 1) {
+    const seat = state.phase === "awaiting-claims"
+      ? ([0, 1, 2, 3] as const).find((candidate) => junkRuleSet.getLegalActions(state, candidate).length > 0)!
+      : state.currentSeat;
+    const action = junkRuleSet.getLegalActions(state, seat)[0]!;
+    const result = applyAction(state, seat, action);
+    if ("error" in result) throw new Error(result.error.code);
+    state = result.state;
+    events.push(...result.events);
+    for (const viewer of [0, 1, 2, 3] as const) {
+      expect(rebuildPlayerView(events, viewer)).toEqual(getPlayerView(state, viewer));
+    }
+  }
+});
+
+test("public draw and concealed-gang events never contain a TileId", () => {
+  const started = createJunkGame(29);
+  if ("error" in started) throw new Error(started.error.code);
+  for (const event of started.events) {
+    if (event.visibility.type !== "public") continue;
+    const payload = event.payload as { type?: string; tile?: number; tiles?: number[]; gangType?: string };
+    if (payload.type === "TileDrawn" || payload.type === "GangReplacementDrawn") expect(payload.tile).toBeUndefined();
+    if (payload.type === "GangMade" && payload.gangType === "anGang") expect(payload.tiles).toBeUndefined();
+  }
 });
 
 test("illegal actions do not mutate state or consume event sequence", () => {
