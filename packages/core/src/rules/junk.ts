@@ -136,6 +136,7 @@ const claimOptions = (state: GameState, seat: SeatId): ClaimOption[] => {
   const pending = state.pendingClaims;
   if (!pending || pending.discard.seat === seat) return [];
   const tile = pending.discard.tile;
+  if (pending.source === "robKong") return isWin(state, seat, tile) ? [{ action: { type: "hu" } }] : [];
   const kind = STANDARD_TILE_SET.kindOf(tile);
   const hand = state.seats[seat]!.hand;
   const matching = sameKind(hand, kind);
@@ -233,6 +234,20 @@ const finishRonWins = (state: GameState, events: GameEvent[], winners: SeatId[],
 };
 
 const resolveUnclaimed = (state: GameState, events: GameEvent[]): void => {
+  if (state.pendingClaims!.source === "robKong") {
+    const { seat, tile } = state.pendingClaims!.discard;
+    delete state.pendingClaims;
+    const meld = state.seats[seat]!.melds.find((candidate) =>
+      candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === STANDARD_TILE_SET.kindOf(tile),
+    )!;
+    state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
+    meld.type = "buGang";
+    meld.tiles.push(tile);
+    appendEvent(state, events, publicVisibility, { type: "ClaimWindowResolved", result: "unclaimed" });
+    appendEvent(state, events, publicVisibility, { type: "GangMade", seat, gangType: "buGang", tiles: [...meld.tiles] });
+    beginTurn(state, events, seat, true, true);
+    return;
+  }
   const discardedBy = state.pendingClaims!.discard.seat;
   delete state.pendingClaims;
   appendEvent(state, events, publicVisibility, { type: "ClaimWindowResolved", result: "unclaimed" });
@@ -346,6 +361,21 @@ const applyBuGang = (state: GameState, seat: SeatId, tile: TileId, events: GameE
   const kind = STANDARD_TILE_SET.kindOf(tile);
   const meld = state.seats[seat]!.melds.find((candidate) => candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === kind);
   if (!meld) return fail("GANG_NOT_AVAILABLE");
+  if (configOf(state).robKong) {
+    state.pendingClaims = { discard: { seat, tile }, source: "robKong", options: {}, responses: {} };
+    for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+      const candidateOptions = claimOptions(state, candidate);
+      if (candidateOptions.length === 0) continue;
+      state.pendingClaims.options[candidate] = candidateOptions;
+      appendEvent(state, events, seatVisibility(candidate), { type: "ClaimWindowOpened", options: candidateOptions });
+    }
+    if (Object.keys(state.pendingClaims.options).length > 0) {
+      state.phase = "awaiting-claims";
+      return { state, events };
+    }
+    resolveUnclaimed(state, events);
+    return { state, events };
+  }
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
   meld.type = "buGang";
   meld.tiles.push(tile);

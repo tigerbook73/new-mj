@@ -6,6 +6,8 @@ import {
   eventsVisibleTo,
   getPlayerView,
   junkRuleSet,
+  allTileIds,
+  createPrng,
   parseJunkConfig,
   type GameState,
 } from "../src/index.ts";
@@ -98,6 +100,68 @@ test("illegal actions do not mutate state or consume event sequence", () => {
   const result = junkRuleSet.applyAction(started.state, wrongSeat, { type: "discard", tile: 999 });
   expect(result).toEqual({ error: { code: "NOT_YOUR_TURN" } });
   expect(started.state).toEqual(before);
+});
+
+test("robKong opens a hu-only claim window and preserves the fourth tile on ron", () => {
+  const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
+  const physical = new Set([4, 5, 6, 7, ...seat1Hand]);
+  const state: GameState = {
+    config: { rulesetId: "junk", sevenPairs: false, robKong: true, multiHuPolicy: "headJump" },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: [7], melds: [{ type: "peng", tiles: [4, 5, 6], from: 2 }], discards: [] },
+      { hand: seat1Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [{ tile: 6, claimedBy: 0 }] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    seq: 0,
+    prng: createPrng(1),
+    variantState: {},
+  };
+  const opened = unwrap(applyAction(state, 0, { type: "buGang", tile: 7 }));
+  expect(opened.phase).toBe("awaiting-claims");
+  expect(junkRuleSet.getLegalActions(opened, 1)).toContainEqual({ type: "hu" });
+  const ended = unwrap(applyAction(opened, 1, { type: "hu" }));
+  expect(ended.result).toMatchObject({ type: "win", winner: 1, from: 0 });
+  expect(ended.seats[0]!.hand).toContain(7);
+  expect(ended.seats[0]!.melds[0]!.type).toBe("peng");
+  assertTileConservation(ended);
+});
+
+const multiHuState = (multiHuPolicy: "headJump" | "all"): GameState => {
+  const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
+  const seat2Hand = [1, 9, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41];
+  const physical = new Set([7, ...seat1Hand, ...seat2Hand]);
+  return {
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: [7], melds: [], discards: [] },
+      { hand: seat1Hand, melds: [], discards: [] },
+      { hand: seat2Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    seq: 0,
+    prng: createPrng(1),
+    variantState: {},
+  };
+};
+
+test("multiHuPolicy selects head jump or all ron winners deterministically", () => {
+  let state = unwrap(applyAction(multiHuState("headJump"), 0, { type: "discard", tile: 7 }));
+  state = unwrap(applyAction(state, 1, { type: "hu" }));
+  state = unwrap(applyAction(state, 2, { type: "hu" }));
+  expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-1, 1, 0, 0] });
+
+  state = unwrap(applyAction(multiHuState("all"), 0, { type: "discard", tile: 7 }));
+  state = unwrap(applyAction(state, 1, { type: "hu" }));
+  state = unwrap(applyAction(state, 2, { type: "hu" }));
+  expect(state.result).toMatchObject({ winner: 1, winners: [1, 2], scoreDeltas: [-2, 1, 1, 0] });
+  assertTileConservation(state);
 });
 
 test("1000 seeded games finish while preserving tile conservation", () => {

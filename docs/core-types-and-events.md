@@ -56,10 +56,13 @@ type DiscardEntry = { tile: TileId; claimedBy?: SeatId }
 
 type PendingClaims = {
   discard: { seat: SeatId; tile: TileId }
+  source?: 'discard' | 'robKong' // 缺省/`discard` 为普通弃牌；`robKong` 为补杠第四张
   options: Partial<Record<SeatId, ClaimOption[]>>  // 仅含有权响应的座位
   responses: Partial<Record<SeatId, Action | 'pass'>>
 }
 ```
+
+`source='robKong'` 仅在 junk config 的 `robKong=true` 时出现：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸。若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
 
 **容器唯一性约定**：任一 TileId 任意时刻**物理上**只归属一个容器——牌墙 / 某家手牌 / 某家牌河**活跃条目**（claimedBy 为空）/ 某家副露 / 胡牌快照。牌打出即入出牌者牌河；被吃/碰/杠时，牌的物理归属移入声明者副露（Meld.from 记录来源家），牌河条目原位保留并置 claimedBy（墓碑，不计入守恒）。"牌集守恒"不变量 = 上述容器的 TileId 并集恒等于完整牌集且两两不相交；附加不变量：每个墓碑条目的 TileId 必出现在 claimedBy 家的某个副露中。
 

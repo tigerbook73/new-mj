@@ -84,6 +84,7 @@ export type JunkConfig = GameConfig & {
 
 export type PendingClaims = {
   discard: { seat: SeatId; tile: TileId };
+  source?: "discard" | "robKong";
   options: Partial<Record<SeatId, ClaimOption[]>>;
   responses: Partial<Record<SeatId, Action>>;
 };
