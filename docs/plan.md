@@ -21,23 +21,42 @@
 | 4    | 持久化：事件日志落 PG/战绩/重连/回放调试页                           |                           |                              |
 | 5    | mobile（Expo）                                                       |                           |                              |
 
-## 当前阶段：阶段 1（工作区，收尾清理）
+## 当前阶段：阶段 1（规划完成，待实现）
 
-### 实施顺序 ← 阶段开场时 Claude Code 产出的推演
+### 目标与边界
 
-1. monorepo 骨架 + lint/依赖规则
-2. 牌集/PRNG/事件机制
-3. RuleSet 接口骨架（⚠ 人审后再填充）
-4. 声明窗口 → 5. junk 胡牌判定 → 6. CLI fuzz
+- 完成 TypeScript monorepo、纯函数 core、junk RuleSet、CLI 整局和随机 fuzz。
+- 阶段验收：CLI 跑通完整一局，随机配置 fuzz 不少于 1 万局并全绿。
+- server/web/mobile 只建立可依赖的包边界与占位入口；不提前实现阶段 2 以后功能。
+- `rules-bloodbattle.md` 保持草案状态，阶段 1 不实现血战规则。
+
+### 实施顺序
+
+1. 建立 `packages/core`、`packages/protocol`、`packages/ai` 与 `apps/server`、`apps/web`、`apps/mobile` 的 workspace 骨架；配置 pnpm/Turbo、strict TypeScript、lint、测试和依赖方向检查。
+2. 在 core 实现牌集、`TileId`/`TileKind`、seed 驱动且可序列化的 PRNG、牌墙、事件序号、牌集守恒和容器唯一性校验；禁止时间、全局随机和 I/O。
+3. 采用**阶段表**作为 RuleSet 流程接口：RuleSet 声明阶段、合法动作、动作应用、声明选项、窗口裁决、胡牌、结算和视图派生；core 统一驱动阶段转移与事件可见性。
+4. 先提交类型、RuleSet 接口、空实现和一个预期失败的 happy-path 测试供人审；接口确认后再填充玩法实现。架构级调整须先更新契约/决策文档。
+5. 实现 junk 流程 `dealing → playing ⇄ awaiting-claims → finished`：出牌、吃、碰、明杠、暗杠、补杠、自摸、点炮胡、过、自动摸牌和杠后尾部补摸。
+6. 实现声明窗口“胡 > 杠 > 碰 > 吃”、吃仅限下家、仅有合法响应者入窗、`headJump`；保留牌河墓碑并转移物理牌到副露。
+7. 实现标准 4 面子 + 1 对胡牌、点炮/自摸固定结算、流局，以及 `sevenPairs=false`、`robKong=false`、`multiHuPolicy='headJump'` 的 config 解析与随机化。
+8. 实现公开/座位事件过滤、`getPlayerView` 和事件重建一致性；TileId 与牌面按同等级敏感信息处理。
+9. 提供 `cli:play` 和支持 seed/action log/config 的 `fuzz`；core 改动期间跑至少 1000 局，阶段验收跑至少 10000 局。fuzz 失败先固化 seed 与 action log 为回归测试。
+
+### 验收与收尾
+
+- 全绿运行：`pnpm typecheck`、`pnpm lint`、`pnpm test`、CLI 完整对局和至少 10000 局 fuzz。
+- 覆盖非法动作状态不变、守恒/唯一性、声明裁决、胡牌/结算、事件可见性、TileId 泄漏和视图重建一致性。
+- 阶段收尾执行 doc-map 吸纳、契约/代码漂移审计，更新本节为完成状态并写入阶段 2 第一个具体动作。
+- 实现与测试同 commit；阶段验收后创建 `phase-1` tag。
 
 ### 开放问题
 
-- [ ] RuleSet 接口：流程钩子用回调还是阶段表？（人审时定）
+- [x] RuleSet 流程接口采用阶段表。
 
 ### 进度
 
-- [x] 1、2 完成（本次基线提交）
-- 下一步第一个动作：写 ClaimWindow 裁决的失败用例
+- [x] 阶段 1 实施计划已确定。
+- 下一步第一个动作：建立 workspace 骨架并提交类型检查、lint、测试和依赖方向的最小可运行配置。
 
 ## 待办
 
