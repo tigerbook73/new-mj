@@ -30,17 +30,17 @@
 - server/web/mobile 只建立可依赖的包边界与占位入口；不提前实现阶段 2 以后功能。
 - `rules-bloodbattle.md` 保持草案状态，阶段 1 不实现血战规则。
 
-### 实施顺序
+### 实施步骤
 
-1. 建立 `packages/core`、`packages/protocol`、`packages/ai` 与 `apps/server`、`apps/web`、`apps/mobile` 的 workspace 骨架；配置 pnpm/Turbo、strict TypeScript、lint、测试和依赖方向检查。
-2. 在 core 实现牌集、`TileId`/`TileKind`、seed 驱动且可序列化的 PRNG、牌墙、事件序号、牌集守恒和容器唯一性校验；禁止时间、全局随机和 I/O。
-3. 采用**阶段表**作为 RuleSet 流程接口：RuleSet 声明阶段、合法动作、动作应用、声明选项、窗口裁决、胡牌、结算和视图派生；core 统一驱动阶段转移与事件可见性。
-4. 先提交类型、RuleSet 接口、空实现和一个预期失败的 happy-path 测试供人审；接口确认后再填充玩法实现。架构级调整须先更新契约/决策文档。
-5. 实现 junk 流程 `dealing → playing ⇄ awaiting-claims → finished`：出牌、吃、碰、明杠、暗杠、补杠、自摸、点炮胡、过、自动摸牌和杠后尾部补摸。
-6. 实现声明窗口“胡 > 杠 > 碰 > 吃”、吃仅限下家、仅有合法响应者入窗、`headJump`；保留牌河墓碑并转移物理牌到副露。
-7. 实现标准 4 面子 + 1 对胡牌、点炮/自摸固定结算、流局，以及 `sevenPairs=false`、`robKong=false`、`multiHuPolicy='headJump'` 的 config 解析与随机化。
-8. 实现公开/座位事件过滤、`getPlayerView` 和事件重建一致性；TileId 与牌面按同等级敏感信息处理。
-9. 提供 `cli:play` 和支持 seed/action log/config 的 `fuzz`；core 改动期间跑至少 1000 局，阶段验收跑至少 10000 局。fuzz 失败先固化 seed 与 action log 为回归测试。
+阶段 1 拆成以下五个可独立验证的步骤；每步完成后都应检查 typecheck、lint、test，并与实现一起提交。第 3 步接口评审通过后，才继续填充玩法实现。
+
+1. **Workspace 骨架**：建立 `packages/core`、`packages/protocol`、`packages/ai` 与 `apps/server`、`apps/web`、`apps/mobile`；配置 pnpm/Turbo、strict TypeScript、lint、测试和依赖方向检查。
+2. **Core 基础设施**：实现牌集、`TileId`/`TileKind`、seed 驱动且可序列化的 PRNG、牌墙、事件序号、牌集守恒和容器唯一性校验；禁止时间、全局随机和 I/O。
+3. **RuleSet 接口评审骨架**：采用**阶段表**作为流程接口，提供类型、RuleSet 接口、空实现和一个预期失败的 happy-path 测试；接口确认后再继续。架构级调整须先更新契约/决策文档。
+4. **Junk 完整流程**：实现 `dealing → playing ⇄ awaiting-claims → finished`，包括出牌、吃碰杠、胡牌、过、自动摸牌、杠后尾部补摸、声明裁决、牌河墓碑、结算、事件可见性、`getPlayerView` 和事件重建一致性。
+5. **CLI 与阶段验收**：提供 `cli:play` 和支持 seed/action log/config 的 `fuzz`；core 改动期间跑至少 1000 局，阶段验收跑至少 10000 局。fuzz 失败先固化 seed 与 action log 为回归测试。
+
+其中第 4 步必须覆盖标准 4 面子 + 1 对胡牌、点炮/自摸固定结算、流局，以及 `sevenPairs=false`、`robKong=false`、`multiHuPolicy='headJump'` 的 config 解析与随机化。
 
 ### 验收与收尾
 
@@ -56,7 +56,7 @@
 ### 进度
 
 - [x] 阶段 1 实施计划已确定。
-- 下一步第一个动作：建立 workspace 骨架并提交类型检查、lint、测试和依赖方向的最小可运行配置。
+- 下一步第一个动作：执行阶段 1 Step 1，建立 workspace 骨架并提交类型检查、lint、测试和依赖方向的最小可运行配置。
 
 ## 待办
 
