@@ -75,6 +75,30 @@ export type GameConfig = {
   [key: string]: unknown;
 };
 
+export type JunkConfig = GameConfig & {
+  rulesetId: "junk";
+  sevenPairs: boolean;
+  robKong: boolean;
+  multiHuPolicy: "headJump" | "all";
+};
+
+export type PendingClaims = {
+  discard: { seat: SeatId; tile: TileId };
+  options: Partial<Record<SeatId, ClaimOption[]>>;
+  responses: Partial<Record<SeatId, Action>>;
+};
+
+export type GameResult =
+  | { type: "draw"; scoreDeltas: [number, number, number, number] }
+  | {
+      type: "win";
+      winner: SeatId;
+      winners: SeatId[];
+      winType: "zimo" | "ron";
+      from?: SeatId;
+      scoreDeltas: [number, number, number, number];
+    };
+
 export type GameState = {
   config: GameConfig;
   phase: Phase;
@@ -82,9 +106,11 @@ export type GameState = {
   seats: SeatState[];
   currentSeat: SeatId;
   lastDiscard?: { seat: SeatId; tile: TileId };
+  pendingClaims?: PendingClaims;
   seq: number;
   prng: PrngState;
   variantState: unknown;
+  result?: GameResult;
 };
 
 export type RuleViolation = {
@@ -100,4 +126,21 @@ export type GameEvent<TPayload = unknown> = {
   seq: number;
   visibility: EventVisibility;
   payload: TPayload;
+};
+
+export type PlayerView = {
+  seat: SeatId;
+  hand: TileId[];
+  seats: Array<{
+    melds: Meld[];
+    discards: DiscardEntry[];
+    handCount: number;
+  }>;
+  wallCount: number;
+  currentSeat: SeatId;
+  phase: Phase;
+  myClaimOptions?: ClaimOption[];
+  myClaimResponse?: Action;
+  lastDiscard?: { seat: SeatId; tile: TileId };
+  result?: GameResult;
 };

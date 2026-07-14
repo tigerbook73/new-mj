@@ -20,6 +20,7 @@ export type RuleSetApplySuccess = {
 };
 
 export type RuleSetApplyResult = RuleSetApplySuccess | { error: RuleViolation };
+export type ConfigParseResult = { config: GameState["config"] } | { error: RuleViolation };
 
 export type ClaimResolution =
   | { type: "unclaimed" }
@@ -44,6 +45,7 @@ export type RuleSet = {
   id: string;
   tileSet: TileSet;
   phases: readonly PhaseDefinition[];
+  parseConfig: (input: unknown) => ConfigParseResult;
   getLegalActions: (state: GameState, seat: SeatId) => readonly Action[];
   getClaimOptions: (state: GameState, seat: SeatId) => readonly ClaimOption[];
   applyAction: (state: GameState, seat: SeatId, action: Action) => RuleSetApplyResult;

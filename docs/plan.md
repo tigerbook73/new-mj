@@ -58,8 +58,9 @@
 - [x] 阶段 1 实施计划已确定。
 - [x] Step 1 Workspace 骨架：pnpm workspace、Turbo 配置、strict TypeScript、lint、测试和依赖方向检查已可运行。
 - [x] Step 2 Core 基础设施：牌集、TileId/TileKind、可序列化 PRNG、牌墙、事件序号和守恒/容器唯一性校验已完成；core 测试使用 Vitest。
-- [ ] Step 3 RuleSet 接口评审：阶段表候选、junk 空实现和预期失败的 happy-path 测试已提交，待人工确认接口形状后才进入 Step 4。
-- 下一步第一个动作：评审 `RuleSet` 候选中 core 与玩法的职责边界，确认后开始 junk 的发牌与行牌实现。
+- [x] Step 3 RuleSet 接口评审：阶段表候选已确认；junk 空实现的预期失败测试已替换为真实 happy-path 测试。
+- [ ] Step 4 Junk 完整流程：已实现开局、摸打、声明窗口、吃碰杠、自摸/点炮、流局、结算、视图和 1000 seed fuzz 冒烟；待补抢杠与更细的声明/胡牌回归用例。
+- 下一步第一个动作：为补杠增加 `robKong=true` 的胡牌声明窗口，并固化吃碰杠、头跳/一炮多响的定向回归用例。
 
 ## 待办
 
