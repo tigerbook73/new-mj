@@ -27,11 +27,10 @@ export type Settlement = {
 };
 
 /**
- * REVIEW CANDIDATE — Step 3 intentionally stops at this boundary.
- *
- * RuleSet owns variant rules; the future core driver owns event sequencing,
- * immutable state replacement and visibility distribution. The exact hand-off
- * is deliberately exposed here for review before junk behavior is added.
+ * RuleSet owns variant rules; a future shared core driver may take over event
+ * sequencing, immutable state replacement and visibility distribution — today
+ * junk implements this shape directly. A bounded adjustment is expected when
+ * bloodbattle lands (phase 1.5, decisions.md D9).
  */
 export type RuleSet = {
   id: string;

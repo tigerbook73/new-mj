@@ -1,6 +1,6 @@
 # core 类型与事件清单
 
-> 状态：v2，评审点 A–G 已定稿。定稿后作为 `packages/core` 的实现依据
+> 状态：v3，阶段 1 已实现并测试通过（`packages/core`）；取舍理由见 `decisions.md`（评审点 A–G）
 > 原则回顾：applyAction 对外纯函数；时间不进 core；事件带可见性（D4/D5）
 
 ## 1. 基础类型
@@ -23,7 +23,7 @@ type MeldType = "chi" | "peng" | "minGang" | "anGang" | "buGang";
 type Meld = { type: MeldType; tiles: TileId[]; from?: SeatId };
 ```
 
-**评审点 A【已定：采用实例 ID】**：状态与事件存 `TileId`；规则逻辑（胡牌判定、碰杠匹配）经 `kindOf(id)` 按种类运算。理由：① React/Motion 动画需要稳定 key，一张牌从牌墙→手牌→牌河全程同 id，layout 动画免费；② 牌集守恒不变量 = id 集合精确比对。
+状态与事件存 `TileId`；规则逻辑（胡牌判定、碰杠匹配）经 `kindOf(id)` 按种类运算（取舍理由见 decisions.md 评审点 A）。
 **配套纪律（安全）**：id→kind 映射静态公开，因此**暴露 id 等于暴露牌面**——一切可见性过滤须将 id 与 kind 视为同级敏感（TileDrawn/暗杠的 public 版本均不得携带 id）。
 **配套约定（测试）**：fixture 中用例仍以 kind 书写（如 `[1m,2m,3m]`），由加载器自动派发 id。
 
@@ -66,7 +66,7 @@ type PendingClaims = {
 
 **容器唯一性约定**：任一 TileId 任意时刻**物理上**只归属一个容器——牌墙 / 某家手牌 / 某家牌河**活跃条目**（claimedBy 为空）/ 某家副露 / 胡牌快照。牌打出即入出牌者牌河；被吃/碰/杠时，牌的物理归属移入声明者副露（Meld.from 记录来源家），牌河条目原位保留并置 claimedBy（墓碑，不计入守恒）。"牌集守恒"不变量 = 上述容器的 TileId 并集恒等于完整牌集且两两不相交；附加不变量：每个墓碑条目的 TileId 必出现在 claimedBy 家的某个副露中。
 
-**评审点 B【已定：维持】**：`pendingClaims.options` 只包含**至少有一个合法响应**的座位；无选项的家不进窗口、无需表态，server 的超时计时也只针对这些座位。（备选方案为商用做法：出牌后强制全部三家进窗口表态 pass + 固定时长，以掩盖"谁有选项"；按 D7 口径不采用，泄漏见评审点 E。）
+`pendingClaims.options` 只包含**至少有一个合法响应**的座位；无选项的家不进窗口、无需表态，server 的超时计时也只针对这些座位（取舍理由见 decisions.md 评审点 B；已知泄漏见评审点 E）。
 
 ## 3. Phase（垃圾胡的状态机）
 
@@ -81,7 +81,7 @@ dealing → playing ⇄ awaiting-claims → finished
 
 血战状态机为 `exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）。`exchanging` 与 `choosing-lack` 都是四家独立提交、全员提交后自动转移的阶段；提交顺序不影响随机性或结果。
 
-**评审点 C【已定：采纳】（摸牌为自动转移）**：摸牌不是玩家 Action，杠后补摸同理。上一动作的裁决结果若为"轮到某家摸牌"，引擎在同一次 `applyAction` 内自动完成摸牌、发出 TileDrawn 事件并进入该家的 playing。由于牌墙顺序由 seed 固定，这不破坏确定性，且省去一类无意义的客户端往返。摸牌均有事件（#4/#12，双版本），客户端据此渲染摸牌动画：他家播牌背飞入，自己播牌面飞入。
+摸牌为引擎自动转移，不是玩家 Action，杠后补摸同理：上一动作的裁决结果若为"轮到某家摸牌"，引擎在同一次 `applyAction` 内自动完成摸牌、发出 TileDrawn 事件并进入该家的 playing（取舍理由见 decisions.md 评审点 C）。摸牌均有事件（#4/#12，双版本），客户端据此渲染摸牌动画：他家播牌背飞入，自己播牌面飞入。
 
 ## 4. Action
 
@@ -147,11 +147,11 @@ type GameEvent = {
 | 15  | WallExhausted        | public                                                                | —                                                |
 | 16  | GameEnded            | public                                                                | result 摘要                                      |
 
-**评审点 D【已定：采纳】**：非法动作不进事件日志（不改变状态），仅作为 applyAction 的错误返回：server 以 ack 拒绝该客户端，并记入 server 侧错误日志（logger，非游戏事件）。原表 #17 已删除。
+非法动作不进事件日志（不改变状态），仅作为 applyAction 的错误返回：server 以 ack 拒绝该客户端，并记入 server 侧错误日志（logger，非游戏事件；取舍理由见 decisions.md 评审点 D）。原表 #17 已删除。
 
-**评审点 E【已定：维持，泄漏记录在案】**：ClaimWindowOpened 按座位拆分发送各自的选项，避免泄漏他家能做什么。但窗口的**存在与时长**是全桌可观察的行为特征：出牌后瞬时推进 = 无人有响应权；出现停顿 = 至少一家能碰/杠/胡（即使其最终 pass，"能碰而未碰"已是有价值的读牌信息）。对策（全员强制表态 + 固定时长）按 D7 不采用。
+ClaimWindowOpened 按座位拆分发送各自的选项，避免泄漏他家能做什么。但窗口的**存在与时长**是全桌可观察的行为特征：出牌后瞬时推进 = 无人有响应权；出现停顿 = 至少一家能碰/杠/胡（即使其最终 pass，"能碰而未碰"已是有价值的读牌信息）——已知泄漏，按 D7 口径不做混淆处理（取舍理由见 decisions.md 评审点 E）。
 
-**评审点 F【已定：保留】**：ClaimResponded（#7）仅本人可见。两个作用：① 回放调试的输入完整性——ClaimWindowResolved 只有裁决结果，不含各家表态内容与时序，缺它无法定位裁决 bug 是输入错还是裁决错；② 窗口中途重连的恢复——已表态者重连后 UI 须显示"等待他家"而非重新弹选项（配套：PlayerView 增加 myClaimResponse 字段）。
+ClaimResponded（#7）仅本人可见，用于回放调试的输入完整性与窗口中途重连恢复（配套：PlayerView 的 myClaimResponse 字段；取舍理由见 decisions.md 评审点 F）。
 
 ## 6. PlayerView
 
@@ -178,4 +178,4 @@ type PlayerView = {
 - `getPlayerView(state, seat)` 纯派生，无时间字段；倒计时 deadline 由 server 在协议层附加（D5）
 - 客户端状态 = 初始 PlayerView + 按 seq 应用事件流，两条路径必须收敛（可作为测试不变量：任意时刻 事件重建视图 ≡ getPlayerView）
 
-**评审点 G【已定：采纳】**：上述"事件重建 ≡ 直接派生"作为核心不变量加入阶段 1 测试清单——这是保证断线重连(快照)与正常游玩(事件流)一致的根基。
+上述"事件重建 ≡ 直接派生"是核心不变量，已纳入阶段 1 测试清单（`view-reducer.ts` 与 `getPlayerView` 的一致性测试）——这是保证断线重连(快照)与正常游玩(事件流)一致的根基。
