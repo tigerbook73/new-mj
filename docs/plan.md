@@ -11,15 +11,15 @@
 
 ## 阶段路线
 
-| 阶段 | 内容                                                                 | 验收                      | 状态                         |
-| ---- | -------------------------------------------------------------------- | ------------------------- | ---------------------------- |
-| 0    | 规则与契约定义                                                       | 四份规格文档定稿          | ✅（血战为草案，1.5 前定稿） |
-| 1    | core 基建 + junk RuleSet + CLI fuzz                                  | CLI 整局 + 1 万局 fuzz 绿 | ✅                           |
-| 1.5  | bloodbattle RuleSet（允许一次接口调整）                              | 番型用例全绿 + fuzz       |                              |
-| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk） | 4 模拟客户端整局          |                              |
-| 3    | web：登录/大厅/牌桌（先竖切）                                        | 浏览器真人对局            |                              |
-| 4    | 持久化：事件日志落 PG/战绩/重连/回放调试页                           |                           |                              |
-| 5    | mobile（Expo）                                                       |                           |                              |
+| 阶段 | 内容                                                                 | 验收                      | 状态 |
+| ---- | -------------------------------------------------------------------- | ------------------------- | ---- |
+| 0    | 规则与契约定义                                                       | 四份规格文档定稿          | ✅   |
+| 1    | core 基建 + junk RuleSet + CLI fuzz                                  | CLI 整局 + 1 万局 fuzz 绿 | ✅   |
+| 1.5  | bloodbattle RuleSet（允许一次接口调整）                              | 番型用例全绿 + fuzz       |      |
+| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk） | 4 模拟客户端整局          |      |
+| 3    | web：登录/大厅/牌桌（先竖切）                                        | 浏览器真人对局            |      |
+| 4    | 持久化：事件日志落 PG/战绩/重连/回放调试页                           |                           |      |
+| 5    | mobile（Expo）                                                       |                           |      |
 
 ## 阶段 1：已完成
 
@@ -28,7 +28,7 @@
 - 完成 TypeScript monorepo、纯函数 core、junk RuleSet、CLI 整局和随机 fuzz。
 - 阶段验收：CLI 跑通完整一局，随机配置 fuzz 不少于 1 万局并全绿。
 - server/web/mobile 只建立可依赖的包边界与占位入口；不提前实现阶段 2 以后功能。
-- `rules-bloodbattle.md` 保持草案状态，阶段 1 不实现血战规则。
+- `rules-bloodbattle.md` 已于阶段 1 收尾后定稿；阶段 1 不实现血战规则。
 
 ### 实施步骤
 
@@ -61,11 +61,11 @@
 - [x] Step 3 RuleSet 接口评审：阶段表候选已确认；junk 空实现的预期失败测试已替换为真实 happy-path 测试。
 - [x] Step 4 Junk 完整流程：开局、摸打、声明窗口、吃碰杠、抢杠、自摸/点炮、流局、结算、视图和 1000 seed fuzz 冒烟完成；覆盖抢杠、头跳、一炮多响、TileId 泄漏和事件重建视图一致性。
 - [x] Step 5 CLI 与阶段验收：`cli:play` 支持 seed/config/action log，`fuzz` 支持随机 config；CLI 整局与 10000 局 fuzz 已通过。
-- 下一步第一个动作：阶段 1.5 开工前确认 `docs/rules-bloodbattle.md` 从草案转为定稿，并逐项建立血战 RuleSet 用例表。
+- 下一步第一个动作：为 `bloodbattle` 建立失败的番型/换三张/定缺 fixture，并据此评审 RuleSet 接口调整。
 
 ## 待办
 
-- [ ] 阶段 1.5 前：rules-bloodbattle.md 批注定稿（重点：番型互斥、明杠付分、退税细则版本）
+- [x] 阶段 1.5 前：rules-bloodbattle.md 定稿（番型互斥、杠分、呼叫转移、退税与终局结算顺序已确认）
 - [ ] 阶段 2 前：房间与对局关系模型（一局即散 or 连续 N 局、底分倍率）→ 产出并入 protocol.md 或 docs/rooms.md
 - [ ] 阶段 2 前：AI 定位确认（建议：简单启发式补位）
 - [ ] 阶段 5 前：mobile 具体路线（是否 react-native-web 统一）

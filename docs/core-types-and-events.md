@@ -79,7 +79,7 @@ dealing → playing ⇄ awaiting-claims → finished
 - `awaiting-claims`：声明窗口（见规则文档）
 - `finished`：有人胡或流局
 
-血战将在此序列前插入 `exchanging`（换三张）、`choosing-lack`（定缺）等阶段——阶段作为 RuleSet 提供的流程定义的一部分（阶段 1.5 时定型具体接口）。
+血战状态机为 `exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）。`exchanging` 与 `choosing-lack` 都是四家独立提交、全员提交后自动转移的阶段；提交顺序不影响随机性或结果。
 
 **评审点 C【已定：采纳】（摸牌为自动转移）**：摸牌不是玩家 Action，杠后补摸同理。上一动作的裁决结果若为"轮到某家摸牌"，引擎在同一次 `applyAction` 内自动完成摸牌、发出 TileDrawn 事件并进入该家的 playing。由于牌墙顺序由 seed 固定，这不破坏确定性，且省去一类无意义的客户端往返。摸牌均有事件（#4/#12，双版本），客户端据此渲染摸牌动画：他家播牌背飞入，自己播牌面飞入。
 
@@ -87,6 +87,8 @@ dealing → playing ⇄ awaiting-claims → finished
 
 ```ts
 type Action =
+  | { type: "exchangeThree"; tiles: [TileId, TileId, TileId] } // exchanging：恰好三张、同花色
+  | { type: "chooseLack"; suit: "m" | "p" | "s" } // choosing-lack：必须是自己当前持有的花色
   | { type: "discard"; tile: TileId }
   | { type: "anGang"; kind: TileKind } // 自己回合（四张同种，按种类指定）
   | { type: "buGang"; tile: TileId } // 自己回合
@@ -97,6 +99,19 @@ type Action =
   | { type: "hu" } // 窗口内点炮胡
   | { type: "pass" }; // 窗口内过
 ```
+
+血战新增事件（与垃圾胡事件共用信封和可见性规则）：
+
+| 事件                  | visibility     | payload 要点                                                                                          |
+| --------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| ExchangeThreeSelected | seat（仅本人） | 选出的三张 TileId                                                                                     |
+| ExchangeCompleted     | public         | 交换方向、阶段完成；不含任何 TileId                                                                   |
+| TilesReceived         | seat（仅本人） | 收到的三张 TileId                                                                                     |
+| LackChosen            | seat（仅本人） | 自己选择的花色                                                                                        |
+| HuDeclared            | public         | 血战版额外携带完整胡牌快照、`activeSeats`；胡家的快照从手牌容器接管 TileId                            |
+| Settled               | public         | `reason`、逐座位增减分；`reason` 为 `win`、`gang`、`gangTransfer`、`huaZhu`、`gangRefund` 或 `daJiao` |
+
+血战 PlayerView 的每个公开 seat 额外带 `status: "active" | "won"` 和（若已胡）公开 `winSnapshot`；仅本人的 view 带 `myLackSuit`、本阶段是否已提交。其他座位的换三张与定缺选择不得泄漏。
 
 - `applyAction(state, seat, action)`：非法即返回 `RuleViolation`（含机器可读 code），state 不变
 - server 超时代提交的 `pass` 与玩家主动 `pass` 完全同型（D5）
