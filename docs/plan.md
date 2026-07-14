@@ -58,7 +58,8 @@
 - [x] 阶段 1 实施计划已确定。
 - [x] Step 1 Workspace 骨架：pnpm workspace、Turbo 配置、strict TypeScript、lint、测试和依赖方向检查已可运行。
 - [x] Step 2 Core 基础设施：牌集、TileId/TileKind、可序列化 PRNG、牌墙、事件序号和守恒/容器唯一性校验已完成；core 测试使用 Vitest。
-- 下一步第一个动作：执行阶段 1 Step 3，提交阶段表 RuleSet 接口、类型、空实现和预期失败的 happy-path 测试供接口评审。
+- [ ] Step 3 RuleSet 接口评审：阶段表候选、junk 空实现和预期失败的 happy-path 测试已提交，待人工确认接口形状后才进入 Step 4。
+- 下一步第一个动作：评审 `RuleSet` 候选中 core 与玩法的职责边界，确认后开始 junk 的发牌与行牌实现。
 
 ## 待办
 

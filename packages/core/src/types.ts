@@ -9,6 +9,23 @@ export type TileKind =
 export type Phase = "dealing" | "playing" | "awaiting-claims" | "finished";
 export type MeldType = "chi" | "peng" | "minGang" | "anGang" | "buGang";
 
+export type Action =
+  | { type: "discard"; tile: TileId }
+  | { type: "anGang"; kind: TileKind }
+  | { type: "buGang"; tile: TileId }
+  | { type: "zimo" }
+  | { type: "chi"; tiles: [TileId, TileId] }
+  | { type: "peng" }
+  | { type: "minGang" }
+  | { type: "hu" }
+  | { type: "pass" };
+
+export type ClaimAction = Extract<Action, { type: "chi" | "peng" | "minGang" | "hu" }>;
+
+export type ClaimOption = {
+  action: ClaimAction;
+};
+
 export type Meld = {
   type: MeldType;
   tiles: TileId[];
@@ -68,6 +85,11 @@ export type GameState = {
   seq: number;
   prng: PrngState;
   variantState: unknown;
+};
+
+export type RuleViolation = {
+  code: string;
+  message?: string;
 };
 
 export type EventVisibility =

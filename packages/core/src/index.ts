@@ -6,3 +6,5 @@ export * from "./prng.ts";
 export * from "./wall.ts";
 export * from "./invariants.ts";
 export * from "./events.ts";
+export * from "./ruleset.ts";
+export * from "./rules/junk.ts";
