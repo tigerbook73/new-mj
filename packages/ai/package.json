@@ -3,7 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "node --test" },
-  "dependencies": { "@new-mj/core": "workspace:*" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@new-mj/core": "workspace:*"
+  }
 }

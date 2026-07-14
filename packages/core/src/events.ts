@@ -18,6 +18,8 @@ export const createEvent = <TPayload>(
 export const eventsVisibleTo = <TPayload>(
   events: readonly GameEvent<TPayload>[],
   seat: number,
-): GameEvent<TPayload>[] => events.filter((event) =>
-  event.visibility.type === "public" || event.visibility.seats.includes(seat as 0 | 1 | 2 | 3),
-);
+): GameEvent<TPayload>[] =>
+  events.filter(
+    (event) =>
+      event.visibility.type === "public" || event.visibility.seats.includes(seat as 0 | 1 | 2 | 3),
+  );

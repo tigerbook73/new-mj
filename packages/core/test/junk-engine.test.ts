@@ -33,9 +33,17 @@ const playDeterministically = (seed: number): GameState => {
     // In a claim window, currentSeat is the discarder; submit one response for
     // each eligible seat before requesting the next action.
     if (state.phase === "awaiting-claims") {
-      const responder = ([0, 1, 2, 3] as const).find((seat) => junkRuleSet.getLegalActions(state, seat).length > 0);
+      const responder = ([0, 1, 2, 3] as const).find(
+        (seat) => junkRuleSet.getLegalActions(state, seat).length > 0,
+      );
       if (responder === undefined) throw new Error("missing claim responder");
-      state = unwrap(junkRuleSet.applyAction(state, responder, junkRuleSet.getLegalActions(state, responder)[0]!));
+      state = unwrap(
+        junkRuleSet.applyAction(
+          state,
+          responder,
+          junkRuleSet.getLegalActions(state, responder)[0]!,
+        ),
+      );
     } else {
       if (actions.length === 0) throw new Error("missing legal action");
       state = unwrap(junkRuleSet.applyAction(state, state.currentSeat, actions[0]!));
@@ -54,7 +62,11 @@ test("junk opens a deterministic complete game with private hands", () => {
   expect(first.state.seats.map((seat) => seat.hand.length).sort()).toEqual([13, 13, 13, 14]);
   expect(first.state.wall).toHaveLength(83);
   assertTileConservation(first.state);
-  expect(first.events.filter((event) => event.payload && (event.payload as { type?: string }).type === "HandDealt")).toHaveLength(4);
+  expect(
+    first.events.filter(
+      (event) => event.payload && (event.payload as { type?: string }).type === "HandDealt",
+    ),
+  ).toHaveLength(4);
 });
 
 test("junk config accepts supported switches and rejects invalid values", () => {
@@ -62,7 +74,9 @@ test("junk config accepts supported switches and rejects invalid values", () => 
     config: { rulesetId: "junk", sevenPairs: true, robKong: true, multiHuPolicy: "all" },
   });
   expect(parseJunkConfig({ sevenPairs: "yes" })).toEqual({ error: { code: "INVALID_CONFIG" } });
-  expect(createJunkGame(1, { multiHuPolicy: "invalid" })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(createJunkGame(1, { multiHuPolicy: "invalid" })).toEqual({
+    error: { code: "INVALID_CONFIG" },
+  });
 });
 
 test("junk accepts a legal discard and preserves the caller state", () => {
@@ -76,7 +90,9 @@ test("junk accepts a legal discard and preserves the caller state", () => {
   const state = unwrap(result);
   expect(started.state).toEqual(before);
   expect(state.seq).toBeGreaterThan(before.seq);
-  expect(result.events.some((event) => (event.payload as { type?: string }).type === "TileDiscarded")).toBe(true);
+  expect(
+    result.events.some((event) => (event.payload as { type?: string }).type === "TileDiscarded"),
+  ).toBe(true);
   assertTileConservation(state);
 });
 
@@ -86,13 +102,19 @@ test("views and event filtering do not expose another seat's concealed hand", ()
   const viewer = 0 as const;
   const view = getPlayerView(started.state, viewer);
   expect(view.hand).toEqual(started.state.seats[viewer]!.hand);
-  expect(view.seats.map((seat) => seat.handCount)).toEqual(started.state.seats.map((seat) => seat.hand.length));
-  expect(eventsVisibleTo(started.events, viewer).every((event) =>
-    event.visibility.type === "public" || event.visibility.seats.includes(viewer),
-  )).toBe(true);
-  expect(eventsVisibleTo(started.events, viewer).filter((event) =>
-    (event.payload as { type?: string }).type === "HandDealt",
-  )).toHaveLength(1);
+  expect(view.seats.map((seat) => seat.handCount)).toEqual(
+    started.state.seats.map((seat) => seat.hand.length),
+  );
+  expect(
+    eventsVisibleTo(started.events, viewer).every(
+      (event) => event.visibility.type === "public" || event.visibility.seats.includes(viewer),
+    ),
+  ).toBe(true);
+  expect(
+    eventsVisibleTo(started.events, viewer).filter(
+      (event) => (event.payload as { type?: string }).type === "HandDealt",
+    ),
+  ).toHaveLength(1);
 });
 
 test("filtered events rebuild the same initial player view as direct derivation", () => {
@@ -109,9 +131,12 @@ test("filtered event replay remains equal to direct views through gameplay", () 
   let state = started.state;
   const events = [...started.events];
   for (let step = 0; step < 30 && state.phase !== "finished"; step += 1) {
-    const seat = state.phase === "awaiting-claims"
-      ? ([0, 1, 2, 3] as const).find((candidate) => junkRuleSet.getLegalActions(state, candidate).length > 0)!
-      : state.currentSeat;
+    const seat =
+      state.phase === "awaiting-claims"
+        ? ([0, 1, 2, 3] as const).find(
+            (candidate) => junkRuleSet.getLegalActions(state, candidate).length > 0,
+          )!
+        : state.currentSeat;
     const action = junkRuleSet.getLegalActions(state, seat)[0]!;
     const result = applyAction(state, seat, action);
     if ("error" in result) throw new Error(result.error.code);
@@ -128,9 +153,16 @@ test("public draw and concealed-gang events never contain a TileId", () => {
   if ("error" in started) throw new Error(started.error.code);
   for (const event of started.events) {
     if (event.visibility.type !== "public") continue;
-    const payload = event.payload as { type?: string; tile?: number; tiles?: number[]; gangType?: string };
-    if (payload.type === "TileDrawn" || payload.type === "GangReplacementDrawn") expect(payload.tile).toBeUndefined();
-    if (payload.type === "GangMade" && payload.gangType === "anGang") expect(payload.tiles).toBeUndefined();
+    const payload = event.payload as {
+      type?: string;
+      tile?: number;
+      tiles?: number[];
+      gangType?: string;
+    };
+    if (payload.type === "TileDrawn" || payload.type === "GangReplacementDrawn")
+      expect(payload.tile).toBeUndefined();
+    if (payload.type === "GangMade" && payload.gangType === "anGang")
+      expect(payload.tiles).toBeUndefined();
   }
 });
 

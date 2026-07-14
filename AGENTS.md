@@ -27,7 +27,7 @@
 
 ## DoD（细则见 workflow.md）
 
-typecheck + lint + test 全绿并**贴出运行结果**；core 改动加 fuzz 冒烟（≥1000 局）。测试与实现同 commit；修 bug 先写复现用例。
+format:check + typecheck + lint + test 全绿并**贴出运行结果**；core 改动加 fuzz 冒烟（≥1000 局）。测试与实现同 commit；修 bug 先写复现用例。
 
 - 依赖刷新与新增优先使用最新稳定版；若最新版本与现有工具链 peer 约束冲突，使用最新兼容稳定版并记录原因；同步 lockfile，完成 typecheck/lint/test 后再提交。
 

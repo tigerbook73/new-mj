@@ -11,6 +11,8 @@ pnpm install
 pnpm typecheck
 pnpm lint
 pnpm test
+pnpm format          # 写入格式
+pnpm format:check    # 仅校验格式
 pnpm cli:play --seed 47
 pnpm fuzz --seed 47 --games 10000
 ```

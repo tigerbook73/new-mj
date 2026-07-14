@@ -1,7 +1,15 @@
 import { applyAction, getLegalActions } from "./engine.ts";
 import { createPrng, nextInt } from "./prng.ts";
 import { createJunkGame } from "./rules/junk.ts";
-import type { Action, GameConfig, GameEvent, GameState, JunkConfig, PrngState, SeatId } from "./types.ts";
+import type {
+  Action,
+  GameConfig,
+  GameEvent,
+  GameState,
+  JunkConfig,
+  PrngState,
+  SeatId,
+} from "./types.ts";
 
 export type PlayedGame = {
   state: GameState;
@@ -16,10 +24,14 @@ export type FuzzFailure = {
   error: string;
 };
 
-const nextAction = (state: GameState, prng: PrngState): { seat: SeatId; action: Action; prng: PrngState } | undefined => {
-  const eligible = state.phase === "awaiting-claims"
-    ? ([0, 1, 2, 3] as SeatId[]).filter((seat) => getLegalActions(state, seat).length > 0)
-    : [state.currentSeat];
+const nextAction = (
+  state: GameState,
+  prng: PrngState,
+): { seat: SeatId; action: Action; prng: PrngState } | undefined => {
+  const eligible =
+    state.phase === "awaiting-claims"
+      ? ([0, 1, 2, 3] as SeatId[]).filter((seat) => getLegalActions(state, seat).length > 0)
+      : [state.currentSeat];
   if (eligible.length === 0) return undefined;
   const seatPick = nextInt(prng, eligible.length);
   const seat = eligible[seatPick.value] as SeatId;
@@ -66,7 +78,7 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
     const config = {
       sevenPairs: (switches.value & 1) !== 0,
       robKong: (switches.value & 2) !== 0,
-      multiHuPolicy: (switches.value & 4) !== 0 ? "all" as const : "headJump" as const,
+      multiHuPolicy: (switches.value & 4) !== 0 ? ("all" as const) : ("headJump" as const),
     };
     const result = playJunkGame(gameSeed.value, config);
     if ("error" in result) return result;

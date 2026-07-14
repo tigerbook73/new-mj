@@ -3,6 +3,8 @@
   "tasks": {
     "typecheck": {},
     "lint": {},
-    "test": {}
+    "test": {},
+    "format": {},
+    "format:check": {}
   }
 }

@@ -74,6 +74,9 @@ export const assertTileConservation = (
     });
   });
   if (physical.size !== tileSet.size) {
-    throw new InvariantViolation("TILE_CONSERVATION", `expected ${tileSet.size}, got ${physical.size}`);
+    throw new InvariantViolation(
+      "TILE_CONSERVATION",
+      `expected ${tileSet.size}, got ${physical.size}`,
+    );
   }
 };

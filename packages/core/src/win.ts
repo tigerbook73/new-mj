@@ -1,7 +1,8 @@
 import type { TileId } from "./types.ts";
 import type { TileSet } from "./tiles.ts";
 
-const isSuit = (kind: string): boolean => kind.endsWith("m") || kind.endsWith("p") || kind.endsWith("s");
+const isSuit = (kind: string): boolean =>
+  kind.endsWith("m") || kind.endsWith("p") || kind.endsWith("s");
 
 const canFormMelds = (counts: number[], tileSet: TileSet): boolean => {
   const index = counts.findIndex((count) => count > 0);

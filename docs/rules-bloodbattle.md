@@ -30,24 +30,25 @@
 
 **番型表（标准配置）**：
 
-| 番型 | 番数 | 说明 |
-|------|------|------|
-| 平胡 | 0 番（1 倍） | 基本型 |
-| 对对胡 | 1 番 | 4 刻子 + 对 |
-| 清一色 | 2 番 | 单一花色 |
-| 七对 | 2 番 | 7 个对子 |
-| 金钩钓 | 1 番 | 手牌仅剩 1 张单钓 |
-| 清对 | 3 番 | 清一色 + 对对胡 |
-| 龙七对 | 3 番 | 七对含 4 张相同 |
-| 清七对 | 4 番 | 清一色 + 七对 |
-| 清龙七对 | 5 番 | 清一色 + 龙七对 |
-| 清金钩钓 | 3 番 | 清一色 + 金钩钓 |
-| 根 | +1 番/个 | 每副 4 张相同（含杠） |
-| 自摸 | +1 番 | 标准配置：加番（可配加底） |
-| 杠上花 / 杠上炮 / 抢杠胡 | +1 番 | 杠相关即时番 |
-| 海底捞月 / 海底炮 | +1 番 | 最后一张 |
+| 番型                     | 番数         | 说明                       |
+| ------------------------ | ------------ | -------------------------- |
+| 平胡                     | 0 番（1 倍） | 基本型                     |
+| 对对胡                   | 1 番         | 4 刻子 + 对                |
+| 清一色                   | 2 番         | 单一花色                   |
+| 七对                     | 2 番         | 7 个对子                   |
+| 金钩钓                   | 1 番         | 手牌仅剩 1 张单钓          |
+| 清对                     | 3 番         | 清一色 + 对对胡            |
+| 龙七对                   | 3 番         | 七对含 4 张相同            |
+| 清七对                   | 4 番         | 清一色 + 七对              |
+| 清龙七对                 | 5 番         | 清一色 + 龙七对            |
+| 清金钩钓                 | 3 番         | 清一色 + 金钩钓            |
+| 根                       | +1 番/个     | 每副 4 张相同（含杠）      |
+| 自摸                     | +1 番        | 标准配置：加番（可配加底） |
+| 杠上花 / 杠上炮 / 抢杠胡 | +1 番        | 杠相关即时番               |
+| 海底捞月 / 海底炮        | +1 番        | 最后一张                   |
 
 **杠的即时结算（刮风下雨）**：
+
 - 明杠（含补杠）：放杠者付 1 分 ——【待确认：或三家各 1】
 - 暗杠：三家各付 2 分
 - **呼叫转移/退税**（标准配置开启）：杠后未胡即被查（花猪/大叫不成立时），杠钱退还——【待确认：细则版本较多，需选定一种】
@@ -60,17 +61,17 @@
 
 ## 6. config 清单
 
-| 键 | 标准值 | 备选 |
-|----|--------|------|
-| `exchangeThree` | true | false |
-| `capFan` | 4（极品） | 3 / 5 / 不封顶 |
-| `multiWinOnDiscard` | true（一炮多响） | false（头跳） |
-| `robKong` | true | false |
-| `checkHuaZhu` | true | false |
-| `checkDaJiao` | true | false |
-| `gangRefund` | true | false |
-| `selfDrawBonus` | 'addFan' | 'addBase'（自摸加底） |
-| 番型表 | 上表 | 数据可调 |
+| 键                  | 标准值           | 备选                  |
+| ------------------- | ---------------- | --------------------- |
+| `exchangeThree`     | true             | false                 |
+| `capFan`            | 4（极品）        | 3 / 5 / 不封顶        |
+| `multiWinOnDiscard` | true（一炮多响） | false（头跳）         |
+| `robKong`           | true             | false                 |
+| `checkHuaZhu`       | true             | false                 |
+| `checkDaJiao`       | true             | false                 |
+| `gangRefund`        | true             | false                 |
+| `selfDrawBonus`     | 'addFan'         | 'addBase'（自摸加底） |
+| 番型表              | 上表             | 数据可调              |
 
 ## 7. variantState（血战私有状态预告）
 
@@ -88,12 +89,12 @@
 # cases/bloodbattle-scoring.yaml
 - id: bb-001
   desc: 平胡·点炮
-  config: standard            # 或内联覆盖项 { capFan: 5 }
-  hand: [1m,2m,3m, 4p,5p,6p, 7p,8p,9p, 2s,3s,4s, 9s]   # 胡牌前手牌
-  melds: []                   # 副露，如 [{type: peng, tiles: [5m,5m,5m]}]
-  lack: s?                    # 定缺门（血战必填）……示例应为不含缺门的合法手牌
-  win: { tile: 9s, by: discard }   # by: discard | zimo | robKong | kongFlower
-  context: {}                 # 海底、杠上等标志位
+  config: standard # 或内联覆盖项 { capFan: 5 }
+  hand: [1m, 2m, 3m, 4p, 5p, 6p, 7p, 8p, 9p, 2s, 3s, 4s, 9s] # 胡牌前手牌
+  melds: [] # 副露，如 [{type: peng, tiles: [5m,5m,5m]}]
+  lack: s? # 定缺门（血战必填）……示例应为不含缺门的合法手牌
+  win: { tile: 9s, by: discard } # by: discard | zimo | robKong | kongFlower
+  context: {} # 海底、杠上等标志位
   expect:
     hu: true
     fanTypes: [pinghu]
@@ -103,23 +104,23 @@
 - id: bb-002
   desc: 清一色+根·自摸
   config: standard
-  hand: [1m,1m,1m, 2m,3m,4m, 5m,6m,7m, 8m,8m,8m, 9m]
+  hand: [1m, 1m, 1m, 2m, 3m, 4m, 5m, 6m, 7m, 8m, 8m, 8m, 9m]
   melds: []
   lack: p
   win: { tile: 9m, by: zimo }
   context: {}
   expect:
     hu: true
-    fanTypes: [qingyise, gen, gen, zimo]   # 两个根：111m、888m
-    fan: 5                                  # 2+1+1+1
-    multiplier: 16                          # capFan=4 封顶 → 2^4
+    fanTypes: [qingyise, gen, gen, zimo] # 两个根：111m、888m
+    fan: 5 # 2+1+1+1
+    multiplier: 16 # capFan=4 封顶 → 2^4
     cappedAt: 4
 
 - id: bb-003
   desc: 含缺门牌不可胡（负例）
   config: standard
-  hand: [1m,2m,3m, 4p,5p,6p, 7p,8p,9p, 2s,3s,4s, 9s]
-  lack: m                    # 定缺万但手上有万
+  hand: [1m, 2m, 3m, 4p, 5p, 6p, 7p, 8p, 9p, 2s, 3s, 4s, 9s]
+  lack: m # 定缺万但手上有万
   win: { tile: 9s, by: discard }
   expect: { hu: false, reason: LACK_SUIT_PRESENT }
 ```

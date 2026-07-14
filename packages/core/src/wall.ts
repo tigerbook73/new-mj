@@ -3,24 +3,17 @@ import { shuffle } from "./prng.ts";
 import type { DrawResult, PrngState, TileId, WallResult } from "./types.ts";
 
 // 垃圾胡规则约定牌墙头摸普通牌、尾部摸杠后补牌；返回新数组，禁止原地修改状态。
-export const createWall = (
-  prng: PrngState,
-  tileSet: TileSet = STANDARD_TILE_SET,
-): WallResult => {
+export const createWall = (prng: PrngState, tileSet: TileSet = STANDARD_TILE_SET): WallResult => {
   const shuffled = shuffle(allTileIds(tileSet), prng);
   return { wall: shuffled.items, prng: shuffled.prng };
 };
 
-export const drawFromHead = (
-  wall: readonly TileId[],
-): DrawResult | undefined => {
+export const drawFromHead = (wall: readonly TileId[]): DrawResult | undefined => {
   const [tile, ...remaining] = wall;
   return tile === undefined ? undefined : { tile, wall: remaining };
 };
 
-export const drawFromTail = (
-  wall: readonly TileId[],
-): DrawResult | undefined => {
+export const drawFromTail = (wall: readonly TileId[]): DrawResult | undefined => {
   if (wall.length === 0) return undefined;
   return { tile: wall[wall.length - 1] as TileId, wall: wall.slice(0, -1) };
 };

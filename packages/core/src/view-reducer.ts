@@ -17,7 +17,13 @@ const cloneView = (view: PlayerView): PlayerView => ({
 
 const expectPayload = (payload: unknown): EventPayload => payload as EventPayload;
 
-const updateMeld = (view: PlayerView, seat: SeatId, type: "chi" | "peng" | "minGang" | "anGang" | "buGang", tiles: number[], from?: SeatId): void => {
+const updateMeld = (
+  view: PlayerView,
+  seat: SeatId,
+  type: "chi" | "peng" | "minGang" | "anGang" | "buGang",
+  tiles: number[],
+  from?: SeatId,
+): void => {
   const meld = from === undefined ? { type, tiles } : { type, tiles, from };
   view.seats[seat]!.melds.push(meld);
 };
@@ -77,7 +83,7 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): P
         break;
       }
       case "ClaimWindowOpened":
-        view.myClaimOptions = [...(payload.options as PlayerView["myClaimOptions"] ?? [])];
+        view.myClaimOptions = [...((payload.options as PlayerView["myClaimOptions"]) ?? [])];
         break;
       case "ClaimResponded":
         view.myClaimResponse = payload.action as Action;
@@ -91,31 +97,63 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): P
       case "GangMade": {
         const meldSeat = payload.seat as SeatId;
         const gangType = payload.gangType as "anGang" | "buGang" | undefined;
-        const type = payload.type === "ChiMade" ? "chi" : payload.type === "PengMade" ? "peng" : gangType ?? "minGang";
+        const type =
+          payload.type === "ChiMade"
+            ? "chi"
+            : payload.type === "PengMade"
+              ? "peng"
+              : (gangType ?? "minGang");
         const tiles = "tiles" in payload ? [...(payload.tiles as number[])] : [];
         const from = payload.from as SeatId | undefined;
-        const privateAnGangReveal = type === "anGang" && tiles.length > 0 &&
-          view.seats[meldSeat]!.melds.some((meld) => meld.type === "anGang" && meld.tiles.length === 0);
+        const privateAnGangReveal =
+          type === "anGang" &&
+          tiles.length > 0 &&
+          view.seats[meldSeat]!.melds.some(
+            (meld) => meld.type === "anGang" && meld.tiles.length === 0,
+          );
         if (type === "buGang") {
-          const existing = view.seats[meldSeat]!.melds.find((meld) => meld.type === "peng" && meld.tiles.some((tile) => tiles.includes(tile)));
+          const existing = view.seats[meldSeat]!.melds.find(
+            (meld) => meld.type === "peng" && meld.tiles.some((tile) => tiles.includes(tile)),
+          );
           if (existing) {
             existing.type = "buGang";
             existing.tiles = tiles;
           }
         } else if (privateAnGangReveal) {
-          view.seats[meldSeat]!.melds.find((meld) => meld.type === "anGang" && meld.tiles.length === 0)!.tiles = tiles;
+          view.seats[meldSeat]!.melds.find(
+            (meld) => meld.type === "anGang" && meld.tiles.length === 0,
+          )!.tiles = tiles;
         } else {
           updateMeld(view, meldSeat, type, tiles, from);
         }
-        const usedFromHand = type === "chi" ? 2 : type === "peng" ? 2 : type === "minGang" ? 3 : type === "anGang" ? 4 : 1;
+        const usedFromHand =
+          type === "chi"
+            ? 2
+            : type === "peng"
+              ? 2
+              : type === "minGang"
+                ? 3
+                : type === "anGang"
+                  ? 4
+                  : 1;
         if (!privateAnGangReveal) view.seats[meldSeat]!.handCount -= usedFromHand;
         if (!privateAnGangReveal && meldSeat === seat && tiles.length > 0) {
-          const ownTiles = type === "chi" || type === "peng" || type === "minGang" ? tiles.slice(0, -1) : type === "buGang" ? [tiles[tiles.length - 1]!] : tiles;
+          const ownTiles =
+            type === "chi" || type === "peng" || type === "minGang"
+              ? tiles.slice(0, -1)
+              : type === "buGang"
+                ? [tiles[tiles.length - 1]!]
+                : tiles;
           view.hand = view.hand.filter((tile) => !ownTiles.includes(tile));
         }
-        const discardedTile = type === "chi" || type === "peng" || type === "minGang" ? tiles[tiles.length - 1] : undefined;
+        const discardedTile =
+          type === "chi" || type === "peng" || type === "minGang"
+            ? tiles[tiles.length - 1]
+            : undefined;
         if (from !== undefined && discardedTile !== undefined) {
-          const discard = view.seats[from]!.discards.find((entry) => entry.tile === discardedTile && entry.claimedBy === undefined);
+          const discard = view.seats[from]!.discards.find(
+            (entry) => entry.tile === discardedTile && entry.claimedBy === undefined,
+          );
           if (discard) discard.claimedBy = meldSeat;
         }
         break;

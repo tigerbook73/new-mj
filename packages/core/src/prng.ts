@@ -25,10 +25,7 @@ export const nextUint32 = (prng: PrngState): PrngStep => {
   return { value: state, prng: { seed: prng.seed, state } };
 };
 
-export const nextInt = (
-  prng: PrngState,
-  maxExclusive: number,
-): RandomIntStep => {
+export const nextInt = (prng: PrngState, maxExclusive: number): RandomIntStep => {
   if (!Number.isInteger(maxExclusive) || maxExclusive <= 0 || maxExclusive > UINT32_RANGE) {
     throw new Error("INVALID_RANDOM_BOUND");
   }

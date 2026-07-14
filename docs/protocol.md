@@ -17,7 +17,7 @@
 
 ```ts
 // ack 响应
-type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: string }
+type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: string };
 // 协议包提供封装：request(type, payload): Promise<T>（ok:false 时抛类型化错误）
 ```
 
@@ -29,16 +29,16 @@ type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: st
 
 ## 2. ack 请求类（client → server）
 
-| 消息 | payload | data（成功时） | 主要错误码 |
-|------|---------|---------------|-----------|
-| `lobby:list` | `{}` | `RoomSummary[]`（id、玩法、人数、状态） | — |
-| `room:create` | `{ rulesetId, config? }` | `RoomInfo` 快照（创建即入座） | `INVALID_CONFIG` |
-| `room:join` | `{ roomId }` | `RoomInfo` 快照 | `ROOM_NOT_FOUND` `ROOM_FULL` `ALREADY_IN_ROOM` |
-| `room:leave` | `{}` | `{}` | `NOT_IN_ROOM`（对局中允许离座：转托管，见评审点 H） |
-| `room:ready` | `{ ready: boolean }` | `{}` | `NOT_IN_ROOM` |
-| `room:addBot` | `{}` | `RoomInfo` | `ROOM_FULL`（仅房主，MVP 简化） |
-| `game:action` | `{ action: Action }`（core 的 Action 原样透传） | `{}` | `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core 的 RuleViolation code） |
-| `profile:get` / `stats:get` | `{}` / `{ userId? }` | 资料 / 战绩 | 阶段 4 才实现，先占位 |
+| 消息                        | payload                                         | data（成功时）                          | 主要错误码                                                        |
+| --------------------------- | ----------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
+| `lobby:list`                | `{}`                                            | `RoomSummary[]`（id、玩法、人数、状态） | —                                                                 |
+| `room:create`               | `{ rulesetId, config? }`                        | `RoomInfo` 快照（创建即入座）           | `INVALID_CONFIG`                                                  |
+| `room:join`                 | `{ roomId }`                                    | `RoomInfo` 快照                         | `ROOM_NOT_FOUND` `ROOM_FULL` `ALREADY_IN_ROOM`                    |
+| `room:leave`                | `{}`                                            | `{}`                                    | `NOT_IN_ROOM`（对局中允许离座：转托管，见评审点 H）               |
+| `room:ready`                | `{ ready: boolean }`                            | `{}`                                    | `NOT_IN_ROOM`                                                     |
+| `room:addBot`               | `{}`                                            | `RoomInfo`                              | `ROOM_FULL`（仅房主，MVP 简化）                                   |
+| `game:action`               | `{ action: Action }`（core 的 Action 原样透传） | `{}`                                    | `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core 的 RuleViolation code） |
+| `profile:get` / `stats:get` | `{}` / `{ userId? }`                            | 资料 / 战绩                             | 阶段 4 才实现，先占位                                             |
 
 说明：
 
@@ -49,18 +49,18 @@ type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: st
 
 **房间事件（room:\*，public 于房间内）**
 
-| 消息 | payload |
-|------|---------|
+| 消息                                    | payload              |
+| --------------------------------------- | -------------------- |
 | `room:playerJoined` / `room:playerLeft` | seat、昵称、是否 bot |
-| `room:readyChanged` | seat、ready |
-| `room:starting` | 倒计时或立即 |
+| `room:readyChanged`                     | seat、ready          |
+| `room:starting`                         | 倒计时或立即         |
 
 **对局事件（对局中主通道）**
 
-| 消息 | payload |
-|------|---------|
-| `game:event` | `{ event: GameEvent, deadline?: number }` —— core 事件原样转发（已按 visibility 过滤到本连接应见的版本），deadline 为 server 附加的表态/出牌截止时间戳（epoch ms），驱动客户端倒计时（D5） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }` —— 入座开局时、断线重连时下发的权威快照 |
+| 消息            | payload                                                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `game:event`    | `{ event: GameEvent, deadline?: number }` —— core 事件原样转发（已按 visibility 过滤到本连接应见的版本），deadline 为 server 附加的表态/出牌截止时间戳（epoch ms），驱动客户端倒计时（D5） |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }` —— 入座开局时、断线重连时下发的权威快照                                                                                             |
 
 **评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换。理由：实现最简、绝对一致（不依赖客户端旧状态正确）、代价仅是重连瞬间无增量动画。lastSeq 补发事件降级为将来的优化项。（规划文档 §1.2/§阶段4 已同步回写。）
 

@@ -11,7 +11,9 @@ export const getRuleSet = (rulesetId: string): RuleSet | undefined => ruleSets[r
 /** Public core boundary. Server/UI select no rules: GameState.config selects the RuleSet. */
 export const applyAction = (state: GameState, seat: SeatId, action: Action): RuleSetApplyResult => {
   const ruleSet = getRuleSet(state.config.rulesetId);
-  return ruleSet ? ruleSet.applyAction(state, seat, action) : { error: { code: "UNKNOWN_RULESET" } };
+  return ruleSet
+    ? ruleSet.applyAction(state, seat, action)
+    : { error: { code: "UNKNOWN_RULESET" } };
 };
 
 export const getLegalActions = (state: GameState, seat: SeatId): readonly Action[] =>

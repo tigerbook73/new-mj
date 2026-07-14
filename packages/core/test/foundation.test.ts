@@ -77,13 +77,31 @@ test("invariants reject duplicate and orphaned physical tiles", () => {
   const duplicate = emptySeats();
   duplicate[0]!.hand.push(1);
   duplicate[1]!.hand.push(1);
-  assert.throws(() => assertContainerUniqueness(emptyState(allTileIds().filter((id) => id !== 1), duplicate)), {
-    code: "DUPLICATE_TILE",
-  });
+  assert.throws(
+    () =>
+      assertContainerUniqueness(
+        emptyState(
+          allTileIds().filter((id) => id !== 1),
+          duplicate,
+        ),
+      ),
+    {
+      code: "DUPLICATE_TILE",
+    },
+  );
 
   const orphan = emptySeats();
   orphan[1]!.discards.push({ tile: 1, claimedBy: 0 });
-  assert.throws(() => assertContainerUniqueness(emptyState(allTileIds().filter((id) => id !== 1), orphan)), {
-    code: "ORPHAN_TOMBSTONE",
-  });
+  assert.throws(
+    () =>
+      assertContainerUniqueness(
+        emptyState(
+          allTileIds().filter((id) => id !== 1),
+          orphan,
+        ),
+      ),
+    {
+      code: "ORPHAN_TOMBSTONE",
+    },
+  );
 });

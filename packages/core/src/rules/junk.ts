@@ -28,15 +28,20 @@ export const DEFAULT_JUNK_CONFIG: JunkConfig = {
   multiHuPolicy: "headJump",
 };
 
-export const parseJunkConfig = (input: unknown): { config: JunkConfig } | { error: { code: string } } => {
+export const parseJunkConfig = (
+  input: unknown,
+): { config: JunkConfig } | { error: { code: string } } => {
   if (input === undefined) return { config: { ...DEFAULT_JUNK_CONFIG } };
-  if (!input || typeof input !== "object" || Array.isArray(input)) return { error: { code: "INVALID_CONFIG" } };
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    return { error: { code: "INVALID_CONFIG" } };
   const candidate = input as Record<string, unknown>;
   if (
     (candidate.rulesetId !== undefined && candidate.rulesetId !== "junk") ||
     (candidate.sevenPairs !== undefined && typeof candidate.sevenPairs !== "boolean") ||
     (candidate.robKong !== undefined && typeof candidate.robKong !== "boolean") ||
-    (candidate.multiHuPolicy !== undefined && candidate.multiHuPolicy !== "headJump" && candidate.multiHuPolicy !== "all")
+    (candidate.multiHuPolicy !== undefined &&
+      candidate.multiHuPolicy !== "headJump" &&
+      candidate.multiHuPolicy !== "all")
   ) {
     return { error: { code: "INVALID_CONFIG" } };
   }
@@ -55,18 +60,18 @@ const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
 const cloneState = (state: GameState): GameState => {
   const cloned: GameState = {
     ...state,
-  wall: [...state.wall],
-  seats: state.seats.map((seat) => ({
-    hand: [...seat.hand],
-    melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
-    discards: seat.discards.map((discard) => ({ ...discard })),
-  })),
+    wall: [...state.wall],
+    seats: state.seats.map((seat) => ({
+      hand: [...seat.hand],
+      melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
+      discards: seat.discards.map((discard) => ({ ...discard })),
+    })),
   };
   if (state.pendingClaims) {
     cloned.pendingClaims = {
-        discard: { ...state.pendingClaims.discard },
-        options: { ...state.pendingClaims.options },
-        responses: { ...state.pendingClaims.responses },
+      discard: { ...state.pendingClaims.discard },
+      options: { ...state.pendingClaims.options },
+      responses: { ...state.pendingClaims.responses },
     };
   }
   return cloned;
@@ -75,14 +80,23 @@ const cloneState = (state: GameState): GameState => {
 const publicVisibility = { type: "public" } as const;
 const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats: [seat] });
 
-const appendEvent = (state: GameState, events: GameEvent[], visibility: GameEvent["visibility"], payload: unknown): void => {
+const appendEvent = (
+  state: GameState,
+  events: GameEvent[],
+  visibility: GameEvent["visibility"],
+  payload: unknown,
+): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, visibility, payload));
 };
 
 const fail = (code: string): RuleSetApplyResult => ({ error: { code } });
 
-const configOf = (state: GameState): JunkConfig => ({ ...DEFAULT_JUNK_CONFIG, ...state.config, rulesetId: "junk" });
+const configOf = (state: GameState): JunkConfig => ({
+  ...DEFAULT_JUNK_CONFIG,
+  ...state.config,
+  rulesetId: "junk",
+});
 
 const sameKind = (tiles: readonly TileId[], kind: TileKind): TileId[] =>
   tiles.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === kind);
@@ -109,8 +123,12 @@ const winningTiles = (state: GameState, seat: SeatId, extra?: TileId): TileId[] 
 const isWin = (state: GameState, seat: SeatId, extra?: TileId): boolean => {
   const tiles = winningTiles(state, seat, extra);
   const own = state.seats[seat]!;
-  return isStandardWinningHand(tiles, STANDARD_TILE_SET) ||
-    (configOf(state).sevenPairs && own.melds.length === 0 && isSevenPairsWinningHand(tiles, STANDARD_TILE_SET));
+  return (
+    isStandardWinningHand(tiles, STANDARD_TILE_SET) ||
+    (configOf(state).sevenPairs &&
+      own.melds.length === 0 &&
+      isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
+  );
 };
 
 const chiOptions = (state: GameState, seat: SeatId, discarded: TileId): ClaimOption[] => {
@@ -120,11 +138,17 @@ const chiOptions = (state: GameState, seat: SeatId, discarded: TileId): ClaimOpt
   const suit = tileSuit(discarded);
   const hand = state.seats[seat]!.hand;
   const options: ClaimOption[] = [];
-  const combinations: Array<[number, number]> = [[rank - 2, rank - 1], [rank - 1, rank + 1], [rank + 1, rank + 2]];
+  const combinations: Array<[number, number]> = [
+    [rank - 2, rank - 1],
+    [rank - 1, rank + 1],
+    [rank + 1, rank + 2],
+  ];
   for (const [first, second] of combinations) {
     if (first < 1 || second > 9) continue;
     const firstTile = hand.find((tile) => STANDARD_TILE_SET.kindOf(tile) === `${first}${suit}`);
-    const secondTile = hand.find((tile) => STANDARD_TILE_SET.kindOf(tile) === `${second}${suit}` && tile !== firstTile);
+    const secondTile = hand.find(
+      (tile) => STANDARD_TILE_SET.kindOf(tile) === `${second}${suit}` && tile !== firstTile,
+    );
     if (firstTile !== undefined && secondTile !== undefined) {
       options.push({ action: { type: "chi", tiles: [firstTile, secondTile] } });
     }
@@ -136,7 +160,8 @@ const claimOptions = (state: GameState, seat: SeatId): ClaimOption[] => {
   const pending = state.pendingClaims;
   if (!pending || pending.discard.seat === seat) return [];
   const tile = pending.discard.tile;
-  if (pending.source === "robKong") return isWin(state, seat, tile) ? [{ action: { type: "hu" } }] : [];
+  if (pending.source === "robKong")
+    return isWin(state, seat, tile) ? [{ action: { type: "hu" } }] : [];
   const kind = STANDARD_TILE_SET.kindOf(tile);
   const hand = state.seats[seat]!.hand;
   const matching = sameKind(hand, kind);
@@ -148,7 +173,12 @@ const claimOptions = (state: GameState, seat: SeatId): ClaimOption[] => {
   return options;
 };
 
-const emitDraw = (state: GameState, events: GameEvent[], seat: SeatId, replacement: boolean): boolean => {
+const emitDraw = (
+  state: GameState,
+  events: GameEvent[],
+  seat: SeatId,
+  replacement: boolean,
+): boolean => {
   const drawn = replacement ? drawFromTail(state.wall) : drawFromHead(state.wall);
   if (!drawn) {
     state.phase = "finished";
@@ -159,7 +189,10 @@ const emitDraw = (state: GameState, events: GameEvent[], seat: SeatId, replaceme
   }
   state.wall = drawn.wall;
   state.seats[seat]!.hand.push(drawn.tile);
-  appendEvent(state, events, publicVisibility, { type: replacement ? "GangReplacementDrawn" : "TileDrawn", seat });
+  appendEvent(state, events, publicVisibility, {
+    type: replacement ? "GangReplacementDrawn" : "TileDrawn",
+    seat,
+  });
   appendEvent(state, events, seatVisibility(seat), {
     type: replacement ? "GangReplacementDrawn" : "TileDrawn",
     seat,
@@ -168,7 +201,13 @@ const emitDraw = (state: GameState, events: GameEvent[], seat: SeatId, replaceme
   return true;
 };
 
-const beginTurn = (state: GameState, events: GameEvent[], seat: SeatId, draw: boolean, replacement = false): void => {
+const beginTurn = (
+  state: GameState,
+  events: GameEvent[],
+  seat: SeatId,
+  draw: boolean,
+  replacement = false,
+): void => {
   state.currentSeat = seat;
   state.phase = "playing";
   if (draw && !emitDraw(state, events, seat, replacement)) return;
@@ -205,18 +244,29 @@ const finishWin = (
   const result = settleWins([winner], winType, from);
   state.phase = "finished";
   state.result = result;
-  const revealedHand = winningTile === undefined
-    ? [...state.seats[winner]!.hand]
-    : [...state.seats[winner]!.hand, winningTile];
-  const payload = from === undefined
-    ? { type: "HuDeclared", seat: winner, winType, hand: revealedHand }
-    : { type: "HuDeclared", seat: winner, winType, hand: revealedHand, from };
+  const revealedHand =
+    winningTile === undefined
+      ? [...state.seats[winner]!.hand]
+      : [...state.seats[winner]!.hand, winningTile];
+  const payload =
+    from === undefined
+      ? { type: "HuDeclared", seat: winner, winType, hand: revealedHand }
+      : { type: "HuDeclared", seat: winner, winType, hand: revealedHand, from };
   appendEvent(state, events, publicVisibility, payload);
-  appendEvent(state, events, publicVisibility, { type: "Settled", scoreDeltas: result.scoreDeltas });
+  appendEvent(state, events, publicVisibility, {
+    type: "Settled",
+    scoreDeltas: result.scoreDeltas,
+  });
   appendEvent(state, events, publicVisibility, { type: "GameEnded", result });
 };
 
-const finishRonWins = (state: GameState, events: GameEvent[], winners: SeatId[], from: SeatId, tile: TileId): void => {
+const finishRonWins = (
+  state: GameState,
+  events: GameEvent[],
+  winners: SeatId[],
+  from: SeatId,
+  tile: TileId,
+): void => {
   const result = settleWins(winners, "ron", from);
   state.phase = "finished";
   state.result = result;
@@ -229,7 +279,10 @@ const finishRonWins = (state: GameState, events: GameEvent[], winners: SeatId[],
       from,
     });
   }
-  appendEvent(state, events, publicVisibility, { type: "Settled", scoreDeltas: result.scoreDeltas });
+  appendEvent(state, events, publicVisibility, {
+    type: "Settled",
+    scoreDeltas: result.scoreDeltas,
+  });
   appendEvent(state, events, publicVisibility, { type: "GameEnded", result });
 };
 
@@ -237,25 +290,40 @@ const resolveUnclaimed = (state: GameState, events: GameEvent[]): void => {
   if (state.pendingClaims!.source === "robKong") {
     const { seat, tile } = state.pendingClaims!.discard;
     delete state.pendingClaims;
-    const meld = state.seats[seat]!.melds.find((candidate) =>
-      candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === STANDARD_TILE_SET.kindOf(tile),
+    const meld = state.seats[seat]!.melds.find(
+      (candidate) =>
+        candidate.type === "peng" &&
+        STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === STANDARD_TILE_SET.kindOf(tile),
     )!;
     state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
     meld.type = "buGang";
     meld.tiles.push(tile);
-    appendEvent(state, events, publicVisibility, { type: "ClaimWindowResolved", result: "unclaimed" });
-    appendEvent(state, events, publicVisibility, { type: "GangMade", seat, gangType: "buGang", tiles: [...meld.tiles] });
+    appendEvent(state, events, publicVisibility, {
+      type: "ClaimWindowResolved",
+      result: "unclaimed",
+    });
+    appendEvent(state, events, publicVisibility, {
+      type: "GangMade",
+      seat,
+      gangType: "buGang",
+      tiles: [...meld.tiles],
+    });
     beginTurn(state, events, seat, true, true);
     return;
   }
   const discardedBy = state.pendingClaims!.discard.seat;
   delete state.pendingClaims;
-  appendEvent(state, events, publicVisibility, { type: "ClaimWindowResolved", result: "unclaimed" });
+  appendEvent(state, events, publicVisibility, {
+    type: "ClaimWindowResolved",
+    result: "unclaimed",
+  });
   beginTurn(state, events, nextSeat(discardedBy), true);
 };
 
-const priority = (action: ClaimAction): number => ({ hu: 4, minGang: 3, peng: 2, chi: 1 })[action.type];
-const distanceFromDiscarder = (discarder: SeatId, seat: SeatId): number => (seat - discarder + 4) % 4;
+const priority = (action: ClaimAction): number =>
+  ({ hu: 4, minGang: 3, peng: 2, chi: 1 })[action.type];
+const distanceFromDiscarder = (discarder: SeatId, seat: SeatId): number =>
+  (seat - discarder + 4) % 4;
 
 const chooseClaims = (state: GameState): Array<{ seat: SeatId; action: ClaimAction }> => {
   const pending = state.pendingClaims!;
@@ -264,7 +332,10 @@ const chooseClaims = (state: GameState): Array<{ seat: SeatId; action: ClaimActi
     .map(([seat, action]) => ({ seat: Number(seat) as SeatId, action: action as ClaimAction }));
   const sorted = choices.sort((left, right) => {
     const priorityDiff = priority(right.action) - priority(left.action);
-    return priorityDiff !== 0 ? priorityDiff : distanceFromDiscarder(pending.discard.seat, left.seat) - distanceFromDiscarder(pending.discard.seat, right.seat);
+    return priorityDiff !== 0
+      ? priorityDiff
+      : distanceFromDiscarder(pending.discard.seat, left.seat) -
+          distanceFromDiscarder(pending.discard.seat, right.seat);
   });
   if (sorted[0]?.action.type === "hu" && configOf(state).multiHuPolicy === "all") {
     return sorted.filter((choice) => choice.action.type === "hu");
@@ -279,35 +350,65 @@ const resolveClaimWindow = (state: GameState, events: GameEvent[]): void => {
   const { seat, action } = winners[0]!;
   const discard = pending.discard;
   delete state.pendingClaims;
-  appendEvent(state, events, publicVisibility, { type: "ClaimWindowResolved", seat, action: action.type });
+  appendEvent(state, events, publicVisibility, {
+    type: "ClaimWindowResolved",
+    seat,
+    action: action.type,
+  });
   if (action.type === "hu") {
     // A ron tile stays physically in the active river. It is revealed in the
     // terminal event, rather than moved into a meld (only chi/peng/gang claim it).
-    finishRonWins(state, events, winners.map((winner) => winner.seat), discard.seat, discard.tile);
+    finishRonWins(
+      state,
+      events,
+      winners.map((winner) => winner.seat),
+      discard.seat,
+      discard.tile,
+    );
     return;
   }
-  state.seats[discard.seat]!.discards.find((entry) => entry.tile === discard.tile && entry.claimedBy === undefined)!.claimedBy = seat;
+  state.seats[discard.seat]!.discards.find(
+    (entry) => entry.tile === discard.tile && entry.claimedBy === undefined,
+  )!.claimedBy = seat;
   const hand = state.seats[seat]!.hand;
-  const useTiles = action.type === "chi"
-    ? action.tiles
-    : sameKind(hand, STANDARD_TILE_SET.kindOf(discard.tile)).slice(0, action.type === "minGang" ? 3 : 2);
+  const useTiles =
+    action.type === "chi"
+      ? action.tiles
+      : sameKind(hand, STANDARD_TILE_SET.kindOf(discard.tile)).slice(
+          0,
+          action.type === "minGang" ? 3 : 2,
+        );
   const remaining = removeTiles(hand, useTiles)!;
   state.seats[seat]!.hand = remaining;
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
-  const eventType = action.type === "chi" ? "ChiMade" : action.type === "peng" ? "PengMade" : "GangMade";
-  appendEvent(state, events, publicVisibility, { type: eventType, seat, tiles: meld.tiles, from: discard.seat });
+  const eventType =
+    action.type === "chi" ? "ChiMade" : action.type === "peng" ? "PengMade" : "GangMade";
+  appendEvent(state, events, publicVisibility, {
+    type: eventType,
+    seat,
+    tiles: meld.tiles,
+    from: discard.seat,
+  });
   beginTurn(state, events, seat, action.type === "minGang", action.type === "minGang");
 };
 
 const allResponded = (state: GameState): boolean => {
   const pending = state.pendingClaims!;
-  return Object.keys(pending.options).every((seat) => pending.responses[Number(seat) as SeatId] !== undefined);
+  return Object.keys(pending.options).every(
+    (seat) => pending.responses[Number(seat) as SeatId] !== undefined,
+  );
 };
 
-const actionEquals = (left: Action, right: Action): boolean => JSON.stringify(left) === JSON.stringify(right);
+const actionEquals = (left: Action, right: Action): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
 
-const applyDiscard = (state: GameState, seat: SeatId, tile: TileId, events: GameEvent[]): RuleSetApplyResult => {
+const applyDiscard = (
+  state: GameState,
+  seat: SeatId,
+  tile: TileId,
+  events: GameEvent[],
+): RuleSetApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const hand = state.seats[seat]!.hand;
   const remaining = removeTiles(hand, [tile]);
@@ -316,13 +417,20 @@ const applyDiscard = (state: GameState, seat: SeatId, tile: TileId, events: Game
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
   appendEvent(state, events, publicVisibility, { type: "TileDiscarded", seat, tile });
-  const options: GameState["pendingClaims"] extends infer T ? T : never = { discard: { seat, tile }, options: {}, responses: {} };
+  const options: GameState["pendingClaims"] extends infer T ? T : never = {
+    discard: { seat, tile },
+    options: {},
+    responses: {},
+  };
   state.pendingClaims = options;
   for (const candidate of [0, 1, 2, 3] as SeatId[]) {
     const candidateOptions = claimOptions(state, candidate);
     if (candidateOptions.length === 0) continue;
     options.options[candidate] = candidateOptions;
-    appendEvent(state, events, seatVisibility(candidate), { type: "ClaimWindowOpened", options: candidateOptions });
+    appendEvent(state, events, seatVisibility(candidate), {
+      type: "ClaimWindowOpened",
+      options: candidateOptions,
+    });
   }
   if (Object.keys(options.options).length === 0) {
     resolveUnclaimed(state, events);
@@ -332,42 +440,75 @@ const applyDiscard = (state: GameState, seat: SeatId, tile: TileId, events: Game
   return { state, events };
 };
 
-const applyClaimResponse = (state: GameState, seat: SeatId, action: Action, events: GameEvent[]): RuleSetApplyResult => {
-  if (state.phase !== "awaiting-claims" || !state.pendingClaims) return fail("CLAIM_WINDOW_NOT_OPEN");
+const applyClaimResponse = (
+  state: GameState,
+  seat: SeatId,
+  action: Action,
+  events: GameEvent[],
+): RuleSetApplyResult => {
+  if (state.phase !== "awaiting-claims" || !state.pendingClaims)
+    return fail("CLAIM_WINDOW_NOT_OPEN");
   const options = state.pendingClaims.options[seat];
   if (!options || state.pendingClaims.responses[seat]) return fail("CLAIM_NOT_AVAILABLE");
-  if (action.type !== "pass" && !options.some((option) => actionEquals(option.action, action))) return fail("CLAIM_NOT_AVAILABLE");
+  if (action.type !== "pass" && !options.some((option) => actionEquals(option.action, action)))
+    return fail("CLAIM_NOT_AVAILABLE");
   state.pendingClaims.responses[seat] = action;
   appendEvent(state, events, seatVisibility(seat), { type: "ClaimResponded", action });
   if (allResponded(state)) resolveClaimWindow(state, events);
   return { state, events };
 };
 
-const applyAnGang = (state: GameState, seat: SeatId, kind: TileKind, events: GameEvent[]): RuleSetApplyResult => {
+const applyAnGang = (
+  state: GameState,
+  seat: SeatId,
+  kind: TileKind,
+  events: GameEvent[],
+): RuleSetApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const tiles = sameKind(state.seats[seat]!.hand, kind).slice(0, 4);
   if (tiles.length !== 4) return fail("GANG_NOT_AVAILABLE");
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
   appendEvent(state, events, publicVisibility, { type: "GangMade", seat, gangType: "anGang" });
-  appendEvent(state, events, seatVisibility(seat), { type: "GangMade", seat, gangType: "anGang", tiles });
+  appendEvent(state, events, seatVisibility(seat), {
+    type: "GangMade",
+    seat,
+    gangType: "anGang",
+    tiles,
+  });
   beginTurn(state, events, seat, true, true);
   return { state, events };
 };
 
-const applyBuGang = (state: GameState, seat: SeatId, tile: TileId, events: GameEvent[]): RuleSetApplyResult => {
+const applyBuGang = (
+  state: GameState,
+  seat: SeatId,
+  tile: TileId,
+  events: GameEvent[],
+): RuleSetApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
   const kind = STANDARD_TILE_SET.kindOf(tile);
-  const meld = state.seats[seat]!.melds.find((candidate) => candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === kind);
+  const meld = state.seats[seat]!.melds.find(
+    (candidate) =>
+      candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === kind,
+  );
   if (!meld) return fail("GANG_NOT_AVAILABLE");
   if (configOf(state).robKong) {
-    state.pendingClaims = { discard: { seat, tile }, source: "robKong", options: {}, responses: {} };
+    state.pendingClaims = {
+      discard: { seat, tile },
+      source: "robKong",
+      options: {},
+      responses: {},
+    };
     for (const candidate of [0, 1, 2, 3] as SeatId[]) {
       const candidateOptions = claimOptions(state, candidate);
       if (candidateOptions.length === 0) continue;
       state.pendingClaims.options[candidate] = candidateOptions;
-      appendEvent(state, events, seatVisibility(candidate), { type: "ClaimWindowOpened", options: candidateOptions });
+      appendEvent(state, events, seatVisibility(candidate), {
+        type: "ClaimWindowOpened",
+        options: candidateOptions,
+      });
     }
     if (Object.keys(state.pendingClaims.options).length > 0) {
       state.phase = "awaiting-claims";
@@ -379,7 +520,12 @@ const applyBuGang = (state: GameState, seat: SeatId, tile: TileId, events: GameE
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
   meld.type = "buGang";
   meld.tiles.push(tile);
-  appendEvent(state, events, publicVisibility, { type: "GangMade", seat, gangType: "buGang", tiles: [...meld.tiles] });
+  appendEvent(state, events, publicVisibility, {
+    type: "GangMade",
+    seat,
+    gangType: "buGang",
+    tiles: [...meld.tiles],
+  });
   beginTurn(state, events, seat, true, true);
   return { state, events };
 };
@@ -405,13 +551,18 @@ export const createJunkGame = (seed: number, config: unknown = {}): RuleSetApply
     type: "GameStarted",
     config: state.config,
     dealer,
-    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => seat === dealer ? 14 : 13),
+    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
     wallCount: state.wall.length - 53,
   });
   for (const seat of [0, 1, 2, 3] as SeatId[]) {
     const count = seat === dealer ? 14 : 13;
-    for (let index = 0; index < count; index += 1) state.seats[seat]!.hand.push(state.wall.shift()!);
-    appendEvent(state, events, seatVisibility(seat), { type: "HandDealt", seat, tiles: [...state.seats[seat]!.hand] });
+    for (let index = 0; index < count; index += 1)
+      state.seats[seat]!.hand.push(state.wall.shift()!);
+    appendEvent(state, events, seatVisibility(seat), {
+      type: "HandDealt",
+      seat,
+      tiles: [...state.seats[seat]!.hand],
+    });
   }
   state.phase = "playing";
   appendEvent(state, events, publicVisibility, { type: "TurnStarted", seat: dealer });
@@ -433,7 +584,9 @@ export const junkRuleSet: RuleSet = {
     if (state.phase === "awaiting-claims") {
       const options = state.pendingClaims?.options[seat] ?? [];
       if (state.pendingClaims?.responses[seat]) return [];
-      return options.length > 0 ? [...options.map((option) => option.action), { type: "pass" }] : [];
+      return options.length > 0
+        ? [...options.map((option) => option.action), { type: "pass" }]
+        : [];
     }
     if (state.phase !== "playing" || state.currentSeat !== seat) return [];
     const hand = state.seats[seat]!.hand;
@@ -456,16 +609,18 @@ export const junkRuleSet: RuleSet = {
     const events: GameEvent[] = [];
     let result: RuleSetApplyResult;
     if (action.type === "discard") result = applyDiscard(state, seat, action.tile, events);
-    else if (["chi", "peng", "minGang", "hu", "pass"].includes(action.type)) result = applyClaimResponse(state, seat, action, events);
+    else if (["chi", "peng", "minGang", "hu", "pass"].includes(action.type))
+      result = applyClaimResponse(state, seat, action, events);
     else if (action.type === "anGang") result = applyAnGang(state, seat, action.kind, events);
     else if (action.type === "buGang") result = applyBuGang(state, seat, action.tile, events);
     else if (action.type === "zimo") {
-      result = state.phase !== "playing" || state.currentSeat !== seat || !isWin(state, seat)
-        ? fail("ZIMO_NOT_AVAILABLE")
-        : (() => {
-            finishWin(state, events, seat, "zimo");
-            return { state, events };
-          })();
+      result =
+        state.phase !== "playing" || state.currentSeat !== seat || !isWin(state, seat)
+          ? fail("ZIMO_NOT_AVAILABLE")
+          : (() => {
+              finishWin(state, events, seat, "zimo");
+              return { state, events };
+            })();
     } else result = fail("UNKNOWN_ACTION");
     if ("state" in result) assertTileConservation(result.state);
     return result;

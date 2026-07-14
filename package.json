@@ -3,9 +3,11 @@
   "private": true,
   "packageManager": "pnpm@10.33.3",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "test": "pnpm --recursive --if-present test && node --test tools/*.test.mjs",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint && eslint tools",
+    "test": "turbo run test && node --test tools/*.test.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "check:deps": "node tools/check-deps.mjs",
     "cli:play": "node packages/core/src/cli.ts play",
     "fuzz": "node packages/core/src/cli.ts fuzz"
@@ -15,6 +17,7 @@
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
     "eslint": "^10.7.0",
+    "prettier": "^3.9.5",
     "turbo": "^2.10.5",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"

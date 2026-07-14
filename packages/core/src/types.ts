@@ -3,8 +3,7 @@ export type SeatId = (typeof SEATS)[number];
 
 export type TileId = number;
 export type TileKind =
-  | `${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}${"m" | "p" | "s"}`
-  | `${1 | 2 | 3 | 4 | 5 | 6 | 7}${"z"}`;
+  `${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}${"m" | "p" | "s"}` | `${1 | 2 | 3 | 4 | 5 | 6 | 7}${"z"}`;
 
 export type Phase = "dealing" | "playing" | "awaiting-claims" | "finished";
 export type MeldType = "chi" | "peng" | "minGang" | "anGang" | "buGang";
@@ -119,9 +118,7 @@ export type RuleViolation = {
   message?: string;
 };
 
-export type EventVisibility =
-  | { type: "public" }
-  | { type: "seat"; seats: SeatId[] };
+export type EventVisibility = { type: "public" } | { type: "seat"; seats: SeatId[] };
 
 export type GameEvent<TPayload = unknown> = {
   seq: number;

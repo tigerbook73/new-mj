@@ -9,18 +9,18 @@
 // 牌的种类：字符串字面量，采用 m/p/s/z 记法
 // '1m'–'9m' 万 | '1p'–'9p' 筒 | '1s'–'9s' 条
 // '1z'东 '2z'南 '3z'西 '4z'北 '5z'白 '6z'发 '7z'中
-type TileKind = string  // 用模板字面量类型收紧
+type TileKind = string; // 用模板字面量类型收紧
 
 // 牌的实例：每张物理牌有唯一 id（0..N-1，N 由 RuleSet 牌集决定）
 // id → kind 为静态表，由 RuleSet 牌集按规范顺序派生：kindOf(id): TileKind
-type TileId = number
+type TileId = number;
 
 // 座位：core 只认识座位，不认识用户
 // userId ↔ SeatId 的映射由 server 维护（AI 与真人在 core 层无差别）
-type SeatId = 0 | 1 | 2 | 3
+type SeatId = 0 | 1 | 2 | 3;
 
-type MeldType = 'chi' | 'peng' | 'minGang' | 'anGang' | 'buGang'
-type Meld = { type: MeldType; tiles: TileId[]; from?: SeatId }
+type MeldType = "chi" | "peng" | "minGang" | "anGang" | "buGang";
+type Meld = { type: MeldType; tiles: TileId[]; from?: SeatId };
 ```
 
 **评审点 A【已定：采用实例 ID】**：状态与事件存 `TileId`；规则逻辑（胡牌判定、碰杠匹配）经 `kindOf(id)` 按种类运算。理由：① React/Motion 动画需要稳定 key，一张牌从牌墙→手牌→牌河全程同 id，layout 动画免费；② 牌集守恒不变量 = id 集合精确比对。
@@ -31,35 +31,35 @@ type Meld = { type: MeldType; tiles: TileId[]; from?: SeatId }
 
 ```ts
 type GameState = {
-  config: GameConfig            // { rulesetId, ...变体 config }，随对局持久化
-  phase: Phase                  // 见 §3
-  wall: TileId[]                // 剩余牌墙（头部摸牌、尾部杠补）
-  seats: SeatState[]            // 长度 4
-  currentSeat: SeatId
-  lastDiscard?: { seat: SeatId; tile: TileId }
-  pendingClaims?: PendingClaims // 声明窗口期间存在
-  seq: number                   // 已发出事件的最大序号
-  prng: PrngState               // 可序列化的 PRNG 状态（seed 派生）
-  variantState: unknown         // 变体私有状态命名空间（D6；垃圾胡为空对象）
-  result?: GameResult           // 终局后填充
-}
+  config: GameConfig; // { rulesetId, ...变体 config }，随对局持久化
+  phase: Phase; // 见 §3
+  wall: TileId[]; // 剩余牌墙（头部摸牌、尾部杠补）
+  seats: SeatState[]; // 长度 4
+  currentSeat: SeatId;
+  lastDiscard?: { seat: SeatId; tile: TileId };
+  pendingClaims?: PendingClaims; // 声明窗口期间存在
+  seq: number; // 已发出事件的最大序号
+  prng: PrngState; // 可序列化的 PRNG 状态（seed 派生）
+  variantState: unknown; // 变体私有状态命名空间（D6；垃圾胡为空对象）
+  result?: GameResult; // 终局后填充
+};
 
 type SeatState = {
-  hand: TileId[]                // 手牌（暗牌）
-  melds: Meld[]                 // 副露（明牌）
-  discards: DiscardEntry[]      // 牌河（按出牌者归属，可见性公开）
-}
+  hand: TileId[]; // 手牌（暗牌）
+  melds: Meld[]; // 副露（明牌）
+  discards: DiscardEntry[]; // 牌河（按出牌者归属，可见性公开）
+};
 
 // 牌河条目：被吃/碰/杠拿走的牌条目留在原位，标注 claimedBy（墓碑）
 // —— 保留位置与完整弃牌历史：UI 可自选留空/紧凑渲染；日麻振听判定将来直接可用
-type DiscardEntry = { tile: TileId; claimedBy?: SeatId }
+type DiscardEntry = { tile: TileId; claimedBy?: SeatId };
 
 type PendingClaims = {
-  discard: { seat: SeatId; tile: TileId }
-  source?: 'discard' | 'robKong' // 缺省/`discard` 为普通弃牌；`robKong` 为补杠第四张
-  options: Partial<Record<SeatId, ClaimOption[]>>  // 仅含有权响应的座位
-  responses: Partial<Record<SeatId, Action | 'pass'>>
-}
+  discard: { seat: SeatId; tile: TileId };
+  source?: "discard" | "robKong"; // 缺省/`discard` 为普通弃牌；`robKong` 为补杠第四张
+  options: Partial<Record<SeatId, ClaimOption[]>>; // 仅含有权响应的座位
+  responses: Partial<Record<SeatId, Action | "pass">>;
+};
 ```
 
 `source='robKong'` 仅在 junk config 的 `robKong=true` 时出现：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸。若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
@@ -87,15 +87,15 @@ dealing → playing ⇄ awaiting-claims → finished
 
 ```ts
 type Action =
-  | { type: 'discard'; tile: TileId }
-  | { type: 'anGang'; kind: TileKind }    // 自己回合（四张同种，按种类指定）
-  | { type: 'buGang'; tile: TileId }      // 自己回合
-  | { type: 'zimo' }                      // 自己回合自摸胡
-  | { type: 'chi'; tiles: [TileId, TileId] } // 窗口内：用自己的两张与弃牌组顺
-  | { type: 'peng' }                      // 窗口内
-  | { type: 'minGang' }                   // 窗口内
-  | { type: 'hu' }                        // 窗口内点炮胡
-  | { type: 'pass' }                      // 窗口内过
+  | { type: "discard"; tile: TileId }
+  | { type: "anGang"; kind: TileKind } // 自己回合（四张同种，按种类指定）
+  | { type: "buGang"; tile: TileId } // 自己回合
+  | { type: "zimo" } // 自己回合自摸胡
+  | { type: "chi"; tiles: [TileId, TileId] } // 窗口内：用自己的两张与弃牌组顺
+  | { type: "peng" } // 窗口内
+  | { type: "minGang" } // 窗口内
+  | { type: "hu" } // 窗口内点炮胡
+  | { type: "pass" }; // 窗口内过
 ```
 
 - `applyAction(state, seat, action)`：非法即返回 `RuleViolation`（含机器可读 code），state 不变
@@ -107,32 +107,30 @@ type Action =
 
 ```ts
 type GameEvent = {
-  seq: number
-  visibility:
-    | { type: 'public' }
-    | { type: 'seat'; seats: SeatId[] }   // 仅指定座位可见
-  payload: EventPayload
-}
+  seq: number;
+  visibility: { type: "public" } | { type: "seat"; seats: SeatId[] }; // 仅指定座位可见
+  payload: EventPayload;
+};
 ```
 
-| # | 事件 | visibility | payload 要点 |
-|---|------|-----------|-------------|
-| 1 | GameStarted | public | config、座次、庄家、各家初始手牌张数、牌墙余量 |
-| 2 | HandDealt | seat（各家各收自己的） | 该家 13/14 张手牌 |
-| 3 | TurnStarted | public | seat |
-| 4 | TileDrawn | **双版本**：seat 版含牌面；public 版仅"摸了一张" | seat, tile? |
-| 5 | TileDiscarded | public | seat, tile |
-| 6 | ClaimWindowOpened | seat（仅有权响应者，各自收到自己的选项） | 自己的 ClaimOption[] |
-| 7 | ClaimResponded | seat（仅本人，作为回执/日志） | 本人的响应 |
-| 8 | ClaimWindowResolved | public | 裁决结果（谁以何动作赢得窗口 / 无人响应） |
-| 9 | ChiMade | public | seat, tiles, from |
-| 10 | PengMade | public | seat, tile, from |
-| 11 | GangMade | public（暗杠不露牌面：payload 区分 anGang 时牌面仅 seat 可见→双版本） | seat, type, tile?, from? |
-| 12 | GangReplacementDrawn | 双版本（同 TileDrawn） | seat, tile? |
-| 13 | HuDeclared | public | seat, 胡型（点炮/自摸）, 亮出的完整手牌, 点炮者? |
-| 14 | Settled | public | 分数变动明细 |
-| 15 | WallExhausted | public | — |
-| 16 | GameEnded | public | result 摘要 |
+| #   | 事件                 | visibility                                                            | payload 要点                                     |
+| --- | -------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
+| 1   | GameStarted          | public                                                                | config、座次、庄家、各家初始手牌张数、牌墙余量   |
+| 2   | HandDealt            | seat（各家各收自己的）                                                | 该家 13/14 张手牌                                |
+| 3   | TurnStarted          | public                                                                | seat                                             |
+| 4   | TileDrawn            | **双版本**：seat 版含牌面；public 版仅"摸了一张"                      | seat, tile?                                      |
+| 5   | TileDiscarded        | public                                                                | seat, tile                                       |
+| 6   | ClaimWindowOpened    | seat（仅有权响应者，各自收到自己的选项）                              | 自己的 ClaimOption[]                             |
+| 7   | ClaimResponded       | seat（仅本人，作为回执/日志）                                         | 本人的响应                                       |
+| 8   | ClaimWindowResolved  | public                                                                | 裁决结果（谁以何动作赢得窗口 / 无人响应）        |
+| 9   | ChiMade              | public                                                                | seat, tiles, from                                |
+| 10  | PengMade             | public                                                                | seat, tile, from                                 |
+| 11  | GangMade             | public（暗杠不露牌面：payload 区分 anGang 时牌面仅 seat 可见→双版本） | seat, type, tile?, from?                         |
+| 12  | GangReplacementDrawn | 双版本（同 TileDrawn）                                                | seat, tile?                                      |
+| 13  | HuDeclared           | public                                                                | seat, 胡型（点炮/自摸）, 亮出的完整手牌, 点炮者? |
+| 14  | Settled              | public                                                                | 分数变动明细                                     |
+| 15  | WallExhausted        | public                                                                | —                                                |
+| 16  | GameEnded            | public                                                                | result 摘要                                      |
 
 **评审点 D【已定：采纳】**：非法动作不进事件日志（不改变状态），仅作为 applyAction 的错误返回：server 以 ack 拒绝该客户端，并记入 server 侧错误日志（logger，非游戏事件）。原表 #17 已删除。
 
@@ -144,21 +142,22 @@ type GameEvent = {
 
 ```ts
 type PlayerView = {
-  seat: SeatId
-  hand: TileId[]                     // 仅自己的
-  seats: Array<{                     // 四家公开信息
-    melds: Meld[]                    // 暗杠牌面对他人隐藏
-    discards: DiscardEntry[]
-    handCount: number
-  }>
-  wallCount: number
-  currentSeat: SeatId
-  phase: Phase
-  myClaimOptions?: ClaimOption[]     // 窗口期间自己的选项
-  myClaimResponse?: Action | 'pass'  // 窗口期间自己已提交的表态（重连恢复用，评审点 F）
-  lastDiscard?: { seat: SeatId; tile: TileId }
-  result?: GameResult
-}
+  seat: SeatId;
+  hand: TileId[]; // 仅自己的
+  seats: Array<{
+    // 四家公开信息
+    melds: Meld[]; // 暗杠牌面对他人隐藏
+    discards: DiscardEntry[];
+    handCount: number;
+  }>;
+  wallCount: number;
+  currentSeat: SeatId;
+  phase: Phase;
+  myClaimOptions?: ClaimOption[]; // 窗口期间自己的选项
+  myClaimResponse?: Action | "pass"; // 窗口期间自己已提交的表态（重连恢复用，评审点 F）
+  lastDiscard?: { seat: SeatId; tile: TileId };
+  result?: GameResult;
+};
 ```
 
 - `getPlayerView(state, seat)` 纯派生，无时间字段；倒计时 deadline 由 server 在协议层附加（D5）

@@ -9,7 +9,8 @@ type Arguments = {
   actions: Array<{ seat: SeatId; action: Action }>;
 };
 
-const usage = "Usage: cli.ts <play|fuzz> [--seed <integer>] [--games <integer>] [--config <json>] [--actions <json>]\n";
+const usage =
+  "Usage: cli.ts <play|fuzz> [--seed <integer>] [--games <integer>] [--config <json>] [--actions <json>]\n";
 
 const parseJson = <T>(value: string, name: string): T => {
   try {
@@ -31,7 +32,8 @@ const parseArguments = (argv: string[]): Arguments => {
     if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--games") result.games = Number(value);
     else if (flag === "--config") result.config = parseJson<Arguments["config"]>(value, "config");
-    else if (flag === "--actions") result.actions = parseJson<Arguments["actions"]>(value, "actions");
+    else if (flag === "--actions")
+      result.actions = parseJson<Arguments["actions"]>(value, "actions");
     else throw new Error("UNKNOWN_ARGUMENT");
   }
   if (!Number.isInteger(result.seed) || !Number.isInteger(result.games) || result.games < 1) {
@@ -47,7 +49,10 @@ export const runCli = (argv: string[]): { exitCode: number; output: string } => 
       const failure = fuzzJunkGames(args.games, args.seed);
       return failure
         ? { exitCode: 1, output: `${JSON.stringify({ ok: false, ...failure })}\n` }
-        : { exitCode: 0, output: `${JSON.stringify({ ok: true, games: args.games, seed: args.seed })}\n` };
+        : {
+            exitCode: 0,
+            output: `${JSON.stringify({ ok: true, games: args.games, seed: args.seed })}\n`,
+          };
     }
     const result = playJunkGame(args.seed, args.config, args.actions);
     return "error" in result
@@ -65,7 +70,10 @@ export const runCli = (argv: string[]): { exitCode: number; output: string } => 
           })}\n`,
         };
   } catch (error) {
-    return { exitCode: 1, output: `${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : "UNKNOWN" })}\n${usage}` };
+    return {
+      exitCode: 1,
+      output: `${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : "UNKNOWN" })}\n${usage}`,
+    };
   }
 };
 

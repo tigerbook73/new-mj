@@ -34,6 +34,12 @@
 - `apps/server` 使用 NestJS 时采用 Jest，遵循 NestJS 官方测试生态；server 测试不得因此把 Jest 依赖引入 core。
 - web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调度。
 
+## 检查与格式化边界
+
+- 每个 workspace package/app 都应提供 `typecheck`、`lint` 和 `test` 脚本，便于局部开发与任务缓存。
+- 根目录同名脚本通过 Turbo 聚合所有 workspace；CI、阶段验收和提交前检查一律从根目录运行。
+- 格式化使用 Prettier：`pnpm format` 写入格式，`pnpm format:check` 仅校验；提交前不得以 `format` 代替 lint 或 typecheck。
+
 ## Core 类型与注释
 
 - 已导出的领域状态、事件和跨模块结果优先定义专门的 `type`/`interface`；这样可复用、可被契约引用，并减少后续接口调整时的漂移。
