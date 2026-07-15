@@ -4,12 +4,20 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   },
   "scripts": {
+    "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint src",
-    "test": "node --test",
+    "lint": "eslint src test",
+    "test": "vitest run",
     "verify": "pnpm typecheck && pnpm lint && pnpm test"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
   }
 }
