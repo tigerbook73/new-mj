@@ -89,6 +89,8 @@ export const isWin = (state: BloodbattleState, seat: SeatId, tile?: TileId): boo
   if (tile === undefined) return scoreFor(state, seat, hand[hand.length - 1]!, "zimo").hu;
   return scoreFor(state, seat, tile, "discard").hu;
 };
+const mustHuOnLastFour = (state: BloodbattleState, seat: SeatId, tile?: TileId): boolean =>
+  state.config.mustHuOnLastFour && state.wall.length <= 4 && isWin(state, seat, tile);
 const extraTiles = (state: BloodbattleState): readonly TileId[] =>
   Object.values(state.wins ?? {}).flatMap((win) => win!.hand);
 
@@ -501,12 +503,25 @@ export const applyAction = (
   const events: GameEvent[] = [];
   if (action.type === "exchangeThree") return applyExchangeThree(state, seat, action.tiles);
   if (action.type === "chooseLack") return applyChooseLack(state, seat, action.suit);
+  if (
+    state.phase === "playing" &&
+    state.currentSeat === seat &&
+    state.status[seat] === "active" &&
+    mustHuOnLastFour(state, seat) &&
+    action.type !== "zimo"
+  )
+    return fail("MUST_HU");
   if (action.type === "discard") return checked(applyDiscard(state, seat, action.tile, events));
   if (action.type === "anGang") return checked(applyAnGang(state, seat, action.kind, events));
   if (action.type === "buGang") return checked(applyBuGang(state, seat, action.tile, events));
   if (state.phase === "awaiting-claims") {
     if (!state.pendingClaims?.options[seat] || state.pendingClaims.responses[seat])
       return fail("CLAIM_NOT_AVAILABLE");
+    const mustHu =
+      state.config.mustHuOnLastFour &&
+      state.wall.length <= 4 &&
+      state.pendingClaims.options[seat]!.some((option) => option.action.type === "hu");
+    if (mustHu && action.type !== "hu") return fail("MUST_HU");
     if (
       action.type !== "pass" &&
       !state.pendingClaims.options[seat]!.some((option) => option.action.type === action.type)
@@ -523,6 +538,7 @@ export const applyAction = (
     return { state, events };
   }
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("ACTION_NOT_AVAILABLE");
+  if (mustHuOnLastFour(state, seat) && action.type !== "zimo") return fail("MUST_HU");
   if (action.type === "zimo" && isWin(state, seat)) {
     finishWin(state, events, seat, state.seats[seat]!.hand.at(-1)!, "zimo");
     delete state.lastGangEventId;
@@ -563,11 +579,18 @@ export const getLegalActions = (
   if (state.phase === "awaiting-claims") {
     const options = state.pendingClaims?.options[seat] ?? [];
     if (options.length === 0 || state.pendingClaims?.responses[seat]) return [];
+    if (
+      state.config.mustHuOnLastFour &&
+      state.wall.length <= 4 &&
+      options.some((option) => option.action.type === "hu")
+    )
+      return options.filter((option) => option.action.type === "hu").map((option) => option.action);
     return [...options.map((option) => option.action), { type: "pass" }];
   }
   if (state.phase !== "playing" || state.currentSeat !== seat || state.status[seat] !== "active")
     return [];
   const hand = state.seats[seat]!.hand;
+  if (mustHuOnLastFour(state, seat)) return [{ type: "zimo" }];
   const discardable = hasLackTile(state, seat)
     ? hand.filter((tile) => kind(tile)[1] === state.lack?.[seat])
     : hand;

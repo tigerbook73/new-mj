@@ -95,7 +95,7 @@ type JunkAction =
   | { type: "pass" }; // 窗口内过
 ```
 
-血战的 `BloodbattleAction`（前置阶段、Stage A playing 变体与 Stage B 杠动作；抢杠胡仍待实现）：
+血战的 `BloodbattleAction`（前置阶段、playing 阶段、杠与抢杠胡动作）：
 
 ```ts
 type BloodbattleAction =

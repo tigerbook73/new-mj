@@ -184,6 +184,61 @@ test("buGang opens a rob-kong window before collecting gang payments", () => {
   }
 });
 
+test("mustHuOnLastFour forces a self-draw win instead of a discard", () => {
+  const state = playingState();
+  state.config.mustHuOnLastFour = true;
+  state.wall = state.wall.slice(0, 4);
+  const used = new Set<number>();
+  const byKind = (tileKind: string): number => {
+    const tile = allTileIds(BLOODBATTLE_TILE_SET).find(
+      (candidate) => !used.has(candidate) && BLOODBATTLE_TILE_SET.kindOf(candidate) === tileKind,
+    )!;
+    used.add(tile);
+    return tile;
+  };
+  state.seats[0]!.hand = [
+    "1p",
+    "2p",
+    "3p",
+    "4p",
+    "5p",
+    "6p",
+    "7s",
+    "8s",
+    "9s",
+    "1s",
+    "2s",
+    "3s",
+    "9p",
+    "9p",
+  ].map(byKind);
+  state.lack![0] = "m";
+  const held = new Set(state.seats[0]!.hand);
+  const remaining = allTileIds(BLOODBATTLE_TILE_SET).filter((tile) => !held.has(tile));
+  state.wall = remaining.slice(0, 4);
+  state.seats[1]!.hand = remaining.slice(4);
+
+  expect(getLegalActions(state, 0)).toEqual([{ type: "zimo" }]);
+  expect(applyAction(state, 0, { type: "discard", tile: state.seats[0]!.hand[0]! })).toEqual({
+    error: { code: "MUST_HU" },
+  });
+});
+
+test("mustHuOnLastFour forces a claim-window hu response", () => {
+  const state = playingState();
+  state.config.mustHuOnLastFour = true;
+  state.wall = state.wall.slice(0, 4);
+  state.phase = "awaiting-claims";
+  state.pendingClaims = {
+    discard: { seat: 0, tile: 0 },
+    options: { 1: [{ action: { type: "peng" } }, { action: { type: "hu" } }] },
+    responses: {},
+  };
+
+  expect(getLegalActions(state, 1)).toEqual([{ type: "hu" }]);
+  expect(applyAction(state, 1, { type: "pass" })).toEqual({ error: { code: "MUST_HU" } });
+});
+
 test("杠上炮 transfers the latest gang payment exactly once", () => {
   const state = playingState();
   state.seats[0]!.hand = [7, ...state.seats[0]!.hand.filter((tile) => tile >= 36)];
