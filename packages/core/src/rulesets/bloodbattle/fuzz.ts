@@ -143,11 +143,17 @@ export const fuzzBloodbattleGames = (
   for (let index = 0; index < games; index += 1) {
     const gameSeed = nextInt(prng, 0x1_0000_0000);
     prng = gameSeed.prng;
-    const switches = nextInt(prng, 4);
+    const switches = nextInt(prng, 256);
     prng = switches.prng;
     const config = {
       exchangeThree: (switches.value & 1) !== 0,
       multiWinOnDiscard: (switches.value & 2) !== 0,
+      robKong: (switches.value & 4) !== 0,
+      checkHuaZhu: (switches.value & 8) !== 0,
+      checkDaJiao: (switches.value & 16) !== 0,
+      gangRefund: (switches.value & 32) !== 0,
+      selfDrawBonus: (switches.value & 64) !== 0 ? ("addBase" as const) : ("addFan" as const),
+      capFan: (switches.value & 128) !== 0 ? 0 : 4,
     };
     const result = playBloodbattleGame(gameSeed.value, config);
     if ("error" in result) return result;
