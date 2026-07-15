@@ -1,6 +1,6 @@
-import { createPrng, nextInt, type PrngState } from "@/lib/prng.ts";
-import type { SeatId } from "@/lib/ids.ts";
-import type { GameEvent } from "@/events.ts";
+import { createPrng, nextInt, type PrngState } from "@/lib/prng";
+import type { SeatId } from "@/lib/ids";
+import type { GameEvent } from "@/events";
 import { junkRuleSet } from "./index.ts";
 import type { JunkAction, JunkConfig, JunkState } from "./index.ts";
 

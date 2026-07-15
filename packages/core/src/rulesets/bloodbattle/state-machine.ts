@@ -1,7 +1,7 @@
-import { assertTileConservation } from "@/lib/invariants.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "@/events.ts";
-import type { SeatId, TileId } from "@/lib/ids.ts";
-import { type Meld, type SeatState } from "@/lib/seat.ts";
+import { assertTileConservation } from "@/lib/invariants";
+import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "@/events";
+import type { SeatId, TileId } from "@/lib/ids";
+import { type Meld, type SeatState } from "@/lib/seat";
 import { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 import { settleBloodbattleDraw } from "./settlement.ts";

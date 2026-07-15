@@ -13,7 +13,7 @@ import {
   tileIdOf,
   nextEventSeq,
   type SeatState,
-} from "@/index.ts";
+} from "@/index";
 
 // assertContainerUniqueness/assertTileConservation only ever read
 // { wall, seats } (see lib/invariants.ts) — no need for a full ruleset state.

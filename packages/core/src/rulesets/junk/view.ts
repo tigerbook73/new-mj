@@ -1,5 +1,5 @@
-import { eventsVisibleTo, type GameEvent } from "@/events.ts";
-import type { SeatId } from "@/lib/ids.ts";
+import { eventsVisibleTo, type GameEvent } from "@/events";
+import type { SeatId } from "@/lib/ids";
 import type { JunkAction, JunkGameResult, JunkPlayerView, JunkState } from "./types.ts";
 
 export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView => {

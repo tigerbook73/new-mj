@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { GameEvent } from "@/events.ts";
+import type { GameEvent } from "@/events";
 import {
   allTileIds,
   applyAction,
@@ -11,8 +11,8 @@ import {
   getLegalActions,
   settleBloodbattleDraw,
   type BloodbattleState,
-} from "@/index.ts";
-import { BLOODBATTLE_TILE_SET } from "@/rulesets/bloodbattle/prelude.ts";
+} from "@/index";
+import { BLOODBATTLE_TILE_SET } from "@/rulesets/bloodbattle/prelude";
 
 const config = {
   rulesetId: "bloodbattle" as const,

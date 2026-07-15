@@ -1,5 +1,5 @@
-import type { SeatId } from "@/lib/ids.ts";
-import { TILE_KINDS, createTileSet } from "@/lib/tiles.ts";
+import type { SeatId } from "@/lib/ids";
+import { TILE_KINDS, createTileSet } from "@/lib/tiles";
 
 export const BLOODBATTLE_SEATS = [0, 1, 2, 3] as const satisfies readonly SeatId[];
 export const BLOODBATTLE_SUITS = ["m", "p", "s"] as const;

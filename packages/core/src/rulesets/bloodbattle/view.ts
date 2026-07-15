@@ -1,4 +1,4 @@
-import type { SeatId } from "@/lib/ids.ts";
+import type { SeatId } from "@/lib/ids";
 import type { BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { REGISTERED_RULESETS_FOR_TESTING } from "@/support/registered-rulesets.ts";
+import { REGISTERED_RULESETS_FOR_TESTING } from "@/support/registered-rulesets";
 
 // "Event reconstruction ≡ direct derivation" (decisions.md G) is a core
 // invariant, not a junk-specific one — parameterized so a second ruleset
