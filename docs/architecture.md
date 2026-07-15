@@ -29,6 +29,8 @@ core ← server → protocol
         web/mobile → protocol（只依赖协议与类型，不 import 引擎实现）
 ```
 
+模块系统：`apps/server` 是仓库里唯一的 CommonJS 包（其余 ESM），跟随 NestJS 官方默认构建方式；`core`/`protocol` 用 tsup 双发 CJS+ESM 兼容两边（D13）。
+
 ## 3. 一条动作的旅程
 
 玩家点"碰"：client 发 `game:action {peng}`（ack 仅回执受理）→ Room 将其入队（每房间串行）→ 调 `applyAction` → 得到新 state 与 events → Room 替换 state 引用 → 按每个事件的 visibility 标注分发（含发起者本人）→ 各客户端把事件应用到本地视图。客户端状态永远 = 入局快照 + 事件流；服务端持唯一权威 GameState。

@@ -74,7 +74,7 @@ INTERNAL
 ```
 
 - `GAME_IN_PROGRESS`：对一个已经在对局中/已结束的房间发起 `room:start`（阶段 2 补充：与其反义 `GAME_NOT_STARTED` 不是同一个码，不要混用）
-- `GAME_NOT_STARTED`：房间尚未进入 `in-game` 阶段时收到 `game:action`（阶段 2 补充，见 `docs/phase-2-server.md`「开放问题」）
+- `GAME_NOT_STARTED`：房间尚未进入 `in-game` 阶段时收到 `game:action`（阶段 2 补充，`apps/server` 的 `RoomService.applyPlayerAction` 使用）
 - `ILLEGAL_ACTION` 的 `message` 附 core 返回的 RuleViolation code（如 `TILE_NOT_IN_HAND`、`CLAIM_NOT_AVAILABLE`），便于调试；客户端 UI 原则上不应触发它（合法动作由 myClaimOptions/getLegalActions 驱动渲染）
 
 ## 5. 时序示意

@@ -1,7 +1,7 @@
 # AGENTS.md
 
 在线麻将（非商用）。TS monorepo：packages/{core,protocol,ai} + apps/{server,web,mobile}。
-**当前阶段：阶段 1 已完成；阶段 1.5 前先确认 `rules-bloodbattle.md` 定稿状态。**
+**当前阶段：阶段 2（NestJS server）已完成，打 tag `phase-2`；阶段 3（web 竖切）待启动。**
 
 ## 会话仪式
 
@@ -10,7 +10,7 @@
 
 ## Ground Truth（冲突以 docs 为准）
 
-- 契约：docs/core-types-and-events.md · docs/protocol.md · docs/rules-junk.md（定稿）· docs/rules-bloodbattle.md（**草案**，实现前确认状态）
+- 契约：docs/core-types-and-events.md · docs/protocol.md · docs/rules-junk.md（定稿）· docs/rules-bloodbattle.md（定稿）· docs/rooms.md（定稿）
 - 原理与取舍：docs/architecture.md · docs/decisions.md
 - 流程细则（DoD/Git/验收）：docs/workflow.md；文档规则：docs/doc-map.md
 - 阶段与待办：docs/plan.md
