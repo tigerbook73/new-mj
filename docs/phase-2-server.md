@@ -337,181 +337,34 @@ describe("AppModule", () => {
 
 ---
 
-### 步骤 4：核心服务（1-2 天）
+### 步骤 4：核心服务 —— ✅ 已实现
 
-**目标**：实现 `RoomService`、`GameSession`、`EventBus`，房间编排逻辑完整，接口签名与 core 真实 API / `docs/rooms.md` 契约对齐。
+**目标**：实现 `RoomService`、`EventBus`，房间编排逻辑完整，接口签名与 core 真实 API / `docs/rooms.md` 契约对齐。
 
-**创建/修改文件**：
+**已交付文件**（不再维护一份和代码重复、容易漂移的伪代码草稿，直接看源码）：
 
-1. **`apps/server/src/core/game.service.ts`**：
+- `apps/server/src/core/game.service.ts` + `core.module.ts` — 薄封装 core 四签名，签名与 `packages/core/src/engine.ts:31-32` 一致。
+- `apps/server/src/health/health.controller.ts` + `health.module.ts` — D10「服务端仅 /health」。
+- `apps/server/src/rooms/room.ts` — 内部 `Room`/`RoomPlayer` 状态类型（含 `seed`/`lastEventSeq`，见 `docs/rooms.md` §2.1 更新）。
+- `apps/server/src/rooms/room-service.error.ts` — `RoomServiceError`，携带 `@new-mj/protocol` 的 `ErrCode`，留给步骤 5 的 gateway 捕获映射成 ack 错误。
+- `apps/server/src/rooms/room.events.ts` + `event-bus.ts` — 类型化的 `RoomEventMap` + Node `EventEmitter` 包装（不是无类型的 `extends EventEmitter`，`emit`/`on` 都按事件名收窄 payload 类型）。
+- `apps/server/src/rooms/room.service.ts` + `rooms.module.ts` — 见下方「与草稿的偏差」。
+- `packages/protocol/src/schemas.ts` + `tsup.config.ts` — zod schema（`RoomInfo`/`RoomCreateRequest`/`RoomJoinRequest`/`RoomReadyRequest`/`GameActionRequest`/`ErrCode`）+ 双发构建，照抄 `packages/core/tsup.config.ts`；`packages/protocol/tsconfig.json` 需要同 `packages/core` 一样加 `"ignoreDeprecations": "6.0"`（tsup 的 DTS 构建步骤会踩 TS 6 的 `baseUrl` 弃用检查，即使本包并未用到 `baseUrl`——这是 tsup/rollup-plugin-dts 内部默认行为，不是配置错误）。
 
-   ```ts
-   @Injectable()
-   class GameService {
-     createGame(config: GameConfig, seed: number): ApplyResult<unknown>;
-     applyAction(state: unknown, seat: SeatId, action: unknown): ApplyResult<unknown>;
-     getPlayerView(state: unknown, seat: SeatId): PlayerViewBase | undefined;
-     getLegalActions(state: unknown, seat: SeatId): readonly unknown[];
-   }
-   ```
+**与设计草稿的偏差（已同步回 `docs/rooms.md` §2.1/§7.1）**：
 
-   与 `packages/core/src/engine.ts:31-32` 的真实签名一致：`rulesetId` 已内含在 `GameConfig` 里，不作为独立参数；`seed` 为必填；`getPlayerView` 显式允许 `undefined`。
+- `RoomService.create` 实测多了 `hostUserId`/`hostNickname` 两个参数——protocol.md"创建即入座"要求创建者立刻占座，光有 `rulesetId`/`config` 做不到这件事。
+- 游戏结束判定**不读 `state.phase`**（那是 D12 明确禁止的规则内部状态窥探），改为检测 `applyAction` 返回的 `events` 里是否出现 `GameEnded` 类型的 payload（`packages/core` 的 `EVENT_TYPES.gameEnded`）；`Settled` 事件的 `scoreDeltas` 同理用类型守卫读取，不假设跨 ruleset 统一的事件类型。
+- `gameNumber` 递增下沉到 `beginGame()`（`start()`/`nextRound()` 共用），不再只在 `nextRound()` 里 `+= 1`——否则第 1 局的 `gameNumber` 会停留在初始值，实测时被集成测试抓到。
+- `ConfigService` 推迟到步骤 5：本步骤没有真正的消费者（JWT_SECRET 要到 AuthGuard 才用，PROTOCOL_VERSION 要到握手校验才用），提前建一个没人用的空 service 不符合"不做超出需求的抽象"。
+- `RoomService.get()` 返回 `Room | undefined`（不是草稿写的 `Room | null`），跟 `Map.get()` 的原生返回类型一致，减少一次无意义的空值转换。
 
-2. **`apps/server/src/health/health.controller.ts`**（新增，D10「服务端仅 /health」）：
+**测试**（Jest，全部真实跑通，不是占位）：
 
-   ```ts
-   @Controller("health")
-   class HealthController {
-     @Get()
-     check() {
-       return { ok: true, uptime: process.uptime() };
-     }
-   }
-   ```
-
-3. **`apps/server/src/rooms/room.service.ts`**（方法名对齐 `docs/rooms.md` §7.1，不再沿用旧版自造命名）：
-
-   ```ts
-   @Injectable()
-   class RoomService {
-     create(rulesetId: string, config: GameConfig): Room;
-     join(roomId: string, userId: string): Player;
-     ready(roomId: string, userId: string, ready: boolean): void;
-     start(roomId: string): void;
-     nextRound(roomId: string): void;
-
-     // 辅助计算
-     accumulateScores(room: Room, scoreDeltas: [number, number, number, number]): void;
-     computeNextDealer(sessionFormat: SessionFormat, currentDealer: SeatId): SeatId;
-     shouldContinue(room: Room): boolean;
-     computeRanking(room: Room): RankingEntry[];
-
-     // 工具
-     snapshot(room: Room): RoomInfo;
-     get(roomId: string): Room | null;
-   }
-   ```
-
-   `start`/`nextRound` 内部自行生成随机 seed（存入 `room` 状态便于调试/复现），连同 `room.config` 一起传给 `GameService.createGame(config, seed)`。
-
-   `sessionFormat` 默认值为 `'4-round'`（`SessionFormat = "4-round" | "best-of-3"`，无 `'default'` 取值）。
-
-4. **`apps/server/src/rooms/room.events.ts`**（新增）：
-
-   ```ts
-   interface PlayerJoinedPayload {
-     seat: SeatId;
-     nickname: string;
-     isBot: boolean;
-   }
-   interface ScoreUpdatedPayload {
-     scores: [number, number, number, number];
-     gameNumber: number;
-     totalGames?: number;
-   }
-   interface DealerChangedPayload {
-     dealer: SeatId;
-     gameNumber: number;
-   }
-   interface SessionFinishedPayload {
-     result: SessionResult;
-   }
-   ```
-
-5. **`apps/server/src/rooms/event-bus.ts`**（新增）：
-
-   ```ts
-   @Injectable()
-   class EventBus extends EventEmitter {
-     // 简单包装 Node.js EventEmitter；MVP 用本地 emitter，phase 4 可换成 Redis 或 Bull
-   }
-   ```
-
-6. **`apps/server/src/rooms/rooms.module.ts`**（新增）：
-
-   ```ts
-   @Module({
-     imports: [CoreModule],
-     providers: [RoomService, EventBus],
-     exports: [RoomService, EventBus],
-   })
-   class RoomsModule {}
-   ```
-
-**关键逻辑**（提取分数、终止判定沿用旧版设计，签名已更新）：
-
-```ts
-private extractScoreDeltas(events: GameEvent[]): [number, number, number, number] {
-  const deltas: [number, number, number, number] = [0, 0, 0, 0];
-  events.forEach((e) => {
-    if (e.payload?.type === "Settled") {
-      e.payload.scoreDeltas.forEach((delta, i) => (deltas[i] += delta));
-    }
-  });
-  return deltas;
-}
-```
-
-7. **`packages/protocol/src/schemas.ts`**（新增，当前 `packages/protocol` 只有占位 `index.ts`，这是本步骤的交付物，不是可直接引用的既有资源）：用 zod 定义 `RoomInfo`/`RoomCreateRequest`/`RoomJoinRequest`/`RoomReadyRequest`/`GameActionRequest` 等类型，供 server 及未来 web/mobile 共享。同一 commit 补充 `zod` 依赖。
-
-8. **`packages/protocol` 补 tsup 双发构建**（照抄 `packages/core` 的现有做法，见 `packages/core/tsup.config.ts`）：
-
-   ```ts
-   // packages/protocol/tsup.config.ts
-   import { defineConfig } from "tsup";
-
-   export default defineConfig({
-     clean: true,
-     dts: true,
-     entry: ["src/index.ts"],
-     format: ["esm", "cjs"],
-     outDir: "dist",
-     platform: "neutral",
-     sourcemap: true,
-     splitting: false,
-     target: "es2022",
-   });
-   ```
-
-   `package.json` 同步调整为双发 `exports`（与 `packages/core` 现有写法一致）并新增 `build` 脚本：
-
-   ```jsonc
-   {
-     "exports": {
-       ".": {
-         "types": "./dist/index.d.ts",
-         "import": "./dist/index.js",
-         "require": "./dist/index.cjs",
-       },
-     },
-     "scripts": {
-       "build": "tsup --config tsup.config.ts",
-       "typecheck": "tsc -p tsconfig.json",
-       "lint": "eslint src",
-       "test": "vitest run",
-       "verify": "pnpm typecheck && pnpm lint && pnpm test",
-     },
-   }
-   ```
-
-   这一步是本版新决定的关键前提：正因为 `packages/protocol` 双发 CJS/ESM，CJS 的 `apps/server`（步骤 1+2）才能直接 `require()` 它，不需要 `apps/server` 迁就 ESM。`turbo.json` 的 `build` task 已有 `dependsOn: ["^build"]`，`packages/protocol` 加上 `build` 脚本后会被自动纳入依赖构建链，不需要改 `turbo.json`。
-
-**复杂度**：中等（状态机 + 事件编排）
-
-**最小 commit**：
-
-1. `feat(server): add ConfigService + health endpoint`
-2. `feat(server): add GameService wrapper`
-3. `feat(server): implement RoomService orchestration + EventBus`
-4. `chore(protocol): add tsup dual CJS/ESM build`
-5. `feat(protocol): add zod schemas for room/game contracts`
-
-（如实现中发现契约缺口需要修订 `protocol.md`/`rooms.md`，同批追加 `docs(protocol|rooms): ...` commit，`docs/` 变更与对应代码同一 commit。）
-
-**测试方式**：
-
-- 单元测试（Jest，`*.spec.ts` 与源码同目录）：`RoomService` 每个公共方法（房间创建 + 加入 + 就绪检查、分数累加逻辑、庄家轮转、`shouldContinue` 判定）
-- 不涉及 Socket.IO（步骤 6 集成测试时测）
+- `game.service.spec.ts` — 委托 core 的四个函数，含未知 ruleset 的错误分支。
+- `health.controller.spec.ts` — 通过 `Test.createTestingModule` 验证 DI + 返回形状。
+- `room.service.spec.ts` — 纯函数辅助方法（`accumulateScores`/`computeNextDealer`/`shouldContinue`/`computeRanking`）+ 生命周期错误分支（`ROOM_NOT_FOUND`/`ROOM_FULL`/`ALREADY_IN_ROOM`/`INVALID_CONFIG`/`GAME_IN_PROGRESS`）+ **一个跑满 4 局真实 junk 对局的集成测试**：用 `@new-mj/core` 导出的 `playJunkGame` 针对房间当前的 `seed` 生成确定性动作序列，再把这些动作一步步喂给 `RoomService.applyPlayerAction`，断言最终 `phase === "finished"`、`result.ranking` 长度为 4 且按分数降序——这比手写 mock 更可信，因为走的是真实规则引擎。
+- `packages/protocol/test/schemas.test.ts` — zod schema 的合法/非法 payload 校验。
 
 ---
 
@@ -689,14 +542,14 @@ const ERROR_CODES = [
 
 ## 每步骤 commit 清单
 
-| 步骤     | Commit 数 | 消息示例                                                                                                                                                                                                                                                                                                                     |
-| -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1+2      | 1         | `chore(server): regenerate scaffold via nest CLI (CommonJS), align to pnpm/turbo`                                                                                                                                                                                                                                            |
-| 3        | 1         | `docs(server): add CLAUDE.md + AGENTS.md`                                                                                                                                                                                                                                                                                    |
-| 4        | 5         | `feat(server): add ConfigService + health endpoint` + `feat(server): add GameService wrapper` + `feat(server): implement RoomService orchestration + EventBus` + `chore(protocol): add tsup dual CJS/ESM build` + `feat(protocol): add zod schemas for room/game contracts`（视契约缺口追加 `docs(protocol\|rooms)` commit） |
-| 5        | 3         | `feat(server): RoomsGateway` + `feat(server): game:action handler + per-seat snapshot broadcast` + `feat(server): AuthGuard`                                                                                                                                                                                                 |
-| 6        | 2         | `test(server): E2E integration` + `test(server): unit tests`                                                                                                                                                                                                                                                                 |
-| **总计** | **~12**   | 小、可审阅的提交，达标后打 tag `phase-2`                                                                                                                                                                                                                                                                                     |
+| 步骤     | Commit 数 | 消息示例                                                                                                                                                                                                                                                                        |
+| -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1+2      | 1         | `chore(server): regenerate scaffold via nest CLI (CommonJS), align to pnpm/turbo`                                                                                                                                                                                               |
+| 3        | 1         | `docs(server): add CLAUDE.md + AGENTS.md`                                                                                                                                                                                                                                       |
+| 4        | 2         | `feat(protocol): add tsup dual CJS/ESM build + zod schemas for room/game contracts` + `feat(server): implement GameService/HealthController/RoomService orchestration`（比原计划的 5 个 commit 更粗——房间编排是一整块互相依赖的改动，拆细了反而每个 commit 都过不了 typecheck） |
+| 5        | 3         | `feat(server): RoomsGateway` + `feat(server): game:action handler + per-seat snapshot broadcast` + `feat(server): AuthGuard`                                                                                                                                                    |
+| 6        | 2         | `test(server): E2E integration` + `test(server): unit tests`                                                                                                                                                                                                                    |
+| **总计** | **~9**    | 小、可审阅的提交，达标后打 tag `phase-2`                                                                                                                                                                                                                                        |
 
 ---
 
