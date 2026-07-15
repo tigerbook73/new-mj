@@ -125,7 +125,12 @@ export const applyDiscard = (
     if (isWin(state, candidate, tile)) candidateOptions.push({ action: { type: "hu" as const } });
     if (candidateOptions.length) options[candidate] = candidateOptions;
   }
-  append(state, events, { type: "public" }, { type: EVENT_TYPES.tileDiscarded, seat, tile });
+  append(
+    state,
+    events,
+    { type: "public" },
+    { type: EVENT_TYPES.tileDiscarded, seat, kind: kind(tile) },
+  );
   if (Object.keys(options).length === 0) {
     delete state.lastGangEventId;
     return drawNext(state, events, seat);
@@ -136,7 +141,7 @@ export const applyDiscard = (
     state,
     events,
     { type: "public" },
-    { type: EVENT_TYPES.claimWindowOpened, seat, tile, options },
+    { type: EVENT_TYPES.claimWindowOpened, seat, kind: kind(tile), options },
   );
   return { state, events };
 };
@@ -328,7 +333,7 @@ const applyBuGang = (
         state,
         events,
         { type: "public" },
-        { type: EVENT_TYPES.claimWindowOpened, source: "robKong", seat, tile, options },
+        { type: EVENT_TYPES.claimWindowOpened, source: "robKong", seat, kind: kind(tile), options },
       );
       return { state, events };
     }
@@ -360,7 +365,7 @@ export const finishWin = (
       seat: winner,
       winType: by === "zimo" ? "zimo" : by === "robKong" ? "robKong" : "ron",
       from,
-      snapshot: state.wins[winner],
+      snapshot: { hand: hand.map(kind), winTile: kind(winTile), lack: state.wins[winner]!.lack },
       scoring: scored,
       activeSeats: seats.filter((s) => state.status[s] === "active"),
     },
@@ -460,7 +465,7 @@ export const resolveClaims = (
         type: "PengMade",
         seat: peng,
         from: pending.discard.seat,
-        tiles: [matching[0]!, matching[1]!, tile],
+        kind: kind(tile),
       },
     );
     append(state, events, { type: "public" }, { type: EVENT_TYPES.turnStarted, seat: peng });

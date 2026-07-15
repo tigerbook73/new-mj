@@ -70,11 +70,11 @@ engine-api 的公共骨架（`types.ts`）只保留跨玩法共用的形状：`G
 `JunkPhase`：`dealing → playing ⇄ awaiting-claims → finished`
 
 - `dealing`：发牌（引擎内部瞬时完成，产出发牌事件后进入 playing）
-- `playing`：当前家行动（打牌/暗杠/补杠/自摸）
+- `playing`：当前家行动（打牌/暗杠/补杠/自摸）；血战另含直杠、抢杠胡与流局结算
 - `awaiting-claims`：声明窗口（见规则文档）
 - `finished`：有人胡或流局
 
-`BloodbattlePhase`：`exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）。`exchanging` 与 `choosing-lack` 都是四家独立提交、全员提交后自动转移的阶段；playing 已实现缺门出牌、碰/胡声明、多赢家和三家胡/牌墙耗尽出口；杠及终局检查仍是阶段 1.5 待办。
+`BloodbattlePhase`：`exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）。`exchanging` 与 `choosing-lack` 都是四家独立提交、全员提交后自动转移的阶段；playing 已实现缺门出牌、碰/胡声明、多赢家、杠、抢杠胡、呼叫转移、三家胡/牌墙耗尽与流局终局结算。
 
 摸牌为引擎自动转移，不是玩家 Action，杠后补摸同理：上一动作的裁决结果若为"轮到某家摸牌"，引擎在同一次 `applyAction` 内自动完成摸牌、发出 TileDrawn 事件并进入该家的 playing（取舍理由见 decisions.md 评审点 C）。摸牌均有事件（#4/#12，双版本），客户端据此渲染摸牌动画：他家播牌背飞入，自己播牌面飞入。
 
@@ -111,10 +111,12 @@ type BloodbattleAction =
 | ExchangeCompleted     | public         | 交换方向、阶段完成；不含任何 TileId                                                                   |
 | TilesReceived         | seat（仅本人） | 收到的三张 TileId                                                                                     |
 | LackChosen            | seat（仅本人） | 自己选择的花色                                                                                        |
-| HuDeclared            | public         | 血战版额外携带完整胡牌快照、`activeSeats`；胡家的快照从手牌容器接管 TileId                            |
+| HuDeclared            | public         | 血战版额外携带公开牌面胡牌快照（TileKind）、`activeSeats`；内部快照仍从手牌容器接管 TileId            |
 | Settled               | public         | `reason`、逐座位增减分；`reason` 为 `win`、`gang`、`gangTransfer`、`huaZhu`、`gangRefund` 或 `daJiao` |
 
-血战 PlayerView 的每个公开 seat 额外带 `status: "active" | "won"` 和（若已胡）公开 `winSnapshot`；仅本人的 view 带 `myLackSuit`、本阶段是否已提交。其他座位的换三张与定缺选择不得泄漏。
+血战 PlayerView 的每个公开 seat 额外带 `status: "active" | "won"`、TileKind 形式的副露/牌河和（若已胡）公开 `winSnapshot`；仅本人的 view 带 TileId 形式的 `hand`、`myLackSuit`、本阶段是否已提交。其他座位的换三张与定缺选择不得泄漏。
+
+`TileDiscarded`、`ClaimWindowOpened`、`PengMade` 等 public 事件只携带 `TileKind`，不得携带可由静态映射反查牌面的 TileId；私有 `TileDrawnPrivate`、选牌事件和内部状态仍可携带 TileId。
 
 - `applyAction(state, seat, action)`：非法即返回 `RuleViolation`（含机器可读 code），state 不变
 - server 超时代提交的 `pass` 与玩家主动 `pass` 完全同型（D5）

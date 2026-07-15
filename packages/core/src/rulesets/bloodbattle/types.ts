@@ -1,5 +1,5 @@
 import type { SeatId, TileId, TileKind } from "@/lib/ids.ts";
-import type { SeatState } from "@/lib/seat.ts";
+import type { Meld, SeatState } from "@/lib/seat.ts";
 import type { PrngState } from "@/lib/prng.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types.ts";
 import {
@@ -62,6 +62,13 @@ export type BloodbattleWinSnapshot = {
   lack: BloodbattleSuit;
 };
 
+export type BloodbattlePublicMeld = Omit<Meld, "tiles"> & { tiles: TileKind[] };
+export type BloodbattlePublicDiscard = { tile: TileKind; claimedBy?: SeatId };
+export type BloodbattlePublicWinSnapshot = Omit<BloodbattleWinSnapshot, "hand" | "winTile"> & {
+  hand: TileKind[];
+  winTile: TileKind;
+};
+
 export type BloodbattleGameResult = {
   winners: SeatId[];
   endReason: BloodbattleEndReason;
@@ -76,19 +83,21 @@ export type BloodbattleGangPayment = {
   transferred?: boolean;
 };
 
-export type BloodbattlePlayerView = PlayerViewBase & {
+export type BloodbattlePlayerView = Omit<PlayerViewBase, "seats"> & {
   phase: BloodbattlePhase;
   seats: Array<
-    PlayerViewBase["seats"][number] & {
+    Omit<PlayerViewBase["seats"][number], "melds" | "discards"> & {
+      melds: BloodbattlePublicMeld[];
+      discards: BloodbattlePublicDiscard[];
       status: BloodbattleStatus;
-      winSnapshot?: BloodbattleWinSnapshot & { melds: SeatState["melds"] };
+      winSnapshot?: BloodbattlePublicWinSnapshot & { melds: BloodbattlePublicMeld[] };
     }
   >;
   scores: [number, number, number, number];
   myLackSuit?: BloodbattleSuit;
   myClaimOptions?: BloodbattleClaimOption[];
   myClaimResponse?: BloodbattleAction;
-  lastDiscard?: { seat: SeatId; tile: TileId };
+  lastDiscard?: { seat: SeatId; tile: TileKind };
   result?: BloodbattleGameResult;
 };
 

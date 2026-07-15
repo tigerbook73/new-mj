@@ -1,7 +1,7 @@
 import type { RulesetModule } from "@/engine.ts";
 import { applyAction, createBloodbattleGame, getLegalActions } from "./state-machine.ts";
 import { getPlayerView } from "./view.ts";
-import type { BloodbattleAction, BloodbattleState } from "./types.ts";
+import type { BloodbattleAction, BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 
 export { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
 export { DEFAULT_BLOODBATTLE_CONFIG, parseBloodbattleConfig } from "./config.ts";
@@ -22,7 +22,11 @@ export type {
   BloodbattlePlayerView,
 } from "./types.ts";
 
-export const bloodbattleRuleSet: RulesetModule<BloodbattleState, BloodbattleAction> = {
+export const bloodbattleRuleSet: RulesetModule<
+  BloodbattleState,
+  BloodbattleAction,
+  BloodbattlePlayerView
+> = {
   createGame: createBloodbattleGame,
   applyAction,
   getLegalActions,

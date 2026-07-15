@@ -10,18 +10,18 @@ import { CORE_ERROR_CODES } from "./errors.ts";
  * else it wants (e.g. junkRuleSet.getPlayerView is reused directly by junk
  * tests) — nothing beyond this shape is a public contract.
  */
-export type RulesetModule<TState, TAction> = {
+export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
   createGame: (seed: number, config?: unknown) => ApplyResult<TState>;
   applyAction: (state: TState, seat: SeatId, action: TAction) => ApplyResult<TState>;
   getLegalActions: (state: TState, seat: SeatId) => readonly TAction[];
-  getPlayerView: (state: TState, seat: SeatId) => PlayerViewBase;
+  getPlayerView: (state: TState, seat: SeatId) => TView;
 };
 
 type StateWithConfig = { config: GameConfig };
 
 // any: registry holds heterogeneous ruleset modules; each entry is concretely
 // typed at its own module, the public functions below re-narrow at the boundary.
-const rulesets: Record<string, RulesetModule<any, any>> = {
+const rulesets: Record<string, RulesetModule<any, any, any>> = {
   junk: junkRuleSet,
   bloodbattle: bloodbattleRuleSet,
 };
