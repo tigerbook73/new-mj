@@ -37,7 +37,7 @@ core ← server → protocol
 
 **事件溯源 + seed 可复现**：洗牌用 state 内可序列化 PRNG；任何一局 = seed + action 序列，可重放调试。事件带 seq 与可见性（public/seat），事件日志天然支持任意玩家视角与上帝视角回放。摸牌是引擎自动转移，非玩家动作。
 
-**core 分层：基建 + RuleSet 插件**：牌墙/事件机制/声明窗口机制/视角遮蔽/手牌分解是公共基建；牌集、合法动作、胡牌判定、计分、流程钩子、胡后走向由 RuleSet 注入。变体之间用 RuleSet（代码），变体之内的地方细则用 config（数据）。变体私有状态进 `variantState` 命名空间。
+**core 分层：engine-api 外壳 + rulesets/\* 独立状态机 + lib 积木**（D12）：`createGame`/`applyAction`/`getLegalActions`/`getPlayerView` 四签名与事件信封是唯一冻结契约，本身不理解任何玩法；每个玩法（`rulesets/junk`、`rulesets/bloodbattle`……）实现自己完整的回合循环、自有 Action/Phase/State，互不 import 对方的流程代码；`lib/` 只收无玩法立场的纯函数积木（牌墙/PRNG/手牌分解/容器不变量）。变体之间用独立的 ruleset 模块（代码），变体之内的地方细则仍用 config（数据）——这条边界不受 D12 影响（D8）。`variantState` 命名空间已撤销：规则状态本身就是完整状态，不再需要一层私有命名空间去隔离。
 
 **可见性模型**：他人手牌、牌墙对客户端不存在——server 只下发 `getPlayerView(state, seat)` 的产物。TileId 与牌面同级敏感。AI 与真人同构：AI 只消费 PlayerView + getLegalActions，物理上无法作弊。
 

@@ -79,9 +79,9 @@
 
 `checkHuaZhu=true` 时 `capFan` 必须为数字（花猪罚分取封顶分）；否则 config 非法。`mustHuOnLastFour=true` 时，牌墙剩余不多于 4 张且某家存在合法胡牌动作，该家必须选择胡牌，不能 `pass` 或继续出牌。
 
-## 7. variantState（血战私有状态预告）
+## 7. BloodbattleState 私有字段（D12 后现状）
 
-定缺选择、各家已胡标记与胡牌快照、换三张阶段数据、杠分流水（含付款人、收款人、是否已转移/退回）——均入 `variantState`，不进公共字段（D6）。
+`variantState` 命名空间已被 D12 撤销：血战私有状态是 `BloodbattleState`（`packages/core/src/rulesets/bloodbattle/types.ts`）顶层的可选字段，不再嵌套一层命名空间。已实现：换三张阶段数据 `exchange?`、定缺选择 `lack?`。尚未实现（playing 阶段落地时补）：各家已胡标记与胡牌快照、杠分流水（含付款人、收款人、是否已转移/退回）——届时同样作为 `BloodbattleState` 顶层字段新增，不引入命名空间。
 
 ---
 

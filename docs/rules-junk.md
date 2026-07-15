@@ -1,6 +1,6 @@
 # 垃圾胡规则（rulesetId: `junk`）
 
-> 状态：v2 定稿，阶段 1 已实现并测试通过（`packages/core/src/rules/junk.ts`）
+> 状态：v2 定稿，阶段 1 已实现并测试通过（`packages/core/src/rulesets/junk/`）
 > 定位：最简玩法，用于验证 core 基建/插件分层（D9）
 
 ## 1. 牌集

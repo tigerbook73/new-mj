@@ -29,16 +29,16 @@ type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: st
 
 ## 2. ack 请求类（client → server）
 
-| 消息                        | payload                                         | data（成功时）                          | 主要错误码                                                        |
-| --------------------------- | ----------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
-| `lobby:list`                | `{}`                                            | `RoomSummary[]`（id、玩法、人数、状态） | —                                                                 |
-| `room:create`               | `{ rulesetId, config? }`                        | `RoomInfo` 快照（创建即入座）           | `INVALID_CONFIG`                                                  |
-| `room:join`                 | `{ roomId }`                                    | `RoomInfo` 快照                         | `ROOM_NOT_FOUND` `ROOM_FULL` `ALREADY_IN_ROOM`                    |
-| `room:leave`                | `{}`                                            | `{}`                                    | `NOT_IN_ROOM`（对局中允许离座：转托管，见评审点 H）               |
-| `room:ready`                | `{ ready: boolean }`                            | `{}`                                    | `NOT_IN_ROOM`                                                     |
-| `room:addBot`               | `{}`                                            | `RoomInfo`                              | `ROOM_FULL`（仅房主，MVP 简化）                                   |
-| `game:action`               | `{ action: Action }`（core 的 Action 原样透传） | `{}`                                    | `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core 的 RuleViolation code） |
-| `profile:get` / `stats:get` | `{}` / `{ userId? }`                            | 资料 / 战绩                             | 阶段 4 才实现，先占位                                             |
+| 消息                        | payload                                                                                              | data（成功时）                          | 主要错误码                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
+| `lobby:list`                | `{}`                                                                                                 | `RoomSummary[]`（id、玩法、人数、状态） | —                                                                 |
+| `room:create`               | `{ rulesetId, config? }`                                                                             | `RoomInfo` 快照（创建即入座）           | `INVALID_CONFIG`                                                  |
+| `room:join`                 | `{ roomId }`                                                                                         | `RoomInfo` 快照                         | `ROOM_NOT_FOUND` `ROOM_FULL` `ALREADY_IN_ROOM`                    |
+| `room:leave`                | `{}`                                                                                                 | `{}`                                    | `NOT_IN_ROOM`（对局中允许离座：转托管，见评审点 H）               |
+| `room:ready`                | `{ ready: boolean }`                                                                                 | `{}`                                    | `NOT_IN_ROOM`                                                     |
+| `room:addBot`               | `{}`                                                                                                 | `RoomInfo`                              | `ROOM_FULL`（仅房主，MVP 简化）                                   |
+| `game:action`               | `{ action: Action }`（core 按 rulesetId 判别的 Action 联合原样透传，见 core-types-and-events.md §4） | `{}`                                    | `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core 的 RuleViolation code） |
+| `profile:get` / `stats:get` | `{}` / `{ userId? }`                                                                                 | 资料 / 战绩                             | 阶段 4 才实现，先占位                                             |
 
 说明：
 
