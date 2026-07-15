@@ -5,10 +5,13 @@ export type TileId = number;
 export type TileKind =
   `${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}${"m" | "p" | "s"}` | `${1 | 2 | 3 | 4 | 5 | 6 | 7}${"z"}`;
 
-export type Phase = "dealing" | "playing" | "awaiting-claims" | "finished";
+export type Phase =
+  "dealing" | "exchanging" | "choosing-lack" | "playing" | "awaiting-claims" | "finished";
 export type MeldType = "chi" | "peng" | "minGang" | "anGang" | "buGang";
 
 export type Action =
+  | { type: "exchangeThree"; tiles: [TileId, TileId, TileId] }
+  | { type: "chooseLack"; suit: "m" | "p" | "s" }
   | { type: "discard"; tile: TileId }
   | { type: "anGang"; kind: TileKind }
   | { type: "buGang"; tile: TileId }

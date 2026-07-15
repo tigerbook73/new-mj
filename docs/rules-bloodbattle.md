@@ -110,15 +110,17 @@
 - id: bb-002
   desc: 清一色+根·自摸
   config: standard
-  hand: [1m, 1m, 1m, 1m, 2m, 3m, 4m, 5m, 6m, 7m, 7m, 8m, 8m]
-  melds: []
+  # 暗杠计入 melds（不裸放在 hand 里）；有一副杠时 melds(4)+hand+win 的总数
+  # 应为 14+1=15（杠后多领一张补牌），而不是普通的 14。
+  melds: [{ type: anGang, tiles: [1m, 1m, 1m, 1m] }]
+  hand: [2m, 3m, 4m, 5m, 6m, 7m, 8m, 8m, 9m, 9m]
   lack: p
-  win: { tile: 9m, by: zimo }
+  win: { tile: 8m, by: zimo }
   context: {}
   expect:
     hu: true
-    fanTypes: [qingyise, gen, zimo] # 一个根：1111m
-    fan: 4 # 2+1+1
+    fanTypes: [pinghu, qingyise, gen, zimo] # 基础型（含顺子，非对对胡）仍需列出，即便贡献 0 番；一个根：1111m
+    fan: 4 # 0+2+1+1
     multiplier: 16 # capFan=4 → 2^4
     cappedAt: 4
 
@@ -133,8 +135,11 @@
 
 ## 约定
 
-- `expect.fanTypes` 为**集合语义**（顺序无关，重复项表多个根）
+- `expect.fanTypes` 为**集合语义**（顺序无关，重复项表多个根）；基础型（`pinghu`/`duiduihu`/`qiduizi`/`longqidui`/`jingoudiao`）**始终**列在 `fanTypes` 里，即使 `pinghu` 贡献 0 番也不能省略——否则空的基础型加满附加番会看起来跟"没有基础型"混淆
 - 封顶用例须同时给出 `fan`（原始）与 `cappedAt`，验证封顶逻辑独立可测
+- `cappedAt` 只在 `capFan` 为数字**且** `fan >= capFan` 时出现在 `expect` 里；`capFan` 为 `null`，或 `fan < capFan`（封顶未触及）时不带这个字段——不是"只要 `capFan` 有数值就必带"
 - 负例（`hu: false`）必须带机器可读 `reason`
 - 每个番型至少：1 正例、1 边界例、1 与相邻番型的区分例（如清对 vs 清一色+对对胡分开计的错误写法）
+- 杠（明杠/暗杠/补杠）一律记入 `melds`（一条 4 张的记录），`hand` 里不出现裸的四张相同——七对/龙七对家族例外，那是变体定义本身要求四张仍留在 `hand` 里。有 N 副杠时，`melds`(每副杠 4 张) + `hand` + `win.tile` 的总数 = 14+N（每副杠对应一次杠后补牌）
+- 操作附加番之间默认可叠加（如杠上炮+海底炮同时成立），只有基础型（平胡/对对胡/七对/龙七对/金钩钓）互斥；杠上花（`by: kongFlower`）本质是自摸，`selfDrawBonus='addFan'` 时与 `zimo` 同时计入
 - 垃圾胡用例同格式（`config: junk-standard`，expect 仅 `hu: true/false`），量很小
