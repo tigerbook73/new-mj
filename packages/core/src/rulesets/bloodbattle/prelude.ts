@@ -1,10 +1,10 @@
-import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
-import { createPrng, nextInt } from "../../lib/prng.ts";
-import { TILE_KINDS, createTileSet } from "../../lib/tiles.ts";
-import { createWall } from "../../lib/wall.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "@/events.ts";
+import { createPrng, nextInt } from "@/lib/prng.ts";
+import { TILE_KINDS, createTileSet } from "@/lib/tiles.ts";
+import { createWall } from "@/lib/wall.ts";
 import { parseBloodbattleConfig } from "./config.ts";
-import type { SeatId, TileId } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import type { SeatId, TileId } from "@/lib/ids.ts";
+import type { SeatState } from "@/lib/seat.ts";
 import type { BloodbattleApplyResult, BloodbattleConfig, BloodbattleState } from "./types.ts";
 
 // 108 tiles: m/p/s 1-9 x4, no honors (rules-bloodbattle.md §1).

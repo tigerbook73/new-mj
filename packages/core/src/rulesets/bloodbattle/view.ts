@@ -1,4 +1,4 @@
-import type { SeatId } from "../../lib/ids.ts";
+import type { SeatId } from "@/lib/ids.ts";
 import type { BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 
 export const getPlayerView = (state: BloodbattleState, seat: SeatId): BloodbattlePlayerView => ({

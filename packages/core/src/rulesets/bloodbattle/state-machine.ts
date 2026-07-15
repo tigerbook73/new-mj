@@ -1,7 +1,7 @@
-import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
-import type { SeatId, TileId } from "../../lib/ids.ts";
-import { type Meld, type SeatState } from "../../lib/seat.ts";
+import { assertTileConservation } from "@/lib/invariants.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "@/events.ts";
+import type { SeatId, TileId } from "@/lib/ids.ts";
+import { type Meld, type SeatState } from "@/lib/seat.ts";
 import {
   BLOODBATTLE_TILE_SET,
   applyChooseLack,
@@ -69,7 +69,7 @@ export const scoreFor = (
   state: BloodbattleState,
   seat: SeatId,
   winTile: TileId,
-  by: "zimo" | "discard",
+  by: "zimo" | "discard" | "robKong",
 ) => {
   const own = state.seats[seat]!;
   const hand = [...own.hand];
@@ -235,7 +235,7 @@ const applyAnGang = (
   drawReplacement(state, events, seat);
   return { state, events };
 };
-const applyBuGang = (
+const completeBuGang = (
   state: BloodbattleState,
   seat: SeatId,
   tile: TileId,
@@ -255,12 +255,48 @@ const applyBuGang = (
   drawReplacement(state, events, seat);
   return { state, events };
 };
+const applyBuGang = (
+  state: BloodbattleState,
+  seat: SeatId,
+  tile: TileId,
+  events: GameEvent[],
+): BloodbattleApplyResult => {
+  if (state.phase !== "playing" || state.currentSeat !== seat) return fail("GANG_NOT_AVAILABLE");
+  if (kind(tile)[1] !== state.lack?.[seat]) return fail("GANG_NOT_AVAILABLE");
+  const peng = state.seats[seat]!.melds.find(
+    (meld) => meld.type === "peng" && kind(meld.tiles[0]!) === kind(tile),
+  );
+  if (!peng || !state.seats[seat]!.hand.includes(tile)) return fail("GANG_NOT_AVAILABLE");
+  if (state.config.robKong) {
+    const options: NonNullable<BloodbattleState["pendingClaims"]>["options"] = {};
+    for (const candidate of seats) {
+      if (
+        candidate !== seat &&
+        state.status[candidate] === "active" &&
+        isWin(state, candidate, tile)
+      )
+        options[candidate] = [{ action: { type: "hu" } }];
+    }
+    if (Object.keys(options).length > 0) {
+      state.phase = "awaiting-claims";
+      state.pendingClaims = { discard: { seat, tile }, source: "robKong", options, responses: {} };
+      append(
+        state,
+        events,
+        { type: "public" },
+        { type: "ClaimWindowOpened", source: "robKong", seat, tile, options },
+      );
+      return { state, events };
+    }
+  }
+  return completeBuGang(state, seat, tile, events);
+};
 export const finishWin = (
   state: BloodbattleState,
   events: GameEvent[],
   winner: SeatId,
   winTile: TileId,
-  by: "zimo" | "discard",
+  by: "zimo" | "discard" | "robKong",
   from?: SeatId,
 ): void => {
   const scored = scoreFor(state, winner, winTile, by);
@@ -279,7 +315,7 @@ export const finishWin = (
     {
       type: "HuDeclared",
       seat: winner,
-      winType: by === "zimo" ? "zimo" : "ron",
+      winType: by === "zimo" ? "zimo" : by === "robKong" ? "robKong" : "ron",
       from,
       snapshot: state.wins[winner],
       scoring: scored,
@@ -300,6 +336,16 @@ export const resolveClaims = (
   const responses = pending.responses;
   const hu = seats.filter((s) => responses[s]?.type === "hu");
   const winners = state.config.multiWinOnDiscard ? hu : hu.slice(0, 1);
+  if (pending.source === "robKong") {
+    if (winners.length) {
+      for (const winner of winners)
+        finishWin(state, events, winner, pending.discard.tile, "robKong", pending.discard.seat);
+      delete state.pendingClaims;
+      return { state, events };
+    }
+    delete state.pendingClaims;
+    return completeBuGang(state, pending.discard.seat, pending.discard.tile, events);
+  }
   if (winners.length) {
     const tile = pending.discard.tile;
     for (const winner of winners)

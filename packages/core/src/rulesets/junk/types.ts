@@ -1,7 +1,7 @@
-import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
-import type { PrngState } from "../../lib/prng.ts";
-import type { ApplyResult, GameConfig, PlayerViewBase } from "../../types.ts";
+import type { SeatId, TileId, TileKind } from "@/lib/ids.ts";
+import type { SeatState } from "@/lib/seat.ts";
+import type { PrngState } from "@/lib/prng.ts";
+import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types.ts";
 
 export type JunkPhase = "dealing" | "playing" | "awaiting-claims" | "finished";
 

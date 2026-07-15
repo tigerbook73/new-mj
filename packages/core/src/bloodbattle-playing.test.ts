@@ -130,3 +130,31 @@ test("minGang resolves from a discard and charges only the discarder", () => {
     ]);
   }
 });
+
+test("buGang opens a rob-kong window before collecting gang payments", () => {
+  const state = playingState();
+  state.seats[0]!.melds = [{ type: "peng", tiles: [4, 5, 6], from: 1 }];
+  state.seats[0]!.hand = [7, ...state.seats[0]!.hand.filter((tile) => tile >= 36)];
+  state.seats[1]!.hand = [8, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24];
+  state.lack![1] = "s";
+  state.wall = allTileIds(BLOODBATTLE_TILE_SET).filter(
+    (tile) =>
+      !state.seats.some(
+        (entry) =>
+          entry.hand.includes(tile) || entry.melds.some((meld) => meld.tiles.includes(tile)),
+      ),
+  );
+  const opened = applyAction(state, 0, { type: "buGang", tile: 7 });
+  expect("state" in opened).toBe(true);
+  if (!("state" in opened)) return;
+  const openedState = opened.state as BloodbattleState;
+  expect(openedState.phase).toBe("awaiting-claims");
+  expect(openedState.pendingClaims?.source).toBe("robKong");
+  const robbed = applyAction(openedState, 1, { type: "hu" });
+  expect("state" in robbed).toBe(true);
+  if ("state" in robbed) {
+    const next = robbed.state as BloodbattleState;
+    expect(next.wins?.[1]?.winTile).toBe(7);
+    expect(next.gangPayments).toHaveLength(0);
+  }
+});

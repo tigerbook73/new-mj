@@ -1,4 +1,4 @@
-import type { TileKind } from "../../lib/ids.ts";
+import type { TileKind } from "@/lib/ids.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 
 const suits = ["m", "p", "s"] as const;

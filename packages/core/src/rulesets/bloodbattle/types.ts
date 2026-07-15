@@ -1,7 +1,7 @@
-import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
-import type { PrngState } from "../../lib/prng.ts";
-import type { ApplyResult, GameConfig, PlayerViewBase } from "../../types.ts";
+import type { SeatId, TileId, TileKind } from "@/lib/ids.ts";
+import type { SeatState } from "@/lib/seat.ts";
+import type { PrngState } from "@/lib/prng.ts";
+import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types.ts";
 
 export type BloodbattlePhase =
   "exchanging" | "choosing-lack" | "playing" | "awaiting-claims" | "finished";
@@ -39,6 +39,7 @@ export type BloodbattleClaimOption = { action: BloodbattleClaimAction };
 
 export type BloodbattlePendingClaims = {
   discard: { seat: SeatId; tile: TileId };
+  source?: "discard" | "robKong";
   options: Partial<Record<SeatId, BloodbattleClaimOption[]>>;
   responses: Partial<Record<SeatId, BloodbattleAction>>;
 };

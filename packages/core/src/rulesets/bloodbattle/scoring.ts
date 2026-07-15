@@ -1,4 +1,4 @@
-import type { TileKind } from "../../lib/ids.ts";
+import type { TileKind } from "@/lib/ids.ts";
 
 // Tile-count convention (see docs/rules-bloodbattle.md "约定"): a kong
 // (anGang/minGang/buGang) is always represented as a 4-tile entry in `melds`,

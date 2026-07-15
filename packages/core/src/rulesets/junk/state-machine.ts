@@ -1,11 +1,11 @@
-import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
-import { createPrng, nextInt } from "../../lib/prng.ts";
-import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
-import { isSevenPairsWinningHand, isStandardWinningHand } from "../../lib/win.ts";
-import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import { assertTileConservation } from "@/lib/invariants.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "@/events.ts";
+import { createPrng, nextInt } from "@/lib/prng.ts";
+import { STANDARD_TILE_SET } from "@/lib/tiles.ts";
+import { createWall, drawFromHead, drawFromTail } from "@/lib/wall.ts";
+import { isSevenPairsWinningHand, isStandardWinningHand } from "@/lib/win.ts";
+import type { SeatId, TileId, TileKind } from "@/lib/ids.ts";
+import type { SeatState } from "@/lib/seat.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 import type {
   JunkApplyResult,

@@ -1,7 +1,7 @@
-import type { GameEvent } from "../../events.ts";
-import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { SeatId } from "../../lib/ids.ts";
-import type { Meld } from "../../lib/seat.ts";
+import type { GameEvent } from "@/events.ts";
+import { STANDARD_TILE_SET } from "@/lib/tiles.ts";
+import type { SeatId } from "@/lib/ids.ts";
+import type { Meld } from "@/lib/seat.ts";
 import type { JunkAction, JunkApplyResult, JunkClaimAction, JunkState } from "./types.ts";
 import {
   appendEvent,
