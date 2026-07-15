@@ -1,5 +1,5 @@
 import { assertTileConservation } from "@/lib/invariants.ts";
-import { createEvent, nextEventSeq, type GameEvent } from "@/events.ts";
+import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "@/events.ts";
 import { createPrng, nextInt } from "@/lib/prng.ts";
 import { STANDARD_TILE_SET } from "@/lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "@/lib/wall.ts";
@@ -152,8 +152,11 @@ export const emitDraw = (
   if (!drawn) {
     state.phase = "finished";
     state.result = { type: "draw", scoreDeltas: [0, 0, 0, 0] };
-    appendEvent(state, events, publicVisibility, { type: "WallExhausted" });
-    appendEvent(state, events, publicVisibility, { type: "GameEnded", result: state.result });
+    appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.wallExhausted });
+    appendEvent(state, events, publicVisibility, {
+      type: EVENT_TYPES.gameEnded,
+      result: state.result,
+    });
     return false;
   }
   state.wall = drawn.wall;
@@ -180,7 +183,7 @@ export const beginTurn = (
   state.currentSeat = seat;
   state.phase = "playing";
   if (draw && !emitDraw(state, events, seat, replacement)) return;
-  appendEvent(state, events, publicVisibility, { type: "TurnStarted", seat });
+  appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.turnStarted, seat });
 };
 
 export const settleWins = (
@@ -223,14 +226,14 @@ export const finishWin = (
       : [...state.seats[winner]!.hand, winningTile];
   const payload =
     from === undefined
-      ? { type: "HuDeclared", seat: winner, winType, hand: revealedHand }
-      : { type: "HuDeclared", seat: winner, winType, hand: revealedHand, from };
+      ? { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand }
+      : { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand, from };
   appendEvent(state, events, publicVisibility, payload);
   appendEvent(state, events, publicVisibility, {
-    type: "Settled",
+    type: EVENT_TYPES.settled,
     scoreDeltas: result.scoreDeltas,
   });
-  appendEvent(state, events, publicVisibility, { type: "GameEnded", result });
+  appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.gameEnded, result });
 };
 
 export const finishRonWins = (
@@ -245,7 +248,7 @@ export const finishRonWins = (
   state.result = result;
   for (const winner of winners) {
     appendEvent(state, events, publicVisibility, {
-      type: "HuDeclared",
+      type: EVENT_TYPES.huDeclared,
       seat: winner,
       winType: "ron",
       hand: [...state.seats[winner]!.hand, tile],
@@ -253,10 +256,10 @@ export const finishRonWins = (
     });
   }
   appendEvent(state, events, publicVisibility, {
-    type: "Settled",
+    type: EVENT_TYPES.settled,
     scoreDeltas: result.scoreDeltas,
   });
-  appendEvent(state, events, publicVisibility, { type: "GameEnded", result });
+  appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.gameEnded, result });
 };
 
 export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void => {
@@ -272,11 +275,11 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void =>
     meld.type = "buGang";
     meld.tiles.push(tile);
     appendEvent(state, events, publicVisibility, {
-      type: "ClaimWindowResolved",
+      type: EVENT_TYPES.claimWindowResolved,
       result: "unclaimed",
     });
     appendEvent(state, events, publicVisibility, {
-      type: "GangMade",
+      type: EVENT_TYPES.gangMade,
       seat,
       gangType: "buGang",
       tiles: [...meld.tiles],
@@ -287,7 +290,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void =>
   const discardedBy = state.pendingClaims!.discard.seat;
   delete state.pendingClaims;
   appendEvent(state, events, publicVisibility, {
-    type: "ClaimWindowResolved",
+    type: EVENT_TYPES.claimWindowResolved,
     result: "unclaimed",
   });
   beginTurn(state, events, nextSeat(discardedBy), true);
@@ -306,7 +309,7 @@ export const applyDiscard = (
   state.seats[seat]!.hand = remaining;
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
-  appendEvent(state, events, publicVisibility, { type: "TileDiscarded", seat, tile });
+  appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
     options: {},
@@ -318,7 +321,7 @@ export const applyDiscard = (
     if (candidateOptions.length === 0) continue;
     options.options[candidate] = candidateOptions;
     appendEvent(state, events, seatVisibility(candidate), {
-      type: "ClaimWindowOpened",
+      type: EVENT_TYPES.claimWindowOpened,
       options: candidateOptions,
     });
   }
@@ -341,9 +344,13 @@ export const applyAnGang = (
   if (tiles.length !== 4) return fail("GANG_NOT_AVAILABLE");
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
-  appendEvent(state, events, publicVisibility, { type: "GangMade", seat, gangType: "anGang" });
+  appendEvent(state, events, publicVisibility, {
+    type: EVENT_TYPES.gangMade,
+    seat,
+    gangType: "anGang",
+  });
   appendEvent(state, events, seatVisibility(seat), {
-    type: "GangMade",
+    type: EVENT_TYPES.gangMade,
     seat,
     gangType: "anGang",
     tiles,
@@ -378,7 +385,7 @@ export const applyBuGang = (
       if (candidateOptions.length === 0) continue;
       state.pendingClaims.options[candidate] = candidateOptions;
       appendEvent(state, events, seatVisibility(candidate), {
-        type: "ClaimWindowOpened",
+        type: EVENT_TYPES.claimWindowOpened,
         options: candidateOptions,
       });
     }
@@ -393,7 +400,7 @@ export const applyBuGang = (
   meld.type = "buGang";
   meld.tiles.push(tile);
   appendEvent(state, events, publicVisibility, {
-    type: "GangMade",
+    type: EVENT_TYPES.gangMade,
     seat,
     gangType: "buGang",
     tiles: [...meld.tiles],
@@ -419,7 +426,7 @@ export const createJunkGame = (seed: number, config: unknown = {}): JunkApplyRes
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {
-    type: "GameStarted",
+    type: EVENT_TYPES.gameStarted,
     config: state.config,
     dealer,
     handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
@@ -430,13 +437,13 @@ export const createJunkGame = (seed: number, config: unknown = {}): JunkApplyRes
     for (let index = 0; index < count; index += 1)
       state.seats[seat]!.hand.push(state.wall.shift()!);
     appendEvent(state, events, seatVisibility(seat), {
-      type: "HandDealt",
+      type: EVENT_TYPES.handDealt,
       seat,
       tiles: [...state.seats[seat]!.hand],
     });
   }
   state.phase = "playing";
-  appendEvent(state, events, publicVisibility, { type: "TurnStarted", seat: dealer });
+  appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.turnStarted, seat: dealer });
   assertTileConservation(state);
   return { state, events };
 };

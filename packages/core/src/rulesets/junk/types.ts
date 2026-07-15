@@ -2,8 +2,10 @@ import type { SeatId, TileId, TileKind } from "@/lib/ids.ts";
 import type { SeatState } from "@/lib/seat.ts";
 import type { PrngState } from "@/lib/prng.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types.ts";
+import { JUNK_MULTI_HU_POLICIES, JUNK_PHASES } from "./constants.ts";
 
-export type JunkPhase = "dealing" | "playing" | "awaiting-claims" | "finished";
+export type JunkPhase = (typeof JUNK_PHASES)[number];
+export type JunkMultiHuPolicy = (typeof JUNK_MULTI_HU_POLICIES)[number];
 
 export type JunkAction =
   | { type: "discard"; tile: TileId }
@@ -26,7 +28,7 @@ export type JunkConfig = GameConfig & {
   rulesetId: "junk";
   sevenPairs: boolean;
   robKong: boolean;
-  multiHuPolicy: "headJump" | "all";
+  multiHuPolicy: JunkMultiHuPolicy;
 };
 
 export type JunkPendingClaims = {

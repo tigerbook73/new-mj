@@ -24,6 +24,7 @@
 5. **容器唯一性**：任一 TileId 物理上只归属一个容器（牌墙/手牌/牌河活跃条目/副露/胡牌快照）；被声明的牌入副露，牌河留墓碑。
 6. **ack 与事件**：查询=ack 给数据；命令=ack 给回执、状态走事件广播（含本人、幂等）；进新上下文=ack 给快照。客户端不得依据命令 ack 更新状态。
 7. **分层**（依赖规则强制）：`lib/` 不含玩法分支，复用以纯函数积木下沉为准（不是"提取公共接口方法"，D12）；`rulesets/*` 互不 import 对方流程代码；玩法内部地方细则用 config（D8 边界）；server/client 不实现规则（UI 由 myClaimOptions/getLegalActions 驱动）。
+8. **core 代码约定**：公共/玩法/计分/事件常量按模块归拢；Action/State 类型保留可读字面量联合。`packages/core/src` 跨层引用使用包内 `@/*` alias，禁止直接 import 父级目录。
 
 ## DoD（细则见 workflow.md）
 

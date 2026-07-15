@@ -1,4 +1,4 @@
-import type { GameEvent } from "@/events.ts";
+import { EVENT_TYPES, type GameEvent } from "@/events.ts";
 import { STANDARD_TILE_SET } from "@/lib/tiles.ts";
 import type { SeatId } from "@/lib/ids.ts";
 import type { Meld } from "@/lib/seat.ts";
@@ -49,7 +49,7 @@ export const resolveClaimWindow = (state: JunkState, events: GameEvent[]): void 
   const discard = pending.discard;
   delete state.pendingClaims;
   appendEvent(state, events, publicVisibility, {
-    type: "ClaimWindowResolved",
+    type: EVENT_TYPES.claimWindowResolved,
     seat,
     action: action.type,
   });
@@ -114,7 +114,7 @@ export const applyClaimResponse = (
   if (action.type !== "pass" && !options.some((option) => actionEquals(option.action, action)))
     return fail("CLAIM_NOT_AVAILABLE");
   state.pendingClaims.responses[seat] = action;
-  appendEvent(state, events, seatVisibility(seat), { type: "ClaimResponded", action });
+  appendEvent(state, events, seatVisibility(seat), { type: EVENT_TYPES.claimResponded, action });
   if (allResponded(state)) resolveClaimWindow(state, events);
   return { state, events };
 };

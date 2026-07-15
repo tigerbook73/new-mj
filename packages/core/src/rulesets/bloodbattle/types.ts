@@ -2,9 +2,21 @@ import type { SeatId, TileId, TileKind } from "@/lib/ids.ts";
 import type { SeatState } from "@/lib/seat.ts";
 import type { PrngState } from "@/lib/prng.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types.ts";
+import {
+  BLOODBATTLE_DRAW_BONUSES,
+  BLOODBATTLE_END_REASONS,
+  BLOODBATTLE_PHASES,
+  BLOODBATTLE_STATUSES,
+  BLOODBATTLE_SUITS,
+  BLOODBATTLE_WIN_TYPES,
+} from "./constants.ts";
 
-export type BloodbattlePhase =
-  "exchanging" | "choosing-lack" | "playing" | "awaiting-claims" | "finished";
+export type BloodbattlePhase = (typeof BLOODBATTLE_PHASES)[number];
+export type BloodbattleSuit = (typeof BLOODBATTLE_SUITS)[number];
+export type BloodbattleStatus = (typeof BLOODBATTLE_STATUSES)[number];
+export type BloodbattleEndReason = (typeof BLOODBATTLE_END_REASONS)[number];
+export type BloodbattleWinType = (typeof BLOODBATTLE_WIN_TYPES)[number];
+export type BloodbattleDrawBonus = (typeof BLOODBATTLE_DRAW_BONUSES)[number];
 
 export type BloodbattleConfig = GameConfig & {
   rulesetId: "bloodbattle";
@@ -15,13 +27,13 @@ export type BloodbattleConfig = GameConfig & {
   checkHuaZhu: boolean;
   checkDaJiao: boolean;
   gangRefund: boolean;
-  selfDrawBonus: "addFan" | "addBase";
+  selfDrawBonus: BloodbattleDrawBonus;
   mustHuOnLastFour: boolean;
 };
 
 export type BloodbattleAction =
   | { type: "exchangeThree"; tiles: [TileId, TileId, TileId] }
-  | { type: "chooseLack"; suit: "m" | "p" | "s" }
+  | { type: "chooseLack"; suit: BloodbattleSuit }
   | { type: "discard"; tile: TileId }
   | { type: "anGang"; kind: TileKind }
   | { type: "buGang"; tile: TileId }
@@ -47,12 +59,12 @@ export type BloodbattlePendingClaims = {
 export type BloodbattleWinSnapshot = {
   hand: TileId[];
   winTile: TileId;
-  lack: "m" | "p" | "s";
+  lack: BloodbattleSuit;
 };
 
 export type BloodbattleGameResult = {
   winners: SeatId[];
-  endReason: "allWin" | "wallExhausted";
+  endReason: BloodbattleEndReason;
 };
 
 export type BloodbattleGangPayment = {
@@ -68,12 +80,12 @@ export type BloodbattlePlayerView = PlayerViewBase & {
   phase: BloodbattlePhase;
   seats: Array<
     PlayerViewBase["seats"][number] & {
-      status: "active" | "won";
+      status: BloodbattleStatus;
       winSnapshot?: BloodbattleWinSnapshot & { melds: SeatState["melds"] };
     }
   >;
   scores: [number, number, number, number];
-  myLackSuit?: "m" | "p" | "s";
+  myLackSuit?: BloodbattleSuit;
   myClaimOptions?: BloodbattleClaimOption[];
   myClaimResponse?: BloodbattleAction;
   lastDiscard?: { seat: SeatId; tile: TileId };
@@ -89,11 +101,11 @@ export type BloodbattleState = {
   seq: number;
   prng: PrngState;
   scores: [number, number, number, number];
-  status: ["active" | "won", "active" | "won", "active" | "won", "active" | "won"];
+  status: [BloodbattleStatus, BloodbattleStatus, BloodbattleStatus, BloodbattleStatus];
   // Pre-play submissions, one per seat; flattened out of the old
   // variantState namespace (D12 retires variantState entirely).
   exchange?: { selections: Partial<Record<SeatId, [TileId, TileId, TileId]>> };
-  lack?: Partial<Record<SeatId, "m" | "p" | "s">>;
+  lack?: Partial<Record<SeatId, BloodbattleSuit>>;
   wins?: Partial<Record<SeatId, BloodbattleWinSnapshot>>;
   lastDiscard?: { seat: SeatId; tile: TileId };
   pendingClaims?: BloodbattlePendingClaims;

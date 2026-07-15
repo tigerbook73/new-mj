@@ -1,4 +1,5 @@
 import type { JunkConfig } from "./types.ts";
+import { JUNK_MULTI_HU_POLICIES } from "./constants.ts";
 
 export const DEFAULT_JUNK_CONFIG: JunkConfig = {
   rulesetId: "junk",
@@ -19,17 +20,20 @@ export const parseJunkConfig = (
     (candidate.sevenPairs !== undefined && typeof candidate.sevenPairs !== "boolean") ||
     (candidate.robKong !== undefined && typeof candidate.robKong !== "boolean") ||
     (candidate.multiHuPolicy !== undefined &&
-      candidate.multiHuPolicy !== "headJump" &&
-      candidate.multiHuPolicy !== "all")
+      !JUNK_MULTI_HU_POLICIES.includes(candidate.multiHuPolicy as JunkConfig["multiHuPolicy"]))
   ) {
     return { error: { code: "INVALID_CONFIG" } };
   }
+  const multiHuPolicy =
+    candidate.multiHuPolicy === undefined
+      ? DEFAULT_JUNK_CONFIG.multiHuPolicy
+      : (candidate.multiHuPolicy as JunkConfig["multiHuPolicy"]);
   return {
     config: {
       ...DEFAULT_JUNK_CONFIG,
       ...(candidate.sevenPairs === undefined ? {} : { sevenPairs: candidate.sevenPairs }),
       ...(candidate.robKong === undefined ? {} : { robKong: candidate.robKong }),
-      ...(candidate.multiHuPolicy === undefined ? {} : { multiHuPolicy: candidate.multiHuPolicy }),
+      multiHuPolicy,
     },
   };
 };

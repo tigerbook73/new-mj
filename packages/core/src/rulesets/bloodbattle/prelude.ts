@@ -1,22 +1,19 @@
-import { createEvent, nextEventSeq, type GameEvent } from "@/events.ts";
+import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "@/events.ts";
 import { createPrng, nextInt } from "@/lib/prng.ts";
-import { TILE_KINDS, createTileSet } from "@/lib/tiles.ts";
 import { createWall } from "@/lib/wall.ts";
 import { parseBloodbattleConfig } from "./config.ts";
 import type { SeatId, TileId } from "@/lib/ids.ts";
 import type { SeatState } from "@/lib/seat.ts";
 import type { BloodbattleApplyResult, BloodbattleConfig, BloodbattleState } from "./types.ts";
+import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 
-// 108 tiles: m/p/s 1-9 x4, no honors (rules-bloodbattle.md §1).
-export const BLOODBATTLE_TILE_SET = createTileSet(
-  TILE_KINDS.filter((kind) => !kind.endsWith("z")),
-  4,
-);
+export { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 const publicVisibility = { type: "public" } as const;
 const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats: [seat] });
 
-const seats = (): SeatState[] => [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
+const seats = (): SeatState[] =>
+  BLOODBATTLE_SEATS.map(() => ({ hand: [], melds: [], discards: [] }));
 
 const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
@@ -81,7 +78,7 @@ export const createBloodbattlePrelude = (seed: number, config: unknown): Bloodba
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {
-    type: "GameStarted",
+    type: EVENT_TYPES.gameStarted,
     config: state.config,
     dealer,
     handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
@@ -92,7 +89,7 @@ export const createBloodbattlePrelude = (seed: number, config: unknown): Bloodba
     for (let index = 0; index < count; index += 1)
       state.seats[seat]!.hand.push(state.wall.shift()!);
     appendEvent(state, events, seatVisibility(seat), {
-      type: "HandDealt",
+      type: EVENT_TYPES.handDealt,
       seat,
       tiles: [...state.seats[seat]!.hand],
     });
@@ -171,7 +168,7 @@ export const applyChooseLack = (
 
   clonedState.phase = "playing";
   appendEvent(clonedState, events, publicVisibility, {
-    type: "TurnStarted",
+    type: EVENT_TYPES.turnStarted,
     seat: clonedState.currentSeat,
   });
   return { state: clonedState, events };

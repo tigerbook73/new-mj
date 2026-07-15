@@ -1,8 +1,8 @@
 import type { TileKind } from "@/lib/ids.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
+import { BLOODBATTLE_SUITS } from "./constants.ts";
 
-const suits = ["m", "p", "s"] as const;
-const kinds = suits.flatMap((suit) =>
+const kinds = BLOODBATTLE_SUITS.flatMap((suit) =>
   Array.from({ length: 9 }, (_, i) => `${i + 1}${suit}` as TileKind),
 );
 

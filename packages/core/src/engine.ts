@@ -2,6 +2,7 @@ import type { SeatId } from "./lib/ids.ts";
 import { junkRuleSet } from "./rulesets/junk/index.ts";
 import { bloodbattleRuleSet } from "./rulesets/bloodbattle/index.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "./types.ts";
+import { CORE_ERROR_CODES } from "./errors.ts";
 
 /**
  * Consumer-defined minimal contract: only the four functions the engine-api
@@ -29,7 +30,7 @@ const getRuleset = (rulesetId: string) => rulesets[rulesetId];
 
 export const createGame = (config: GameConfig, seed: number): ApplyResult<unknown> =>
   getRuleset(config.rulesetId)?.createGame(seed, config) ?? {
-    error: { code: "UNKNOWN_RULESET" },
+    error: { code: CORE_ERROR_CODES.unknownRuleset },
   };
 
 /** Public core boundary. Server/UI select no rules: state.config.rulesetId selects the ruleset module. */
@@ -39,7 +40,7 @@ export const applyAction = (
   action: unknown,
 ): ApplyResult<unknown> =>
   getRuleset(state.config.rulesetId)?.applyAction(state, seat, action) ?? {
-    error: { code: "UNKNOWN_RULESET" },
+    error: { code: CORE_ERROR_CODES.unknownRuleset },
   };
 
 export const getLegalActions = (state: StateWithConfig, seat: SeatId): readonly unknown[] =>

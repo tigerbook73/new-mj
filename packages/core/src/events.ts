@@ -1,4 +1,25 @@
 import type { SeatId } from "./lib/ids.ts";
+import { CORE_ERROR_CODES } from "./errors.ts";
+
+export const EVENT_TYPES = {
+  gameStarted: "GameStarted",
+  handDealt: "HandDealt",
+  turnStarted: "TurnStarted",
+  tileDrawn: "TileDrawn",
+  tileDrawnPrivate: "TileDrawnPrivate",
+  tileDiscarded: "TileDiscarded",
+  claimWindowOpened: "ClaimWindowOpened",
+  claimResponded: "ClaimResponded",
+  claimWindowResolved: "ClaimWindowResolved",
+  gangMade: "GangMade",
+  gangReplacementDrawn: "GangReplacementDrawn",
+  huDeclared: "HuDeclared",
+  settled: "Settled",
+  gameEnded: "GameEnded",
+  wallExhausted: "WallExhausted",
+} as const;
+
+export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
 
 export type EventVisibility = { type: "public" } | { type: "seat"; seats: SeatId[] };
 
@@ -10,7 +31,7 @@ export type GameEvent<TPayload = unknown> = {
 
 export const nextEventSeq = (currentSeq: number): number => {
   if (!Number.isInteger(currentSeq) || currentSeq < 0) {
-    throw new Error("INVALID_EVENT_SEQUENCE");
+    throw new Error(CORE_ERROR_CODES.invalidEventSequence);
   }
   return currentSeq + 1;
 };
