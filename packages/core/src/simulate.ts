@@ -1,6 +1,6 @@
 import { applyAction, getLegalActions } from "./engine.ts";
 import { createPrng, nextInt } from "./lib/prng.ts";
-import { createJunkGame } from "./rules/junk.ts";
+import { createJunkGame } from "./rulesets/junk/index.ts";
 import type {
   Action,
   GameConfig,

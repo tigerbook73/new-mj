@@ -1,4 +1,4 @@
-import { junkRuleSet } from "./rules/junk.ts";
+import { junkRuleSet } from "./rulesets/junk/index.ts";
 import type { RuleSet, RuleSetApplyResult } from "./ruleset.ts";
 import type { Action, GameState, SeatId } from "./types.ts";
 

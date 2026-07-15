@@ -1,5 +1,30 @@
-import { eventsVisibleTo } from "./events.ts";
-import type { Action, GameEvent, GameResult, PlayerView, SeatId } from "./types.ts";
+import { eventsVisibleTo } from "../../events.ts";
+import type { Action, GameEvent, GameResult, GameState, PlayerView, SeatId } from "../../types.ts";
+
+export const getPlayerView = (state: GameState, seat: SeatId): PlayerView => {
+  const pending = state.pendingClaims;
+  const ownResponse = pending?.responses[seat];
+  const view: PlayerView = {
+    seat,
+    hand: [...state.seats[seat]!.hand],
+    seats: state.seats.map((entry, index) => ({
+      melds: entry.melds.map((meld) => ({
+        ...meld,
+        tiles: meld.type === "anGang" && index !== seat ? [] : [...meld.tiles],
+      })),
+      discards: entry.discards.map((discard) => ({ ...discard })),
+      handCount: entry.hand.length,
+    })),
+    wallCount: state.wall.length,
+    currentSeat: state.currentSeat,
+    phase: state.phase,
+  };
+  if (state.lastDiscard) view.lastDiscard = { ...state.lastDiscard };
+  if (state.result) view.result = state.result;
+  if (pending?.options[seat]) view.myClaimOptions = [...pending.options[seat]];
+  if (ownResponse) view.myClaimResponse = ownResponse;
+  return view;
+};
 
 type EventPayload = { type: string; [key: string]: unknown };
 
