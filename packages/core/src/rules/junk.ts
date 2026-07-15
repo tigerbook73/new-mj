@@ -1,10 +1,10 @@
-import { assertTileConservation } from "../invariants.ts";
+import { assertTileConservation } from "../lib/invariants.ts";
 import { createEvent, nextEventSeq } from "../events.ts";
-import { createPrng, nextInt } from "../prng.ts";
+import { createPrng, nextInt } from "../lib/prng.ts";
 import type { ClaimResolution, RuleSet, RuleSetApplyResult } from "../ruleset.ts";
-import { STANDARD_TILE_SET } from "../tiles.ts";
-import { createWall, drawFromHead, drawFromTail } from "../wall.ts";
-import { isSevenPairsWinningHand, isStandardWinningHand } from "../win.ts";
+import { STANDARD_TILE_SET } from "../lib/tiles.ts";
+import { createWall, drawFromHead, drawFromTail } from "../lib/wall.ts";
+import { isSevenPairsWinningHand, isStandardWinningHand } from "../lib/win.ts";
 import type {
   Action,
   ClaimAction,

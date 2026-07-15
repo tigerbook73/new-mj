@@ -1,4 +1,4 @@
-import type { TileId, TileKind } from "./types.ts";
+import type { TileId, TileKind } from "./ids.ts";
 
 export const TILE_KINDS = [
   "1m",

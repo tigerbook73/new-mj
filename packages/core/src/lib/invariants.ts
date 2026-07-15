@@ -1,4 +1,5 @@
-import type { GameState, SeatId, TileId } from "./types.ts";
+import type { SeatId, TileId } from "./ids.ts";
+import type { SeatState } from "./seat.ts";
 import type { TileSet } from "./tiles.ts";
 import { STANDARD_TILE_SET } from "./tiles.ts";
 
@@ -12,6 +13,11 @@ export class InvariantViolation extends Error {
   }
 }
 
+type TileContainerState = {
+  wall: readonly TileId[];
+  seats: readonly SeatState[];
+};
+
 const assertId = (id: TileId, tileSet: TileSet): void => {
   if (!Number.isInteger(id) || id < 0 || id >= tileSet.size) {
     throw new InvariantViolation("INVALID_TILE_ID");
@@ -24,19 +30,24 @@ const addPhysical = (seen: Set<TileId>, id: TileId, tileSet: TileSet): void => {
   seen.add(id);
 };
 
-const seatHasMeldTile = (state: GameState, seat: SeatId, tile: TileId): boolean =>
-  state.seats[seat]?.melds.some((meld) => meld.tiles.includes(tile)) ?? false;
+const seatHasMeldTile = <S extends TileContainerState>(
+  state: S,
+  seat: SeatId,
+  tile: TileId,
+): boolean => state.seats[seat]?.melds.some((meld) => meld.tiles.includes(tile)) ?? false;
 
-// extraTiles 供 RuleSet 声明 variantState 内的额外容器（如血战的胡牌快照），
-// 使其计入守恒与去重检查，而不必在 GameState 顶层新增专用字段。
-export type ExtraTiles = (state: GameState) => readonly TileId[];
+// extraTiles 供 ruleset 声明自身状态内的额外容器（如血战的胡牌快照），
+// 使其计入守恒与去重检查，而不必在公共状态形状里新增专用字段。
+export type ExtraTiles<S extends TileContainerState = TileContainerState> = (
+  state: S,
+) => readonly TileId[];
 
 const noExtraTiles: ExtraTiles = () => [];
 
-export const assertContainerUniqueness = (
-  state: GameState,
+export const assertContainerUniqueness = <S extends TileContainerState>(
+  state: S,
   tileSet: TileSet = STANDARD_TILE_SET,
-  extraTiles: ExtraTiles = noExtraTiles,
+  extraTiles: ExtraTiles<S> = noExtraTiles,
 ): void => {
   // claimed discard 是墓碑：物理归属已经转入 meld，只校验其对应副露存在，
   // 不把墓碑再次计入 physical 集合。
@@ -67,10 +78,10 @@ export const assertContainerUniqueness = (
   extraTiles(state).forEach((id) => addPhysical(physical, id, tileSet));
 };
 
-export const assertTileConservation = (
-  state: GameState,
+export const assertTileConservation = <S extends TileContainerState>(
+  state: S,
   tileSet: TileSet = STANDARD_TILE_SET,
-  extraTiles: ExtraTiles = noExtraTiles,
+  extraTiles: ExtraTiles<S> = noExtraTiles,
 ): void => {
   assertContainerUniqueness(state, tileSet, extraTiles);
   const physical = new Set<TileId>();

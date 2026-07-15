@@ -1,13 +1,12 @@
-export const SEATS = [0, 1, 2, 3] as const;
-export type SeatId = (typeof SEATS)[number];
+export { SEATS } from "./lib/ids.ts";
+export type { SeatId, TileId, TileKind } from "./lib/ids.ts";
+export type { MeldType, Meld, DiscardEntry, SeatState } from "./lib/seat.ts";
 
-export type TileId = number;
-export type TileKind =
-  `${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9}${"m" | "p" | "s"}` | `${1 | 2 | 3 | 4 | 5 | 6 | 7}${"z"}`;
+import type { SeatId, TileId, TileKind } from "./lib/ids.ts";
+import type { Meld, DiscardEntry, SeatState } from "./lib/seat.ts";
 
 export type Phase =
   "dealing" | "exchanging" | "choosing-lack" | "playing" | "awaiting-claims" | "finished";
-export type MeldType = "chi" | "peng" | "minGang" | "anGang" | "buGang";
 
 export type Action =
   | { type: "exchangeThree"; tiles: [TileId, TileId, TileId] }
@@ -26,23 +25,6 @@ export type ClaimAction = Extract<Action, { type: "chi" | "peng" | "minGang" | "
 
 export type ClaimOption = {
   action: ClaimAction;
-};
-
-export type Meld = {
-  type: MeldType;
-  tiles: TileId[];
-  from?: SeatId;
-};
-
-export type DiscardEntry = {
-  tile: TileId;
-  claimedBy?: SeatId;
-};
-
-export type SeatState = {
-  hand: TileId[];
-  melds: Meld[];
-  discards: DiscardEntry[];
 };
 
 export type PrngState = {

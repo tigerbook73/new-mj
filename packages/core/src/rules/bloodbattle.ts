@@ -1,8 +1,8 @@
 import { createEvent, nextEventSeq } from "../events.ts";
-import { createPrng, nextInt } from "../prng.ts";
+import { createPrng, nextInt } from "../lib/prng.ts";
 import type { RuleSetApplyResult } from "../ruleset.ts";
-import { TILE_KINDS, createTileSet } from "../tiles.ts";
-import { createWall } from "../wall.ts";
+import { TILE_KINDS, createTileSet } from "../lib/tiles.ts";
+import { createWall } from "../lib/wall.ts";
 import type { GameConfig, GameEvent, GameState, SeatId, SeatState, TileId } from "../types.ts";
 
 // Bloodbattle-private variantState slice for the pre-play phases (D6

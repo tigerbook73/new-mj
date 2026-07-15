@@ -1,5 +1,5 @@
 import { applyAction, getLegalActions } from "./engine.ts";
-import { createPrng, nextInt } from "./prng.ts";
+import { createPrng, nextInt } from "./lib/prng.ts";
 import { createJunkGame } from "./rules/junk.ts";
 import type {
   Action,

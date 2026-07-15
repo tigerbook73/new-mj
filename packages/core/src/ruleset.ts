@@ -1,4 +1,4 @@
-import type { TileSet } from "./tiles.ts";
+import type { TileSet } from "./lib/tiles.ts";
 import type { Action, ClaimOption, GameEvent, GameState, RuleViolation, SeatId } from "./types.ts";
 
 /** A phase table keeps a variant's flow explicit instead of encoding it in server/UI code. */

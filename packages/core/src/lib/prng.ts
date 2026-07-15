@@ -1,4 +1,4 @@
-import type { PrngState, PrngStep, RandomIntStep, ShuffleResult } from "./types.ts";
+import type { PrngState, PrngStep, RandomIntStep, ShuffleResult } from "../types.ts";
 
 const UINT32_RANGE = 0x1_0000_0000;
 

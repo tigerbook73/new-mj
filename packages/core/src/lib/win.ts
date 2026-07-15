@@ -1,4 +1,4 @@
-import type { TileId } from "./types.ts";
+import type { TileId } from "./ids.ts";
 import type { TileSet } from "./tiles.ts";
 
 const isSuit = (kind: string): boolean =>
