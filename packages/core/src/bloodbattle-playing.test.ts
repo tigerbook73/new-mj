@@ -83,3 +83,50 @@ test("anGang records a meld, pays active seats, and draws a replacement tile", (
     expect(next.gangPayments).toHaveLength(3);
   }
 });
+
+test("buGang upgrades an existing peng and charges one point from each active seat", () => {
+  const state = playingState();
+  state.seats[0]!.melds = [{ type: "peng", tiles: [0, 1, 2], from: 1 }];
+  state.seats[0]!.hand = state.seats[0]!.hand.filter((tile) => ![0, 1, 2].includes(tile));
+  state.wall = allTileIds(BLOODBATTLE_TILE_SET).filter(
+    (tile) =>
+      !state.seats.some(
+        (entry) =>
+          entry.hand.includes(tile) || entry.melds.some((meld) => meld.tiles.includes(tile)),
+      ),
+  );
+  const result = applyAction(state, 0, { type: "buGang", tile: 3 });
+  expect("state" in result).toBe(true);
+  if ("state" in result) {
+    const next = result.state as BloodbattleState;
+    expect(next.seats[0]!.melds).toEqual([{ type: "buGang", tiles: [0, 1, 2, 3], from: 1 }]);
+    expect(next.scores).toEqual([3, -1, -1, -1]);
+    expect(next.gangPayments.every((payment) => payment.amount === 1)).toBe(true);
+  }
+});
+
+test("minGang resolves from a discard and charges only the discarder", () => {
+  const state = playingState();
+  state.seats[0]!.hand = [4, ...state.seats[0]!.hand.filter((tile) => tile >= 36)];
+  state.seats[1]!.hand = [5, 6, 7];
+  state.wall = allTileIds(BLOODBATTLE_TILE_SET).filter(
+    (tile) =>
+      !state.seats.some(
+        (entry) =>
+          entry.hand.includes(tile) || entry.melds.some((meld) => meld.tiles.includes(tile)),
+      ),
+  );
+  const discarded = applyAction(state, 0, { type: "discard", tile: 4 });
+  expect("state" in discarded).toBe(true);
+  if (!("state" in discarded)) return;
+  const claimed = applyAction(discarded.state as BloodbattleState, 1, { type: "minGang" });
+  expect("state" in claimed).toBe(true);
+  if ("state" in claimed) {
+    const next = claimed.state as BloodbattleState;
+    expect(next.seats[1]!.melds[0]).toMatchObject({ type: "minGang", from: 0 });
+    expect(next.scores).toEqual([-2, 2, 0, 0]);
+    expect(next.gangPayments).toEqual([
+      { gangEventId: expect.any(Number), opener: 1, payer: 0, amount: 2 },
+    ]);
+  }
+});

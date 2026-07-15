@@ -180,10 +180,16 @@ const settleGang = (
   events: GameEvent[],
   opener: SeatId,
   amount: number,
+  onlyPayers?: readonly SeatId[],
 ): void => {
   const gangEventId = state.seq + 1;
   for (const payer of seats) {
-    if (payer === opener || state.status[payer] !== "active") continue;
+    if (
+      payer === opener ||
+      state.status[payer] !== "active" ||
+      (onlyPayers !== undefined && !onlyPayers.includes(payer))
+    )
+      continue;
     state.scores[opener] += amount;
     state.scores[payer] -= amount;
     state.gangPayments.push({ gangEventId, opener, payer, amount });
@@ -196,12 +202,19 @@ const settleGang = (
     {
       type: "Settled",
       reason: "gang",
-      scoreDeltas: state.scores.map((score, index) =>
-        index === opener
-          ? amount *
-            seats.filter((payer) => payer !== opener && state.status[payer] === "active").length
-          : 0,
-      ) as [number, number, number, number],
+      scoreDeltas: state.scores.map((_, index) => {
+        const payers = seats.filter(
+          (payer) =>
+            payer !== opener &&
+            state.status[payer] === "active" &&
+            (onlyPayers === undefined || onlyPayers.includes(payer)),
+        );
+        return index === opener
+          ? amount * payers.length
+          : payers.includes(index as SeatId)
+            ? -amount
+            : 0;
+      }) as [number, number, number, number],
     },
   );
 };
@@ -305,7 +318,7 @@ export const resolveClaims = (
       .reduce((hand, candidate) => remove(hand, candidate), state.seats[minGang]!.hand);
     state.seats[minGang]!.melds.push({
       type: "minGang",
-      tiles: [tile, tile, tile, tile],
+      tiles: [matching[0]!, matching[1]!, matching[2]!, tile],
       from: pending.discard.seat,
     });
     const discard = state.seats[pending.discard.seat]!.discards.at(-1);
@@ -317,7 +330,7 @@ export const resolveClaims = (
       { type: "public" },
       { type: "GangMade", seat: minGang, gangType: "minGang", from: pending.discard.seat },
     );
-    settleGang(state, events, minGang, 2);
+    settleGang(state, events, minGang, 2, [pending.discard.seat]);
     drawReplacement(state, events, minGang);
     return { state, events };
   }
@@ -327,7 +340,7 @@ export const resolveClaims = (
     state.seats[peng]!.hand = remove(remove(state.seats[peng]!.hand, matching[0]!), matching[1]!);
     state.seats[peng]!.melds.push({
       type: "peng",
-      tiles: [tile, tile, tile],
+      tiles: [matching[0]!, matching[1]!, tile],
       from: pending.discard.seat,
     });
     const discard = state.seats[pending.discard.seat]!.discards.at(-1);
@@ -339,7 +352,12 @@ export const resolveClaims = (
       state,
       events,
       { type: "public" },
-      { type: "PengMade", seat: peng, from: pending.discard.seat, tiles: [tile, tile, tile] },
+      {
+        type: "PengMade",
+        seat: peng,
+        from: pending.discard.seat,
+        tiles: [matching[0]!, matching[1]!, tile],
+      },
     );
     append(state, events, { type: "public" }, { type: "TurnStarted", seat: peng });
     return { state, events };
