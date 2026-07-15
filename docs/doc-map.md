@@ -4,18 +4,18 @@
 
 ## 1. 文档清单与分类
 
-| 生命周期      | 文档                                                                                                              | 读者        | 维护方式                                     |
-| ------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------- |
-| 产品级·活文档 | `docs/core-types-and-events.md`、`docs/protocol.md`、`docs/rules-*.md`（规格四件套，将随主题增加，如 `rooms.md`） | 人 + AI     | **与代码同 commit** 更新；始终只描述当前状态 |
-| 产品级·活文档 | `docs/architecture.md`（系统叙事）、`README.md`                                                                   | 新人优先    | 里程碑更新；只写原理与入口，不复制契约细节   |
-| 产品级·活文档 | `CLAUDE.md`、`AGENTS.md`（AI 会话规范）、`docs/workflow.md`（流程细则）                                           | AI / 协作者 | 里程碑更新；CLAUDE.md 预算 100 行            |
-| 记录级        | `docs/decisions.md`                                                                                               | 人 + AI     | **append-only**，只增不改，永不过期          |
-| 过程性        | `docs/plan.md` 的阶段状态与待办区；Claude Project 讨论；规格中的评审标注                                          | 推进用      | 阶段收尾清理；耐久内容先吸纳再删             |
+| 生命周期      | 文档                                                                                                              | 读者        | 维护方式                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| 产品级·活文档 | `docs/core-types-and-events.md`、`docs/protocol.md`、`docs/rules-*.md`（规格四件套，将随主题增加，如 `rooms.md`） | 人 + AI     | **与代码同 commit** 更新；始终只描述当前状态                      |
+| 产品级·活文档 | `docs/architecture.md`（系统叙事）、`README.md`                                                                   | 新人优先    | 里程碑更新；只写原理与入口，不复制契约细节                        |
+| 产品级·活文档 | 根目录及各 package 的 `CLAUDE.md`、`AGENTS.md`（分层 AI 会话规范）、`docs/workflow.md`（流程细则）                | AI / 协作者 | 根目录只放全局规则；package 目录放局部规则；CLAUDE.md 预算 100 行 |
+| 记录级        | `docs/decisions.md`                                                                                               | 人 + AI     | **append-only**，只增不改，永不过期                               |
+| 过程性        | `docs/plan.md` 的阶段状态与待办区；Claude Project 讨论；规格中的评审标注                                          | 推进用      | 阶段收尾清理；耐久内容先吸纳再删                                  |
 
 ## 2. 阅读路径
 
 - 新人：README（跑起来）→ architecture.md（懂原理）→ decisions.md（懂取舍）→ 规格（做事时查）
-- Claude Code：CLAUDE.md（自动加载）→ plan.md 状态区（开工）→ 按需读规格与 workflow.md
+- Claude Code：从当前目录向上读取根级规则，再读取最近的 package 级 `CLAUDE.md`/`AGENTS.md` → plan.md 状态区（开工）→ 按需读规格与 workflow.md
 
 ## 3. 阶段设计内容的分流规则
 
