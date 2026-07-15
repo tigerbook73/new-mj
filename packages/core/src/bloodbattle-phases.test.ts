@@ -44,6 +44,7 @@ const exchangingState = (): BloodbattleState => {
     prng: createPrng(1),
     scores: [0, 0, 0, 0],
     status: ["active", "active", "active", "active"],
+    gangPayments: [],
   };
 };
 

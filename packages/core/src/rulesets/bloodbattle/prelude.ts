@@ -77,6 +77,7 @@ export const createBloodbattlePrelude = (seed: number, config: unknown): Bloodba
     prng: shuffled.prng,
     scores: [0, 0, 0, 0],
     status: ["active", "active", "active", "active"],
+    gangPayments: [],
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {
