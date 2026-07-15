@@ -11,7 +11,6 @@ import {
   allTileIds,
   createPrng,
   parseJunkConfig,
-  rebuildPlayerView,
   fuzzJunkGames,
   playJunkGame,
   type JunkState,
@@ -119,38 +118,8 @@ test("views and event filtering do not expose another seat's concealed hand", ()
   ).toHaveLength(1);
 });
 
-test("filtered events rebuild the same initial player view as direct derivation", () => {
-  const started = createJunkGame(19);
-  if ("error" in started) throw new Error(started.error.code);
-  for (const seat of [0, 1, 2, 3] as const) {
-    expect(rebuildPlayerView(started.events, seat)).toEqual(
-      junkRuleSet.getPlayerView(started.state, seat),
-    );
-  }
-});
-
-test("filtered event replay remains equal to direct views through gameplay", () => {
-  const started = createJunkGame(23);
-  if ("error" in started) throw new Error(started.error.code);
-  let state = started.state;
-  const events = [...started.events];
-  for (let step = 0; step < 30 && state.phase !== "finished"; step += 1) {
-    const seat =
-      state.phase === "awaiting-claims"
-        ? ([0, 1, 2, 3] as const).find(
-            (candidate) => junkRuleSet.getLegalActions(state, candidate).length > 0,
-          )!
-        : state.currentSeat;
-    const action = junkRuleSet.getLegalActions(state, seat)[0]!;
-    const result = junkRuleSet.applyAction(state, seat, action);
-    if ("error" in result) throw new Error(result.error.code);
-    state = result.state;
-    events.push(...result.events);
-    for (const viewer of [0, 1, 2, 3] as const) {
-      expect(rebuildPlayerView(events, viewer)).toEqual(junkRuleSet.getPlayerView(state, viewer));
-    }
-  }
-});
+// "Event reconstruction ≡ direct derivation" moved to
+// cross-ruleset-invariants.test.ts (parameterized over registered rulesets).
 
 test("public draw and concealed-gang events never contain a TileId", () => {
   const started = createJunkGame(29);

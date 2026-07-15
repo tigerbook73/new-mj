@@ -1,4 +1,4 @@
-import { fuzzJunkGames, playJunkGame } from "./simulate.ts";
+import { fuzzJunkGames, playJunkGame } from "./rulesets/junk/fuzz.ts";
 import type { SeatId } from "./lib/ids.ts";
 import type { JunkAction, JunkConfig } from "./rulesets/junk/index.ts";
 

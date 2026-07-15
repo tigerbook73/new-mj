@@ -1,8 +1,8 @@
-import { createPrng, nextInt, type PrngState } from "./lib/prng.ts";
-import type { SeatId } from "./lib/ids.ts";
-import type { GameEvent } from "./events.ts";
-import { junkRuleSet } from "./rulesets/junk/index.ts";
-import type { JunkAction, JunkConfig, JunkState } from "./rulesets/junk/index.ts";
+import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
+import type { SeatId } from "../../lib/ids.ts";
+import type { GameEvent } from "../../events.ts";
+import { junkRuleSet } from "./index.ts";
+import type { JunkAction, JunkConfig, JunkState } from "./index.ts";
 
 export type PlayedGame = {
   state: JunkState;
@@ -63,6 +63,8 @@ export const playJunkGame = (
     : { seed, config, actions, error: "STEP_LIMIT_EXCEEDED" };
 };
 
+// --ruleset-parameterized fuzz entry point is future work — only junk has a
+// full applyAction/getLegalActions/createGame trio today (see rulesets/junk/index.ts).
 export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined => {
   let prng = createPrng(seed);
   for (let index = 0; index < games; index += 1) {
