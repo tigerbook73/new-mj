@@ -10,7 +10,7 @@
     "lint": "eslint src",
     "test": "jest --passWithNoTests",
     "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

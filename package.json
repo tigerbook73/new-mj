@@ -9,7 +9,7 @@
     "lint": "turbo run lint && eslint tools",
     "lint:fix": "eslint --fix .",
     "test": "turbo run test && node --test tools/*.test.ts",
-    "verify": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test",
+    "verify": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:deps": "node tools/check-deps.ts",
