@@ -1,4 +1,4 @@
-import type { JunkConfig } from "../../types.ts";
+import type { JunkConfig } from "./types.ts";
 
 export const DEFAULT_JUNK_CONFIG: JunkConfig = {
   rulesetId: "junk",

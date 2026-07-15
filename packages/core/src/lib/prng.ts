@@ -1,4 +1,19 @@
-import type { PrngState, PrngStep, RandomIntStep, ShuffleResult } from "../types.ts";
+export type PrngState = {
+  seed: number;
+  state: number;
+};
+
+export type PrngStep = {
+  value: number;
+  prng: PrngState;
+};
+
+export type RandomIntStep = PrngStep;
+
+export type ShuffleResult<T> = {
+  items: T[];
+  prng: PrngState;
+};
 
 const UINT32_RANGE = 0x1_0000_0000;
 

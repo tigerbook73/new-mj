@@ -1,7 +1,16 @@
 import { allTileIds, STANDARD_TILE_SET, type TileSet } from "./tiles.ts";
-import { shuffle } from "./prng.ts";
+import { shuffle, type PrngState } from "./prng.ts";
 import type { TileId } from "./ids.ts";
-import type { DrawResult, PrngState, WallResult } from "../types.ts";
+
+export type WallResult = {
+  wall: TileId[];
+  prng: PrngState;
+};
+
+export type DrawResult = {
+  tile: TileId;
+  wall: TileId[];
+};
 
 // 垃圾胡规则约定牌墙头摸普通牌、尾部摸杠后补牌；返回新数组，禁止原地修改状态。
 export const createWall = (prng: PrngState, tileSet: TileSet = STANDARD_TILE_SET): WallResult => {

@@ -1,101 +1,10 @@
-export { SEATS } from "./lib/ids.ts";
-export type { SeatId, TileId, TileKind } from "./lib/ids.ts";
-export type { MeldType, Meld, DiscardEntry, SeatState } from "./lib/seat.ts";
-
-import type { SeatId, TileId, TileKind } from "./lib/ids.ts";
-import type { Meld, DiscardEntry, SeatState } from "./lib/seat.ts";
-
-export type Phase =
-  "dealing" | "exchanging" | "choosing-lack" | "playing" | "awaiting-claims" | "finished";
-
-export type Action =
-  | { type: "exchangeThree"; tiles: [TileId, TileId, TileId] }
-  | { type: "chooseLack"; suit: "m" | "p" | "s" }
-  | { type: "discard"; tile: TileId }
-  | { type: "anGang"; kind: TileKind }
-  | { type: "buGang"; tile: TileId }
-  | { type: "zimo" }
-  | { type: "chi"; tiles: [TileId, TileId] }
-  | { type: "peng" }
-  | { type: "minGang" }
-  | { type: "hu" }
-  | { type: "pass" };
-
-export type ClaimAction = Extract<Action, { type: "chi" | "peng" | "minGang" | "hu" }>;
-
-export type ClaimOption = {
-  action: ClaimAction;
-};
-
-export type PrngState = {
-  seed: number;
-  state: number;
-};
-
-export type PrngStep = {
-  value: number;
-  prng: PrngState;
-};
-
-export type RandomIntStep = PrngStep;
-
-export type ShuffleResult<T> = {
-  items: T[];
-  prng: PrngState;
-};
-
-export type WallResult = {
-  wall: TileId[];
-  prng: PrngState;
-};
-
-export type DrawResult = {
-  tile: TileId;
-  wall: TileId[];
-};
+import type { SeatId, TileId } from "./lib/ids.ts";
+import type { DiscardEntry, Meld } from "./lib/seat.ts";
+import type { GameEvent } from "./events.ts";
 
 export type GameConfig = {
   rulesetId: string;
   [key: string]: unknown;
-};
-
-export type JunkConfig = GameConfig & {
-  rulesetId: "junk";
-  sevenPairs: boolean;
-  robKong: boolean;
-  multiHuPolicy: "headJump" | "all";
-};
-
-export type PendingClaims = {
-  discard: { seat: SeatId; tile: TileId };
-  source?: "discard" | "robKong";
-  options: Partial<Record<SeatId, ClaimOption[]>>;
-  responses: Partial<Record<SeatId, Action>>;
-};
-
-export type GameResult =
-  | { type: "draw"; scoreDeltas: [number, number, number, number] }
-  | {
-      type: "win";
-      winner: SeatId;
-      winners: SeatId[];
-      winType: "zimo" | "ron";
-      from?: SeatId;
-      scoreDeltas: [number, number, number, number];
-    };
-
-export type GameState = {
-  config: GameConfig;
-  phase: Phase;
-  wall: TileId[];
-  seats: SeatState[];
-  currentSeat: SeatId;
-  lastDiscard?: { seat: SeatId; tile: TileId };
-  pendingClaims?: PendingClaims;
-  seq: number;
-  prng: PrngState;
-  variantState: unknown;
-  result?: GameResult;
 };
 
 export type RuleViolation = {
@@ -103,15 +12,9 @@ export type RuleViolation = {
   message?: string;
 };
 
-export type EventVisibility = { type: "public" } | { type: "seat"; seats: SeatId[] };
-
-export type GameEvent<TPayload = unknown> = {
-  seq: number;
-  visibility: EventVisibility;
-  payload: TPayload;
-};
-
-export type PlayerView = {
+// Common skeleton every ruleset's PlayerView extends; ruleset-specific fields
+// (phase, myClaimOptions, win results, ...) live in each ruleset's own types.
+export type PlayerViewBase = {
   seat: SeatId;
   hand: TileId[];
   seats: Array<{
@@ -121,9 +24,6 @@ export type PlayerView = {
   }>;
   wallCount: number;
   currentSeat: SeatId;
-  phase: Phase;
-  myClaimOptions?: ClaimOption[];
-  myClaimResponse?: Action;
-  lastDiscard?: { seat: SeatId; tile: TileId };
-  result?: GameResult;
 };
+
+export type ApplyResult<TState> = { state: TState; events: GameEvent[] } | { error: RuleViolation };

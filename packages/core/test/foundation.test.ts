@@ -12,21 +12,16 @@ import {
   drawFromTail,
   tileIdOf,
   nextEventSeq,
-  type GameState,
+  type SeatState,
 } from "../src/index.ts";
 
-const emptyState = (wall: number[], seats: GameState["seats"]): GameState => ({
-  config: { rulesetId: "test" },
-  phase: "playing",
-  wall,
-  seats,
-  currentSeat: 0,
-  seq: 0,
-  prng: createPrng(1),
-  variantState: {},
-});
+// assertContainerUniqueness/assertTileConservation only ever read
+// { wall, seats } (see lib/invariants.ts) — no need for a full ruleset state.
+type TileContainerState = { wall: number[]; seats: SeatState[] };
 
-const emptySeats = (): GameState["seats"] =>
+const emptyState = (wall: number[], seats: SeatState[]): TileContainerState => ({ wall, seats });
+
+const emptySeats = (): SeatState[] =>
   [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
 
 test("standard tile set has 136 stable ids", () => {

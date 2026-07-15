@@ -1,28 +1,26 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, nextEventSeq } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng, nextInt } from "../../lib/prng.ts";
-import type { RuleSetApplyResult } from "../../ruleset.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import { isSevenPairsWinningHand, isStandardWinningHand } from "../../lib/win.ts";
-import type {
-  ClaimOption,
-  GameEvent,
-  GameResult,
-  GameState,
-  JunkConfig,
-  SeatId,
-  SeatState,
-  TileId,
-  TileKind,
-} from "../../types.ts";
+import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
+import type { SeatState } from "../../lib/seat.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
+import type {
+  JunkApplyResult,
+  JunkClaimOption,
+  JunkConfig,
+  JunkGameResult,
+  JunkPendingClaims,
+  JunkState,
+} from "./types.ts";
 
 export const seats = (): SeatState[] =>
   [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
 export const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
-export const cloneState = (state: GameState): GameState => {
-  const cloned: GameState = {
+export const cloneState = (state: JunkState): JunkState => {
+  const cloned: JunkState = {
     ...state,
     wall: [...state.wall],
     seats: state.seats.map((seat) => ({
@@ -45,7 +43,7 @@ export const publicVisibility = { type: "public" } as const;
 export const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats: [seat] });
 
 export const appendEvent = (
-  state: GameState,
+  state: JunkState,
   events: GameEvent[],
   visibility: GameEvent["visibility"],
   payload: unknown,
@@ -54,9 +52,9 @@ export const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-export const fail = (code: string): RuleSetApplyResult => ({ error: { code } });
+export const fail = (code: string): JunkApplyResult => ({ error: { code } });
 
-export const configOf = (state: GameState): JunkConfig => ({
+export const configOf = (state: JunkState): JunkConfig => ({
   ...DEFAULT_JUNK_CONFIG,
   ...state.config,
   rulesetId: "junk",
@@ -81,13 +79,13 @@ export const removeTiles = (
 export const tileRank = (tile: TileId): number => Number(STANDARD_TILE_SET.kindOf(tile)[0]);
 export const tileSuit = (tile: TileId): string => STANDARD_TILE_SET.kindOf(tile)[1] as string;
 
-export const winningTiles = (state: GameState, seat: SeatId, extra?: TileId): TileId[] => {
+export const winningTiles = (state: JunkState, seat: SeatId, extra?: TileId): TileId[] => {
   const own = state.seats[seat] as SeatState;
   const tiles = extra === undefined ? own.hand : [...own.hand, extra];
   return [...tiles, ...own.melds.flatMap((meld) => meld.tiles)];
 };
 
-export const isWin = (state: GameState, seat: SeatId, extra?: TileId): boolean => {
+export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean => {
   const tiles = winningTiles(state, seat, extra);
   const own = state.seats[seat]!;
   return (
@@ -98,13 +96,17 @@ export const isWin = (state: GameState, seat: SeatId, extra?: TileId): boolean =
   );
 };
 
-export const chiOptions = (state: GameState, seat: SeatId, discarded: TileId): ClaimOption[] => {
+export const chiOptions = (
+  state: JunkState,
+  seat: SeatId,
+  discarded: TileId,
+): JunkClaimOption[] => {
   const kind = STANDARD_TILE_SET.kindOf(discarded);
   if (kind.endsWith("z")) return [];
   const rank = tileRank(discarded);
   const suit = tileSuit(discarded);
   const hand = state.seats[seat]!.hand;
-  const options: ClaimOption[] = [];
+  const options: JunkClaimOption[] = [];
   const combinations: Array<[number, number]> = [
     [rank - 2, rank - 1],
     [rank - 1, rank + 1],
@@ -123,7 +125,7 @@ export const chiOptions = (state: GameState, seat: SeatId, discarded: TileId): C
   return options;
 };
 
-export const claimOptions = (state: GameState, seat: SeatId): ClaimOption[] => {
+export const claimOptions = (state: JunkState, seat: SeatId): JunkClaimOption[] => {
   const pending = state.pendingClaims;
   if (!pending || pending.discard.seat === seat) return [];
   const tile = pending.discard.tile;
@@ -132,7 +134,7 @@ export const claimOptions = (state: GameState, seat: SeatId): ClaimOption[] => {
   const kind = STANDARD_TILE_SET.kindOf(tile);
   const hand = state.seats[seat]!.hand;
   const matching = sameKind(hand, kind);
-  const options: ClaimOption[] = [];
+  const options: JunkClaimOption[] = [];
   if (isWin(state, seat, tile)) options.push({ action: { type: "hu" } });
   if (matching.length >= 3) options.push({ action: { type: "minGang" } });
   if (matching.length >= 2) options.push({ action: { type: "peng" } });
@@ -141,7 +143,7 @@ export const claimOptions = (state: GameState, seat: SeatId): ClaimOption[] => {
 };
 
 export const emitDraw = (
-  state: GameState,
+  state: JunkState,
   events: GameEvent[],
   seat: SeatId,
   replacement: boolean,
@@ -169,7 +171,7 @@ export const emitDraw = (
 };
 
 export const beginTurn = (
-  state: GameState,
+  state: JunkState,
   events: GameEvent[],
   seat: SeatId,
   draw: boolean,
@@ -185,7 +187,7 @@ export const settleWins = (
   winners: SeatId[],
   winType: "zimo" | "ron",
   from?: SeatId,
-): GameResult => {
+): JunkGameResult => {
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
   if (winType === "zimo") {
     for (const seat of [0, 1, 2, 3] as SeatId[]) {
@@ -205,7 +207,7 @@ export const settleWins = (
 };
 
 export const finishWin = (
-  state: GameState,
+  state: JunkState,
   events: GameEvent[],
   winner: SeatId,
   winType: "zimo" | "ron",
@@ -232,7 +234,7 @@ export const finishWin = (
 };
 
 export const finishRonWins = (
-  state: GameState,
+  state: JunkState,
   events: GameEvent[],
   winners: SeatId[],
   from: SeatId,
@@ -257,7 +259,7 @@ export const finishRonWins = (
   appendEvent(state, events, publicVisibility, { type: "GameEnded", result });
 };
 
-export const resolveUnclaimed = (state: GameState, events: GameEvent[]): void => {
+export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void => {
   if (state.pendingClaims!.source === "robKong") {
     const { seat, tile } = state.pendingClaims!.discard;
     delete state.pendingClaims;
@@ -292,11 +294,11 @@ export const resolveUnclaimed = (state: GameState, events: GameEvent[]): void =>
 };
 
 export const applyDiscard = (
-  state: GameState,
+  state: JunkState,
   seat: SeatId,
   tile: TileId,
   events: GameEvent[],
-): RuleSetApplyResult => {
+): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const hand = state.seats[seat]!.hand;
   const remaining = removeTiles(hand, [tile]);
@@ -305,7 +307,7 @@ export const applyDiscard = (
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
   appendEvent(state, events, publicVisibility, { type: "TileDiscarded", seat, tile });
-  const options: GameState["pendingClaims"] extends infer T ? T : never = {
+  const options: JunkPendingClaims = {
     discard: { seat, tile },
     options: {},
     responses: {},
@@ -329,11 +331,11 @@ export const applyDiscard = (
 };
 
 export const applyAnGang = (
-  state: GameState,
+  state: JunkState,
   seat: SeatId,
   kind: TileKind,
   events: GameEvent[],
-): RuleSetApplyResult => {
+): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const tiles = sameKind(state.seats[seat]!.hand, kind).slice(0, 4);
   if (tiles.length !== 4) return fail("GANG_NOT_AVAILABLE");
@@ -351,11 +353,11 @@ export const applyAnGang = (
 };
 
 export const applyBuGang = (
-  state: GameState,
+  state: JunkState,
   seat: SeatId,
   tile: TileId,
   events: GameEvent[],
-): RuleSetApplyResult => {
+): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
   const kind = STANDARD_TILE_SET.kindOf(tile);
@@ -400,13 +402,13 @@ export const applyBuGang = (
   return { state, events };
 };
 
-export const createJunkGame = (seed: number, config: unknown = {}): RuleSetApplyResult => {
+export const createJunkGame = (seed: number, config: unknown = {}): JunkApplyResult => {
   const parsed = parseJunkConfig(config);
   if ("error" in parsed) return parsed;
   const first = nextInt(createPrng(seed), 4);
   const dealer = first.value as SeatId;
   const shuffled = createWall(first.prng);
-  const state: GameState = {
+  const state: JunkState = {
     config: parsed.config,
     phase: "dealing",
     wall: shuffled.wall,
@@ -414,7 +416,6 @@ export const createJunkGame = (seed: number, config: unknown = {}): RuleSetApply
     currentSeat: dealer,
     seq: 0,
     prng: shuffled.prng,
-    variantState: {},
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {

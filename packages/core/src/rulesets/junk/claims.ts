@@ -1,6 +1,8 @@
-import type { RuleSetApplyResult } from "../../ruleset.ts";
+import type { GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { Action, ClaimAction, GameEvent, GameState, Meld, SeatId } from "../../types.ts";
+import type { SeatId } from "../../lib/ids.ts";
+import type { Meld } from "../../lib/seat.ts";
+import type { JunkAction, JunkApplyResult, JunkClaimAction, JunkState } from "./types.ts";
 import {
   appendEvent,
   beginTurn,
@@ -14,16 +16,18 @@ import {
   seatVisibility,
 } from "./state-machine.ts";
 
-export const priority = (action: ClaimAction): number =>
+export const priority = (action: JunkClaimAction): number =>
   ({ hu: 4, minGang: 3, peng: 2, chi: 1 })[action.type];
 export const distanceFromDiscarder = (discarder: SeatId, seat: SeatId): number =>
   (seat - discarder + 4) % 4;
 
-export const chooseClaims = (state: GameState): Array<{ seat: SeatId; action: ClaimAction }> => {
+export const chooseClaims = (
+  state: JunkState,
+): Array<{ seat: SeatId; action: JunkClaimAction }> => {
   const pending = state.pendingClaims!;
   const choices = Object.entries(pending.responses)
-    .filter((entry): entry is [string, ClaimAction] => entry[1].type !== "pass")
-    .map(([seat, action]) => ({ seat: Number(seat) as SeatId, action: action as ClaimAction }));
+    .filter((entry): entry is [string, JunkClaimAction] => entry[1].type !== "pass")
+    .map(([seat, action]) => ({ seat: Number(seat) as SeatId, action: action as JunkClaimAction }));
   const sorted = choices.sort((left, right) => {
     const priorityDiff = priority(right.action) - priority(left.action);
     return priorityDiff !== 0
@@ -37,7 +41,7 @@ export const chooseClaims = (state: GameState): Array<{ seat: SeatId; action: Cl
   return sorted.slice(0, 1);
 };
 
-export const resolveClaimWindow = (state: GameState, events: GameEvent[]): void => {
+export const resolveClaimWindow = (state: JunkState, events: GameEvent[]): void => {
   const pending = state.pendingClaims!;
   const winners = chooseClaims(state);
   if (winners.length === 0) return resolveUnclaimed(state, events);
@@ -87,22 +91,22 @@ export const resolveClaimWindow = (state: GameState, events: GameEvent[]): void 
   beginTurn(state, events, seat, action.type === "minGang", action.type === "minGang");
 };
 
-export const allResponded = (state: GameState): boolean => {
+export const allResponded = (state: JunkState): boolean => {
   const pending = state.pendingClaims!;
   return Object.keys(pending.options).every(
     (seat) => pending.responses[Number(seat) as SeatId] !== undefined,
   );
 };
 
-export const actionEquals = (left: Action, right: Action): boolean =>
+export const actionEquals = (left: JunkAction, right: JunkAction): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
 export const applyClaimResponse = (
-  state: GameState,
+  state: JunkState,
   seat: SeatId,
-  action: Action,
+  action: JunkAction,
   events: GameEvent[],
-): RuleSetApplyResult => {
+): JunkApplyResult => {
   if (state.phase !== "awaiting-claims" || !state.pendingClaims)
     return fail("CLAIM_WINDOW_NOT_OPEN");
   const options = state.pendingClaims.options[seat];

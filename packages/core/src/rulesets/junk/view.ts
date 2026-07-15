@@ -1,10 +1,11 @@
-import { eventsVisibleTo } from "../../events.ts";
-import type { Action, GameEvent, GameResult, GameState, PlayerView, SeatId } from "../../types.ts";
+import { eventsVisibleTo, type GameEvent } from "../../events.ts";
+import type { SeatId } from "../../lib/ids.ts";
+import type { JunkAction, JunkGameResult, JunkPlayerView, JunkState } from "./types.ts";
 
-export const getPlayerView = (state: GameState, seat: SeatId): PlayerView => {
+export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView => {
   const pending = state.pendingClaims;
   const ownResponse = pending?.responses[seat];
-  const view: PlayerView = {
+  const view: JunkPlayerView = {
     seat,
     hand: [...state.seats[seat]!.hand],
     seats: state.seats.map((entry, index) => ({
@@ -28,7 +29,7 @@ export const getPlayerView = (state: GameState, seat: SeatId): PlayerView => {
 
 type EventPayload = { type: string; [key: string]: unknown };
 
-const cloneView = (view: PlayerView): PlayerView => ({
+const cloneView = (view: JunkPlayerView): JunkPlayerView => ({
   ...view,
   hand: [...view.hand],
   seats: view.seats.map((seat) => ({
@@ -43,7 +44,7 @@ const cloneView = (view: PlayerView): PlayerView => ({
 const expectPayload = (payload: unknown): EventPayload => payload as EventPayload;
 
 const updateMeld = (
-  view: PlayerView,
+  view: JunkPlayerView,
   seat: SeatId,
   type: "chi" | "peng" | "minGang" | "anGang" | "buGang",
   tiles: number[],
@@ -55,10 +56,10 @@ const updateMeld = (
 
 /**
  * Rebuild the state a seat can observe from its filtered event stream.
- * It intentionally has no GameState input, so tests catch accidental leakage.
+ * It intentionally has no JunkState input, so tests catch accidental leakage.
  */
-export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): PlayerView => {
-  let view: PlayerView | undefined;
+export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): JunkPlayerView => {
+  let view: JunkPlayerView | undefined;
   for (const event of eventsVisibleTo(events, seat)) {
     const payload = expectPayload(event.payload);
     if (payload.type === "GameStarted") {
@@ -108,10 +109,10 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): P
         break;
       }
       case "ClaimWindowOpened":
-        view.myClaimOptions = [...((payload.options as PlayerView["myClaimOptions"]) ?? [])];
+        view.myClaimOptions = [...((payload.options as JunkPlayerView["myClaimOptions"]) ?? [])];
         break;
       case "ClaimResponded":
-        view.myClaimResponse = payload.action as Action;
+        view.myClaimResponse = payload.action as JunkAction;
         break;
       case "ClaimWindowResolved":
         delete view.myClaimOptions;
@@ -190,7 +191,7 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): P
         view.phase = "finished";
         break;
       case "GameEnded":
-        view.result = payload.result as GameResult;
+        view.result = payload.result as JunkGameResult;
         view.phase = "finished";
         break;
       default:

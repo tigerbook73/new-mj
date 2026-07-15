@@ -1,17 +1,10 @@
-import { createEvent, nextEventSeq } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng, nextInt } from "../../lib/prng.ts";
-import type { RuleSetApplyResult } from "../../ruleset.ts";
 import { TILE_KINDS, createTileSet } from "../../lib/tiles.ts";
 import { createWall } from "../../lib/wall.ts";
-import type { GameConfig, GameEvent, GameState, SeatId, SeatState, TileId } from "../../types.ts";
-
-// Bloodbattle-private variantState slice for the pre-play phases (D6
-// namespacing). Each seat's private submission is recorded here, mirroring
-// the Partial<Record<SeatId, T>> idiom PendingClaims.responses already uses.
-export type BloodbattleVariantState = {
-  exchange?: { selections: Partial<Record<SeatId, [TileId, TileId, TileId]>> };
-  lack?: Partial<Record<SeatId, "m" | "p" | "s">>;
-};
+import type { SeatId, TileId } from "../../lib/ids.ts";
+import type { SeatState } from "../../lib/seat.ts";
+import type { BloodbattleApplyResult, BloodbattleConfig, BloodbattleState } from "./types.ts";
 
 // 108 tiles: m/p/s 1-9 x4, no honors (rules-bloodbattle.md §1).
 const BLOODBATTLE_TILE_SET = createTileSet(
@@ -24,7 +17,7 @@ const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats: [seat]
 
 const seats = (): SeatState[] => [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
 
-const cloneState = (state: GameState): GameState => ({
+const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
   wall: [...state.wall],
   seats: state.seats.map((seat) => ({
@@ -32,11 +25,12 @@ const cloneState = (state: GameState): GameState => ({
     melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
     discards: seat.discards.map((discard) => ({ ...discard })),
   })),
-  variantState: structuredClone(state.variantState),
+  ...(state.exchange ? { exchange: { selections: { ...state.exchange.selections } } } : {}),
+  ...(state.lack ? { lack: { ...state.lack } } : {}),
 });
 
 const appendEvent = (
-  state: GameState,
+  state: BloodbattleState,
   events: GameEvent[],
   visibility: GameEvent["visibility"],
   payload: unknown,
@@ -45,7 +39,7 @@ const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-const fail = (code: string): RuleSetApplyResult => ({ error: { code } });
+const fail = (code: string): BloodbattleApplyResult => ({ error: { code } });
 
 const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[] | undefined => {
   const remaining = [...hand];
@@ -64,16 +58,20 @@ const receiverOf = (seat: SeatId, direction: 0 | 1 | 2): SeatId => {
   return ((seat + (direction === 0 ? 1 : 3)) % 4) as SeatId;
 };
 
-export const createBloodbattlePrelude = (seed: number, config: unknown): RuleSetApplyResult => {
+export const createBloodbattlePrelude = (seed: number, config: unknown): BloodbattleApplyResult => {
   const configObject =
     typeof config === "object" && config !== null ? (config as Record<string, unknown>) : {};
   const exchangeThree = configObject.exchangeThree !== false;
-  const gameConfig: GameConfig = { ...configObject, rulesetId: "bloodbattle", exchangeThree };
+  const gameConfig: BloodbattleConfig = {
+    ...configObject,
+    rulesetId: "bloodbattle",
+    exchangeThree,
+  };
 
   const first = nextInt(createPrng(seed), 4);
   const dealer = first.value as SeatId;
   const shuffled = createWall(first.prng, BLOODBATTLE_TILE_SET);
-  const state: GameState = {
+  const state: BloodbattleState = {
     config: gameConfig,
     phase: exchangeThree ? "exchanging" : "choosing-lack",
     wall: shuffled.wall,
@@ -81,7 +79,6 @@ export const createBloodbattlePrelude = (seed: number, config: unknown): RuleSet
     currentSeat: dealer,
     seq: 0,
     prng: shuffled.prng,
-    variantState: {} satisfies BloodbattleVariantState,
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {
@@ -105,13 +102,12 @@ export const createBloodbattlePrelude = (seed: number, config: unknown): RuleSet
 };
 
 export const applyExchangeThree = (
-  state: GameState,
+  state: BloodbattleState,
   seat: SeatId,
   tiles: [TileId, TileId, TileId],
-): RuleSetApplyResult => {
+): BloodbattleApplyResult => {
   if (state.phase !== "exchanging") return fail("EXCHANGE_NOT_OPEN");
-  const variantState = state.variantState as BloodbattleVariantState;
-  if (variantState.exchange?.selections[seat]) return fail("ALREADY_SUBMITTED");
+  if (state.exchange?.selections[seat]) return fail("ALREADY_SUBMITTED");
   const hand = state.seats[seat]!.hand;
   if (new Set(tiles).size !== 3 || tiles.some((tile) => !hand.includes(tile))) {
     return fail("INVALID_EXCHANGE_TILES");
@@ -121,12 +117,11 @@ export const applyExchangeThree = (
 
   const clonedState = cloneState(state);
   const events: GameEvent[] = [];
-  const clonedVariant = clonedState.variantState as BloodbattleVariantState;
-  clonedVariant.exchange = clonedVariant.exchange ?? { selections: {} };
-  clonedVariant.exchange.selections[seat] = tiles;
+  clonedState.exchange = clonedState.exchange ?? { selections: {} };
+  clonedState.exchange.selections[seat] = tiles;
   appendEvent(clonedState, events, seatVisibility(seat), { type: "ExchangeThreeSelected", tiles });
 
-  const selections = clonedVariant.exchange.selections;
+  const selections = clonedState.exchange.selections;
   const allSubmitted = ([0, 1, 2, 3] as SeatId[]).every((candidate) => selections[candidate]);
   if (!allSubmitted) return { state: clonedState, events };
 
@@ -145,7 +140,7 @@ export const applyExchangeThree = (
       tiles: incoming,
     });
   }
-  delete clonedVariant.exchange;
+  delete clonedState.exchange;
   appendEvent(clonedState, events, publicVisibility, {
     type: "ExchangeCompleted",
     direction: direction.value,
@@ -155,25 +150,23 @@ export const applyExchangeThree = (
 };
 
 export const applyChooseLack = (
-  state: GameState,
+  state: BloodbattleState,
   seat: SeatId,
   suit: "m" | "p" | "s",
-): RuleSetApplyResult => {
+): BloodbattleApplyResult => {
   if (state.phase !== "choosing-lack") return fail("LACK_NOT_OPEN");
-  const variantState = state.variantState as BloodbattleVariantState;
-  if (variantState.lack?.[seat]) return fail("ALREADY_SUBMITTED");
+  if (state.lack?.[seat]) return fail("ALREADY_SUBMITTED");
   const hand = state.seats[seat]!.hand;
   if (!hand.some((tile) => BLOODBATTLE_TILE_SET.kindOf(tile)[1] === suit))
     return fail("SUIT_NOT_HELD");
 
   const clonedState = cloneState(state);
   const events: GameEvent[] = [];
-  const clonedVariant = clonedState.variantState as BloodbattleVariantState;
-  clonedVariant.lack = clonedVariant.lack ?? {};
-  clonedVariant.lack[seat] = suit;
+  clonedState.lack = clonedState.lack ?? {};
+  clonedState.lack[seat] = suit;
   appendEvent(clonedState, events, seatVisibility(seat), { type: "LackChosen", suit });
 
-  const lack = clonedVariant.lack;
+  const lack = clonedState.lack;
   const allSubmitted = ([0, 1, 2, 3] as SeatId[]).every((candidate) => lack[candidate]);
   if (!allSubmitted) return { state: clonedState, events };
 

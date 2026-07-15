@@ -1,20 +1,47 @@
+import type { SeatId } from "./lib/ids.ts";
 import { junkRuleSet } from "./rulesets/junk/index.ts";
-import type { RuleSet, RuleSetApplyResult } from "./ruleset.ts";
-import type { Action, GameState, SeatId } from "./types.ts";
+import type { ApplyResult, GameConfig, PlayerViewBase } from "./types.ts";
 
-const ruleSets: Record<string, RuleSet> = {
+/**
+ * Consumer-defined minimal contract: only the four functions the engine-api
+ * boundary actually dispatches. A ruleset module is free to expose whatever
+ * else it wants (e.g. junkRuleSet.getPlayerView is reused directly by junk
+ * tests) — nothing beyond this shape is a public contract.
+ */
+export type RulesetModule<TState, TAction> = {
+  createGame: (seed: number, config?: unknown) => ApplyResult<TState>;
+  applyAction: (state: TState, seat: SeatId, action: TAction) => ApplyResult<TState>;
+  getLegalActions: (state: TState, seat: SeatId) => readonly TAction[];
+  getPlayerView: (state: TState, seat: SeatId) => PlayerViewBase;
+};
+
+type StateWithConfig = { config: GameConfig };
+
+// any: registry holds heterogeneous ruleset modules; each entry is concretely
+// typed at its own module, the public functions below re-narrow at the boundary.
+const rulesets: Record<string, RulesetModule<any, any>> = {
   junk: junkRuleSet,
 };
 
-export const getRuleSet = (rulesetId: string): RuleSet | undefined => ruleSets[rulesetId];
+const getRuleset = (rulesetId: string) => rulesets[rulesetId];
 
-/** Public core boundary. Server/UI select no rules: GameState.config selects the RuleSet. */
-export const applyAction = (state: GameState, seat: SeatId, action: Action): RuleSetApplyResult => {
-  const ruleSet = getRuleSet(state.config.rulesetId);
-  return ruleSet
-    ? ruleSet.applyAction(state, seat, action)
-    : { error: { code: "UNKNOWN_RULESET" } };
-};
+export const createGame = (config: GameConfig, seed: number): ApplyResult<unknown> =>
+  getRuleset(config.rulesetId)?.createGame(seed, config) ?? {
+    error: { code: "UNKNOWN_RULESET" },
+  };
 
-export const getLegalActions = (state: GameState, seat: SeatId): readonly Action[] =>
-  getRuleSet(state.config.rulesetId)?.getLegalActions(state, seat) ?? [];
+/** Public core boundary. Server/UI select no rules: state.config.rulesetId selects the ruleset module. */
+export const applyAction = (
+  state: StateWithConfig,
+  seat: SeatId,
+  action: unknown,
+): ApplyResult<unknown> =>
+  getRuleset(state.config.rulesetId)?.applyAction(state, seat, action) ?? {
+    error: { code: "UNKNOWN_RULESET" },
+  };
+
+export const getLegalActions = (state: StateWithConfig, seat: SeatId): readonly unknown[] =>
+  getRuleset(state.config.rulesetId)?.getLegalActions(state, seat) ?? [];
+
+export const getPlayerView = (state: StateWithConfig, seat: SeatId): PlayerViewBase | undefined =>
+  getRuleset(state.config.rulesetId)?.getPlayerView(state, seat);

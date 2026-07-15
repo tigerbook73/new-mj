@@ -1,10 +1,12 @@
 import { expect, test } from "vitest";
 import {
   assertTileConservation,
-  applyAction,
+  applyAction as engineApplyAction,
+  createGame as engineCreateGame,
   createJunkGame,
   eventsVisibleTo,
-  getPlayerView,
+  getLegalActions as engineGetLegalActions,
+  getPlayerView as engineGetPlayerView,
   junkRuleSet,
   allTileIds,
   createPrng,
@@ -12,15 +14,15 @@ import {
   rebuildPlayerView,
   fuzzJunkGames,
   playJunkGame,
-  type GameState,
+  type JunkState,
 } from "../src/index.ts";
 
-const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): GameState => {
+const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState => {
   if ("error" in result) throw new Error(result.error.code);
   return result.state;
 };
 
-const playDeterministically = (seed: number): GameState => {
+const playDeterministically = (seed: number): JunkState => {
   const started = createJunkGame(seed, {
     sevenPairs: seed % 2 === 0,
     robKong: seed % 3 === 0,
@@ -85,7 +87,7 @@ test("junk accepts a legal discard and preserves the caller state", () => {
   const before = structuredClone(started.state);
   const seat = started.state.currentSeat;
   const tile = started.state.seats[seat]!.hand[0]!;
-  const result = applyAction(started.state, seat, { type: "discard", tile });
+  const result = junkRuleSet.applyAction(started.state, seat, { type: "discard", tile });
   if ("error" in result) throw new Error(result.error.code);
   const state = unwrap(result);
   expect(started.state).toEqual(before);
@@ -100,7 +102,7 @@ test("views and event filtering do not expose another seat's concealed hand", ()
   const started = createJunkGame(17);
   if ("error" in started) throw new Error(started.error.code);
   const viewer = 0 as const;
-  const view = getPlayerView(started.state, viewer);
+  const view = junkRuleSet.getPlayerView(started.state, viewer);
   expect(view.hand).toEqual(started.state.seats[viewer]!.hand);
   expect(view.seats.map((seat) => seat.handCount)).toEqual(
     started.state.seats.map((seat) => seat.hand.length),
@@ -121,7 +123,9 @@ test("filtered events rebuild the same initial player view as direct derivation"
   const started = createJunkGame(19);
   if ("error" in started) throw new Error(started.error.code);
   for (const seat of [0, 1, 2, 3] as const) {
-    expect(rebuildPlayerView(started.events, seat)).toEqual(getPlayerView(started.state, seat));
+    expect(rebuildPlayerView(started.events, seat)).toEqual(
+      junkRuleSet.getPlayerView(started.state, seat),
+    );
   }
 });
 
@@ -138,12 +142,12 @@ test("filtered event replay remains equal to direct views through gameplay", () 
           )!
         : state.currentSeat;
     const action = junkRuleSet.getLegalActions(state, seat)[0]!;
-    const result = applyAction(state, seat, action);
+    const result = junkRuleSet.applyAction(state, seat, action);
     if ("error" in result) throw new Error(result.error.code);
     state = result.state;
     events.push(...result.events);
     for (const viewer of [0, 1, 2, 3] as const) {
-      expect(rebuildPlayerView(events, viewer)).toEqual(getPlayerView(state, viewer));
+      expect(rebuildPlayerView(events, viewer)).toEqual(junkRuleSet.getPlayerView(state, viewer));
     }
   }
 });
@@ -187,7 +191,7 @@ test("illegal actions do not mutate state or consume event sequence", () => {
 test("robKong opens a hu-only claim window and preserves the fourth tile on ron", () => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const physical = new Set([4, 5, 6, 7, ...seat1Hand]);
-  const state: GameState = {
+  const state: JunkState = {
     config: { rulesetId: "junk", sevenPairs: false, robKong: true, multiHuPolicy: "headJump" },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
@@ -200,19 +204,18 @@ test("robKong opens a hu-only claim window and preserves the fourth tile on ron"
     currentSeat: 0,
     seq: 0,
     prng: createPrng(1),
-    variantState: {},
   };
-  const opened = unwrap(applyAction(state, 0, { type: "buGang", tile: 7 }));
+  const opened = unwrap(junkRuleSet.applyAction(state, 0, { type: "buGang", tile: 7 }));
   expect(opened.phase).toBe("awaiting-claims");
   expect(junkRuleSet.getLegalActions(opened, 1)).toContainEqual({ type: "hu" });
-  const ended = unwrap(applyAction(opened, 1, { type: "hu" }));
+  const ended = unwrap(junkRuleSet.applyAction(opened, 1, { type: "hu" }));
   expect(ended.result).toMatchObject({ type: "win", winner: 1, from: 0 });
   expect(ended.seats[0]!.hand).toContain(7);
   expect(ended.seats[0]!.melds[0]!.type).toBe("peng");
   assertTileConservation(ended);
 });
 
-const multiHuState = (multiHuPolicy: "headJump" | "all"): GameState => {
+const multiHuState = (multiHuPolicy: "headJump" | "all"): JunkState => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const seat2Hand = [1, 9, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41];
   const physical = new Set([7, ...seat1Hand, ...seat2Hand]);
@@ -229,19 +232,20 @@ const multiHuState = (multiHuPolicy: "headJump" | "all"): GameState => {
     currentSeat: 0,
     seq: 0,
     prng: createPrng(1),
-    variantState: {},
   };
 };
 
 test("multiHuPolicy selects head jump or all ron winners deterministically", () => {
-  let state = unwrap(applyAction(multiHuState("headJump"), 0, { type: "discard", tile: 7 }));
-  state = unwrap(applyAction(state, 1, { type: "hu" }));
-  state = unwrap(applyAction(state, 2, { type: "hu" }));
+  let state = unwrap(
+    junkRuleSet.applyAction(multiHuState("headJump"), 0, { type: "discard", tile: 7 }),
+  );
+  state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
+  state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-1, 1, 0, 0] });
 
-  state = unwrap(applyAction(multiHuState("all"), 0, { type: "discard", tile: 7 }));
-  state = unwrap(applyAction(state, 1, { type: "hu" }));
-  state = unwrap(applyAction(state, 2, { type: "hu" }));
+  state = unwrap(junkRuleSet.applyAction(multiHuState("all"), 0, { type: "discard", tile: 7 }));
+  state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
+  state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({ winner: 1, winners: [1, 2], scoreDeltas: [-2, 1, 1, 0] });
   assertTileConservation(state);
 });
@@ -252,3 +256,20 @@ test("1000 seeded games finish while preserving tile conservation", () => {
     expect(state.result).toBeDefined();
   }
 }, 20_000);
+
+test("engine-api createGame/applyAction/getLegalActions/getPlayerView dispatch by rulesetId", () => {
+  const started = engineCreateGame({ rulesetId: "junk" }, 7);
+  expect(started).toEqual(createJunkGame(7));
+  if ("error" in started) throw new Error(started.error.code);
+  const state = started.state as JunkState;
+  const seat = state.currentSeat;
+  expect(engineGetLegalActions(state, seat)).toEqual(junkRuleSet.getLegalActions(state, seat));
+  expect(engineGetPlayerView(state, seat)).toEqual(junkRuleSet.getPlayerView(state, seat));
+  const tile = state.seats[seat]!.hand[0]!;
+  const viaEngine = engineApplyAction(state, seat, { type: "discard", tile });
+  const viaRuleSet = junkRuleSet.applyAction(state, seat, { type: "discard", tile });
+  expect(viaEngine).toEqual(viaRuleSet);
+  expect(
+    engineApplyAction({ config: { rulesetId: "unknown-ruleset" } }, 0, { type: "pass" }),
+  ).toEqual({ error: { code: "UNKNOWN_RULESET" } });
+});

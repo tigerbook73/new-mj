@@ -5,8 +5,8 @@ import {
   applyChooseLack,
   applyExchangeThree,
   createPrng,
+  type BloodbattleState,
   type GameEvent,
-  type GameState,
   type SeatId,
 } from "../src/index.ts";
 
@@ -16,7 +16,7 @@ import {
 // bloodbattle (m/p/s-only) tile set, since honors are appended last in
 // TILE_KINDS — safe to build hands from allTileIds() here as long as ids stay
 // under 108, which slices 0..51 do.
-const exchangingState = (): GameState => {
+const exchangingState = (): BloodbattleState => {
   const hands: [number[], number[], number[], number[]] = [
     allTileIds().slice(0, 13),
     allTileIds().slice(13, 26),
@@ -31,13 +31,14 @@ const exchangingState = (): GameState => {
     currentSeat: 0,
     seq: 0,
     prng: createPrng(1),
-    variantState: {},
   };
 };
 
-const unwrap = <T extends { state: GameState; events: GameEvent[] } | { error: { code: string } }>(
+const unwrap = <
+  T extends { state: BloodbattleState; events: GameEvent[] } | { error: { code: string } },
+>(
   result: T,
-): { state: GameState; events: GameEvent[] } => {
+): { state: BloodbattleState; events: GameEvent[] } => {
   if ("error" in result) throw new Error(result.error.code);
   return result;
 };

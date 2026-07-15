@@ -1,7 +1,7 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { ClaimResolution, RuleSet, RuleSetApplyResult } from "../../ruleset.ts";
-import type { Action, GameEvent, GameState, SeatId } from "../../types.ts";
+import type { GameEvent } from "../../events.ts";
+import type { RulesetModule } from "../../engine.ts";
 import { parseJunkConfig } from "./config.ts";
 import {
   applyAnGang,
@@ -14,23 +14,28 @@ import {
   isWin,
   sameKind,
 } from "./state-machine.ts";
-import { applyClaimResponse, chooseClaims } from "./claims.ts";
+import { applyClaimResponse } from "./claims.ts";
 import { getPlayerView } from "./view.ts";
+import type { JunkAction, JunkApplyResult, JunkState } from "./types.ts";
 
 export { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 export { createJunkGame } from "./state-machine.ts";
 export { getPlayerView, rebuildPlayerView } from "./view.ts";
+export type {
+  JunkAction,
+  JunkApplyResult,
+  JunkClaimAction,
+  JunkClaimOption,
+  JunkConfig,
+  JunkGameResult,
+  JunkPendingClaims,
+  JunkPhase,
+  JunkPlayerView,
+  JunkState,
+} from "./types.ts";
 
-export const junkRuleSet: RuleSet = {
-  id: "junk",
-  tileSet: STANDARD_TILE_SET,
-  phases: [
-    { id: "dealing", next: ["playing"] },
-    { id: "playing", next: ["awaiting-claims", "finished"] },
-    { id: "awaiting-claims", next: ["playing", "finished"] },
-    { id: "finished", next: [] },
-  ],
-  parseConfig: parseJunkConfig,
+export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
+  createGame: createJunkGame,
   getLegalActions: (state, seat) => {
     if (state.phase === "awaiting-claims") {
       const options = state.pendingClaims?.options[seat] ?? [];
@@ -41,7 +46,7 @@ export const junkRuleSet: RuleSet = {
     }
     if (state.phase !== "playing" || state.currentSeat !== seat) return [];
     const hand = state.seats[seat]!.hand;
-    const actions: Action[] = hand.map((tile) => ({ type: "discard", tile }));
+    const actions: JunkAction[] = hand.map((tile) => ({ type: "discard", tile }));
     for (const kind of STANDARD_TILE_SET.kinds) {
       if (sameKind(hand, kind).length === 4) actions.push({ type: "anGang", kind });
     }
@@ -54,11 +59,10 @@ export const junkRuleSet: RuleSet = {
     if (isWin(state, seat)) actions.push({ type: "zimo" });
     return actions;
   },
-  getClaimOptions: (state, seat) => state.pendingClaims?.options[seat] ?? [],
   applyAction: (input, seat, action) => {
     const state = cloneState(input);
     const events: GameEvent[] = [];
-    let result: RuleSetApplyResult;
+    let result: JunkApplyResult;
     if (action.type === "discard") result = applyDiscard(state, seat, action.tile, events);
     else if (["chi", "peng", "minGang", "hu", "pass"].includes(action.type))
       result = applyClaimResponse(state, seat, action, events);
@@ -76,11 +80,5 @@ export const junkRuleSet: RuleSet = {
     if ("state" in result) assertTileConservation(result.state);
     return result;
   },
-  resolveClaims: (state): ClaimResolution | undefined => {
-    if (!state.pendingClaims) return undefined;
-    const choice = chooseClaims(state)[0];
-    return choice ? { type: "claimed", ...choice } : { type: "unclaimed" };
-  },
-  evaluateWin: (state, seat) => ({ isWin: isWin(state, seat) }),
-  settle: (state) => ({ scoreDeltas: state.result?.scoreDeltas ?? [0, 0, 0, 0] }),
+  getPlayerView,
 };

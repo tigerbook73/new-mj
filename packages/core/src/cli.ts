@@ -1,12 +1,13 @@
 import { fuzzJunkGames, playJunkGame } from "./simulate.ts";
-import type { Action, JunkConfig, SeatId } from "./types.ts";
+import type { SeatId } from "./lib/ids.ts";
+import type { JunkAction, JunkConfig } from "./rulesets/junk/index.ts";
 
 type Arguments = {
   command: "play" | "fuzz";
   seed: number;
   games: number;
   config: Partial<Omit<JunkConfig, "rulesetId">>;
-  actions: Array<{ seat: SeatId; action: Action }>;
+  actions: Array<{ seat: SeatId; action: JunkAction }>;
 };
 
 const usage =

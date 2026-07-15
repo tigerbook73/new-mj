@@ -1,4 +1,12 @@
-import type { EventVisibility, GameEvent } from "./types.ts";
+import type { SeatId } from "./lib/ids.ts";
+
+export type EventVisibility = { type: "public" } | { type: "seat"; seats: SeatId[] };
+
+export type GameEvent<TPayload = unknown> = {
+  seq: number;
+  visibility: EventVisibility;
+  payload: TPayload;
+};
 
 export const nextEventSeq = (currentSeq: number): number => {
   if (!Number.isInteger(currentSeq) || currentSeq < 0) {
