@@ -1,4 +1,4 @@
-import { junkRuleSet, rebuildPlayerView } from "../../src/rulesets/junk/index.ts";
+import { junkRuleSet, rebuildPlayerView } from "../rulesets/junk/index.ts";
 
 // Test-only registry: cross-ruleset invariants (event reconstruction ≡
 // direct derivation, etc.) walk this list instead of hardcoding junk.

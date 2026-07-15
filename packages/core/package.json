@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint src test",
-    "test": "vitest run test/*.test.ts"
+    "lint": "eslint src",
+    "test": "vitest run src/*.test.ts"
   }
 }

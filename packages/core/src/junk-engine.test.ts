@@ -14,7 +14,7 @@ import {
   fuzzJunkGames,
   playJunkGame,
   type JunkState,
-} from "../src/index.ts";
+} from "./index.ts";
 
 const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState => {
   if ("error" in result) throw new Error(result.error.code);

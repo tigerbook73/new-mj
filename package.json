@@ -5,10 +5,10 @@
   "scripts": {
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint && eslint tools",
-    "test": "turbo run test && node --test tools/*.test.mjs",
+    "test": "turbo run test && node --test tools/*.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check:deps": "node tools/check-deps.mjs",
+    "check:deps": "node tools/check-deps.ts",
     "cli:play": "node packages/core/src/cli.ts play",
     "fuzz": "node packages/core/src/cli.ts fuzz"
   },
