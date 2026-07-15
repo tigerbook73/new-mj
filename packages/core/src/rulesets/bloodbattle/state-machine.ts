@@ -123,7 +123,10 @@ export const applyDiscard = (
     if (candidateOptions.length) options[candidate] = candidateOptions;
   }
   append(state, events, { type: "public" }, { type: EVENT_TYPES.tileDiscarded, seat, tile });
-  if (Object.keys(options).length === 0) return drawNext(state, events, seat);
+  if (Object.keys(options).length === 0) {
+    delete state.lastGangEventId;
+    return drawNext(state, events, seat);
+  }
   state.phase = "awaiting-claims";
   state.pendingClaims = { discard: { seat, tile }, options, responses: {} };
   append(
@@ -228,6 +231,33 @@ const settleGang = (
       }) as [number, number, number, number],
     },
   );
+};
+const transferGangPayments = (
+  state: BloodbattleState,
+  events: GameEvent[],
+  opener: SeatId,
+  winner: SeatId,
+): void => {
+  const gangEventId = state.lastGangEventId;
+  if (gangEventId === undefined) return;
+  const scoreDeltas = [0, 0, 0, 0] as [number, number, number, number];
+  for (const payment of state.gangPayments) {
+    if (payment.gangEventId !== gangEventId || payment.opener !== opener || payment.transferred)
+      continue;
+    state.scores[opener] -= payment.amount;
+    state.scores[winner] += payment.amount;
+    scoreDeltas[opener] -= payment.amount;
+    scoreDeltas[winner] += payment.amount;
+    payment.transferred = true;
+  }
+  if (scoreDeltas.some((delta) => delta !== 0))
+    append(
+      state,
+      events,
+      { type: "public" },
+      { type: EVENT_TYPES.settled, reason: "gangTransfer", scoreDeltas },
+    );
+  delete state.lastGangEventId;
 };
 const applyAnGang = (
   state: BloodbattleState,
@@ -366,20 +396,24 @@ export const resolveClaims = (
     if (winners.length) {
       for (const winner of winners)
         finishWin(state, events, winner, pending.discard.tile, "robKong", pending.discard.seat);
+      delete state.lastGangEventId;
       delete state.pendingClaims;
       return { state, events };
     }
+    delete state.lastGangEventId;
     delete state.pendingClaims;
     return completeBuGang(state, pending.discard.seat, pending.discard.tile, events);
   }
   if (winners.length) {
     const tile = pending.discard.tile;
+    transferGangPayments(state, events, pending.discard.seat, winners[0]!);
     for (const winner of winners)
       finishWin(state, events, winner, tile, "discard", pending.discard.seat);
     delete state.pendingClaims;
     if (state.phase !== "finished") return drawNext(state, events, pending.discard.seat);
     return { state, events };
   }
+  delete state.lastGangEventId;
   const peng = seats.find((s) => responses[s]?.type === "peng");
   const minGang = seats.find((s) => responses[s]?.type === "minGang");
   if (minGang !== undefined) {
@@ -476,6 +510,7 @@ export const applyAction = (
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("ACTION_NOT_AVAILABLE");
   if (action.type === "zimo" && isWin(state, seat)) {
     finishWin(state, events, seat, state.seats[seat]!.hand.at(-1)!, "zimo");
+    delete state.lastGangEventId;
     return checked({ state, events });
   }
   return fail("UNKNOWN_ACTION");

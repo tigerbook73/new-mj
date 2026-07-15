@@ -158,3 +158,40 @@ test("buGang opens a rob-kong window before collecting gang payments", () => {
     expect(next.gangPayments).toHaveLength(0);
   }
 });
+
+test("杠上炮 transfers the latest gang payment exactly once", () => {
+  const state = playingState();
+  state.seats[0]!.hand = [7, ...state.seats[0]!.hand.filter((tile) => tile >= 36)];
+  state.seats[1]!.hand = [8, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24];
+  state.lack![0] = "m";
+  state.lack![1] = "s";
+  state.scores = [2, 0, -2, 0];
+  state.gangPayments = [{ gangEventId: 99, opener: 0, payer: 2, amount: 2 }];
+  state.lastGangEventId = 99;
+  state.wall = allTileIds(BLOODBATTLE_TILE_SET).filter(
+    (tile) =>
+      !state.seats.some(
+        (entry) =>
+          entry.hand.includes(tile) || entry.melds.some((meld) => meld.tiles.includes(tile)),
+      ),
+  );
+
+  const opened = applyAction(state, 0, { type: "discard", tile: 7 });
+  expect("state" in opened).toBe(true);
+  if (!("state" in opened)) return;
+  const claimed = applyAction(opened.state as BloodbattleState, 1, { type: "hu" });
+  expect("state" in claimed).toBe(true);
+  if ("state" in claimed) {
+    const next = claimed.state as BloodbattleState;
+    expect(next.scores[0]).toBe(0);
+    expect(next.scores[2]).toBe(-2);
+    expect(next.scores[1]).toBeGreaterThan(2);
+    expect(next.gangPayments[0]).toMatchObject({ transferred: true });
+    expect(next.lastGangEventId).toBeUndefined();
+    expect(
+      claimed.events.filter(
+        (event) => (event.payload as { reason?: string }).reason === "gangTransfer",
+      ),
+    ).toHaveLength(1);
+  }
+});

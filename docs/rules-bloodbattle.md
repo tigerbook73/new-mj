@@ -81,7 +81,7 @@
 
 ## 7. BloodbattleState 私有字段（D12 后现状）
 
-`variantState` 命名空间已被 D12 撤销：血战私有状态是 `BloodbattleState`（`packages/core/src/rulesets/bloodbattle/types.ts`）顶层的可选字段，不再嵌套一层命名空间。已实现：换三张阶段数据 `exchange?`、定缺选择 `lack?`、playing 阶段各家已胡标记与胡牌快照、基础杠分流水、补杠抢杠胡窗口。尚未实现：抢杠胡后的呼叫转移、退税及终局检查——同样作为 `BloodbattleState` 顶层字段处理，不引入命名空间。
+`variantState` 命名空间已被 D12 撤销：血战私有状态是 `BloodbattleState`（`packages/core/src/rulesets/bloodbattle/types.ts`）顶层的可选字段，不再嵌套一层命名空间。已实现：换三张阶段数据 `exchange?`、定缺选择 `lack?`、playing 阶段各家已胡标记与胡牌快照、基础杠分流水、补杠抢杠胡窗口、抢杠胡后的呼叫转移。尚未实现：退税及终局检查——同样作为 `BloodbattleState` 顶层字段处理，不引入命名空间。
 
 ---
 
