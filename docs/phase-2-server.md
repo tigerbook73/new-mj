@@ -1,6 +1,6 @@
 # 阶段 2：NestJS Server 架构与实施计划
 
-> **状态**：设计完成，待执行
+> **状态**：6 步骤均已实现，`pnpm verify` 全绿；阶段收尾的 doc-map §4 吸纳仪式 + 打 tag `phase-2` 待确认后执行
 > **范围**：房间管理 + Socket.IO 集成 + MVP 4-round 会话
 > **总工期**：~7-10 天单人；~4-5 天并行（本版不再宣称脚手架/文档可并行，见「章节调整说明」）
 
@@ -396,34 +396,36 @@ describe("AppModule", () => {
 
 ---
 
-### 步骤 6：集成与 E2E 测试（1-2 天）
+### 步骤 6：集成与 E2E 测试 —— ✅ 已实现
 
-**目标**：端到端验证 4 人游戏完整流程（创建 → 开始 → 1 局完成 → 排名）。
+**目标**：端到端验证 4 人游戏完整流程（创建 → 开始 → 完整会话 → 排名）。
 
-**创建文件**：
+**已交付文件**：
 
-1. **`apps/server/test/rooms.e2e-spec.ts`**：4 个 `socket.io-client` 模拟客户端跑通 create → join×4 → ready×4 → start → 1 局 → finished → 排名。
-2. **`apps/server/src/rooms/room.service.spec.ts`**：分数累加、庄家轮转、`shouldContinue` 判定。
-3. **`apps/server/src/core/game.service.spec.ts`**：包装 `createGame`/`applyAction` 委托 core 正确。
-4. **`apps/server/test/fixtures/mock-actions.ts`**：预定义的合理动作序列（用于 E2E）。
+- `apps/server/test/rooms.session.e2e-spec.ts`（新增，本步骤的核心交付物）：4 个真实 `socket.io-client` 连接跑完整 **4 局**会话（不是原计划的"1 局"——`RoomService.shouldContinue()` 的终止条件本来就要求满 `totalGames`，验收如果只测 1 局验证不到 `room:sessionFinished`/最终排名这条路径）：`room:create` → `room:join` ×3 → `room:ready` ×4 → `room:start` → 每局用 `@new-mj/core` 的 `playJunkGame(room.seed, ...)` 生成确定性动作序列、按座位分发给对应 socket 依次 `game:action` → 断言收到 `room:sessionFinished`、`room.phase === "finished"`、排名长度为 4、期间至少收到 4 次 `room:scoreUpdated`。
+- `RoomService`/`GameService` 的单元测试已在步骤 4 交付（`room.service.spec.ts`/`game.service.spec.ts`），步骤 5 的 `rooms.gateway.e2e-spec.ts` 已覆盖连接/鉴权/单局 `game:action` 路径——本步骤不重复造轮子，只补"完整会话"这一层。
+
+**与设计草稿的偏差**：
+
+- 不需要 `test/fixtures/mock-actions.ts`：`playJunkGame` 已经能按 seed 生成保证合法的确定性动作序列，手写固定 fixture 反而要跟着规则变化维护，没有必要。
+- 会话测试直接从测试代码里 `app.get(RoomService)` 读 `room.seed`（同进程内的白盒访问）来生成匹配的动作脚本——这是必须的：客户端不可能凭空知道"当前局用的是哪个随机种子"，协议本来也不会把 `seed` 发给客户端（见 `docs/rooms.md` 的 `RoomInfo` 定义）。传输层本身（Socket.IO 握手、ack/event 帧、per-seat 广播）仍然是全链路真实跑的，白盒的只是"用什么动作"这一步。
 
 **DoD（验收标准）**：
 
-- [ ] 4 玩家创建房间 → 加入 → 就绪 → 开始
-- [ ] Core engine 驱动完整 1 局游戏
-- [ ] 分数正确累加
-- [ ] 房间状态转移（waiting → in-game → finished）
-- [ ] 最终排名计算正确
-- [ ] 所有错误码匹配 `docs/protocol.md` §4
-- [ ] `pnpm --filter @new-mj/server verify` 全绿
-- [ ] 手工测试：4 个 `socket.io-client` 模拟客户端完整流程
+- [x] 4 玩家创建房间 → 加入 → 就绪 → 开始
+- [x] Core engine 驱动完整对局（4 局，不只 1 局）
+- [x] 分数正确累加（`room:scoreUpdated` 广播 + 最终 `ranking`）
+- [x] 房间状态转移（waiting → in-game → finished）
+- [x] 最终排名计算正确（`gamesPlayed === 4`，`ranking.length === 4`）
+- [x] 所有错误码匹配 `docs/protocol.md` §4
+- [x] `pnpm --filter @new-mj/server verify` 全绿（含 `test:e2e`）
+- [x] 手工测试：4 个 `socket.io-client` 模拟客户端完整流程（`rooms.session.e2e-spec.ts` 就是这个手工场景的自动化版本）
 
 **最小 commit**：
 
-1. `test(server): add 4-player E2E via socket.io-client`
-2. `test(server): add RoomService/GameService unit specs`
+1. `test(server): add full 4-round session e2e via socket.io-client`
 
-达标后打 tag `phase-2`（`docs/workflow.md`：阶段验收 = 可运行产物跑通 + doc-map §4 吸纳仪式完成）。
+达标后打 tag `phase-2`（`docs/workflow.md`：阶段验收 = 可运行产物跑通 + doc-map §4 吸纳仪式完成——吸纳仪式和打 tag 留给你确认后再做，不在本次改动里自动执行）。
 
 ---
 
@@ -458,8 +460,8 @@ describe("AppModule", () => {
 | 3        | 1         | `docs(server): add CLAUDE.md + AGENTS.md`                                                                                                                                                                                                                                       |
 | 4        | 2         | `feat(protocol): add tsup dual CJS/ESM build + zod schemas for room/game contracts` + `feat(server): implement GameService/HealthController/RoomService orchestration`（比原计划的 5 个 commit 更粗——房间编排是一整块互相依赖的改动，拆细了反而每个 commit 都过不了 typecheck） |
 | 5        | 1         | `feat(server): add Socket.IO gateway with handshake auth + per-seat broadcast`（含 `GAME_NOT_STARTED` 补码、`room:start` ack 修正，均是同一批改动的一部分，拆开会有中间态过不了 typecheck）                                                                                     |
-| 6        | 2         | `test(server): E2E integration` + `test(server): unit tests`                                                                                                                                                                                                                    |
-| **总计** | **~7**    | 小、可审阅的提交，达标后打 tag `phase-2`                                                                                                                                                                                                                                        |
+| 6        | 1         | `test(server): add full 4-round session e2e via socket.io-client`                                                                                                                                                                                                               |
+| **总计** | **~6**    | 小、可审阅的提交，达标后打 tag `phase-2`                                                                                                                                                                                                                                        |
 
 ---
 
@@ -482,15 +484,15 @@ describe("AppModule", () => {
 
 **最终检查清单**：
 
-- [ ] `pnpm typecheck` 无错误
-- [ ] `pnpm lint` 无违规
-- [ ] `pnpm test` 全部通过（server 用 Jest，core/protocol/ai 用 Vitest）
-- [ ] `socket.io-client` × 4 手工测试完整流程
-- [ ] 所有错误码映射到 `docs/protocol.md` §4，无编造码
-- [ ] 没有在 server 中实现规则（规则只在 core）
-- [ ] 所有 Socket.IO 消息遵循 ack/event 分离原则（含「开放问题」第 1 条的澄清结果）
-- [ ] 可见性过滤用 core 的 `eventsVisibleTo()`
-- [ ] `game:snapshot` 为单播，非群发
+- [x] `pnpm typecheck` 无错误
+- [x] `pnpm lint` 无违规
+- [x] `pnpm test` 全部通过（server 用 Jest，core/protocol/ai 用 Vitest）
+- [x] `socket.io-client` × 4 手工测试完整流程（`rooms.session.e2e-spec.ts` + 一次针对编译产物的手工冒烟）
+- [x] 所有错误码映射到 `docs/protocol.md` §4，无编造码
+- [x] 没有在 server 中实现规则（规则只在 core；游戏结束判定读 `GameEnded` 事件，不读 `state.phase`）
+- [x] 所有 Socket.IO 消息遵循 ack/event 分离原则（含「开放问题」第 1 条的澄清结果——`room:start`/`room:nextGame` 已改纯回执）
+- [x] 可见性过滤用 core 的 `eventsVisibleTo()`
+- [x] `game:snapshot` 为单播，非群发
 
 **end-to-end 验证命令**：
 
@@ -498,12 +500,20 @@ describe("AppModule", () => {
 cd apps/server
 
 pnpm build
-pnpm test
-pnpm verify
+pnpm verify   # typecheck && lint && test && test:e2e，含 4 局真实 socket 会话
 
-# 手工测试（启动 server + 4 个客户端模拟器）
+# 手工冒烟（针对编译产物，不是 ts-jest）：启动 server，另开一个真实 socket.io-client 连接
 node dist/main.js &
-node test/fixtures/manual-4client.js
+node -e '
+  const { JwtService } = require("./node_modules/@nestjs/jwt");
+  const { io } = require("./node_modules/socket.io-client");
+  const token = new JwtService().sign({ sub: "smoke-user" }, { secret: "dev-only-insecure-secret" });
+  const socket = io("http://127.0.0.1:3000", { transports: ["websocket"], auth: { token, protocolVersion: "1.0" } });
+  socket.on("connect", () => socket.emit("room:create", { rulesetId: "junk" }, (reply) => {
+    console.log(JSON.stringify(reply));
+    process.exit(reply.ok ? 0 : 1);
+  }));
+'
 ```
 
 ---
