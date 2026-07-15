@@ -140,15 +140,15 @@ rm -rf /tmp/server-scaffold
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
 }
 ```
 
-（`types` 需要显式加 `"jest"`：`tsconfig.base.json` 把 `types` 锁定为 `["node"]`，不加会导致 `describe`/`it`/`expect` 报"找不到名称"。不设置 `baseUrl`/`incremental`：`baseUrl` 在 TS 6 已弃用且这里用不到路径别名；`incremental` 曾在实测中踩坑——见下方「实测踩坑」。）
+（`types` 需要显式加 `"jest"`：`tsconfig.base.json` 把 `types` 锁定为 `["node"]`，不加会导致 `describe`/`it`/`expect` 报"找不到名称"。不设置 `baseUrl`/`incremental`：`baseUrl` 在 TS 6 已弃用且这里用不到路径别名；`incremental` 曾在实测中踩坑——见下方「实测踩坑」。`rootDir` 起初设成 `"./src"`，步骤 5 加了 `test/*.e2e-spec.ts` 后报 TS6059（文件不在 rootDir 下）——这份 `tsconfig.json` 只管 typecheck、`noEmit` 恒为真，放宽到 `"."` 覆盖 `src/`+`test/` 没有副作用；真正约束产物布局的是下面 `tsconfig.build.json`，那份继续收紧到 `"./src"`。）
 
-`apps/server/tsconfig.build.json`（在 `tsconfig.json` 基础上打开 emit、关闭继承来的 `allowImportingTsExtensions`——CJS 不需要 `.ts` 导入后缀改写，且该选项要求 `noEmit`/`emitDeclarationOnly`/`rewriteRelativeImportExtensions` 三者之一为真，`noEmit: false` 后必须关掉它，排除测试文件参与构建产物）：
+`apps/server/tsconfig.build.json`（在 `tsconfig.json` 基础上打开 emit、关闭继承来的 `allowImportingTsExtensions`——CJS 不需要 `.ts` 导入后缀改写，且该选项要求 `noEmit`/`emitDeclarationOnly`/`rewriteRelativeImportExtensions` 三者之一为真，`noEmit: false` 后必须关掉它；`rootDir` 单独收紧回 `./src`，配合 `exclude` 排除测试文件，保证 `dist/` 产物布局跟 `src/` 一一对应）：
 
 ```jsonc
 {
@@ -156,6 +156,7 @@ rm -rf /tmp/server-scaffold
   "compilerOptions": {
     "noEmit": false,
     "allowImportingTsExtensions": false,
+    "rootDir": "./src",
   },
   "exclude": ["node_modules", "test", "dist", "**/*.spec.ts"],
 }
@@ -368,125 +369,30 @@ describe("AppModule", () => {
 
 ---
 
-### 步骤 5：Socket.IO Gateway（2-3 天）
+### 步骤 5：Socket.IO Gateway —— ✅ 已实现
 
 **目标**：WebSocket 入口，消息路由，可见性过滤，错误处理。
 
-**创建文件**：
+**已交付文件**：
 
-1. **`apps/server/src/gateway/rooms.gateway.ts`**：
+- `apps/server/src/config/config.service.ts` + `config.module.ts` —— 之前推迟的 `ConfigService`，本步骤有了真正的消费者：`protocolVersion`（握手校验）、`jwtSecret`（token 验证）。
+- `apps/server/src/gateway/auth.middleware.ts` —— 见下方「与草稿的偏差」，**不是** `CanActivate` 守卫。
+- `apps/server/src/gateway/connection-registry.ts` —— `socketId ↔ {roomId, userId}` + `roomId → seat → Socket` 两张表，见下方偏差说明。
+- `apps/server/src/gateway/rooms.gateway.ts` + `gateway.module.ts` —— `room:create`/`room:join`/`room:ready`/`room:start`/`game:action` 五个 `@SubscribeMessage` handler + `EventBus` 订阅者（把步骤 4 发出的域事件转成实际的 Socket.IO 广播/单播）。
 
-   ```ts
-   @WebSocketGateway({ namespace: "/", transports: ["websocket"] })
-   class RoomsGateway {
-     @SubscribeMessage("room:create")
-     async handleRoomCreate(client: Socket, payload: RoomCreateRequest) {}
+**与设计草稿的偏差**：
 
-     @SubscribeMessage("room:join")
-     async handleRoomJoin(client: Socket, payload: RoomJoinRequest) {}
+1. **鉴权用 Socket.IO 握手中间件，不是 `CanActivate` 守卫**：`docs/protocol.md` §0 要求"版本不匹配/token 无效 → 拒绝连接"，但 Nest 的 WS `CanActivate` 只保护 `@SubscribeMessage` handler，`handleConnection` 生命周期钩子不经过守卫——用守卫的话，未鉴权的客户端仍能完成 WebSocket 握手、白占一个连接，直到它发第一条消息才会被拒。改用 `server.use((socket, next) => ...)`（`afterInit` 里注册），在 Engine.IO 握手阶段、`connection` 事件触发前就拒绝，语义上更贴近"拒绝连接"而不是"拒绝消息"。
+2. **座位 → socket 的映射不放在 `RoomPlayer` 里**：草稿设想 `player.socketId`，但那样会把 Socket.IO 概念泄漏进 `RoomService`（`event-bus.ts` 的注释已经说"phase 4 可能换成 Redis/Bull"——如果 `Room` 状态里嵌了 `Socket` 对象，换传输层就要跟着改 `RoomService`）。改为 Gateway 自己维护 `ConnectionRegistry`：房间内广播（`room:playerJoined` 等）直接用 Socket.IO 原生的 `client.join(roomId)` + `server.to(roomId)`；只有 `game:snapshot`/`game:event` 这两个需要按座位单播的消息，才查 `ConnectionRegistry` 的 `roomId → seat → Socket` 表。`RoomService`/`EventBus` 完全不知道 Socket.IO 的存在。
+3. **`GAME_NOT_STARTED` 错误码**（开放问题 3 的解决方案）：`docs/protocol.md` §4 补了这个码，`packages/protocol` 的 `ERROR_CODES` 同步更新；`RoomService.applyPlayerAction` 在 `room.phase !== "in-game"` 时抛这个码，不再借用语义相反的 `GAME_IN_PROGRESS`。
+4. **`room:start`/`room:nextGame` 的 ack 改为纯回执 `{}`**（开放问题 1 的解决方案）：`docs/rooms.md` §5.1 已改，视图统一走 `game:snapshot` 事件单播，不再把 `gameSnapshot` 塞进 ack data。
+5. **昵称字段**：`docs/protocol.md` 的 `room:create`/`room:join` payload 没有 nickname 字段（大概率是漏项，不是有意省略）。本步骤先用 `` `Player-${userId.slice(0,6)}` `` 占位，这是一个还没解决的开放项，不是刻意设计——以后要支持自定义昵称，需要先在协议里补这个字段。
 
-     @SubscribeMessage("room:ready")
-     async handleRoomReady(client: Socket, payload: RoomReadyRequest) {}
+**测试**：
 
-     @SubscribeMessage("room:start")
-     async handleRoomStart(client: Socket, payload: {}) {}
-
-     @SubscribeMessage("game:action")
-     async handleGameAction(client: Socket, payload: GameActionRequest) {}
-
-     handleConnection(client: Socket) {}
-     handleDisconnect(client: Socket) {}
-   }
-   ```
-
-2. **`apps/server/src/gateway/auth.guard.ts`**：
-
-   ```ts
-   @Injectable()
-   class AuthGuard implements CanActivate {
-     canActivate(context: ExecutionContext): boolean {
-       const client = context.switchToWs().getClient<Socket>();
-       const payload = this.jwtService.verify(client.handshake.auth.token);
-       client.data.userId = payload.sub;
-       return true;
-     }
-   }
-   ```
-
-3. **`apps/server/src/gateway/gateway.module.ts`**：
-
-   ```ts
-   @Module({
-     imports: [RoomsModule, AuthModule],
-     providers: [RoomsGateway],
-   })
-   class GatewayModule {}
-   ```
-
-**`game:snapshot` 单播广播**（修正：`docs/protocol.md` §3 定义为单播 `{ view, seq, deadline? }`，不是群发）：
-
-```ts
-private broadcastSnapshots(room: Room): void {
-  room.players.forEach((player, seatId) => {
-    if (!player?.socketId) return;
-    const view = this.gameService.getPlayerView(room.gameState, seatId as SeatId);
-    if (!view) return;
-    this.server.to(player.socketId).emit("game:snapshot", {
-      view,
-      seq: room.seq,
-      deadline: undefined,
-    });
-  });
-}
-```
-
-**可见性过滤**（`game:event` 按座位单连接推送）：
-
-```ts
-private broadcastGameEvent(roomId: string, event: GameEvent): void {
-  const room = this.roomService.get(roomId);
-  if (!room) return;
-  room.players.forEach((player, seatId) => {
-    if (!player?.socketId) return;
-    const visible = eventsVisibleTo([event], seatId as SeatId).length > 0;
-    if (!visible) return;
-    this.server.to(player.socketId).emit("game:event", { event });
-  });
-}
-```
-
-**错误码**（照抄 `docs/protocol.md` §4 真实枚举，不再编造码）：
-
-```ts
-const ERROR_CODES = [
-  "UNAUTHORIZED",
-  "VERSION_MISMATCH",
-  "ROOM_NOT_FOUND",
-  "ROOM_FULL",
-  "ALREADY_IN_ROOM",
-  "NOT_IN_ROOM",
-  "GAME_IN_PROGRESS",
-  "NOT_YOUR_TURN",
-  "ILLEGAL_ACTION",
-  "INVALID_CONFIG",
-  "INTERNAL",
-] as const;
-```
-
-若"对局未开始时收到 `game:action`"确有必要单独区分，属于本步骤实现时的开放问题——见下方「开放问题」，不得复用语义相反的 `GAME_IN_PROGRESS`。
-
-**复杂度**：中-高（NestJS + Socket.IO 模式，可见性过滤）
-
-**最小 commit**：
-
-1. `feat(server): add RoomsGateway with room lifecycle handlers`
-2. `feat(server): implement game:action handler + per-seat snapshot broadcast`
-3. `feat(server): add AuthGuard`
-
-**测试方式**：
-
-- 单元测试：`AuthGuard`、错误处理
-- 集成测试（`socket.io-client` 模拟客户端）：`room:create` → ack + broadcast `room:playerJoined`；`room:join` × 3 → 房间满；`room:ready` × 4 → 触发 `start`；`game:action` → ack + `game:event`（按座位单连接过滤）
+- `auth.middleware.spec.ts` —— 单测握手中间件的四条分支（版本不对/无 token/签名不对/正常签发），不起真实 server。
+- `test/rooms.gateway.e2e-spec.ts`（`socket.io-client`，真实起 `NestFactory.create(AppModule)` 监听端口）：拒绝版本不匹配/无 token 的连接；`create → join×3 → ready×4 → start`，验证 ack 内容、`room:playerJoined` 广播、四个座位分别收到自己的 `game:snapshot`；房间满后第 5 个用户 `join` 被拒 `ROOM_FULL`；未入座的 socket 发 `game:action` 被拒 `NOT_IN_ROOM`。
+- 另外手工验证过一遍**编译产物**（`nest build` → `node dist/main.js` → 真实 `socket.io-client` 连接 → `room:create` 拿到正确 ack），确认不是只在 ts-jest 环境下才能跑。
 
 ---
 
@@ -532,11 +438,15 @@ const ERROR_CODES = [
 
 ## 开放问题
 
-以下问题在制定本文档时发现，**不擅自裁决**，标注解决时机：
+制定本文档时发现的三处契约矛盾/缺口，**均已在步骤 5 实现时同一批解决**（不是本文档单方面裁决——每处都同步修订了对应的契约文档）：
 
-1. **`room:start` ack 内容与 ack/event 分离原则的矛盾**：`docs/rooms.md` §5.1 把 `room:start` 的 ack data 写成 `{ gameSnapshot }`，但 `docs/protocol.md` §1 明确"命令 = ack 给回执、事件给状态"（发起者不得靠 ack data 更新状态）。步骤 5 实现 `room:start` 时需要与 `docs/rooms.md` 澄清并同一 commit 修订。
-2. **未登记的事件名**：`game:started`、`room:phaseChanged` 曾在早期草稿/`docs/rooms.md` §8 时序图中出现，但均未在 `docs/protocol.md` §3 或 `docs/rooms.md` §5.2 的正式事件表登记。本文档统一改用已登记的 `game:snapshot` 表达开局/切局。如实现时确认仍需要专门的阶段切换信号，需先在 `protocol.md`/`rooms.md` 补登记，再实现。
-3. **"对局未开始收到 `game:action`"的错误码缺口**：`docs/protocol.md` §4 现有枚举里没有语义贴合的码（`GAME_IN_PROGRESS` 语义相反）。步骤 5 实现时如确认这是真实会发生的场景，需要同一 commit 在 `protocol.md` §4 补码，不得复用 `GAME_IN_PROGRESS`。
+1. ✅ **`room:start` ack 内容与 ack/event 分离原则的矛盾**——已解决：`docs/rooms.md` §5.1 的 `room:start`/`room:nextGame` ack data 改为 `{}`，视图统一走 `game:snapshot` 事件单播。
+2. ✅ **未登记的事件名**（`game:started`/`room:phaseChanged`）——已解决：全文统一用已登记的 `game:snapshot` 表达开局/切局，`docs/rooms.md` §8 时序图同步改写，不再出现这两个未登记事件名。
+3. ✅ **"对局未开始收到 `game:action`"的错误码缺口**——已解决：`docs/protocol.md` §4 新增 `GAME_NOT_STARTED`，`packages/protocol` 的 `ERROR_CODES` 同步，`RoomService.applyPlayerAction` 使用该码。
+
+**本步骤新发现、尚未解决的开放项**（不影响当前功能，留给后续步骤）：
+
+4. **`room:create`/`room:join` payload 缺 nickname 字段**：`docs/protocol.md` 没有定义昵称怎么传，当前用 `userId` 派生占位昵称。要支持真实昵称需要先扩展协议（补字段或走个人资料系统），本文档不擅自加字段，标注为待办。
 
 ---
 
@@ -547,9 +457,9 @@ const ERROR_CODES = [
 | 1+2      | 1         | `chore(server): regenerate scaffold via nest CLI (CommonJS), align to pnpm/turbo`                                                                                                                                                                                               |
 | 3        | 1         | `docs(server): add CLAUDE.md + AGENTS.md`                                                                                                                                                                                                                                       |
 | 4        | 2         | `feat(protocol): add tsup dual CJS/ESM build + zod schemas for room/game contracts` + `feat(server): implement GameService/HealthController/RoomService orchestration`（比原计划的 5 个 commit 更粗——房间编排是一整块互相依赖的改动，拆细了反而每个 commit 都过不了 typecheck） |
-| 5        | 3         | `feat(server): RoomsGateway` + `feat(server): game:action handler + per-seat snapshot broadcast` + `feat(server): AuthGuard`                                                                                                                                                    |
+| 5        | 1         | `feat(server): add Socket.IO gateway with handshake auth + per-seat broadcast`（含 `GAME_NOT_STARTED` 补码、`room:start` ack 修正，均是同一批改动的一部分，拆开会有中间态过不了 typecheck）                                                                                     |
 | 6        | 2         | `test(server): E2E integration` + `test(server): unit tests`                                                                                                                                                                                                                    |
-| **总计** | **~9**    | 小、可审阅的提交，达标后打 tag `phase-2`                                                                                                                                                                                                                                        |
+| **总计** | **~7**    | 小、可审阅的提交，达标后打 tag `phase-2`                                                                                                                                                                                                                                        |
 
 ---
 

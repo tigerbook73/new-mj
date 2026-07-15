@@ -76,6 +76,7 @@ describe("ERROR_CODES", () => {
       "ALREADY_IN_ROOM",
       "NOT_IN_ROOM",
       "GAME_IN_PROGRESS",
+      "GAME_NOT_STARTED",
       "NOT_YOUR_TURN",
       "ILLEGAL_ACTION",
       "INVALID_CONFIG",

@@ -109,7 +109,7 @@ export class RoomService {
   applyPlayerAction(roomId: string, seat: SeatId, action: unknown): ApplyResult<unknown> {
     const room = this.mustGet(roomId);
     if (room.phase !== "in-game") {
-      throw new RoomServiceError("GAME_IN_PROGRESS", "no game in progress");
+      throw new RoomServiceError("GAME_NOT_STARTED", "no game in progress");
     }
 
     const result = this.gameService.applyAction(room.gameState, seat, action);

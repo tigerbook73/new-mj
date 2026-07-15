@@ -9,6 +9,7 @@ export const ERROR_CODES = [
   "ALREADY_IN_ROOM",
   "NOT_IN_ROOM",
   "GAME_IN_PROGRESS",
+  "GAME_NOT_STARTED",
   "NOT_YOUR_TURN",
   "ILLEGAL_ACTION",
   "INVALID_CONFIG",
@@ -16,6 +17,9 @@ export const ERROR_CODES = [
 ] as const;
 export const ErrCodeSchema = z.enum(ERROR_CODES);
 export type ErrCode = z.infer<typeof ErrCodeSchema>;
+
+/** docs/protocol.md §1 — the ack envelope every command/query response uses. */
+export type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: string };
 
 export const SessionFormatSchema = z.enum(["4-round", "best-of-3"]);
 export type SessionFormat = z.infer<typeof SessionFormatSchema>;

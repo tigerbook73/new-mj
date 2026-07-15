@@ -143,11 +143,11 @@ function nextDealer(currentDealer: SeatId): SeatId {
 
 ### 5.1 新的 ack 请求
 
-| 消息            | payload                   | data（成功时）     | 备注                                             |
-| --------------- | ------------------------- | ------------------ | ------------------------------------------------ |
-| `room:start`    | `{}`                      | `{ gameSnapshot }` | 房主发起，4 人到达后可调用；触发 game 1          |
-| `room:nextGame` | `{}`                      | `{ gameSnapshot }` | 自动或房主触发进下一局（内部用）                 |
-| `room:create`   | `{ sessionFormat?, ... }` | `RoomInfo`         | 创建时可指定 sessionFormat（MVP 默认 "4-round"） |
+| 消息            | payload                   | data（成功时） | 备注                                                                                                                                           |
+| --------------- | ------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `room:start`    | `{}`                      | `{}`           | 房主发起，4 人到达后可调用；触发 game 1。**修正**：命令类消息 ack 只给回执（protocol.md §1），视图走 `game:snapshot` 事件单播，不塞进 ack data |
+| `room:nextGame` | `{}`                      | `{}`           | 自动或房主触发进下一局（内部用）；同上，视图走 `game:snapshot` 事件                                                                            |
+| `room:create`   | `{ sessionFormat?, ... }` | `RoomInfo`     | 创建时可指定 sessionFormat（MVP 默认 "4-round"）；这是"进入新上下文"类消息，ack 给快照，与上面两行不同                                         |
 
 ### 5.2 新的事件推送
 
@@ -205,35 +205,30 @@ Player A/B/C/D: room:ready { ready: true }
   ← 房间内所有人: room:readyChanged { seat, ready: true } ×4
 
 Player A (房主): room:start {}
-  ← ack: { data: { gameSnapshot: PlayerView (round-1) } }
-  ← room:phaseChanged { phase: "round-1", dealer: 0 }
-  ← 所有人: game:snapshot { view: ..., seq: 0 }
+  ← ack: { ok: true }（回执，不带视图——protocol.md §1「命令=ack给回执」）
+  ← 每个座位单独收到: game:snapshot { view: PlayerView(seat), seq, deadline? }
   [进入正常对局，如 protocol.md §5 所述]
 ```
 
 **第 1 局结束 → 第 2 局**
 
 ```
-[局结束，core 返回 finished 状态]
-  server: 从事件提取 scoreDeltas，更新 room.scores
+[applyPlayerAction 收到的 events 里出现 GameEnded]
+  server: 从 Settled 事件提取 scoreDeltas，更新 room.scores
   server: 计算 nextDealer = 1（轮转）
 
-房间内所有人: room:scoreUpdated { scores: [...], roundNumber: 1 }
-  (可选) room:dealerChanged { dealer: 1, roundNumber: 2 }
-  room:phaseChanged { phase: "round-2" } 或直接下发 game:snapshot
-
-所有人: game:snapshot { view: PlayerView (round-2), seq: 0 }
-  [游戏自动开始或等待房主/所有人确认后开始]
+房间内所有人: room:scoreUpdated { scores, gameNumber: 1, totalGames: 4 }
+房间内所有人: room:dealerChanged { dealer: 1, gameNumber: 2 }
+每个座位单独收到: game:snapshot { view: PlayerView(seat, game 2), seq, deadline? }
 ```
 
 **4 局全完**
 
 ```
-[round-4 结束]
+[第 4 局 applyPlayerAction 收到的 events 里出现 GameEnded，shouldContinue() 判 false]
   server: 计算 ranking
 
-房间内所有人: room:sessionFinished { result: { winner, ranking: [...] } }
-  room:phaseChanged { phase: "finished" }
+房间内所有人: room:sessionFinished { result: { winner, ranking, format, gamesPlayed: 4 } }
 ```
 
 ## 6. MVP 范围

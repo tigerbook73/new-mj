@@ -129,6 +129,15 @@ describe("RoomService — lifecycle", () => {
       expect.objectContaining({ code: "GAME_IN_PROGRESS" }),
     );
   });
+
+  it("applyPlayerAction on a room with no game running throws GAME_NOT_STARTED", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    expect(() => service.applyPlayerAction(room.id, 0, { type: "discard", tile: 0 })).toThrow(
+      expect.objectContaining({ code: "GAME_NOT_STARTED" }),
+    );
+  });
 });
 
 describe("RoomService — full 4-round session (real junk engine)", () => {
