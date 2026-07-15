@@ -74,7 +74,7 @@ engine-api 的公共骨架（`types.ts`）只保留跨玩法共用的形状：`G
 - `awaiting-claims`：声明窗口（见规则文档）
 - `finished`：有人胡或流局
 
-`BloodbattlePhase`：`exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）。`exchanging` 与 `choosing-lack` 都是四家独立提交、全员提交后自动转移的阶段；提交顺序不影响随机性或结果。`playing ⇄ awaiting-claims → finished` 部分尚未实现（阶段 1.5 待办）。
+`BloodbattlePhase`：`exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）。`exchanging` 与 `choosing-lack` 都是四家独立提交、全员提交后自动转移的阶段；playing 已实现缺门出牌、碰/胡声明、多赢家和三家胡/牌墙耗尽出口；杠及终局检查仍是阶段 1.5 待办。
 
 摸牌为引擎自动转移，不是玩家 Action，杠后补摸同理：上一动作的裁决结果若为"轮到某家摸牌"，引擎在同一次 `applyAction` 内自动完成摸牌、发出 TileDrawn 事件并进入该家的 playing（取舍理由见 decisions.md 评审点 C）。摸牌均有事件（#4/#12，双版本），客户端据此渲染摸牌动画：他家播牌背飞入，自己播牌面飞入。
 
@@ -95,7 +95,7 @@ type JunkAction =
   | { type: "pass" }; // 窗口内过
 ```
 
-血战的 `BloodbattleAction`（目前仅前置阶段两个变体，`playing` 阶段的 discard/chi/peng/gang/hu/pass 尚未实现，不要提前臆测形状）：
+血战的 `BloodbattleAction`（前置阶段与 Stage A playing 变体；杠动作待 Stage B）：
 
 ```ts
 type BloodbattleAction =

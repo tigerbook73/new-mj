@@ -1,5 +1,6 @@
 import type { SeatId } from "./lib/ids.ts";
 import { junkRuleSet } from "./rulesets/junk/index.ts";
+import { bloodbattleRuleSet } from "./rulesets/bloodbattle/index.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "./types.ts";
 
 /**
@@ -21,6 +22,7 @@ type StateWithConfig = { config: GameConfig };
 // typed at its own module, the public functions below re-narrow at the boundary.
 const rulesets: Record<string, RulesetModule<any, any>> = {
   junk: junkRuleSet,
+  bloodbattle: bloodbattleRuleSet,
 };
 
 const getRuleset = (rulesetId: string) => rulesets[rulesetId];

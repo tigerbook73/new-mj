@@ -2,12 +2,13 @@ import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng, nextInt } from "../../lib/prng.ts";
 import { TILE_KINDS, createTileSet } from "../../lib/tiles.ts";
 import { createWall } from "../../lib/wall.ts";
+import { parseBloodbattleConfig } from "./config.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import type { BloodbattleApplyResult, BloodbattleConfig, BloodbattleState } from "./types.ts";
 
 // 108 tiles: m/p/s 1-9 x4, no honors (rules-bloodbattle.md §1).
-const BLOODBATTLE_TILE_SET = createTileSet(
+export const BLOODBATTLE_TILE_SET = createTileSet(
   TILE_KINDS.filter((kind) => !kind.endsWith("z")),
   4,
 );
@@ -59,26 +60,23 @@ const receiverOf = (seat: SeatId, direction: 0 | 1 | 2): SeatId => {
 };
 
 export const createBloodbattlePrelude = (seed: number, config: unknown): BloodbattleApplyResult => {
-  const configObject =
-    typeof config === "object" && config !== null ? (config as Record<string, unknown>) : {};
-  const exchangeThree = configObject.exchangeThree !== false;
-  const gameConfig: BloodbattleConfig = {
-    ...configObject,
-    rulesetId: "bloodbattle",
-    exchangeThree,
-  };
+  const parsed = parseBloodbattleConfig(config);
+  if ("error" in parsed) return parsed;
+  const gameConfig: BloodbattleConfig = parsed.config;
 
   const first = nextInt(createPrng(seed), 4);
   const dealer = first.value as SeatId;
   const shuffled = createWall(first.prng, BLOODBATTLE_TILE_SET);
   const state: BloodbattleState = {
     config: gameConfig,
-    phase: exchangeThree ? "exchanging" : "choosing-lack",
+    phase: gameConfig.exchangeThree ? "exchanging" : "choosing-lack",
     wall: shuffled.wall,
     seats: seats(),
     currentSeat: dealer,
     seq: 0,
     prng: shuffled.prng,
+    scores: [0, 0, 0, 0],
+    status: ["active", "active", "active", "active"],
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {

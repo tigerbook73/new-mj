@@ -24,13 +24,26 @@ const exchangingState = (): BloodbattleState => {
     allTileIds().slice(39, 52),
   ];
   return {
-    config: { rulesetId: "bloodbattle", exchangeThree: true },
+    config: {
+      rulesetId: "bloodbattle",
+      exchangeThree: true,
+      capFan: 4,
+      multiWinOnDiscard: true,
+      robKong: true,
+      checkHuaZhu: true,
+      checkDaJiao: true,
+      gangRefund: true,
+      selfDrawBonus: "addFan",
+      mustHuOnLastFour: false,
+    },
     phase: "exchanging",
     wall: allTileIds().slice(52),
     seats: hands.map((hand) => ({ hand, melds: [], discards: [] })),
     currentSeat: 0,
     seq: 0,
     prng: createPrng(1),
+    scores: [0, 0, 0, 0],
+    status: ["active", "active", "active", "active"],
   };
 };
 
