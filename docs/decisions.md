@@ -13,6 +13,7 @@
 - **D9 垃圾胡为第一玩法**：最简规则快速验证 core 分层；血战为第二个实现，用两个真实实现的拉扯矫正 RuleSet 抽象（预期阶段 1.5 一次有边界的接口调整）。
 - **D10 除 OAuth 外全走 Socket.IO**：砍掉 tRPC/HTTP 整层（查询用 ack 模式）；握手单次 JWT 鉴权绑定 socket.data.userId，不做二次临时 token（同信道同凭据的第二道门不增加攻击成本）；服务端仅 /health。
 - **D11 房间对应连续 N 局，非一局即散**：房间生命周期跨多局运行，比分逐局累加，不是打完一局就散场重开。N 的具体取值、底分倍率、庄家轮换等实现细节留待阶段 2 设计，产出并入 `protocol.md` 或 `docs/rooms.md`。
+- **D12 core 结构反转：engine-api 极小外壳 + rulesets/\* 各自完整状态机 + lib 无观点积木（方案 C）**：日麻确定要做，其差异（王牌区/宝牌改变牌墙结构、四风连打等中途流局出口、"无役不能和"击穿胡牌判定∥计分分离、立直后行为模式切换）是控制流级差异，不是数据/枚举级差异，方案 A/B（共用回合循环模块）无法容纳。旧模型"通用框架 + RuleSet 插件"（D6）把变化点上移到框架层——`ruleset.ts` 8 方法接口里 `getClaimOptions`/`resolveClaims`/`evaluateWin`/`settle`/`parseConfig` 五个在全仓库范围内零消费者，接口注释已自称"junk 一次性实现的形状，血战落地会强制调整"。新模型：engine-api（`createGame`/`applyAction`/`getLegalActions`/`getPlayerView` 四签名 + 事件信封 + PlayerView 骨架，四方共同依赖）不反向了解任何玩法；每个玩法在 `rulesets/<id>/` 下实现完整状态机（自有 Action/Phase/State，互不 import 对方流程代码）；`lib/` 收纯函数积木（牌/墙/PRNG/手牌分解/容器不变量）。`variantState` 字段撤销——规则状态本身就是完整状态。实施：目录/归属搬移 + import 调整为主，逻辑本体不动（阶段 1 早期窗口，血战尚未真正接入 `applyAction` 边界，避免阶段 1.5 与日麻两次流程重构）。
 
 ## 规格级决策（评审点，详情见规格文档定稿）
 
