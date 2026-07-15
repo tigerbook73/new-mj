@@ -39,7 +39,7 @@
 - 每个 workspace package/app 都应提供 `typecheck`、`lint` 和 `test` 脚本，便于局部开发与任务缓存。
 - 有运行时产物的 package 应提供 `build`，并将 `dist/**` 声明为 Turbo 输出；依赖 package 的检查由 Turbo 的 `^build` 依赖先构建上游产物。构建工具统一放在根 devDependencies，package 只保留自己的入口/输出配置。
 - 每个 workspace package/app 都应提供 `verify`，串行执行本 package 的 `typecheck`、`lint`、`test`；根目录 `pnpm verify` 另包含全局 `format:check`。
-- 根目录 `pnpm lint:fix` 支持 ESLint 自动修复（可追加文件路径）；`pnpm typecheck:fix` 会先执行 format/lint 修复再 typecheck，TypeScript 类型错误仍需人工处理。
+- 根目录 `pnpm lint:fix` 支持 ESLint 自动修复（可追加文件路径）；TypeScript 类型错误没有自动修复手段，仍需人工处理。
 - 根目录同名脚本通过 Turbo 聚合所有 workspace；CI、阶段验收和提交前检查一律从根目录运行。
 - 格式化使用 Prettier：`pnpm format` 写入格式，`pnpm format:check` 仅校验；提交前不得以 `format` 代替 lint 或 typecheck。
 

@@ -6,7 +6,6 @@
   "scripts": {
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "typecheck:fix": "pnpm format && pnpm lint:fix && pnpm typecheck",
     "lint": "turbo run lint && eslint tools",
     "lint:fix": "eslint --fix .",
     "test": "turbo run test && node --test tools/*.test.ts",
