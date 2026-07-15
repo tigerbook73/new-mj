@@ -1,6 +1,7 @@
 {
   "name": "new-mj",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@10.33.3",
   "scripts": {
     "build": "turbo run build",
