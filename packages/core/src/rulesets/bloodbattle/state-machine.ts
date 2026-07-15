@@ -131,6 +131,12 @@ export const applyDiscard = (
     { type: "public" },
     { type: EVENT_TYPES.tileDiscarded, seat, kind: kind(tile) },
   );
+  append(
+    state,
+    events,
+    { type: "seat", seats: [seat] },
+    { type: EVENT_TYPES.tileDiscardedPrivate, seat, tile },
+  );
   if (Object.keys(options).length === 0) {
     delete state.lastGangEventId;
     return drawNext(state, events, seat);
@@ -273,7 +279,7 @@ const applyAnGang = (
     state,
     events,
     { type: "public" },
-    { type: EVENT_TYPES.gangMade, seat, gangType: "anGang" },
+    { type: EVENT_TYPES.gangMade, seat, gangType: "anGang", kinds: tiles.map(kind) },
   );
   settleGang(state, events, seat, 2);
   drawReplacement(state, events, seat);
@@ -298,7 +304,7 @@ const completeBuGang = (
     state,
     events,
     { type: "public" },
-    { type: EVENT_TYPES.gangMade, seat, gangType: "buGang" },
+    { type: EVENT_TYPES.gangMade, seat, gangType: "buGang", kinds: peng.tiles.map(kind) },
   );
   settleGang(state, events, seat, 1);
   drawReplacement(state, events, seat);
@@ -365,7 +371,16 @@ export const finishWin = (
       seat: winner,
       winType: by === "zimo" ? "zimo" : by === "robKong" ? "robKong" : "ron",
       from,
-      snapshot: { hand: hand.map(kind), winTile: kind(winTile), lack: state.wins[winner]!.lack },
+      snapshot: {
+        hand: hand.map(kind),
+        winTile: kind(winTile),
+        lack: state.wins[winner]!.lack,
+        melds: state.seats[winner]!.melds.map((meld) => ({
+          type: meld.type,
+          tiles: meld.tiles.map(kind),
+          ...(meld.from === undefined ? {} : { from: meld.from }),
+        })),
+      },
       scoring: scored,
       activeSeats: seats.filter((s) => state.status[s] === "active"),
     },
@@ -437,6 +452,7 @@ export const resolveClaims = (
         seat: minGang,
         gangType: "minGang",
         from: pending.discard.seat,
+        kinds: matching.slice(0, 3).concat(tile).map(kind),
       },
     );
     settleGang(state, events, minGang, 2, [pending.discard.seat]);
@@ -466,6 +482,7 @@ export const resolveClaims = (
         seat: peng,
         from: pending.discard.seat,
         kind: kind(tile),
+        kinds: [kind(tile), kind(tile), kind(tile)],
       },
     );
     append(state, events, { type: "public" }, { type: EVENT_TYPES.turnStarted, seat: peng });
@@ -524,6 +541,25 @@ export const getLegalActions = (
   state: BloodbattleState,
   seat: SeatId,
 ): readonly BloodbattleAction[] => {
+  if (state.phase === "exchanging") {
+    if (state.exchange?.selections[seat]) return [];
+    const suit = (["m", "p", "s"] as const).find(
+      (candidate) =>
+        state.seats[seat]!.hand.filter((tile) => kind(tile)[1] === candidate).length >= 3,
+    );
+    if (!suit) return [];
+    const tiles = state.seats[seat]!.hand.filter((tile) => kind(tile)[1] === suit).slice(0, 3);
+    return tiles.length === 3
+      ? [{ type: "exchangeThree", tiles: tiles as [TileId, TileId, TileId] }]
+      : [];
+  }
+  if (state.phase === "choosing-lack") {
+    if (state.lack?.[seat]) return [];
+    return [...new Set(state.seats[seat]!.hand.map((tile) => kind(tile)[1]))].map((suit) => ({
+      type: "chooseLack" as const,
+      suit: suit as "m" | "p" | "s",
+    }));
+  }
   if (state.phase === "awaiting-claims") {
     const options = state.pendingClaims?.options[seat] ?? [];
     if (options.length === 0 || state.pendingClaims?.responses[seat]) return [];

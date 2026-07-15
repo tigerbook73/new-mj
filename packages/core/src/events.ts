@@ -8,6 +8,7 @@ export const EVENT_TYPES = {
   tileDrawn: "TileDrawn",
   tileDrawnPrivate: "TileDrawnPrivate",
   tileDiscarded: "TileDiscarded",
+  tileDiscardedPrivate: "TileDiscardedPrivate",
   claimWindowOpened: "ClaimWindowOpened",
   claimResponded: "ClaimResponded",
   claimWindowResolved: "ClaimWindowResolved",

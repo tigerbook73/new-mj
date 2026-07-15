@@ -21,12 +21,10 @@ for (const ruleset of REGISTERED_RULESETS_FOR_TESTING) {
     let state = started.state;
     const events = [...started.events];
     for (let step = 0; step < 30 && state.phase !== "finished"; step += 1) {
-      const seat =
-        state.phase === "awaiting-claims"
-          ? ([0, 1, 2, 3] as const).find(
-              (candidate) => ruleset.getLegalActions(state, candidate).length > 0,
-            )!
-          : state.currentSeat;
+      const seat = ([0, 1, 2, 3] as const).find(
+        (candidate) => ruleset.getLegalActions(state, candidate).length > 0,
+      )!;
+      if (seat === undefined) throw new Error(`NO_LEGAL_ACTION:${ruleset.id}:${state.phase}`);
       const action = ruleset.getLegalActions(state, seat)[0]!;
       const result = ruleset.applyAction(state, seat, action);
       if ("error" in result) throw new Error(result.error.code);
