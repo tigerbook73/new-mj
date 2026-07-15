@@ -4,6 +4,7 @@ import type { SeatId, TileId } from "@/lib/ids.ts";
 import { type Meld, type SeatState } from "@/lib/seat.ts";
 import { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
+import { settleBloodbattleDraw } from "./settlement.ts";
 import type { BloodbattleAction, BloodbattleApplyResult, BloodbattleState } from "./types.ts";
 import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 
@@ -144,12 +145,7 @@ const drawNext = (
 ): BloodbattleApplyResult => {
   const seat = nextActive(state, from);
   if (seat === undefined || state.wall.length === 0) {
-    state.phase = "finished";
-    state.result = {
-      winners: seats.filter((s) => state.status[s] === "won"),
-      endReason: "wallExhausted",
-    };
-    append(state, events, { type: "public" }, { type: EVENT_TYPES.wallExhausted });
+    settleBloodbattleDraw(state, events);
     return { state, events };
   }
   const tile = state.wall.shift()!;
@@ -168,12 +164,7 @@ const drawNext = (
 };
 const drawReplacement = (state: BloodbattleState, events: GameEvent[], seat: SeatId): void => {
   if (state.wall.length === 0) {
-    state.phase = "finished";
-    state.result = {
-      winners: seats.filter((s) => state.status[s] === "won"),
-      endReason: "wallExhausted",
-    };
-    append(state, events, { type: "public" }, { type: EVENT_TYPES.wallExhausted });
+    settleBloodbattleDraw(state, events);
     return;
   }
   const tile = state.wall.shift()!;

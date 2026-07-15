@@ -21,7 +21,7 @@
 - `src/engine.ts`：engine API 四签名与 ruleset 静态注册表。
 - `src/lib/`：tiles、prng、wall、win、invariants、ids、seat 等通用积木。
 - `src/rulesets/junk/`：完整 junk 状态机、结算、PlayerView 与 fuzz。
-- `src/rulesets/bloodbattle/`：血战前置、playing、番型、基础杠分/抢杠胡/呼叫转移；终局结算待补齐。
+- `src/rulesets/bloodbattle/`：血战前置、playing、番型、杠分/抢杠胡/呼叫转移和流局结算；fuzz 待补齐。
 - `src/events.ts`：事件信封与事件类型常量；`src/cli.ts`：CLI 薄壳。
 
 ## core DoD

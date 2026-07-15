@@ -1,10 +1,12 @@
 import { expect, test } from "vitest";
+import type { GameEvent } from "./events.ts";
 import {
   allTileIds,
   applyAction,
   createGame,
   createPrng,
   getLegalActions,
+  settleBloodbattleDraw,
   type BloodbattleState,
 } from "./index.ts";
 import { BLOODBATTLE_TILE_SET } from "./rulesets/bloodbattle/prelude.ts";
@@ -69,6 +71,26 @@ test("playing only offers lack-suit discards and draws for the next active seat"
     expect(next.currentSeat).toBe(1);
     expect(next.seats[1]!.hand).toContain(4);
     expect(next.seats[0]!.discards).toEqual([{ tile: 0 }]);
+  }
+});
+
+test("wall exhaustion runs bloodbattle end settlement", () => {
+  const state = playingState();
+  state.seats[0]!.hand = [0];
+  state.seats[1]!.hand = Array.from({ length: 36 }, (_, index) => index + 1);
+  state.seats[2]!.hand = Array.from({ length: 36 }, (_, index) => index + 37);
+  state.seats[3]!.hand = Array.from({ length: 35 }, (_, index) => index + 73);
+  state.status = ["active", "won", "won", "won"];
+  state.wall = [];
+  const result = applyAction(state, 0, { type: "discard", tile: 0 });
+  expect("state" in result).toBe(true);
+  if ("state" in result) {
+    const next = result.state as BloodbattleState;
+    expect(next.phase).toBe("finished");
+    expect(next.result).toEqual({ winners: [1, 2, 3], endReason: "wallExhausted" });
+    expect(result.events.map((event) => (event.payload as { type?: string }).type)).toContain(
+      "GameEnded",
+    );
   }
 });
 
@@ -194,4 +216,31 @@ test("杠上炮 transfers the latest gang payment exactly once", () => {
       ),
     ).toHaveLength(1);
   }
+});
+
+test("draw settlement applies huaZhu, gang refund, then daJiao", () => {
+  const state = playingState();
+  state.seats[0]!.hand = [0, 36, 72];
+  state.seats[1]!.hand = [8, 9, 10, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24];
+  state.seats[2]!.hand = [4];
+  state.status = ["active", "active", "active", "won"];
+  state.lack = { 0: "m", 1: "s", 2: "m", 3: "m" };
+  state.scores = [0, 2, -2, 0];
+  state.gangPayments = [{ gangEventId: 7, opener: 1, payer: 2, amount: 2 }];
+
+  const events: GameEvent[] = [];
+  settleBloodbattleDraw(state, events);
+
+  expect(state.phase).toBe("finished");
+  expect(state.scores[0]).toBe(-32);
+  expect(state.scores[1]).toBeGreaterThan(16);
+  expect(state.scores[2]).toBe(8);
+  expect(state.gangPayments[0]).toMatchObject({ refunded: true });
+  expect(events.map((event) => (event.payload as { reason?: string }).reason)).toEqual([
+    "huaZhu",
+    "gangRefund",
+    "daJiao",
+    undefined,
+    undefined,
+  ]);
 });
