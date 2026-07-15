@@ -180,7 +180,8 @@ export const rebuildPlayerView = (
         break;
       case "TileDiscarded": {
         const discardedSeat = payload.seat as SeatId;
-        const tileKind = payload.kind as string;
+        const tile = payload.tile as number;
+        const tileKind = BLOODBATTLE_TILE_SET.kindOf(tile);
         view.seats[discardedSeat]!.handCount -= 1;
         view.seats[discardedSeat]!.discards.push({ tile: tileKind as never });
         view.lastDiscard = { seat: discardedSeat, tile: tileKind as never };
@@ -195,10 +196,14 @@ export const rebuildPlayerView = (
         break;
       case "ClaimWindowOpened":
         view.phase = "awaiting-claims";
-        view.lastDiscard = {
-          seat: payload.seat as SeatId,
-          tile: payload.kind as never,
-        };
+        {
+          const tile = payload.tile as number;
+          const tileKind = BLOODBATTLE_TILE_SET.kindOf(tile);
+          view.lastDiscard = {
+            seat: payload.seat as SeatId,
+            tile: tileKind as never,
+          };
+        }
         if (payload.options && (payload.options as Record<string, unknown>)[seat])
           view.myClaimOptions = [
             ...(((payload.options as Record<string, unknown>)[
@@ -214,7 +219,8 @@ export const rebuildPlayerView = (
         break;
       case "PengMade": {
         const meldSeat = payload.seat as SeatId;
-        const tileKind = payload.kind as string;
+        const tiles = (payload.tiles as number[]) ?? [];
+        const tileKind = tiles.length > 0 ? BLOODBATTLE_TILE_SET.kindOf(tiles[0]!) : "";
         view.seats[meldSeat]!.handCount -= 2;
         view.seats[meldSeat]!.melds.push({
           type: "peng",
@@ -230,8 +236,9 @@ export const rebuildPlayerView = (
       case "GangMade": {
         const meldSeat = payload.seat as SeatId;
         const gangType = payload.gangType as "anGang" | "buGang" | "minGang";
-        const kinds = [...(payload.kinds as string[])];
-        const tileKind = kinds[0]!;
+        const tiles = (payload.tiles as number[]) ?? [];
+        const tileKind = tiles.length > 0 ? BLOODBATTLE_TILE_SET.kindOf(tiles[0]!) : "";
+        const kinds = tiles.map((t) => BLOODBATTLE_TILE_SET.kindOf(t));
         const existing = view.seats[meldSeat]!.melds.find(
           (meld) => meld.type === "peng" && meld.tiles[0] === tileKind,
         );
@@ -257,18 +264,22 @@ export const rebuildPlayerView = (
       case "HuDeclared": {
         const winner = payload.seat as SeatId;
         const snapshot = payload.snapshot as {
-          hand: string[];
-          winTile: string;
+          hand: number[];
+          winTile: number;
           lack: BloodbattlePlayerView["myLackSuit"];
-          melds: BloodbattlePlayerView["seats"][number]["melds"];
+          melds: Array<{ type: string; tiles: number[]; from?: SeatId }>;
         };
         view.seats[winner]!.status = "won";
         view.seats[winner]!.handCount = 0;
         view.seats[winner]!.winSnapshot = {
-          hand: [...snapshot.hand] as never,
-          winTile: snapshot.winTile as never,
+          hand: snapshot.hand.map((t) => BLOODBATTLE_TILE_SET.kindOf(t)) as never,
+          winTile: BLOODBATTLE_TILE_SET.kindOf(snapshot.winTile) as never,
           lack: snapshot.lack!,
-          melds: snapshot.melds,
+          melds: snapshot.melds.map((meld) => ({
+            type: meld.type as never,
+            tiles: meld.tiles.map((t) => BLOODBATTLE_TILE_SET.kindOf(t)) as never,
+            ...(meld.from === undefined ? {} : { from: meld.from as never }),
+          })) as BloodbattlePlayerView["seats"][number]["melds"],
         };
         view.scores[winner] += (payload.scoring as { multiplier: number }).multiplier;
         delete view.myClaimOptions;

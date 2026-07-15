@@ -307,33 +307,34 @@ test("10000 seeded bloodbattle games cover config combinations", () => {
   expect(fuzzBloodbattleGames(10_000, 73)).toBeUndefined();
 }, 60_000);
 
-test("bloodbattle public events and views expose kinds, never TileIds", () => {
+test("bloodbattle public events expose public tiles' TileIds, private events hide hand tiles", () => {
   const state = playingState();
   state.seats[1]!.melds = [{ type: "peng", tiles: [4, 5, 6], from: 0 }];
   state.seats[1]!.discards = [{ tile: 7 }];
   state.lastDiscard = { seat: 1, tile: 7 };
   state.wins = { 1: { hand: [8], winTile: 9, lack: "s" } };
   const view = bloodbattleRuleSet.getPlayerView(state, 0);
+  // PlayerView always shows kinds, never TileIds (even for public tiles)
   expect(view.lastDiscard).toEqual({ seat: 1, tile: "2m" });
   expect(view.seats[1]!.melds[0]!.tiles).toEqual(["2m", "2m", "2m"]);
   expect(view.seats[1]!.discards[0]!.tile).toBe("2m");
   expect(view.seats[1]!.winSnapshot).toMatchObject({ hand: ["3m"], winTile: "3m" });
+
+  // But events should contain TileIds for public tiles (to support UI animation)
   const played = playBloodbattleGame(101, { exchangeThree: false });
   expect("state" in played).toBe(true);
   if ("state" in played) {
-    const hasPublicTileId = (value: unknown): boolean => {
-      if (Array.isArray(value)) return value.some((item) => hasPublicTileId(item));
-      if (typeof value !== "object" || value === null) return false;
-      return Object.entries(value).some(([key, item]) =>
-        ["tile", "tiles", "hand", "winTile"].includes(key)
-          ? typeof item === "number" ||
-            (Array.isArray(item) && item.some((entry) => typeof entry === "number"))
-          : hasPublicTileId(item),
-      );
-    };
     for (const event of played.events) {
       if (event.visibility.type !== "public") continue;
-      expect(hasPublicTileId(event.payload)).toBe(false);
+      const payload = event.payload as Record<string, unknown>;
+      // Public events for open tiles should contain TileId
+      if (payload.type === "TileDiscarded" || payload.type === "ClaimWindowOpened") {
+        expect(typeof payload.tile).toBe("number");
+      }
+      // But should never expose hand tiles in public events
+      if (payload.type !== "HuDeclared") {
+        expect(payload.hand).toBeUndefined();
+      }
     }
   }
 });

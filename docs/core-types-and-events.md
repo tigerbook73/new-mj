@@ -24,7 +24,7 @@ type Meld = { type: MeldType; tiles: TileId[]; from?: SeatId };
 ```
 
 状态与事件存 `TileId`；规则逻辑（胡牌判定、碰杠匹配）经 `kindOf(id)` 按种类运算（取舍理由见 decisions.md 评审点 A）。
-**配套纪律（安全）**：id→kind 映射静态公开，因此**暴露 id 等于暴露牌面**——一切可见性过滤须将 id 与 kind 视为同级敏感（TileDrawn/暗杠的 public 版本均不得携带 id）。
+**配套纪律（安全）**：id→kind 映射静态公开，因此 TileId 与牌面同级敏感。可见性过滤的原则：**不得在 public 事件中暴露仍在隐藏状态的牌的 id**（如手牌、暗杠）；已公开的牌（出牌、副露中的牌、胡牌快照）可在 public 事件中包含 id，以支持 UI 精准动画。TileDrawn 的 public 版本不携带 id；TileDiscarded、PengMade、GangMade 等 public 事件含 id（已公开的牌）。
 **配套约定（测试）**：fixture 中用例仍以 kind 书写（如 `[1m,2m,3m]`），由加载器自动派发 id。
 
 ## 2. 状态形状（按 ruleset 私有）

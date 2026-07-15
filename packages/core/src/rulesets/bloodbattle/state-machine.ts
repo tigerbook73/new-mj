@@ -127,12 +127,7 @@ export const applyDiscard = (
     if (isWin(state, candidate, tile)) candidateOptions.push({ action: { type: "hu" as const } });
     if (candidateOptions.length) options[candidate] = candidateOptions;
   }
-  append(
-    state,
-    events,
-    { type: "public" },
-    { type: EVENT_TYPES.tileDiscarded, seat, kind: kind(tile) },
-  );
+  append(state, events, { type: "public" }, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   append(
     state,
     events,
@@ -149,7 +144,7 @@ export const applyDiscard = (
     state,
     events,
     { type: "public" },
-    { type: EVENT_TYPES.claimWindowOpened, seat, kind: kind(tile), options },
+    { type: EVENT_TYPES.claimWindowOpened, seat, tile, options },
   );
   return { state, events };
 };
@@ -341,7 +336,7 @@ const applyBuGang = (
         state,
         events,
         { type: "public" },
-        { type: EVENT_TYPES.claimWindowOpened, source: "robKong", seat, kind: kind(tile), options },
+        { type: EVENT_TYPES.claimWindowOpened, source: "robKong", seat, tile, options },
       );
       return { state, events };
     }
@@ -374,12 +369,12 @@ export const finishWin = (
       winType: by === "zimo" ? "zimo" : by === "robKong" ? "robKong" : "ron",
       from,
       snapshot: {
-        hand: hand.map(kind),
-        winTile: kind(winTile),
+        hand,
+        winTile,
         lack: state.wins[winner]!.lack,
         melds: state.seats[winner]!.melds.map((meld) => ({
           type: meld.type,
-          tiles: meld.tiles.map(kind),
+          tiles: meld.tiles,
           ...(meld.from === undefined ? {} : { from: meld.from }),
         })),
       },
@@ -454,7 +449,7 @@ export const resolveClaims = (
         seat: minGang,
         gangType: "minGang",
         from: pending.discard.seat,
-        kinds: matching.slice(0, 3).concat(tile).map(kind),
+        tiles: [matching[0]!, matching[1]!, matching[2]!, tile],
       },
     );
     settleGang(state, events, minGang, 2, [pending.discard.seat]);
@@ -483,8 +478,8 @@ export const resolveClaims = (
         type: "PengMade",
         seat: peng,
         from: pending.discard.seat,
-        kind: kind(tile),
-        kinds: [kind(tile), kind(tile), kind(tile)],
+        tile,
+        tiles: [matching[0]!, matching[1]!, tile],
       },
     );
     append(state, events, { type: "public" }, { type: EVENT_TYPES.turnStarted, seat: peng });
