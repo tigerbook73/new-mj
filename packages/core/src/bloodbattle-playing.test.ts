@@ -40,6 +40,7 @@ const playingState = (): BloodbattleState => {
     prng: createPrng(1),
     scores: [0, 0, 0, 0],
     status: ["active", "active", "active", "active"],
+    gangPayments: [],
     lack: { 0: "m", 1: "p", 2: "s", 3: "m" },
   };
 };
@@ -53,7 +54,8 @@ test("bloodbattle is registered in the engine", () => {
 
 test("playing only offers lack-suit discards and draws for the next active seat", () => {
   const state = playingState();
-  expect(getLegalActions(state, 0)).toEqual([
+  const actions = getLegalActions(state, 0) as Array<{ type: string; tile?: number }>;
+  expect(actions.filter((action) => action.type === "discard")).toEqual([
     { type: "discard", tile: 0 },
     { type: "discard", tile: 1 },
     { type: "discard", tile: 2 },
@@ -67,5 +69,17 @@ test("playing only offers lack-suit discards and draws for the next active seat"
     expect(next.currentSeat).toBe(1);
     expect(next.seats[1]!.hand).toContain(4);
     expect(next.seats[0]!.discards).toEqual([{ tile: 0 }]);
+  }
+});
+
+test("anGang records a meld, pays active seats, and draws a replacement tile", () => {
+  const result = applyAction(playingState(), 0, { type: "anGang", kind: "1m" });
+  expect("state" in result).toBe(true);
+  if ("state" in result) {
+    const next = result.state as BloodbattleState;
+    expect(next.seats[0]!.melds).toEqual([{ type: "anGang", tiles: [0, 1, 2, 3] }]);
+    expect(next.seats[0]!.hand).toContain(4);
+    expect(next.scores).toEqual([6, -2, -2, -2]);
+    expect(next.gangPayments).toHaveLength(3);
   }
 });

@@ -18,6 +18,7 @@ const cloneState = (state: BloodbattleState): BloodbattleState => ({
   wall: [...state.wall],
   scores: [...state.scores] as BloodbattleState["scores"],
   status: [...state.status] as BloodbattleState["status"],
+  gangPayments: state.gangPayments.map((payment) => ({ ...payment })),
   seats: state.seats.map((seat) => ({
     hand: [...seat.hand],
     melds: seat.melds.map((m) => ({ ...m, tiles: [...m.tiles] })),
@@ -48,6 +49,8 @@ const append = (
 const kind = (tile: TileId) => BLOODBATTLE_TILE_SET.kindOf(tile);
 const sameKind = (hand: readonly TileId[], tile: TileId) =>
   hand.filter((candidate) => kind(candidate) === kind(tile));
+const sameKindValue = (hand: readonly TileId[], tileKind: string) =>
+  hand.filter((candidate) => kind(candidate) === tileKind);
 const remove = (hand: readonly TileId[], tile: TileId): TileId[] => {
   const copy = [...hand];
   const i = copy.indexOf(tile);
@@ -115,6 +118,11 @@ export const applyDiscard = (
       kind(tile)[1] !== state.lack?.[candidate]
     )
       candidateOptions.push({ action: { type: "peng" as const } });
+    if (
+      sameKind(state.seats[candidate]!.hand, tile).length >= 3 &&
+      kind(tile)[1] !== state.lack?.[candidate]
+    )
+      candidateOptions.push({ action: { type: "minGang" as const } });
     if (isWin(state, candidate, tile)) candidateOptions.push({ action: { type: "hu" as const } });
     if (candidateOptions.length) options[candidate] = candidateOptions;
   }
@@ -147,6 +155,91 @@ const drawNext = (
   append(state, events, { type: "public" }, { type: "TileDrawn", seat });
   append(state, events, { type: "seat", seats: [seat] }, { type: "TileDrawnPrivate", seat, tile });
   append(state, events, { type: "public" }, { type: "TurnStarted", seat });
+  return { state, events };
+};
+const drawReplacement = (state: BloodbattleState, events: GameEvent[], seat: SeatId): void => {
+  if (state.wall.length === 0) {
+    state.phase = "finished";
+    state.result = {
+      winners: seats.filter((s) => state.status[s] === "won"),
+      endReason: "wallExhausted",
+    };
+    append(state, events, { type: "public" }, { type: "WallExhausted" });
+    return;
+  }
+  const tile = state.wall.shift()!;
+  state.seats[seat]!.hand.push(tile);
+  state.currentSeat = seat;
+  state.phase = "playing";
+  append(state, events, { type: "public" }, { type: "GangReplacementDrawn", seat });
+  append(state, events, { type: "seat", seats: [seat] }, { type: "TileDrawnPrivate", seat, tile });
+  append(state, events, { type: "public" }, { type: "TurnStarted", seat });
+};
+const settleGang = (
+  state: BloodbattleState,
+  events: GameEvent[],
+  opener: SeatId,
+  amount: number,
+): void => {
+  const gangEventId = state.seq + 1;
+  for (const payer of seats) {
+    if (payer === opener || state.status[payer] !== "active") continue;
+    state.scores[opener] += amount;
+    state.scores[payer] -= amount;
+    state.gangPayments.push({ gangEventId, opener, payer, amount });
+  }
+  state.lastGangEventId = gangEventId;
+  append(
+    state,
+    events,
+    { type: "public" },
+    {
+      type: "Settled",
+      reason: "gang",
+      scoreDeltas: state.scores.map((score, index) =>
+        index === opener
+          ? amount *
+            seats.filter((payer) => payer !== opener && state.status[payer] === "active").length
+          : 0,
+      ) as [number, number, number, number],
+    },
+  );
+};
+const applyAnGang = (
+  state: BloodbattleState,
+  seat: SeatId,
+  gangKind: string,
+  events: GameEvent[],
+): BloodbattleApplyResult => {
+  if (state.phase !== "playing" || state.currentSeat !== seat) return fail("GANG_NOT_AVAILABLE");
+  const tiles = state.seats[seat]!.hand.filter((tile) => kind(tile) === gangKind);
+  if (tiles.length !== 4 || tiles.some((tile) => kind(tile)[1] !== state.lack?.[seat]))
+    return fail("GANG_NOT_AVAILABLE");
+  state.seats[seat]!.hand = state.seats[seat]!.hand.filter((tile) => !tiles.includes(tile));
+  state.seats[seat]!.melds.push({ type: "anGang", tiles });
+  append(state, events, { type: "public" }, { type: "GangMade", seat, gangType: "anGang" });
+  settleGang(state, events, seat, 2);
+  drawReplacement(state, events, seat);
+  return { state, events };
+};
+const applyBuGang = (
+  state: BloodbattleState,
+  seat: SeatId,
+  tile: TileId,
+  events: GameEvent[],
+): BloodbattleApplyResult => {
+  if (state.phase !== "playing" || state.currentSeat !== seat) return fail("GANG_NOT_AVAILABLE");
+  if (kind(tile)[1] !== state.lack?.[seat]) return fail("GANG_NOT_AVAILABLE");
+  const peng = state.seats[seat]!.melds.find(
+    (meld) => meld.type === "peng" && kind(meld.tiles[0]!) === kind(tile),
+  );
+  if (!peng || !state.seats[seat]!.hand.includes(tile)) return fail("GANG_NOT_AVAILABLE");
+  state.seats[seat]!.hand = remove(state.seats[seat]!.hand, tile);
+  peng.type = "buGang";
+  peng.tiles.push(tile);
+  append(state, events, { type: "public" }, { type: "GangMade", seat, gangType: "buGang" });
+  settleGang(state, events, seat, 1);
+  drawReplacement(state, events, seat);
   return { state, events };
 };
 export const finishWin = (
@@ -203,6 +296,31 @@ export const resolveClaims = (
     return { state, events };
   }
   const peng = seats.find((s) => responses[s]?.type === "peng");
+  const minGang = seats.find((s) => responses[s]?.type === "minGang");
+  if (minGang !== undefined) {
+    const tile = pending.discard.tile;
+    const matching = sameKind(state.seats[minGang]!.hand, tile);
+    state.seats[minGang]!.hand = matching
+      .slice(0, 3)
+      .reduce((hand, candidate) => remove(hand, candidate), state.seats[minGang]!.hand);
+    state.seats[minGang]!.melds.push({
+      type: "minGang",
+      tiles: [tile, tile, tile, tile],
+      from: pending.discard.seat,
+    });
+    const discard = state.seats[pending.discard.seat]!.discards.at(-1);
+    if (discard) discard.claimedBy = minGang;
+    delete state.pendingClaims;
+    append(
+      state,
+      events,
+      { type: "public" },
+      { type: "GangMade", seat: minGang, gangType: "minGang", from: pending.discard.seat },
+    );
+    settleGang(state, events, minGang, 2);
+    drawReplacement(state, events, minGang);
+    return { state, events };
+  }
   if (peng !== undefined) {
     const tile = pending.discard.tile;
     const matching = sameKind(state.seats[peng]!.hand, tile);
@@ -240,6 +358,8 @@ export const applyAction = (
   if (action.type === "exchangeThree") return applyExchangeThree(state, seat, action.tiles);
   if (action.type === "chooseLack") return applyChooseLack(state, seat, action.suit);
   if (action.type === "discard") return checked(applyDiscard(state, seat, action.tile, events));
+  if (action.type === "anGang") return checked(applyAnGang(state, seat, action.kind, events));
+  if (action.type === "buGang") return checked(applyBuGang(state, seat, action.tile, events));
   if (state.phase === "awaiting-claims") {
     if (!state.pendingClaims?.options[seat] || state.pendingClaims.responses[seat])
       return fail("CLAIM_NOT_AVAILABLE");
@@ -285,6 +405,17 @@ export const getLegalActions = (
   const actions: BloodbattleAction[] = state.seats[seat]!.hand.filter(
     (tile) => kind(tile)[1] === state.lack?.[seat],
   ).map((tile) => ({ type: "discard", tile }));
+  for (const candidate of new Set(state.seats[seat]!.hand.map(kind))) {
+    if (sameKindValue(state.seats[seat]!.hand, candidate).length === 4)
+      actions.push({ type: "anGang", kind: candidate });
+  }
+  for (const meld of state.seats[seat]!.melds)
+    if (meld.type === "peng") {
+      const tile = state.seats[seat]!.hand.find(
+        (candidate) => kind(candidate) === kind(meld.tiles[0]!),
+      );
+      if (tile !== undefined) actions.push({ type: "buGang", tile });
+    }
   if (isWin(state, seat)) actions.push({ type: "zimo" });
   return actions;
 };

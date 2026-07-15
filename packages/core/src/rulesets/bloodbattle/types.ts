@@ -1,4 +1,4 @@
-import type { SeatId, TileId } from "../../lib/ids.ts";
+import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "../../types.ts";
@@ -23,6 +23,8 @@ export type BloodbattleAction =
   | { type: "exchangeThree"; tiles: [TileId, TileId, TileId] }
   | { type: "chooseLack"; suit: "m" | "p" | "s" }
   | { type: "discard"; tile: TileId }
+  | { type: "anGang"; kind: TileKind }
+  | { type: "buGang"; tile: TileId }
   | { type: "peng" }
   | { type: "minGang" }
   | { type: "hu" }
@@ -50,6 +52,15 @@ export type BloodbattleWinSnapshot = {
 export type BloodbattleGameResult = {
   winners: SeatId[];
   endReason: "allWin" | "wallExhausted";
+};
+
+export type BloodbattleGangPayment = {
+  gangEventId: number;
+  opener: SeatId;
+  payer: SeatId;
+  amount: number;
+  refunded?: boolean;
+  transferred?: boolean;
 };
 
 export type BloodbattlePlayerView = PlayerViewBase & {
@@ -85,6 +96,8 @@ export type BloodbattleState = {
   wins?: Partial<Record<SeatId, BloodbattleWinSnapshot>>;
   lastDiscard?: { seat: SeatId; tile: TileId };
   pendingClaims?: BloodbattlePendingClaims;
+  gangPayments: BloodbattleGangPayment[];
+  lastGangEventId?: number;
   result?: BloodbattleGameResult;
 };
 
