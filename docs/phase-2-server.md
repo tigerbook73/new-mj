@@ -316,7 +316,7 @@ describe("AppModule", () => {
 
   ## 代码地图
 
-  - `src/main.ts`：启动入口，`reflect-metadata` 必须是第一行 import。
+  - `src/main.ts`：启动入口（`reflect-metadata` 由 `@nestjs/core` 内部引入，不需要手动 import）。
   - `src/app.module.ts`：根 DI 容器。
   - `src/config/`：`ConfigModule`/`ConfigService`，环境变量与 `PROTOCOL_VERSION` 常量。
   - `src/health/`：自定义 `/health` controller。
