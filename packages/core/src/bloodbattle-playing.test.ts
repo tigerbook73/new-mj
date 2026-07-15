@@ -5,6 +5,7 @@ import {
   applyAction,
   createGame,
   createPrng,
+  fuzzBloodbattleGames,
   getLegalActions,
   settleBloodbattleDraw,
   type BloodbattleState,
@@ -244,3 +245,7 @@ test("draw settlement applies huaZhu, gang refund, then daJiao", () => {
     undefined,
   ]);
 });
+
+test("1000 seeded bloodbattle games preserve tiles and finish", () => {
+  expect(fuzzBloodbattleGames(1_000, 73)).toBeUndefined();
+}, 30_000);

@@ -48,6 +48,8 @@ const sameKind = (hand: readonly TileId[], tile: TileId) =>
   hand.filter((candidate) => kind(candidate) === kind(tile));
 const sameKindValue = (hand: readonly TileId[], tileKind: string) =>
   hand.filter((candidate) => kind(candidate) === tileKind);
+const hasLackTile = (state: BloodbattleState, seat: SeatId): boolean =>
+  state.seats[seat]!.hand.some((tile) => kind(tile)[1] === state.lack?.[seat]);
 const remove = (hand: readonly TileId[], tile: TileId): TileId[] => {
   const copy = [...hand];
   const i = copy.indexOf(tile);
@@ -100,7 +102,7 @@ export const applyDiscard = (
   events: GameEvent[],
 ): BloodbattleApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("DISCARD_NOT_AVAILABLE");
-  if (state.lack?.[seat] !== undefined && kind(tile)[1] !== state.lack[seat])
+  if (hasLackTile(state, seat) && kind(tile)[1] !== state.lack?.[seat])
     return fail("MUST_DISCARD_LACK");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
   state.seats[seat]!.hand = remove(state.seats[seat]!.hand, tile);
@@ -344,8 +346,7 @@ export const finishWin = (
   const scored = scoreFor(state, winner, winTile, by);
   if (!scored.hu) throw new Error("WIN_NOT_AVAILABLE");
   const hand = [...state.seats[winner]!.hand];
-  if (by === "zimo") state.seats[winner]!.hand = remove(state.seats[winner]!.hand, winTile);
-  else state.seats[winner]!.hand = [];
+  state.seats[winner]!.hand = [];
   state.status[winner] = "won";
   state.wins = state.wins ?? {};
   state.wins[winner] = { hand, winTile, lack: state.lack![winner]! };
@@ -389,6 +390,7 @@ export const resolveClaims = (
         finishWin(state, events, winner, pending.discard.tile, "robKong", pending.discard.seat);
       delete state.lastGangEventId;
       delete state.pendingClaims;
+      if (state.phase !== "finished") return drawNext(state, events, pending.discard.seat);
       return { state, events };
     }
     delete state.lastGangEventId;
@@ -502,6 +504,8 @@ export const applyAction = (
   if (action.type === "zimo" && isWin(state, seat)) {
     finishWin(state, events, seat, state.seats[seat]!.hand.at(-1)!, "zimo");
     delete state.lastGangEventId;
+    if (state.status.filter((status) => status === "won").length < 3)
+      return checked(drawNext(state, events, seat));
     return checked({ state, events });
   }
   return fail("UNKNOWN_ACTION");
@@ -517,23 +521,28 @@ export const getLegalActions = (
 ): readonly BloodbattleAction[] => {
   if (state.phase === "awaiting-claims") {
     const options = state.pendingClaims?.options[seat] ?? [];
-    return state.pendingClaims?.responses[seat]
-      ? []
-      : [...options.map((option) => option.action), { type: "pass" }];
+    if (options.length === 0 || state.pendingClaims?.responses[seat]) return [];
+    return [...options.map((option) => option.action), { type: "pass" }];
   }
   if (state.phase !== "playing" || state.currentSeat !== seat || state.status[seat] !== "active")
     return [];
-  const actions: BloodbattleAction[] = state.seats[seat]!.hand.filter(
-    (tile) => kind(tile)[1] === state.lack?.[seat],
-  ).map((tile) => ({ type: "discard", tile }));
+  const hand = state.seats[seat]!.hand;
+  const discardable = hasLackTile(state, seat)
+    ? hand.filter((tile) => kind(tile)[1] === state.lack?.[seat])
+    : hand;
+  const actions: BloodbattleAction[] = discardable.map((tile) => ({ type: "discard", tile }));
   for (const candidate of new Set(state.seats[seat]!.hand.map(kind))) {
-    if (sameKindValue(state.seats[seat]!.hand, candidate).length === 4)
+    if (
+      sameKindValue(state.seats[seat]!.hand, candidate).length === 4 &&
+      candidate[1] === state.lack?.[seat]
+    )
       actions.push({ type: "anGang", kind: candidate });
   }
   for (const meld of state.seats[seat]!.melds)
     if (meld.type === "peng") {
       const tile = state.seats[seat]!.hand.find(
-        (candidate) => kind(candidate) === kind(meld.tiles[0]!),
+        (candidate) =>
+          kind(candidate) === kind(meld.tiles[0]!) && kind(candidate)[1] === state.lack?.[seat],
       );
       if (tile !== undefined) actions.push({ type: "buGang", tile });
     }

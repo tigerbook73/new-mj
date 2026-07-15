@@ -6,6 +6,7 @@ import type { BloodbattleAction, BloodbattleState } from "./types.ts";
 export { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
 export { DEFAULT_BLOODBATTLE_CONFIG, parseBloodbattleConfig } from "./config.ts";
 export { settleBloodbattleDraw } from "./settlement.ts";
+export { fuzzBloodbattleGames, playBloodbattleGame } from "./fuzz.ts";
 export {
   scoreBloodbattleHand,
   type BloodbattleScoringContext,
