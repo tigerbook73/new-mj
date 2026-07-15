@@ -9,6 +9,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test"
   }
 }

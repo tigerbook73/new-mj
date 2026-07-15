@@ -13,7 +13,7 @@
 
 - `src/lib/` 只放不带玩法立场的纯函数积木；`rulesets/*` 不 import 其他 ruleset 的流程代码。
 - 公共、玩法、计分、事件常量按模块归拢；Action/State 类型保留可读字面量联合。
-- `src` 内跨层引用使用 package-local `@/*` alias，禁止直接 import 父级目录。
+- `src` 与 `test` 内跨层引用使用 package-local `@/*` alias，禁止直接 import 父级目录。
 - package 集成/契约/fuzz 测试放在 `test/`，测试文件命名为 `*.test.ts`；只有真正贴近实现细节的单元测试才就近放在 `src/`。
 
 ## 代码地图
@@ -26,5 +26,5 @@
 
 ## core DoD
 
-- 修改后必须通过 `pnpm --filter @new-mj/core typecheck`、`lint`、`test`。
+- 修改后必须通过 `pnpm --filter @new-mj/core verify`。
 - core 改动必须跑 fuzz 冒烟，至少 1000 局；测试与实现同一 commit。
