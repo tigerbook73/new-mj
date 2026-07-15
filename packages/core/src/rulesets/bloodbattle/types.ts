@@ -86,7 +86,7 @@ export type BloodbattleGangPayment = {
 export type BloodbattlePlayerView = Omit<PlayerViewBase, "seats"> & {
   phase: BloodbattlePhase;
   seats: Array<
-    Omit<PlayerViewBase["seats"][number], "melds" | "discards"> & {
+    PlayerViewBase["seats"][number] & {
       melds: BloodbattlePublicMeld[];
       discards: BloodbattlePublicDiscard[];
       status: BloodbattleStatus;

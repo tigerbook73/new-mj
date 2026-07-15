@@ -1,5 +1,4 @@
 import type { SeatId, TileId } from "./lib/ids.ts";
-import type { DiscardEntry, Meld } from "./lib/seat.ts";
 import type { GameEvent } from "./events.ts";
 
 export type GameConfig = {
@@ -17,11 +16,7 @@ export type RuleViolation = {
 export type PlayerViewBase = {
   seat: SeatId;
   hand: TileId[];
-  seats: Array<{
-    melds: Meld[];
-    discards: DiscardEntry[];
-    handCount: number;
-  }>;
+  seats: Array<{ handCount: number }>;
   wallCount: number;
   currentSeat: SeatId;
 };

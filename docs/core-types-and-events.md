@@ -167,20 +167,22 @@ type PlayerViewBase = {
   seat: SeatId;
   hand: TileId[]; // 仅自己的
   seats: Array<{
-    // 四家公开信息
-    melds: Meld[]; // 暗杠牌面对他人隐藏
-    discards: DiscardEntry[];
-    handCount: number;
+    handCount: number; // 四家公开的牌数
   }>;
   wallCount: number;
   currentSeat: SeatId;
 };
 ```
 
-`phase`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`result` 等字段是玩法私有的，各 ruleset 用交叉类型扩展。junk 的 `JunkPlayerView`：
+`phase`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`result` 以及公开副露、牌河的具体表示都是玩法私有的，各 ruleset 用交叉类型扩展。junk 使用 `TileId` 形式的 `melds`/`discards`，bloodbattle 使用对外安全的 `TileKind` 形式；这些字段不放进公共骨架，避免不同玩法的牌面敏感性和数据形状混在一起。junk 的 `JunkPlayerView`：
 
 ```ts
-type JunkPlayerView = PlayerViewBase & {
+type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
+  seats: Array<{
+    melds: Meld[];
+    discards: DiscardEntry[];
+    handCount: number;
+  }>;
   phase: JunkPhase;
   myClaimOptions?: JunkClaimOption[]; // 窗口期间自己的选项
   myClaimResponse?: JunkAction; // 窗口期间自己已提交的表态（重连恢复用，评审点 F）

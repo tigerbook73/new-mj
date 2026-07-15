@@ -1,6 +1,6 @@
 # 血战 playing 阶段实施方案
 
-> 状态：候选存档，未落地执行。裁决所需的架构问题已讨论确定；规则细节的 7 处模糊推断已按 `decisions.md` BB2 先例采纳合理默认值，不逐条向用户确认。采纳并执行完成后按 doc-map 惯例应删除本文件，结论并入 `docs/plan.md`/`docs/rules-bloodbattle.md`/`docs/core-types-and-events.md`。
+> 状态：已按本方案的 Stage A/B/C 实施，当前进入阶段 1.5 验收审计；审计完成后按 doc-map 惯例删除本文件，并保留结论于 `docs/plan.md`/`docs/rules-bloodbattle.md`/`docs/core-types-and-events.md`。
 
 ## Context
 

@@ -1,5 +1,5 @@
 import type { SeatId, TileId, TileKind } from "@/lib/ids";
-import type { SeatState } from "@/lib/seat";
+import type { DiscardEntry, Meld, SeatState } from "@/lib/seat";
 import type { PrngState } from "@/lib/prng";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types";
 import { JUNK_MULTI_HU_POLICIES, JUNK_PHASES } from "./constants.ts";
@@ -62,7 +62,12 @@ export type JunkState = {
   result?: JunkGameResult;
 };
 
-export type JunkPlayerView = PlayerViewBase & {
+export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
+  seats: Array<{
+    melds: Meld[];
+    discards: DiscardEntry[];
+    handCount: number;
+  }>;
   phase: JunkPhase;
   myClaimOptions?: JunkClaimOption[];
   myClaimResponse?: JunkAction;
