@@ -46,6 +46,8 @@ export class RoomService {
     const room: Room = {
       id: randomUUID(),
       name: name?.trim() || `${hostNickname}'s room`,
+      ownerUserId: hostUserId,
+      ownerNickname: hostNickname,
       rulesetId,
       config,
       sessionFormat,
@@ -81,6 +83,8 @@ export class RoomService {
         id: room.id,
         name: room.name,
         rulesetId: room.rulesetId,
+        creator: room.ownerNickname,
+        createdAt: room.createdAt,
         playerCount: room.players.filter((player) => player !== null).length,
         status: room.status,
       });
@@ -95,8 +99,40 @@ export class RoomService {
 
   join(roomId: string, userId: string, nickname: string, seat?: SeatId): RoomPlayer {
     const room = this.mustGet(roomId);
-    if (room.players.some((player) => player?.userId === userId)) {
-      throw new RoomServiceError("ALREADY_IN_ROOM");
+    const currentSeat = room.players.findIndex((player) => player?.userId === userId);
+    if (currentSeat >= 0) {
+      if (seat === undefined) {
+        throw new RoomServiceError("ALREADY_IN_ROOM");
+      }
+      if (room.phase !== "waiting") {
+        throw new RoomServiceError("GAME_IN_PROGRESS");
+      }
+      const player = room.players[currentSeat];
+      if (!player) throw new RoomServiceError("NOT_IN_ROOM");
+      if (seat === currentSeat) return player;
+      if (room.players[seat] !== null) {
+        throw new RoomServiceError("SEAT_TAKEN");
+      }
+      const wasReady = player.isReady;
+      room.players[currentSeat] = null;
+      player.seatId = seat;
+      player.isReady = false;
+      room.players[seat] = player;
+      this.eventBus.emit("room:playerLeft", { roomId, seat: currentSeat as SeatId });
+      if (wasReady) {
+        this.eventBus.emit("room:readyChanged", {
+          roomId,
+          seat: currentSeat as SeatId,
+          ready: false,
+        });
+      }
+      this.eventBus.emit("room:playerJoined", {
+        roomId,
+        seat,
+        nickname: player.nickname,
+        isBot: player.isBot,
+      });
+      return player;
     }
     return this.seatPlayer(room, userId, nickname, false, seat);
   }
@@ -124,7 +160,7 @@ export class RoomService {
       return;
     }
 
-    if (seat === 0) {
+    if (userId === room.ownerUserId) {
       this.rooms.delete(roomId);
       this.eventBus.emit("room:closed", { roomId, reason: "hostLeft" });
       return;
@@ -144,8 +180,13 @@ export class RoomService {
     return room.phase === "waiting" && room.players.every((player) => player?.isReady === true);
   }
 
-  start(roomId: string): Room {
+  start(roomId: string, requesterUserId?: string): Room {
     const room = this.mustGet(roomId);
+    if (requesterUserId !== undefined) {
+      if (requesterUserId !== room.ownerUserId) {
+        throw new RoomServiceError("UNAUTHORIZED", "only the host can start the room");
+      }
+    }
     if (room.phase !== "waiting") {
       throw new RoomServiceError("GAME_IN_PROGRESS", "room already started");
     }
@@ -177,8 +218,7 @@ export class RoomService {
    */
   addBot(roomId: string, requesterUserId: string, seat?: SeatId): RoomPlayer {
     const room = this.mustGet(roomId);
-    const requesterSeat = room.players.findIndex((player) => player?.userId === requesterUserId);
-    if (requesterSeat !== 0) {
+    if (requesterUserId !== room.ownerUserId) {
       throw new RoomServiceError("UNAUTHORIZED", "only the host can add a bot");
     }
     if (room.phase !== "waiting") {
@@ -191,6 +231,36 @@ export class RoomService {
     const player = this.seatPlayer(room, `bot:${randomUUID()}`, `AI-${seatIndex + 1}`, true, seat);
     this.ready(room.id, player.userId, true);
     return player;
+  }
+
+  removeBot(roomId: string, requesterUserId: string, seat: SeatId): void {
+    const room = this.mustGet(roomId);
+    if (!room.players[seat]?.isBot) {
+      throw new RoomServiceError("NOT_IN_ROOM", "seat is not occupied by a bot");
+    }
+    this.removePlayer(roomId, requesterUserId, seat);
+  }
+
+  removePlayer(
+    roomId: string,
+    requesterUserId: string,
+    seat: SeatId,
+  ): { userId: string; isBot: boolean } {
+    const room = this.mustGet(roomId);
+    if (requesterUserId !== room.ownerUserId) {
+      throw new RoomServiceError("UNAUTHORIZED", "only the host can remove a player");
+    }
+    if (room.phase !== "waiting") {
+      throw new RoomServiceError("GAME_IN_PROGRESS", "room already started");
+    }
+    const player = room.players[seat];
+    if (!player) throw new RoomServiceError("NOT_IN_ROOM", "seat is empty");
+    if (player.userId === room.ownerUserId) {
+      throw new RoomServiceError("UNAUTHORIZED", "the host cannot be removed");
+    }
+    room.players[seat] = null;
+    this.eventBus.emit("room:playerLeft", { roomId, seat });
+    return { userId: player.userId, isBot: player.isBot };
   }
 
   applyPlayerAction(roomId: string, seat: SeatId, action: unknown): ApplyResult<unknown> {
@@ -329,6 +399,8 @@ export class RoomService {
     return {
       id: room.id,
       name: room.name,
+      ownerUserId: room.ownerUserId,
+      owner: room.ownerNickname,
       rulesetId: room.rulesetId,
       config: room.config,
       sessionFormat: room.sessionFormat,
@@ -342,6 +414,7 @@ export class RoomService {
               nickname: player.nickname,
               isBot: player.isBot,
               isReady: player.isReady,
+              ...(player.avatar ? { avatar: player.avatar } : {}),
             }
           : null,
       ) as RoomInfo["players"],

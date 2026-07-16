@@ -15,6 +15,12 @@ async function openVariant(page: Page, name: "Junk Hu" | "Bloodbattle") {
   await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
 }
 
+async function createRoom(page: Page, name: string) {
+  await page.getByRole("button", { name: "Create room" }).last().click();
+  await page.getByLabel("Room name").fill(name);
+  await page.getByRole("button", { name: "Create room" }).click();
+}
+
 test("four players find a room, choose seats, ready up, and start", async ({ browser }) => {
   const [host, p2, p3, p4] = await Promise.all([
     loginAs(browser, "host"),
@@ -24,8 +30,7 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
   ]);
 
   await openVariant(host, "Junk Hu");
-  await host.getByLabel("Room name").fill("Four players");
-  await host.getByRole("button", { name: "Create room" }).click();
+  await createRoom(host, "Four players");
   await expect(host).toHaveURL(/\/lobby\/[0-9a-f-]{36}$/);
 
   for (const [page, seat] of [
@@ -37,7 +42,10 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
     await page.getByRole("button", { name: "Refresh" }).click();
     await page.getByRole("button", { name: "Four players" }).click();
     await expect(page).toHaveURL(/\/lobby\//);
-    await page.getByRole("button", { name: `Sit in seat ${seat + 1}` }).click();
+    await page
+      .locator(`[data-seat="${seat + 1}"]`)
+      .getByRole("button", { name: "Sit" })
+      .click();
   }
 
   const players = [host, p2, p3, p4];
@@ -51,14 +59,14 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
 test("host can name a room and fill specifically selected seats with bots", async ({ browser }) => {
   const page = await loginAs(browser, "host");
   await openVariant(page, "Junk Hu");
-  await page.getByLabel("Room name").fill("Solo table");
-  await page.getByRole("button", { name: "Create room" }).click();
+  await createRoom(page, "Solo table");
   await expect(page).toHaveURL(/\/lobby\//);
+  await expect(page.getByText(/Owner:/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Add bot to seat 4" }).click();
-  await page.getByRole("button", { name: "Add bot to seat 2" }).click();
-  await page.getByRole("button", { name: "Add bot to seat 3" }).click();
-  await expect(page.getByText("(Bot)")).toHaveCount(3);
+  await page.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
+  await page.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
+  await page.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
+  await expect(page.getByText("BOT")).toHaveCount(3);
   await page.getByRole("checkbox", { name: "Ready" }).check();
   await page.getByRole("button", { name: "Start game" }).click();
   await expect(page).toHaveURL(/\/room\//, { timeout: 10_000 });
@@ -79,15 +87,75 @@ test("a guest can leave a waiting room and return to the lobby", async ({ browse
     loginAs(browser, "leave-guest"),
   ]);
   await openVariant(host, "Junk Hu");
-  await host.getByLabel("Room name").fill("Guest leaves");
-  await host.getByRole("button", { name: "Create room" }).click();
+  await createRoom(host, "Guest leaves");
   await openVariant(guest, "Junk Hu");
   await guest.getByRole("button", { name: "Refresh" }).click();
   await guest.getByRole("button", { name: "Guest leaves" }).click();
-  await guest.getByRole("button", { name: "Sit in seat 2" }).click();
+  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
   await guest.getByRole("button", { name: "Leave room" }).click();
   await expect(guest).toHaveURL(/\/games$/);
-  await expect(host.getByText("Seat 2 · Empty")).toBeVisible();
+  await expect(host.locator('[data-seat="2"]').getByRole("button", { name: "Sit" })).toBeVisible();
+  await host.context().close();
+  await guest.context().close();
+});
+
+test("a visitor can leave a room preview without taking a seat", async ({ browser }) => {
+  const [host, visitor] = await Promise.all([
+    loginAs(browser, "preview-host"),
+    loginAs(browser, "preview-visitor"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await createRoom(host, "Preview only");
+  await openVariant(visitor, "Junk Hu");
+  await visitor.getByRole("button", { name: "Refresh" }).click();
+  await visitor.getByRole("button", { name: "Preview only" }).click();
+  await expect(
+    visitor.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }),
+  ).toBeVisible();
+  await visitor.getByRole("button", { name: "Leave room" }).click();
+  await expect(visitor).toHaveURL(/\/games$/);
+  await host.context().close();
+  await visitor.context().close();
+});
+
+test("a player can switch to another empty seat in the same room", async ({ browser }) => {
+  const page = await loginAs(browser, "seat-switcher");
+  await openVariant(page, "Junk Hu");
+  await createRoom(page, "Seat switch");
+  await page.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
+  await page.locator('[data-seat="3"]').getByRole("button", { name: "Sit" }).click();
+  await expect(page.locator('[data-seat="2"]').getByRole("button", { name: "Sit" })).toBeVisible();
+  await expect(
+    page.locator('[data-seat="3"]').getByRole("button", { name: "Sit" }),
+  ).not.toBeVisible();
+  await page.context().close();
+});
+
+test("the host can remove a bot from a waiting seat", async ({ browser }) => {
+  const page = await loginAs(browser, "bot-remover");
+  await openVariant(page, "Junk Hu");
+  await createRoom(page, "Remove bot");
+  await page.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
+  await expect(page.locator('[data-seat="2"]')).toContainText("BOT");
+  await page.locator('[data-seat="2"]').getByRole("button", { name: "Remove" }).click();
+  await expect(page.locator('[data-seat="2"]')).not.toContainText("BOT");
+  await page.context().close();
+});
+
+test("the host can remove another player from a waiting room", async ({ browser }) => {
+  const [host, guest] = await Promise.all([
+    loginAs(browser, "remove-host"),
+    loginAs(browser, "remove-guest"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await createRoom(host, "Remove player");
+  await openVariant(guest, "Junk Hu");
+  await guest.getByRole("button", { name: "Refresh" }).click();
+  await guest.getByRole("button", { name: "Remove player" }).click();
+  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
+  await host.locator('[data-seat="2"]').getByRole("button", { name: "Remove" }).click();
+  await expect(guest).toHaveURL(/\/games$/);
+  await expect(guest.getByText("You were removed by the host.")).toBeVisible();
   await host.context().close();
   await guest.context().close();
 });
@@ -98,13 +166,13 @@ test("the host leaving a waiting room closes it for everyone", async ({ browser 
     loginAs(browser, "close-guest"),
   ]);
   await openVariant(host, "Junk Hu");
-  await host.getByLabel("Room name").fill("Host leaves");
-  await host.getByRole("button", { name: "Create room" }).click();
+  await createRoom(host, "Host leaves");
   await openVariant(guest, "Junk Hu");
   await guest.getByRole("button", { name: "Refresh" }).click();
   await guest.getByRole("button", { name: "Host leaves" }).click();
-  await guest.getByRole("button", { name: "Sit in seat 2" }).click();
+  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
   await host.getByRole("button", { name: "Leave room" }).click();
+  await host.getByRole("dialog").getByRole("button", { name: "Leave room" }).click();
   await expect(host).toHaveURL(/\/games$/);
   await expect(guest).toHaveURL(/\/games$/);
   await expect(guest.getByText("The host closed this room.")).toBeVisible();
@@ -118,20 +186,20 @@ test("leaving an in-game room keeps the other human in the match", async ({ brow
     loginAs(browser, "game-leave-guest"),
   ]);
   await openVariant(host, "Junk Hu");
-  await host.getByLabel("Room name").fill("Game leaves");
-  await host.getByRole("button", { name: "Create room" }).click();
-  await host.getByRole("button", { name: "Add bot to seat 3" }).click();
-  await host.getByRole("button", { name: "Add bot to seat 4" }).click();
+  await createRoom(host, "Game leaves");
+  await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
+  await host.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
   await openVariant(guest, "Junk Hu");
   await guest.getByRole("button", { name: "Refresh" }).click();
   await guest.getByRole("button", { name: "Game leaves" }).click();
-  await guest.getByRole("button", { name: "Sit in seat 2" }).click();
+  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
   await host.getByRole("checkbox", { name: "Ready" }).check();
   await guest.getByRole("checkbox", { name: "Ready" }).check();
   await host.getByRole("button", { name: "Start game" }).click();
   await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
   await expect(guest).toHaveURL(/\/room\//, { timeout: 10_000 });
   await host.getByRole("button", { name: "Leave room" }).click();
+  await host.getByRole("dialog").getByRole("button", { name: "Leave room" }).click();
   await expect(host).toHaveURL(/\/games$/);
   await expect(guest).toHaveURL(/\/room\//);
   await host.context().close();

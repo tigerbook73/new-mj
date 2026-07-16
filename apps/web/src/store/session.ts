@@ -19,7 +19,7 @@ export type SessionState = {
    * 需要知道别人的 userId（自己的座位号靠自己的 userId 在初始快照里就能定位，
    * 不依赖这里补的占位值）。
    */
-  applyPlayerJoined: (seat: SeatId, nickname: string, isBot: boolean) => void;
+  applyPlayerJoined: (seat: SeatId, nickname: string, isBot: boolean, avatar?: string) => void;
   applyReadyChanged: (seat: SeatId, ready: boolean) => void;
   /**
    * 只对"事实型" game:event 做增量更新（谁的回合、谁打出了什么牌、我能声明
@@ -49,11 +49,11 @@ export const useSessionStore = create<SessionState>((set) => ({
     }),
   setRoom: (room) => set({ room }),
   setView: (view) => set({ view }),
-  applyPlayerJoined: (seat, nickname, isBot) =>
+  applyPlayerJoined: (seat, nickname, isBot, avatar) =>
     set((state) => {
       if (!state.room) return state;
       const players = [...state.room.players] as RoomInfo["players"];
-      players[seat] = { userId: "", seatId: seat, nickname, isBot, isReady: false };
+      players[seat] = { userId: "", seatId: seat, nickname, isBot, isReady: false, avatar };
       return { room: { ...state.room, players } };
     }),
   applyReadyChanged: (seat, ready) =>

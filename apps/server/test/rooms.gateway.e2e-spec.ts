@@ -105,6 +105,9 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
       expect(result.ok).toBe(true);
     }
 
+    const nonOwnerStart = await ack<object>(b, "room:start", {});
+    expect(nonOwnerStart).toMatchObject({ ok: false, code: "UNAUTHORIZED" });
+
     const started = await ack<object>(a, "room:start", {});
     expect(started).toEqual({ ok: true, data: {} });
 
@@ -146,7 +149,11 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     });
     expect(listed.ok).toBe(true);
     if (listed.ok) {
-      expect(listed.data.map((room) => room.id)).toContain(roomId);
+      const listedRoom = listed.data.find((room) => room.id === roomId);
+      expect(listedRoom).toMatchObject({
+        creator: expect.any(String),
+        createdAt: expect.any(Number),
+      });
     }
 
     const peeked = await ack<RoomInfo>(guest, "room:peek", { roomId });
@@ -175,5 +182,39 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
 
     const peekAfterClose = await ack<RoomInfo>(guest, "room:peek", { roomId });
     expect(peekAfterClose).toMatchObject({ ok: false, code: "ROOM_NOT_FOUND" });
+  });
+
+  it("room:enter exposes human members and broadcasts observer changes", async () => {
+    const host = await connectAs("participant-host");
+    const observer = await connectAs("participant-observer");
+
+    const created = await ack<RoomInfo>(host, "room:create", { rulesetId: "junk" });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const joined = once<{
+      participant: { userId: string; isSeated: boolean; isBot: boolean };
+    }>(host, "room:participantJoined");
+    const entered = await ack<RoomInfo>(observer, "room:enter", { roomId: created.data.id });
+    expect(entered).toMatchObject({
+      ok: true,
+      data: {
+        participants: expect.arrayContaining([
+          expect.objectContaining({ userId: "participant-host", isSeated: true, isBot: false }),
+          expect.objectContaining({
+            userId: "participant-observer",
+            isSeated: false,
+            isBot: false,
+          }),
+        ]),
+      },
+    });
+    await expect(joined).resolves.toMatchObject({
+      participant: { userId: "participant-observer", isSeated: false, isBot: false },
+    });
+
+    const left = once<{ userId: string }>(host, "room:participantLeft");
+    expect(await ack<object>(observer, "room:leave", {})).toEqual({ ok: true, data: {} });
+    await expect(left).resolves.toEqual({ userId: "participant-observer" });
   });
 });

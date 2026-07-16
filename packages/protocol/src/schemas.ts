@@ -42,10 +42,20 @@ export const PlayerSchema = z.object({
   userId: z.string(),
   seatId: SeatIdSchema,
   nickname: z.string(),
+  avatar: z.string().optional(),
   isBot: z.boolean(),
   isReady: z.boolean(),
 });
 export type Player = z.infer<typeof PlayerSchema>;
+
+export const RoomParticipantSchema = z.object({
+  userId: z.string(),
+  nickname: z.string(),
+  avatar: z.string().optional(),
+  isSeated: z.boolean(),
+  isBot: z.boolean(),
+});
+export type RoomParticipant = z.infer<typeof RoomParticipantSchema>;
 
 export const RankingEntrySchema = z.object({
   seatId: SeatIdSchema,
@@ -78,12 +88,15 @@ const nullablePlayerTupleSchema = z.tuple([
 export const RoomInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
+  ownerUserId: z.string(),
+  owner: z.string(),
   rulesetId: z.string(),
   config: GameConfigSchema,
   sessionFormat: SessionFormatSchema,
   phase: z.enum(["waiting", "in-game", "finished"]),
   status: z.enum(["open", "closed"]),
   players: nullablePlayerTupleSchema,
+  participants: z.array(RoomParticipantSchema).optional(),
   scores: scoreTupleSchema,
   gameNumber: z.number(),
   totalGames: z.number().optional(),
@@ -100,6 +113,8 @@ export const RoomSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   rulesetId: z.string(),
+  creator: z.string(),
+  createdAt: z.number(),
   playerCount: z.number(),
   status: z.enum(["open", "closed"]),
 });
@@ -130,6 +145,12 @@ export type RoomReadyRequest = z.infer<typeof RoomReadyRequestSchema>;
 export const RoomAddBotRequestSchema = z.object({ seat: SeatIdSchema.optional() });
 export type RoomAddBotRequest = z.infer<typeof RoomAddBotRequestSchema>;
 
+export const RoomRemoveBotRequestSchema = z.object({ seat: SeatIdSchema });
+export type RoomRemoveBotRequest = z.infer<typeof RoomRemoveBotRequestSchema>;
+
+export const RoomRemovePlayerRequestSchema = z.object({ seat: SeatIdSchema });
+export type RoomRemovePlayerRequest = z.infer<typeof RoomRemovePlayerRequestSchema>;
+
 /** lobby:list — query, no side effect. Only returns rooms that are actually joinable (phase "waiting", status "open"); MVP has no spectating. */
 export const LobbyListRequestSchema = z.object({
   rulesetId: z.string(),
@@ -140,6 +161,9 @@ export type LobbyListRequest = z.infer<typeof LobbyListRequestSchema>;
 /** room:peek — query, no side effect, does not seat the caller. One-time snapshot for the pre-join room page's seat layout. */
 export const RoomPeekRequestSchema = z.object({ roomId: z.string() });
 export type RoomPeekRequest = z.infer<typeof RoomPeekRequestSchema>;
+
+export const RoomEnterRequestSchema = z.object({ roomId: z.string() });
+export type RoomEnterRequest = z.infer<typeof RoomEnterRequestSchema>;
 
 /**
  * action is intentionally z.unknown(): each ruleset owns its own Action union
@@ -168,8 +192,17 @@ export const RoomPlayerJoinedEventSchema = z.object({
   seat: SeatIdSchema,
   nickname: z.string(),
   isBot: z.boolean(),
+  avatar: z.string().optional(),
 });
 export type RoomPlayerJoinedEvent = z.infer<typeof RoomPlayerJoinedEventSchema>;
+
+export const RoomParticipantJoinedEventSchema = z.object({
+  participant: RoomParticipantSchema,
+});
+export type RoomParticipantJoinedEvent = z.infer<typeof RoomParticipantJoinedEventSchema>;
+
+export const RoomParticipantLeftEventSchema = z.object({ userId: z.string() });
+export type RoomParticipantLeftEvent = z.infer<typeof RoomParticipantLeftEventSchema>;
 
 export const RoomReadyChangedEventSchema = z.object({
   seat: SeatIdSchema,

@@ -21,6 +21,7 @@ async function createAndStartRoom(browser: Browser, rulesetId: "junk" | "bloodba
 
   const variant = rulesetId === "junk" ? "Junk Hu" : "Bloodbattle";
   await host.getByRole("tab", { name: variant }).click();
+  await host.getByRole("button", { name: "Create room" }).last().click();
   await host.getByLabel("Room name").fill("Table test");
   await host.getByRole("button", { name: "Create room" }).click();
   await expect(host).toHaveURL(/\/lobby\//, { timeout: 10_000 });
@@ -33,7 +34,10 @@ async function createAndStartRoom(browser: Browser, rulesetId: "junk" | "bloodba
     await page.getByRole("tab", { name: variant }).click();
     await page.getByRole("button", { name: "Refresh" }).click();
     await page.getByRole("button", { name: "Table test" }).click();
-    await page.getByRole("button", { name: `Sit in seat ${seat + 1}` }).click();
+    await page
+      .locator(`[data-seat="${seat + 1}"]`)
+      .getByRole("button", { name: "Sit" })
+      .click();
   }
   for (const page of players) {
     await page.getByRole("checkbox").check();

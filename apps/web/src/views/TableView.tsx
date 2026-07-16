@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { Dialog } from "@base-ui/react/dialog";
 import type { GameEventEnvelope, GameSnapshot, SeatId } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
 import { ack } from "@/lib/socket";
@@ -17,6 +18,8 @@ type ViewExtras = { phase?: string; myClaimOptions?: ClaimOption[] };
 export function TableView() {
   const navigate = useNavigate();
   const socket = useSessionStore((state) => state.socket);
+  const userId = useSessionStore((state) => state.userId);
+  const room = useSessionStore((state) => state.room);
   const view = useSessionStore((state) => state.view);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
@@ -24,6 +27,7 @@ export function TableView() {
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<unknown>(null);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
 
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
@@ -64,16 +68,24 @@ export function TableView() {
       }
     };
     const onSessionFinished = (message: { result: unknown }) => setSessionResult(message.result);
+    const onClosed = ({ reason }: { reason: string }) => {
+      const notice =
+        reason === "hostLeft" ? "The owner closed this room." : "This room was closed.";
+      setRoom(null);
+      void navigate("/games", { state: { notice } });
+    };
 
     activeSocket.on("game:snapshot", onSnapshot);
     activeSocket.on("game:event", onEvent);
     activeSocket.on("room:sessionFinished", onSessionFinished);
+    activeSocket.on("room:closed", onClosed);
     return () => {
       activeSocket.off("game:snapshot", onSnapshot);
       activeSocket.off("game:event", onEvent);
       activeSocket.off("room:sessionFinished", onSessionFinished);
+      activeSocket.off("room:closed", onClosed);
     };
-  }, [activeSocket]);
+  }, [activeSocket, navigate, setRoom]);
 
   const sendAction = async (action: unknown) => {
     setError(null);
@@ -101,12 +113,22 @@ export function TableView() {
   const extras = view as unknown as ViewExtras;
   const isMyTurn = view.currentSeat === view.seat && extras.phase === "playing";
   const claimOptions = extras.myClaimOptions ?? [];
+  const isOwner = room?.ownerUserId === userId;
+  const hasOtherPlayers = room?.players.some(
+    (player, seat) => player !== null && seat !== view.seat,
+  );
 
   return (
     <div className="flex min-h-screen flex-col gap-4 p-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 pr-20">
         <h1 className="text-lg font-medium">Table (Seat {view.seat})</h1>
-        <Button variant="outline" onClick={() => void leave()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (isOwner && hasOtherPlayers) setLeaveConfirmOpen(true);
+            else void leave();
+          }}
+        >
           Leave room
         </Button>
       </div>
@@ -157,6 +179,30 @@ export function TableView() {
       )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
+          <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex w-96 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border bg-background p-6 shadow-xl">
+            <Dialog.Title className="text-lg font-semibold">Leave room?</Dialog.Title>
+            <Dialog.Description className="text-sm text-muted-foreground">
+              Other players are still in this room. Are you sure you want to leave?
+            </Dialog.Description>
+            <div className="flex justify-end gap-2">
+              <Dialog.Close render={<Button variant="outline">Cancel</Button>} />
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setLeaveConfirmOpen(false);
+                  void leave();
+                }}
+              >
+                Leave room
+              </Button>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       <div>
         <h2 className="text-sm font-medium">Recent events</h2>

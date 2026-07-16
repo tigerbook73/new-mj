@@ -6,6 +6,7 @@ export interface PlayerJoinedEvent {
   seat: SeatId;
   nickname: string;
   isBot: boolean;
+  avatar?: string;
 }
 
 export interface ReadyChangedEvent {

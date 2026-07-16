@@ -8,6 +8,7 @@ export interface RoomPlayer {
   userId: string;
   seatId: SeatId;
   nickname: string;
+  avatar?: string;
   isBot: boolean;
   isReady: boolean;
   /**
@@ -28,6 +29,8 @@ export interface RoomPlayer {
 export interface Room {
   id: string;
   name: string;
+  ownerUserId: string;
+  ownerNickname: string;
   rulesetId: string;
   config: GameConfig;
   sessionFormat: SessionFormat;

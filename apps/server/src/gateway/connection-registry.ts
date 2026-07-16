@@ -5,6 +5,7 @@ import type { Socket } from "socket.io";
 export interface ConnectionInfo {
   roomId: string;
   userId: string;
+  nickname: string;
 }
 
 /**
@@ -19,10 +20,17 @@ export interface ConnectionInfo {
 export class ConnectionRegistry {
   private readonly bySocketId = new Map<string, ConnectionInfo>();
   private readonly seatSockets = new Map<string, Map<SeatId, Socket>>();
+  private readonly roomSockets = new Map<string, Set<Socket>>();
 
-  track(client: Socket, roomId: string, userId: string, seat: SeatId): void {
+  enter(client: Socket, roomId: string, userId: string, nickname: string): void {
     client.join(roomId);
-    this.bySocketId.set(client.id, { roomId, userId });
+    this.bySocketId.set(client.id, { roomId, userId, nickname });
+    if (!this.roomSockets.has(roomId)) this.roomSockets.set(roomId, new Set());
+    this.roomSockets.get(roomId)!.add(client);
+  }
+
+  track(client: Socket, roomId: string, userId: string, nickname: string, seat: SeatId): void {
+    this.enter(client, roomId, userId, nickname);
     if (!this.seatSockets.has(roomId)) this.seatSockets.set(roomId, new Map());
     // !: the map was just created above if missing, so it is always present here.
     this.seatSockets.get(roomId)!.set(seat, client);
@@ -40,6 +48,16 @@ export class ConnectionRegistry {
     return this.seatSockets.get(roomId) ?? new Map();
   }
 
+  allSocketsByRoom(roomId: string): ReadonlySet<Socket> {
+    return this.roomSockets.get(roomId) ?? new Set();
+  }
+
+  infosByRoom(roomId: string): ConnectionInfo[] {
+    return [...(this.roomSockets.get(roomId) ?? [])]
+      .map((socket) => this.bySocketId.get(socket.id))
+      .filter((info): info is ConnectionInfo => info !== undefined);
+  }
+
   /**
    * Only forgets the socket mapping — the disconnect takeover itself (评审点
    * H: mark the seat auto-piloted, keep the game moving) is RoomsGateway's
@@ -50,6 +68,9 @@ export class ConnectionRegistry {
     const info = this.bySocketId.get(client.id);
     this.bySocketId.delete(client.id);
     if (!info) return;
+    const roomSockets = this.roomSockets.get(info.roomId);
+    roomSockets?.delete(client);
+    if (roomSockets?.size === 0) this.roomSockets.delete(info.roomId);
     const seatMap = this.seatSockets.get(info.roomId);
     if (!seatMap) return;
     for (const [seat, socket] of seatMap) {

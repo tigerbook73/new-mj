@@ -10,6 +10,8 @@ import { RoomService } from "./room.service";
 const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   id: "room-1",
   name: "Test Room",
+  ownerUserId: "host",
+  ownerNickname: "Host",
   rulesetId: "junk",
   config: { rulesetId: "junk" },
   sessionFormat: "4-round",

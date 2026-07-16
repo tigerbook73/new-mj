@@ -27,6 +27,8 @@ import {
 const validRoomInfo = {
   id: "room-1",
   name: "Test Room",
+  ownerUserId: "owner-1",
+  owner: "Owner",
   rulesetId: "bloodbattle",
   config: { rulesetId: "bloodbattle" },
   sessionFormat: "4-round" as const,

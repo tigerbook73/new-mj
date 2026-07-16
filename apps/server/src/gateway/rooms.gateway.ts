@@ -16,11 +16,15 @@ import {
   LobbyListRequestSchema,
   RoomAddBotRequestSchema,
   RoomCreateRequestSchema,
+  RoomEnterRequestSchema,
   RoomJoinRequestSchema,
   RoomPeekRequestSchema,
   RoomReadyRequestSchema,
+  RoomRemoveBotRequestSchema,
+  RoomRemovePlayerRequestSchema,
   type Reply,
   type RoomInfo,
+  type RoomParticipant,
   type RoomSummary,
 } from "@new-mj/protocol";
 import type { Server, Socket } from "socket.io";
@@ -38,7 +42,16 @@ import { RoomService } from "../rooms/room.service";
  * this protocol version, so we derive a placeholder from userId. Flagged as
  * an open item rather than silently inventing a payload field.
  */
-const defaultNickname = (userId: string): string => `Player-${userId.slice(0, 6)}`;
+const defaultNickname = (userId: string): string => {
+  const username = userId.replace(/-[a-z0-9]{6}$/, "");
+  return (
+    username
+      .split("-")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ") || "User"
+  );
+};
 
 /**
  * origin: true reflects the request's Origin header — web/mobile run on a
@@ -69,6 +82,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         seat: event.seat,
         nickname: event.nickname,
         isBot: event.isBot,
+        ...(event.avatar ? { avatar: event.avatar } : {}),
       });
     });
     this.eventBus.on("room:readyChanged", (event) => {
@@ -96,6 +110,10 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
     this.eventBus.on("room:closed", (event) => {
       this.server.to(event.roomId).emit("room:closed", { reason: event.reason });
+      for (const socket of this.connections.allSocketsByRoom(event.roomId)) {
+        socket.leave(event.roomId);
+        this.connections.untrack(socket);
+      }
     });
     this.eventBus.on("game:snapshot", (event) => {
       const socket = this.connections.socketForSeat(event.roomId, event.seat);
@@ -115,6 +133,9 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     this.connections.untrack(client);
     if (info) {
       this.roomService.handleDisconnect(info.roomId, info.userId);
+      if (this.roomService.get(info.roomId)) {
+        this.server.to(info.roomId).emit("room:participantLeft", { userId: info.userId });
+      }
     }
   }
 
@@ -136,8 +157,8 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         parsed.name,
       );
       // Host is always seated at 0: create() seats the very first player of a fresh room.
-      this.connections.track(client, room.id, userId, 0);
-      return this.roomService.snapshot(room);
+      this.connections.track(client, room.id, userId, nickname, 0);
+      return this.snapshotWithParticipants(room.id);
     });
   }
 
@@ -155,10 +176,12 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         defaultNickname(userId),
         parsed.seat,
       );
-      this.connections.track(client, parsed.roomId, userId, player.seatId);
+      const nickname = defaultNickname(userId);
+      this.connections.track(client, parsed.roomId, userId, nickname, player.seatId);
+      this.emitParticipantJoined(parsed.roomId, userId, nickname, true, false);
       // join() throwing ROOM_NOT_FOUND is the only way this could be missing.
       const room = this.roomService.get(parsed.roomId)!;
-      return this.roomService.snapshot(room);
+      return this.snapshotWithParticipants(parsed.roomId);
     });
   }
 
@@ -175,6 +198,23 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     return this.reply(() => {
       const parsed = RoomPeekRequestSchema.parse(payload);
       return this.roomService.peek(parsed.roomId);
+    });
+  }
+
+  @SubscribeMessage("room:enter")
+  handleRoomEnter(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<RoomInfo> {
+    return this.reply(() => {
+      const userId = this.requireUserId(client);
+      const parsed = RoomEnterRequestSchema.parse(payload);
+      const room = this.roomService.get(parsed.roomId);
+      if (!room) throw new RoomServiceError("ROOM_NOT_FOUND");
+      const nickname = defaultNickname(userId);
+      this.connections.enter(client, parsed.roomId, userId, nickname);
+      this.emitParticipantJoined(parsed.roomId, userId, nickname, false, false);
+      return this.snapshotWithParticipants(parsed.roomId);
     });
   }
 
@@ -195,7 +235,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   handleRoomStart(@ConnectedSocket() client: Socket): Reply<object> {
     return this.reply(() => {
       const info = this.requireConnection(client);
-      this.roomService.start(info.roomId);
+      this.roomService.start(info.roomId, info.userId);
       return {};
     });
   }
@@ -213,11 +253,48 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage("room:removeBot")
+  handleRoomRemoveBot(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<object> {
+    return this.reply(() => {
+      const info = this.requireConnection(client);
+      const parsed = RoomRemoveBotRequestSchema.parse(payload);
+      this.roomService.removeBot(info.roomId, info.userId, parsed.seat);
+      return {};
+    });
+  }
+
+  @SubscribeMessage("room:removePlayer")
+  handleRoomRemovePlayer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<object> {
+    return this.reply(() => {
+      const info = this.requireConnection(client);
+      const parsed = RoomRemovePlayerRequestSchema.parse(payload);
+      const targetSocket = this.connections.socketForSeat(info.roomId, parsed.seat);
+      const removed = this.roomService.removePlayer(info.roomId, info.userId, parsed.seat);
+      if (!removed.isBot && targetSocket) {
+        targetSocket.emit("room:kicked", { reason: "removedByHost" });
+        targetSocket.leave(info.roomId);
+        this.connections.untrack(targetSocket);
+      }
+      return {};
+    });
+  }
+
   @SubscribeMessage("room:leave")
   handleRoomLeave(@ConnectedSocket() client: Socket): Reply<object> {
     return this.reply(() => {
       const info = this.requireConnection(client);
-      this.roomService.leave(info.roomId, info.userId);
+      const room = this.roomService.get(info.roomId);
+      const isSeated = room?.players.some((player) => player?.userId === info.userId) ?? false;
+      if (isSeated) this.roomService.leave(info.roomId, info.userId);
+      if (this.roomService.get(info.roomId)) {
+        this.server.to(info.roomId).emit("room:participantLeft", { userId: info.userId });
+      }
       client.leave(info.roomId);
       this.connections.untrack(client);
       return {};
@@ -258,6 +335,45 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     const userId = client.data.userId as string | undefined;
     if (!userId) throw new RoomServiceError("UNAUTHORIZED");
     return userId;
+  }
+
+  private snapshotWithParticipants(roomId: string): RoomInfo {
+    const room = this.roomService.get(roomId);
+    if (!room) throw new RoomServiceError("ROOM_NOT_FOUND");
+    const participants = new Map<string, RoomParticipant>();
+    for (const player of room.players) {
+      if (player && !player.isBot) {
+        participants.set(player.userId, {
+          userId: player.userId,
+          nickname: player.nickname,
+          ...(player.avatar ? { avatar: player.avatar } : {}),
+          isSeated: true,
+          isBot: false,
+        });
+      }
+    }
+    for (const info of this.connections.infosByRoom(roomId)) {
+      participants.set(info.userId, {
+        userId: info.userId,
+        nickname: info.nickname,
+        isSeated: room.players.some((player) => player?.userId === info.userId),
+        isBot: false,
+      });
+    }
+    return { ...this.roomService.snapshot(room), participants: [...participants.values()] };
+  }
+
+  private emitParticipantJoined(
+    roomId: string,
+    userId: string,
+    nickname: string,
+    isSeated: boolean,
+    isBot: boolean,
+  ): void {
+    if (isBot) return;
+    this.server.to(roomId).emit("room:participantJoined", {
+      participant: { userId, nickname, isSeated, isBot: false },
+    });
   }
 
   private reply<T>(fn: () => T): Reply<T> {

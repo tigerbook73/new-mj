@@ -5,14 +5,9 @@ import { test, expect } from "@playwright/test";
 // only when localStorage has no explicit choice yet.
 test.use({ colorScheme: "light" });
 
-test("theme toggle switches to dark mode and persists across reload", async ({ page }) => {
+test("theme follows the system preference", async ({ page }) => {
   await page.goto("/login");
   const html = page.locator("html");
   await expect(html).not.toHaveClass(/dark/);
-
-  await page.getByRole("button", { name: "Toggle dark mode" }).click();
-  await expect(html).toHaveClass(/dark/);
-
-  await page.reload();
-  await expect(html).toHaveClass(/dark/);
+  await expect(page.getByRole("button", { name: "Toggle dark mode" })).toHaveCount(0);
 });
