@@ -10,7 +10,7 @@ test("theme toggle switches to dark mode and persists across reload", async ({ p
   const html = page.locator("html");
   await expect(html).not.toHaveClass(/dark/);
 
-  await page.getByRole("button", { name: "切换黑暗模式" }).click();
+  await page.getByRole("button", { name: "Toggle dark mode" }).click();
   await expect(html).toHaveClass(/dark/);
 
   await page.reload();

@@ -4,8 +4,8 @@ async function loginAs(browser: Browser, nickname: string): Promise<Page> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("/login");
-  await page.getByPlaceholder("输入昵称").fill(nickname);
-  await page.getByRole("button", { name: "进入游戏" }).click();
+  await page.getByPlaceholder("Enter nickname").fill(nickname);
+  await page.getByRole("button", { name: "Enter game" }).click();
   await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
   return page;
 }
@@ -26,20 +26,20 @@ test("4 players create, join, ready up, and start a junk room together", async (
   // session (socket/userId) — navigate the same way a real user would,
   // through React Router's client-side transition from the picker button.
   for (const page of players) {
-    await page.getByRole("button", { name: "垃圾胡" }).click();
+    await page.getByRole("button", { name: "Junk Hu" }).click();
     await expect(page).toHaveURL(/\/lobby\/junk$/, { timeout: 10_000 });
   }
 
-  await host.getByRole("button", { name: "建房" }).click();
-  const heading = host.getByRole("heading", { name: /^房间 / });
+  await host.getByRole("button", { name: "Create room" }).click();
+  const heading = host.getByRole("heading", { name: /^Room / });
   await expect(heading).toBeVisible({ timeout: 10_000 });
-  const roomId = (await heading.textContent())!.replace("房间", "").trim();
+  const roomId = (await heading.textContent())!.replace("Room", "").trim();
   expect(roomId).toMatch(/^[0-9a-f-]{36}$/);
 
   for (const page of [p2, p3, p4]) {
-    await page.getByPlaceholder("房间 ID").fill(roomId);
-    await page.getByRole("button", { name: "加入" }).click();
-    await expect(page.getByRole("heading", { name: /^房间 / })).toBeVisible({ timeout: 10_000 });
+    await page.getByPlaceholder("Room ID").fill(roomId);
+    await page.getByRole("button", { name: "Join" }).click();
+    await expect(page.getByRole("heading", { name: /^Room / })).toBeVisible({ timeout: 10_000 });
   }
 
   // 每个客户端各自看到 4 个座位都到齐（room:playerJoined 广播驱动的实时同步）。
@@ -51,9 +51,9 @@ test("4 players create, join, ready up, and start a junk room together", async (
     await page.getByRole("checkbox").check();
   }
 
-  // 房主等所有人都显示"已准备"再点开始，避免 canStart() 因还没同步到而拒绝。
-  await expect(host.getByText("（已准备）")).toHaveCount(4, { timeout: 10_000 });
-  await host.getByRole("button", { name: "开始" }).click();
+  // 房主等所有人都显示 Ready 再点开始，避免 canStart() 因还没同步到而拒绝。
+  await expect(host.getByText("(Ready)")).toHaveCount(4, { timeout: 10_000 });
+  await host.getByRole("button", { name: "Start" }).click();
 
   for (const page of players) {
     await expect(page).toHaveURL(new RegExp(`/room/${roomId}$`), { timeout: 10_000 });
@@ -68,25 +68,25 @@ test("4 players create, join, ready up, and start a junk room together", async (
 // 不需要另外 3 个真人浏览器 context——这是"一个人也能玩"的大厅层前置条件。
 test("host fills remaining seats with bots and starts solo", async ({ browser }) => {
   const host = await loginAs(browser, "host");
-  await host.getByRole("button", { name: "垃圾胡" }).click();
+  await host.getByRole("button", { name: "Junk Hu" }).click();
   await expect(host).toHaveURL(/\/lobby\/junk$/, { timeout: 10_000 });
 
-  await host.getByRole("button", { name: "建房" }).click();
-  await expect(host.getByRole("heading", { name: /^房间 / })).toBeVisible({ timeout: 10_000 });
+  await host.getByRole("button", { name: "Create room" }).click();
+  await expect(host.getByRole("heading", { name: /^Room / })).toBeVisible({ timeout: 10_000 });
 
   // players 是固定 4 长的座位元组（空座位也渲染一个"空"的 <li>），listitem
   // 数量从一开始就恒为 4，不能拿来判断补了几个 bot——改成认每个 bot 各自的
   // 座位昵称，addBot() 按空位顺序补，昵称是 `AI-${座位号+1}`。
   for (const nickname of ["AI-2", "AI-3", "AI-4"]) {
-    await host.getByRole("button", { name: "补 AI" }).click();
+    await host.getByRole("button", { name: "Add Bot" }).click();
     await expect(host.getByText(nickname, { exact: false })).toBeVisible({ timeout: 10_000 });
   }
-  // 房间坐满后"补 AI"按钮应该自己消失，不给出无意义的第 5 次点击入口。
-  await expect(host.getByRole("button", { name: "补 AI" })).toHaveCount(0);
+  // 房间坐满后 Add Bot 按钮应该自己消失，不给出无意义的第 5 次点击入口。
+  await expect(host.getByRole("button", { name: "Add Bot" })).toHaveCount(0);
 
   await host.getByRole("checkbox").check();
-  await expect(host.getByText("（已准备）")).toHaveCount(4, { timeout: 10_000 });
-  await host.getByRole("button", { name: "开始" }).click();
+  await expect(host.getByText("(Ready)")).toHaveCount(4, { timeout: 10_000 });
+  await host.getByRole("button", { name: "Start" }).click();
   await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
 
   await host.context().close();
@@ -96,11 +96,11 @@ test("host fills remaining seats with bots and starts solo", async ({ browser })
 // 第 0 座——不重复整套 4 人流程（那部分逻辑与玩法无关，已经在上面测过）。
 test("bloodbattle lobby creates a room and seats the host at seat 0", async ({ browser }) => {
   const page = await loginAs(browser, "host");
-  await page.getByRole("button", { name: "血战到底" }).click();
+  await page.getByRole("button", { name: "Bloodbattle" }).click();
   await expect(page).toHaveURL(/\/lobby\/bloodbattle$/, { timeout: 10_000 });
 
-  await page.getByRole("button", { name: "建房" }).click();
-  await expect(page.getByRole("heading", { name: /^房间 / })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Create room" }).click();
+  await expect(page.getByRole("heading", { name: /^Room / })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("listitem").first()).toContainText("host");
 
   await page.context().close();

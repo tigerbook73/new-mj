@@ -18,7 +18,7 @@ export function LoginView() {
     event.preventDefault();
     const trimmed = nickname.trim();
     if (!trimmed) {
-      setError("请输入昵称");
+      setError("Please enter a nickname");
       return;
     }
 
@@ -42,17 +42,17 @@ export function LoginView() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <form onSubmit={(event) => void handleSubmit(event)} className="flex w-64 flex-col gap-4">
-        <h1 className="text-lg font-medium">在线麻将 · 登录</h1>
+        <h1 className="text-lg font-medium">Online Mahjong · Login</h1>
         <Input
           value={nickname}
           onChange={(event) => setNickname(event.target.value)}
-          placeholder="输入昵称"
+          placeholder="Enter nickname"
           disabled={pending}
           autoFocus
         />
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button type="submit" disabled={pending}>
-          {pending ? "连接中…" : "进入游戏"}
+          {pending ? "Connecting…" : "Enter game"}
         </Button>
       </form>
     </div>

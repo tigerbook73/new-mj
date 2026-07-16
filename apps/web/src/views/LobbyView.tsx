@@ -99,15 +99,15 @@ export function LobbyView() {
   if (!room) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <h1 className="text-lg font-medium">{rulesetId} 大厅</h1>
-        <Button onClick={() => void handleCreate()}>建房</Button>
+        <h1 className="text-lg font-medium">{rulesetId} Lobby</h1>
+        <Button onClick={() => void handleCreate()}>Create room</Button>
         <div className="flex gap-2">
           <Input
             value={roomIdInput}
             onChange={(event) => setRoomIdInput(event.target.value)}
-            placeholder="房间 ID"
+            placeholder="Room ID"
           />
-          <Button onClick={() => void handleJoin()}>加入</Button>
+          <Button onClick={() => void handleJoin()}>Join</Button>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
@@ -119,13 +119,13 @@ export function LobbyView() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-lg font-medium">房间 {room.id}</h1>
+      <h1 className="text-lg font-medium">Room {room.id}</h1>
       <ul className="flex flex-col gap-1">
         {room.players.map((player, seat) => (
           <li key={seat}>
             {player
-              ? `座位${seat}：${player.nickname}${player.isReady ? "（已准备）" : ""}`
-              : `座位${seat}：空`}
+              ? `Seat ${seat}: ${player.nickname}${player.isReady ? " (Ready)" : ""}`
+              : `Seat ${seat}: Empty`}
           </li>
         ))}
       </ul>
@@ -136,15 +136,15 @@ export function LobbyView() {
             checked={ready}
             onChange={(event) => void handleReadyToggle(event.target.checked)}
           />
-          准备
+          Ready
         </label>
       )}
       {isHost && room.players.some((player) => player === null) && (
         <Button variant="outline" onClick={() => void handleAddBot()}>
-          补 AI
+          Add Bot
         </Button>
       )}
-      {isHost && <Button onClick={() => void handleStart()}>开始</Button>}
+      {isHost && <Button onClick={() => void handleStart()}>Start</Button>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

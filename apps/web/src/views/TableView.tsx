@@ -81,7 +81,7 @@ export function TableView() {
   };
 
   if (!view) {
-    return <div className="p-6">等待牌局数据…</div>;
+    return <div className="p-6">Waiting for game data…</div>;
   }
 
   const extras = view as unknown as ViewExtras;
@@ -90,23 +90,24 @@ export function TableView() {
 
   return (
     <div className="flex min-h-screen flex-col gap-4 p-6">
-      <h1 className="text-lg font-medium">牌桌（座位 {view.seat}）</h1>
+      <h1 className="text-lg font-medium">Table (Seat {view.seat})</h1>
       {sessionResult != null && (
-        <p className="text-sm">会话已结束：{JSON.stringify(sessionResult)}</p>
+        <p className="text-sm">Session finished: {JSON.stringify(sessionResult)}</p>
       )}
       <p className="text-sm">
-        阶段：{extras.phase ?? "未知"} ｜ 轮到座位：{view.currentSeat} ｜ 牌墙剩余：{view.wallCount}
+        Phase: {extras.phase ?? "unknown"} | Current turn: seat {view.currentSeat} | Wall remaining:{" "}
+        {view.wallCount}
       </p>
       <ul className="flex gap-4 text-sm">
         {view.seats.map((seat, index) => (
           <li key={index}>
-            座位{index}：{seat.handCount} 张{index === view.seat ? "（我）" : ""}
+            Seat {index}: {seat.handCount} tiles{index === view.seat ? " (you)" : ""}
           </li>
         ))}
       </ul>
 
       <div>
-        <h2 className="text-sm font-medium">我的手牌</h2>
+        <h2 className="text-sm font-medium">Your hand</h2>
         <div className="flex flex-wrap gap-1">
           {view.hand.map((tile, index) => (
             <Button
@@ -125,7 +126,7 @@ export function TableView() {
 
       {claimOptions.length > 0 && (
         <div>
-          <h2 className="text-sm font-medium">可声明</h2>
+          <h2 className="text-sm font-medium">Claims</h2>
           <div className="flex gap-2">
             {claimOptions.map((option, index) => (
               <Button key={index} onClick={() => void sendAction(option.action)}>
@@ -139,7 +140,7 @@ export function TableView() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div>
-        <h2 className="text-sm font-medium">最近事件</h2>
+        <h2 className="text-sm font-medium">Recent events</h2>
         <ul className="text-xs text-muted-foreground">
           {log.map((line, index) => (
             <li key={index}>{line}</li>

@@ -15,7 +15,7 @@ export function ThemeToggle() {
       variant="outline"
       size="icon"
       className="fixed top-4 right-4 z-50"
-      aria-label="切换黑暗模式"
+      aria-label="Toggle dark mode"
       onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
     >
       {theme === "dark" ? <Sun /> : <Moon />}

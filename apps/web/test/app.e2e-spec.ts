@@ -10,8 +10,8 @@ test("root redirects to /login", async ({ page }) => {
 // 这条用例连的是真实起的 apps/server（playwright.config.ts 的 webServer）。
 test("logging in with a nickname connects and lands on /games", async ({ page }) => {
   await page.goto("/login");
-  await page.getByPlaceholder("输入昵称").fill("测试玩家");
-  await page.getByRole("button", { name: "进入游戏" }).click();
+  await page.getByPlaceholder("Enter nickname").fill("Test Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
   await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
 });
 
@@ -19,7 +19,7 @@ test("submitting an empty nickname shows an inline error and does not navigate",
   page,
 }) => {
   await page.goto("/login");
-  await page.getByRole("button", { name: "进入游戏" }).click();
-  await expect(page.getByText("请输入昵称")).toBeVisible();
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page.getByText("Please enter a nickname")).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
