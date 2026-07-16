@@ -88,6 +88,14 @@ export function LobbyView() {
     }
   };
 
+  const handleAddBot = async () => {
+    setError(null);
+    const result = await ack(activeSocket, "room:addBot", {});
+    if (!result.ok) {
+      setError(result.code);
+    }
+  };
+
   if (!room) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
@@ -130,6 +138,11 @@ export function LobbyView() {
           />
           准备
         </label>
+      )}
+      {isHost && room.players.some((player) => player === null) && (
+        <Button variant="outline" onClick={() => void handleAddBot()}>
+          补 AI
+        </Button>
       )}
       {isHost && <Button onClick={() => void handleStart()}>开始</Button>}
       {error && <p className="text-sm text-destructive">{error}</p>}

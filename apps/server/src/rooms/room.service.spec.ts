@@ -1,5 +1,7 @@
 import { playJunkGame } from "@new-mj/core";
 import { GameService } from "../core/game.service";
+// GameService is used directly (not via RoomService) so the acceptance test
+// below can inspect legal actions without exposing gameService as public API.
 import { EventBus } from "./event-bus";
 import type { Room } from "./room";
 import { RoomServiceError } from "./room-service.error";
@@ -131,6 +133,84 @@ describe("RoomService — lifecycle", () => {
     expect(() => service.applyPlayerAction(room.id, 0, { type: "discard", tile: 0 })).toThrow(
       expect.objectContaining({ code: "GAME_NOT_STARTED" }),
     );
+  });
+});
+
+describe("RoomService — addBot", () => {
+  it("seats a ready bot into the next empty seat when the host asks", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    const bot = service.addBot(room.id, "host");
+
+    expect(bot.seatId).toBe(1);
+    expect(room.players[1]).toMatchObject({ isBot: true, isReady: true });
+  });
+
+  it("rejects a non-host requester", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.join(room.id, "p2", "P2");
+
+    expect(() => service.addBot(room.id, "p2")).toThrow(
+      expect.objectContaining({ code: "UNAUTHORIZED" }),
+    );
+  });
+
+  it("rejects once the room is full", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+
+    expect(() => service.addBot(room.id, "host")).toThrow(
+      expect.objectContaining({ code: "ROOM_FULL" }),
+    );
+  });
+
+  it("rejects once the game has started", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+
+    expect(() => service.addBot(room.id, "host")).toThrow(
+      expect.objectContaining({ code: "GAME_IN_PROGRESS" }),
+    );
+  });
+});
+
+describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
+  it("a single human plus 3 bots plays a complete junk session", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    expect(room.players.filter((player) => player?.isBot)).toHaveLength(3);
+    expect(room.players[0]?.isReady).toBe(false);
+
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+
+    // start()/applyPlayerAction() auto-play every bot seat, so once control
+    // returns here it must be the human's (seat 0) turn — this loop only
+    // ever supplies seat-0 actions.
+    let steps = 0;
+    while (room.phase === "in-game" && steps < 500) {
+      steps += 1;
+      const legalActions = gameService.getLegalActions(room.gameState, 0);
+      expect(legalActions.length).toBeGreaterThan(0);
+      service.applyPlayerAction(room.id, 0, legalActions[0]);
+    }
+
+    expect(room.phase).toBe("finished");
+    expect(room.result?.gamesPlayed).toBe(4);
   });
 });
 

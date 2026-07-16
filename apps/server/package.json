@@ -19,6 +19,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.28",
     "@nestjs/websockets": "^11.1.28",
+    "@new-mj/ai": "workspace:*",
     "@new-mj/core": "workspace:*",
     "@new-mj/protocol": "workspace:*",
     "reflect-metadata": "^0.2.2",

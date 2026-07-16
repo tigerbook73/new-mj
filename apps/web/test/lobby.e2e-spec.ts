@@ -64,6 +64,34 @@ test("4 players create, join, ready up, and start a junk room together", async (
   }
 });
 
+// 阶段 4 AI 补位的验收路径：单人开房，补满 3 个 bot 座位，能自己 ready + start，
+// 不需要另外 3 个真人浏览器 context——这是"一个人也能玩"的大厅层前置条件。
+test("host fills remaining seats with bots and starts solo", async ({ browser }) => {
+  const host = await loginAs(browser, "host");
+  await host.getByRole("button", { name: "垃圾胡" }).click();
+  await expect(host).toHaveURL(/\/lobby\/junk$/, { timeout: 10_000 });
+
+  await host.getByRole("button", { name: "建房" }).click();
+  await expect(host.getByRole("heading", { name: /^房间 / })).toBeVisible({ timeout: 10_000 });
+
+  // players 是固定 4 长的座位元组（空座位也渲染一个"空"的 <li>），listitem
+  // 数量从一开始就恒为 4，不能拿来判断补了几个 bot——改成认每个 bot 各自的
+  // 座位昵称，addBot() 按空位顺序补，昵称是 `AI-${座位号+1}`。
+  for (const nickname of ["AI-2", "AI-3", "AI-4"]) {
+    await host.getByRole("button", { name: "补 AI" }).click();
+    await expect(host.getByText(nickname, { exact: false })).toBeVisible({ timeout: 10_000 });
+  }
+  // 房间坐满后"补 AI"按钮应该自己消失，不给出无意义的第 5 次点击入口。
+  await expect(host.getByRole("button", { name: "补 AI" })).toHaveCount(0);
+
+  await host.getByRole("checkbox").check();
+  await expect(host.getByText("（已准备）")).toHaveCount(4, { timeout: 10_000 });
+  await host.getByRole("button", { name: "开始" }).click();
+  await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
+
+  await host.context().close();
+});
+
 // 轻量冒烟：只验证大厅层本身不写死 junk，bloodbattle 一样能建房、看到自己入座
 // 第 0 座——不重复整套 4 人流程（那部分逻辑与玩法无关，已经在上面测过）。
 test("bloodbattle lobby creates a room and seats the host at seat 0", async ({ browser }) => {

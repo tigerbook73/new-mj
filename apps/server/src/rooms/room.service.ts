@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
+import { chooseAction } from "@new-mj/ai";
 import type { ApplyResult, GameConfig, GameEvent, SeatId } from "@new-mj/core";
 import type { RankingEntry, RoomInfo, SessionFormat } from "@new-mj/protocol";
 import { GameService } from "../core/game.service";
@@ -91,6 +92,7 @@ export class RoomService {
       throw new RoomServiceError("INVALID_CONFIG", "room is not full and ready");
     }
     this.beginGame(room);
+    this.autoPlayBots(room);
     return room;
   }
 
@@ -103,11 +105,47 @@ export class RoomService {
       dealer: room.dealer,
       gameNumber: room.gameNumber,
     });
+    this.autoPlayBots(room);
     return room;
+  }
+
+  /**
+   * Only the host (seat 0, session-mechanics.md §6) may add a bot, and only
+   * before the game starts — mirrors join()'s seat-filling but marks the
+   * seat isBot and auto-readies it (a bot has no UI to click ready with).
+   */
+  addBot(roomId: string, requesterUserId: string): RoomPlayer {
+    const room = this.mustGet(roomId);
+    const requesterSeat = room.players.findIndex((player) => player?.userId === requesterUserId);
+    if (requesterSeat !== 0) {
+      throw new RoomServiceError("UNAUTHORIZED", "only the host can add a bot");
+    }
+    if (room.phase !== "waiting") {
+      throw new RoomServiceError("GAME_IN_PROGRESS", "room already started");
+    }
+    const seatIndex = room.players.findIndex((player) => player === null);
+    if (seatIndex === -1) {
+      throw new RoomServiceError("ROOM_FULL");
+    }
+    const player = this.seatPlayer(room, `bot:${randomUUID()}`, `AI-${seatIndex + 1}`, true);
+    this.ready(room.id, player.userId, true);
+    return player;
   }
 
   applyPlayerAction(roomId: string, seat: SeatId, action: unknown): ApplyResult<unknown> {
     const room = this.mustGet(roomId);
+    const result = this.runAction(room, seat, action);
+    this.autoPlayBots(room);
+    return result;
+  }
+
+  /**
+   * Applies a single seat's action and its side effects (score/event
+   * broadcast/game-end handling); shared by real player actions and bot
+   * actions driven from autoPlayBots. Does not itself trigger bot follow-up
+   * — callers (applyPlayerAction/autoPlayBots) own that loop.
+   */
+  private runAction(room: Room, seat: SeatId, action: unknown): ApplyResult<unknown> {
     if (room.phase !== "in-game") {
       throw new RoomServiceError("GAME_NOT_STARTED", "no game in progress");
     }
@@ -121,7 +159,7 @@ export class RoomService {
     this.trackEventSeq(room, result.events);
     this.accumulateScores(room, this.extractScoreDeltas(result.events));
     for (const event of result.events) {
-      this.eventBus.emit("game:event", { roomId, event });
+      this.eventBus.emit("game:event", { roomId: room.id, event });
     }
 
     if (result.events.some((event) => isGameEndedPayload(event.payload))) {
@@ -129,6 +167,33 @@ export class RoomService {
     }
 
     return result;
+  }
+
+  /**
+   * Drives every bot seat's turn until none has a legal action left (i.e.
+   * control has passed to a real player, or the room is no longer in-game).
+   * Iterative, not recursive into applyPlayerAction, so a bot-heavy multi-
+   * round session doesn't grow the call stack across rounds; re-reads
+   * getLegalActions() fresh each step so it never acts on stale state.
+   */
+  private autoPlayBots(room: Room): void {
+    const maxSteps = 2000;
+    for (let step = 0; step < maxSteps && room.phase === "in-game"; step += 1) {
+      const next = this.nextBotAction(room);
+      if (!next) return;
+      this.runAction(room, next.seat, next.action);
+    }
+  }
+
+  private nextBotAction(room: Room): { seat: SeatId; action: unknown } | undefined {
+    for (let seat = 0; seat < ROOM_SIZE; seat += 1) {
+      if (!room.players[seat]?.isBot) continue;
+      const legalActions = this.gameService.getLegalActions(room.gameState, seat as SeatId);
+      if (legalActions.length > 0) {
+        return { seat: seat as SeatId, action: chooseAction(legalActions) };
+      }
+    }
+    return undefined;
   }
 
   accumulateScores(room: Room, scoreDeltas: readonly [number, number, number, number]): void {
@@ -256,7 +321,7 @@ export class RoomService {
     return deltas;
   }
 
-  private seatPlayer(room: Room, userId: string, nickname: string): RoomPlayer {
+  private seatPlayer(room: Room, userId: string, nickname: string, isBot = false): RoomPlayer {
     const seat = room.players.findIndex((player) => player === null);
     if (seat === -1) {
       throw new RoomServiceError("ROOM_FULL");
@@ -265,7 +330,7 @@ export class RoomService {
       userId,
       seatId: seat as SeatId,
       nickname,
-      isBot: false,
+      isBot,
       isReady: false,
     };
     room.players[seat] = player;
@@ -273,7 +338,7 @@ export class RoomService {
       roomId: room.id,
       seat: player.seatId,
       nickname,
-      isBot: false,
+      isBot,
     });
     return player;
   }

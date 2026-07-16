@@ -164,6 +164,15 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage("room:addBot")
+  handleRoomAddBot(@ConnectedSocket() client: Socket): Reply<object> {
+    return this.reply(() => {
+      const info = this.requireConnection(client);
+      this.roomService.addBot(info.roomId, info.userId);
+      return {};
+    });
+  }
+
   @SubscribeMessage("game:action")
   handleGameAction(
     @ConnectedSocket() client: Socket,

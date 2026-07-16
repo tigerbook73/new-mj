@@ -61,21 +61,23 @@ finished: 计算排名，对外公开 result
 
 **ack 请求**（已实现，详细 payload 见 `contracts/protocol-shared.md` 的通用信封约定）：
 
-| 消息          | 备注                                                                                   |
-| ------------- | -------------------------------------------------------------------------------------- |
-| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播 |
-| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）；"进入新上下文"类消息，ack 给快照           |
-| `room:join`   | ack 给 `RoomInfo` 快照                                                                 |
-| `room:ready`  | ack `{}`                                                                               |
+| 消息          | 备注                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播    |
+| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）；"进入新上下文"类消息，ack 给快照              |
+| `room:join`   | ack 给 `RoomInfo` 快照                                                                    |
+| `room:ready`  | ack `{}`                                                                                  |
+| `room:addBot` | 仅房主（座位 0）、仅 `waiting` 阶段可调用；补入下一个空位，bot 立即视为已 ready；ack `{}` |
 
 **未实现/占位**：
 
-| 消息          | 说明                                                   |
-| ------------- | ------------------------------------------------------ |
-| `room:leave`  | 对局中允许离座：转托管（见 §7 评审点 H），**尚未实现** |
-| `room:addBot` | 仅房主，MVP 简化，**尚未实现**                         |
+| 消息         | 说明                                                   |
+| ------------ | ------------------------------------------------------ |
+| `room:leave` | 对局中允许离座：转托管（见 §7 评审点 H），**尚未实现** |
 
 `nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
+
+**bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `process/phase-4-junk-complete.md`。
 
 **事件推送**（已实现）：
 
