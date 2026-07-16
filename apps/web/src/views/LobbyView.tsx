@@ -7,145 +7,163 @@ import type {
   RoomReadyChangedEvent,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
 
 export function LobbyView() {
-  const { rulesetId } = useParams<{ rulesetId: string }>();
+  const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const socket = useSessionStore((state) => state.socket);
+  const socket = useSessionStore((state) => state.socket)!;
   const userId = useSessionStore((state) => state.userId);
   const room = useSessionStore((state) => state.room);
   const setRoom = useSessionStore((state) => state.setRoom);
-
-  const [roomIdInput, setRoomIdInput] = useState("");
+  const [preview, setPreview] = useState<RoomInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
-
-  // socket 是 RequireAuth 保证非空的前置条件；这里只在渲染期间断言一次。
-  const activeSocket = socket!;
+  const [notice, setNotice] = useState<string | null>(null);
+  const [readyOverride, setReadyOverride] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const onPlayerJoined = (event: RoomPlayerJoinedEvent) => {
+    if (room?.id === roomId) {
+      return;
+    }
+    void ack<RoomInfo>(socket, "room:peek", { roomId }).then((result) => {
+      if (result.ok) setPreview(result.data);
+      else setError(result.code);
+    });
+  }, [room?.id, roomId, setRoom, socket]);
+
+  useEffect(() => {
+    const onPlayerJoined = (event: RoomPlayerJoinedEvent) =>
       useSessionStore.getState().applyPlayerJoined(event.seat, event.nickname, event.isBot);
-    };
-    const onReadyChanged = (event: RoomReadyChangedEvent) => {
+    const onReadyChanged = (event: RoomReadyChangedEvent) =>
       useSessionStore.getState().applyReadyChanged(event.seat, event.ready);
-    };
     const onSnapshot = (event: GameSnapshot) => {
       useSessionStore.getState().setView(event.view);
-      const currentRoom = useSessionStore.getState().room;
-      if (currentRoom) {
-        void navigate(`/room/${currentRoom.id}`);
-      }
+      void navigate(`/room/${roomId}`);
     };
-    activeSocket.on("room:playerJoined", onPlayerJoined);
-    activeSocket.on("room:readyChanged", onReadyChanged);
-    activeSocket.on("game:snapshot", onSnapshot);
+    const onPlayerLeft = ({ seat }: { seat: 0 | 1 | 2 | 3 }) => {
+      useSessionStore.setState((state) => {
+        if (!state.room || state.room.id !== roomId) return state;
+        const players = [...state.room.players] as RoomInfo["players"];
+        players[seat] = null;
+        return { room: { ...state.room, players } };
+      });
+    };
+    const onClosed = ({ reason }: { reason: string }) => {
+      setRoom(null);
+      setNotice(reason === "hostLeft" ? "The host closed this room." : "This room was closed.");
+      void navigate("/games");
+    };
+    socket.on("room:playerJoined", onPlayerJoined);
+    socket.on("room:readyChanged", onReadyChanged);
+    socket.on("game:snapshot", onSnapshot);
+    socket.on("room:playerLeft", onPlayerLeft);
+    socket.on("room:closed", onClosed);
     return () => {
-      activeSocket.off("room:playerJoined", onPlayerJoined);
-      activeSocket.off("room:readyChanged", onReadyChanged);
-      activeSocket.off("game:snapshot", onSnapshot);
+      socket.off("room:playerJoined", onPlayerJoined);
+      socket.off("room:readyChanged", onReadyChanged);
+      socket.off("game:snapshot", onSnapshot);
+      socket.off("room:playerLeft", onPlayerLeft);
+      socket.off("room:closed", onClosed);
     };
-  }, [activeSocket, navigate]);
+  }, [navigate, roomId, setRoom, socket]);
 
-  const handleCreate = async () => {
+  const shownRoom = room?.id === roomId ? room : preview;
+  const mySeat = shownRoom?.players.findIndex((player) => player?.userId === userId) ?? -1;
+  const isHost = mySeat === 0;
+
+  const joinSeat = async (seat: 0 | 1 | 2 | 3) => {
     setError(null);
-    const result = await ack<RoomInfo>(activeSocket, "room:create", { rulesetId });
+    const result = await ack<RoomInfo>(socket, "room:join", { roomId, seat });
+    if (result.ok) setRoom(result.data);
+    else setError(result.code);
+  };
+  const addBot = async (seat: 0 | 1 | 2 | 3) => {
+    setError(null);
+    const result = await ack<object>(socket, "room:addBot", { seat });
+    if (!result.ok) setError(result.code);
+  };
+  const toggleReady = async (ready: boolean) => {
+    setReadyOverride(ready);
+    const result = await ack(socket, "room:ready", { ready });
+    if (!result.ok) setError(result.code);
+  };
+  const start = async () => {
+    const result = await ack(socket, "room:start", {});
+    if (!result.ok) setError(result.code);
+  };
+  const leave = async () => {
+    const result = await ack(socket, "room:leave", {});
     if (!result.ok) {
       setError(result.code);
       return;
     }
-    setRoom(result.data);
+    setRoom(null);
+    void navigate("/games");
   };
 
-  const handleJoin = async () => {
-    setError(null);
-    const result = await ack<RoomInfo>(activeSocket, "room:join", {
-      roomId: roomIdInput.trim(),
-    });
-    if (!result.ok) {
-      setError(result.code);
-      return;
-    }
-    setRoom(result.data);
-  };
-
-  const handleReadyToggle = async (checked: boolean) => {
-    setReady(checked);
-    const result = await ack(activeSocket, "room:ready", { ready: checked });
-    if (!result.ok) {
-      setError(result.code);
-    }
-  };
-
-  const handleStart = async () => {
-    setError(null);
-    const result = await ack(activeSocket, "room:start", {});
-    if (!result.ok) {
-      setError(result.code);
-    }
-  };
-
-  const handleAddBot = async () => {
-    setError(null);
-    const result = await ack(activeSocket, "room:addBot", {});
-    if (!result.ok) {
-      setError(result.code);
-    }
-  };
-
-  if (!room) {
+  if (!shownRoom) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <h1 className="text-lg font-medium">{rulesetId} Lobby</h1>
-        <Button onClick={() => void handleCreate()}>Create room</Button>
-        <div className="flex gap-2">
-          <Input
-            value={roomIdInput}
-            onChange={(event) => setRoomIdInput(event.target.value)}
-            placeholder="Room ID"
-          />
-          <Button onClick={() => void handleJoin()}>Join</Button>
-        </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
+      <main className="flex min-h-screen items-center justify-center">
+        <p>{error ?? "Loading room…"}</p>
+      </main>
     );
   }
 
-  const mySeat = room.players.findIndex((player) => player?.userId === userId);
-  const isHost = mySeat === 0;
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-lg font-medium">Room {room.id}</h1>
-      <ul className="flex flex-col gap-1">
-        {room.players.map((player, seat) => (
-          <li key={seat}>
-            {player
-              ? `Seat ${seat}: ${player.nickname}${player.isReady ? " (Ready)" : ""}`
-              : `Seat ${seat}: Empty`}
-          </li>
-        ))}
-      </ul>
-      {mySeat >= 0 && (
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={ready}
-            onChange={(event) => void handleReadyToggle(event.target.checked)}
-          />
-          Ready
-        </label>
-      )}
-      {isHost && room.players.some((player) => player === null) && (
-        <Button variant="outline" onClick={() => void handleAddBot()}>
-          Add Bot
-        </Button>
-      )}
-      {isHost && <Button onClick={() => void handleStart()}>Start</Button>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </div>
+    <main className="min-h-screen bg-muted/30 px-6 py-12">
+      <section className="mx-auto flex w-full max-w-2xl flex-col gap-6 rounded-xl border bg-background p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">{shownRoom.rulesetId}</p>
+            <h1 className="text-2xl font-semibold">{shownRoom.name}</h1>
+          </div>
+          <Button variant="outline" onClick={() => void leave()}>
+            Leave room
+          </Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {shownRoom.players.map((player, seat) => (
+            <div key={seat} className="flex items-center justify-between rounded-lg border p-4">
+              <span>
+                {player
+                  ? `${player.nickname}${player.isBot ? " (Bot)" : ""}${player.isReady ? " (Ready)" : ""}`
+                  : `Seat ${seat + 1} · Empty`}
+              </span>
+              {!player && shownRoom.phase === "waiting" && (
+                <span className="flex gap-2">
+                  <Button size="sm" onClick={() => void joinSeat(seat as 0 | 1 | 2 | 3)}>
+                    Sit in seat {seat + 1}
+                  </Button>
+                  {isHost && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void addBot(seat as 0 | 1 | 2 | 3)}
+                    >
+                      Add bot to seat {seat + 1}
+                    </Button>
+                  )}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+        {mySeat >= 0 && shownRoom.phase === "waiting" && (
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={readyOverride ?? shownRoom.players[mySeat]?.isReady ?? false}
+              onChange={(event) => void toggleReady(event.target.checked)}
+            />{" "}
+            Ready
+          </label>
+        )}
+        {isHost && shownRoom.phase === "waiting" && (
+          <Button onClick={() => void start()}>Start game</Button>
+        )}
+        {(error || notice) && <p className="text-sm text-destructive">{error ?? notice}</p>}
+      </section>
+    </main>
   );
 }

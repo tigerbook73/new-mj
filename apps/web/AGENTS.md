@@ -27,11 +27,11 @@
 
 - `src/main.tsx`：入口，挂载 `<App/>`。
 - `src/App.tsx`：挂载 `RouterProvider` + 全局 `<ThemeToggle/>`（不放进任何路由，所有页面都要看得到）。
-- `src/router.tsx`：路由表（`/login` `/games` `/lobby/:rulesetId` `/room/:roomId`），`/games` 及以后的路由都包了 `RequireAuth`。
+- `src/router.tsx`：路由表（`/login` `/games` `/lobby/:roomId` `/room/:roomId`），`/games` 及以后的路由都包了 `RequireAuth`。
 - `src/components/RequireAuth.tsx`：未登录（`store.socket` 为空）重定向回 `/login`；单独成文件是因为和 `router.tsx` 放一起会触发 `react-refresh/only-export-components`（路由表本身不是组件导出）。
 - `src/store/session.ts`：`useSessionStore`（socket 实例、用户、房间、`PlayerView`），`applyPlayerJoined`/`applyReadyChanged`/`applyTurnStarted`/`applyTileDiscarded`/`applyClaimWindowOpened`/`applyClaimWindowResolved` 是给事件监听器用的增量更新 action。
 - `src/lib/`：`socket.ts`（连接 + ack/事件封装）、`devAuth.ts`（开发态假登录）、`theme.ts`（黑暗模式：`getInitialTheme` 读 localStorage，没有则退回 `prefers-color-scheme`；`applyTheme` 切 `.dark` class 并持久化，`main.tsx` 在挂载 React 前先调一次避免首屏闪烁）。
-- `src/views/`：`LoginView`/`GamePickerView`/`LobbyView`/`TableView`（`TableView` 只渲染 `PlayerViewBase` 公共骨架，不按 `rulesetId` 分支，血战定缺/换三张这类专属阶段没有对应 UI，卡在那个阶段发不出动作是预期行为）。
+- `src/views/`：`LoginView`/`GamePickerView`/`LobbyView`/`TableView`。`GamePickerView` 负责玩法 Tabs、`lobby:list`、搜索和建房；`LobbyView` 使用 `/lobby/:roomId` 的 `room:peek`，支持指定座位入座/加 bot。`TableView` 只渲染 `PlayerViewBase` 公共骨架，不按 `rulesetId` 分支，血战定缺/换三张这类专属阶段没有对应 UI，卡在那个阶段发不出动作是预期行为。
 - `src/components/ThemeToggle.tsx`：固定右上角的黑暗模式切换按钮，本地 `useState` + `useEffect` 调 `theme.ts`，不进 Zustand store（跟 session 状态无关，不需要跨组件同步）。
 - `src/components/login-form.tsx`：shadcn `login-03` block 生成后手动改的产物（block 不是 `ui/` 基础组件，改动是预期用法）——去掉了原版的社交登录按钮/邮箱密码字段/条款页脚，改成单一昵称输入，实际登录逻辑（`devAuth`/`connect`/`navigate`）仍留在 `LoginView` 里，这个文件只管展示。
 - `src/components/ui/`：shadcn 生成的基础组件，`login-03` 引入时新增了 `card.tsx`/`label.tsx`/`separator.tsx`/`field.tsx`（`separator.tsx` 目前没在用，block 自带、留着无害）。

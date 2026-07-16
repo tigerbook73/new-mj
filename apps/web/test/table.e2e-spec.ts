@@ -19,31 +19,27 @@ async function createAndStartRoom(browser: Browser, rulesetId: "junk" | "bloodba
   ]);
   const players: [Page, Page, Page, Page] = [host, p2, p3, p4];
 
-  for (const page of players) {
-    await page
-      .getByRole("button", { name: rulesetId === "junk" ? "Junk Hu" : "Bloodbattle" })
-      .click();
-    await expect(page).toHaveURL(new RegExp(`/lobby/${rulesetId}$`), { timeout: 10_000 });
-  }
-
+  const variant = rulesetId === "junk" ? "Junk Hu" : "Bloodbattle";
+  await host.getByRole("tab", { name: variant }).click();
+  await host.getByLabel("Room name").fill("Table test");
   await host.getByRole("button", { name: "Create room" }).click();
-  const heading = host.getByRole("heading", { name: /^Room / });
-  await expect(heading).toBeVisible({ timeout: 10_000 });
-  const roomId = (await heading.textContent())!.replace("Room", "").trim();
-
-  for (const page of [p2, p3, p4]) {
-    await page.getByPlaceholder("Room ID").fill(roomId);
-    await page.getByRole("button", { name: "Join" }).click();
-    await expect(page.getByRole("heading", { name: /^Room / })).toBeVisible({ timeout: 10_000 });
-  }
-  for (const page of players) {
-    await expect(page.getByRole("listitem")).toHaveCount(4, { timeout: 10_000 });
+  await expect(host).toHaveURL(/\/lobby\//, { timeout: 10_000 });
+  const roomId = new URL(host.url()).pathname.split("/").at(-1)!;
+  for (const [page, seat] of [
+    [p2, 1],
+    [p3, 2],
+    [p4, 3],
+  ] as const) {
+    await page.getByRole("tab", { name: variant }).click();
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await page.getByRole("button", { name: "Table test" }).click();
+    await page.getByRole("button", { name: `Sit in seat ${seat + 1}` }).click();
   }
   for (const page of players) {
     await page.getByRole("checkbox").check();
   }
   await expect(host.getByText("(Ready)")).toHaveCount(4, { timeout: 10_000 });
-  await host.getByRole("button", { name: "Start" }).click();
+  await host.getByRole("button", { name: "Start game" }).click();
 
   for (const page of players) {
     await expect(page).toHaveURL(new RegExp(`/room/${roomId}$`), { timeout: 10_000 });

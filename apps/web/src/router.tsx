@@ -17,7 +17,7 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: "/lobby/:rulesetId",
+    path: "/lobby/:roomId",
     element: (
       <RequireAuth>
         <LobbyView />
