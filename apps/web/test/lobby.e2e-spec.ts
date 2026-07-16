@@ -1,0 +1,79 @@
+import { test, expect, type Browser, type Page } from "@playwright/test";
+
+async function loginAs(browser: Browser, nickname: string): Promise<Page> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto("/login");
+  await page.getByPlaceholder("输入昵称").fill(nickname);
+  await page.getByRole("button", { name: "进入游戏" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+  return page;
+}
+
+// 3d 的核心验证：4 个独立浏览器 context 模拟 4 个真人玩家，走完建房 → 加入 →
+// ready → start 的完整房间生命周期，全靠 room:playerJoined/room:readyChanged
+// 广播和 game:snapshot 单播驱动，不依赖任何命令 ack 更新状态（架构铁律 5）。
+test("4 players create, join, ready up, and start a junk room together", async ({ browser }) => {
+  const [host, p2, p3, p4] = await Promise.all([
+    loginAs(browser, "host"),
+    loginAs(browser, "p2"),
+    loginAs(browser, "p3"),
+    loginAs(browser, "p4"),
+  ]);
+  const players = [host, p2, p3, p4];
+
+  // page.goto() would be a full page reload, wiping the in-memory Zustand
+  // session (socket/userId) — navigate the same way a real user would,
+  // through React Router's client-side transition from the picker button.
+  for (const page of players) {
+    await page.getByRole("button", { name: "垃圾胡" }).click();
+    await expect(page).toHaveURL(/\/lobby\/junk$/, { timeout: 10_000 });
+  }
+
+  await host.getByRole("button", { name: "建房" }).click();
+  const heading = host.getByRole("heading", { name: /^房间 / });
+  await expect(heading).toBeVisible({ timeout: 10_000 });
+  const roomId = (await heading.textContent())!.replace("房间", "").trim();
+  expect(roomId).toMatch(/^[0-9a-f-]{36}$/);
+
+  for (const page of [p2, p3, p4]) {
+    await page.getByPlaceholder("房间 ID").fill(roomId);
+    await page.getByRole("button", { name: "加入" }).click();
+    await expect(page.getByRole("heading", { name: /^房间 / })).toBeVisible({ timeout: 10_000 });
+  }
+
+  // 每个客户端各自看到 4 个座位都到齐（room:playerJoined 广播驱动的实时同步）。
+  for (const page of players) {
+    await expect(page.getByRole("listitem")).toHaveCount(4, { timeout: 10_000 });
+  }
+
+  for (const page of players) {
+    await page.getByRole("checkbox").check();
+  }
+
+  // 房主等所有人都显示"已准备"再点开始，避免 canStart() 因还没同步到而拒绝。
+  await expect(host.getByText("（已准备）")).toHaveCount(4, { timeout: 10_000 });
+  await host.getByRole("button", { name: "开始" }).click();
+
+  for (const page of players) {
+    await expect(page).toHaveURL(new RegExp(`/room/${roomId}$`), { timeout: 10_000 });
+  }
+
+  for (const page of players) {
+    await page.context().close();
+  }
+});
+
+// 轻量冒烟：只验证大厅层本身不写死 junk，bloodbattle 一样能建房、看到自己入座
+// 第 0 座——不重复整套 4 人流程（那部分逻辑与玩法无关，已经在上面测过）。
+test("bloodbattle lobby creates a room and seats the host at seat 0", async ({ browser }) => {
+  const page = await loginAs(browser, "host");
+  await page.getByRole("button", { name: "血战到底" }).click();
+  await expect(page).toHaveURL(/\/lobby\/bloodbattle$/, { timeout: 10_000 });
+
+  await page.getByRole("button", { name: "建房" }).click();
+  await expect(page.getByRole("heading", { name: /^房间 / })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("listitem").first()).toContainText("host");
+
+  await page.context().close();
+});

@@ -15,6 +15,7 @@
 - 输出本阶段实施顺序 + 开放问题清单；开放问题清零前不动核心接口
 - plan 产物优先是可编译骨架/状态图/竖切，而非文档
 - 阶段 1 特例：先出"类型 + RuleSet 接口签名 + 空实现 + 一个红的 happy-path 测试"供人审接口形状，认可后再填实现
+- 复杂到需要独立文档规划的阶段，写成 `docs/process/<phase 简称>.md`，在 `plan.md` 对应阶段小节链接过去，不直接大段塞进 `plan.md`；阶段收尾时按 `doc-map.md` §5/§6 把耐久内容分流吸收后删除该文件——它是过程性文档，不是永久规格
 
 ## 完成的定义（DoD）
 
@@ -40,7 +41,7 @@
 - 保持 pnpm 为唯一包管理器；测试运行时按包的生态选择，不要求全仓库使用同一个 runner。
 - `packages/core`、`packages/protocol`、`packages/ai` 优先使用 Vitest，便于 TypeScript、参数化用例和 fuzz 测试。
 - `apps/server` 使用 NestJS 时采用 Jest，遵循 NestJS 官方测试生态；server 测试不得因此把 Jest 依赖引入 core。
-- web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调度。
+- `apps/web` 用 Vitest 做单元测试、Playwright 做 e2e（`test/*.e2e-spec.ts`，与 `apps/server` 的 e2e 命名一致；`playwright.config.ts` 自动拉起独立于开发者手动 `pnpm dev` 的一套 web+server 进程，端口隔离细节见 `apps/web/AGENTS.md`）；mobile 待阶段 6 立项时再定。跨包测试从根脚本统一调度。
 
 ## 检查与格式化边界
 

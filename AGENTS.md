@@ -1,7 +1,7 @@
 # AGENTS.md
 
 在线麻将（非商用）。TS monorepo：packages/{core,protocol,ai} + apps/{server,web,mobile}。
-**当前阶段：阶段 2（NestJS server）已完成，打 tag `phase-2`；阶段 3（web 竖切）待启动。**
+**当前阶段：阶段 3（web 竖切）已完成，打 tag `phase-3`；阶段 4（垃圾胡完整人机对战 + 持久化）待启动。**
 
 ## 会话仪式
 

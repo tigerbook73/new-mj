@@ -31,18 +31,18 @@
 
 **番型表（标准配置）**：
 
-| 组别 | 番型 | 番数 | 规则 |
-|---|---|---|---|
-| 基础型（互斥，取其一） | 平胡 | 0 | 基本型 |
-| | 对对胡 | 1 | 4 刻子 + 对 |
-| | 七对 | 2 | 7 个对子 |
-| | 龙七对 | 3 | 七对中至少一组四张相同；已含第一个根 |
-| | 金钩钓 | 1 | 已有四副副露，手中仅剩一张单钓 |
-| 牌型附加（可累加） | 清一色 | +2 | 所有牌仅一种花色 |
-| | 根 | +1/个 | 和牌快照与副露中每组四张相同；龙七对的第一个根不重复计算 |
-| 操作附加（可累加） | 自摸 | +1 | `selfDrawBonus='addFan'` 时 |
-| | 杠上花 / 杠上炮 / 抢杠胡 | +1 | 见下文触发条件 |
-| | 海底捞月 / 海底炮 | +1 | 最后一次正常摸牌自摸 / 该次摸牌后弃牌点炮 |
+| 组别                   | 番型                     | 番数  | 规则                                                     |
+| ---------------------- | ------------------------ | ----- | -------------------------------------------------------- |
+| 基础型（互斥，取其一） | 平胡                     | 0     | 基本型                                                   |
+|                        | 对对胡                   | 1     | 4 刻子 + 对                                              |
+|                        | 七对                     | 2     | 7 个对子                                                 |
+|                        | 龙七对                   | 3     | 七对中至少一组四张相同；已含第一个根                     |
+|                        | 金钩钓                   | 1     | 已有四副副露，手中仅剩一张单钓                           |
+| 牌型附加（可累加）     | 清一色                   | +2    | 所有牌仅一种花色                                         |
+|                        | 根                       | +1/个 | 和牌快照与副露中每组四张相同；龙七对的第一个根不重复计算 |
+| 操作附加（可累加）     | 自摸                     | +1    | `selfDrawBonus='addFan'` 时                              |
+|                        | 杠上花 / 杠上炮 / 抢杠胡 | +1    | 见下文触发条件                                           |
+|                        | 海底捞月 / 海底炮        | +1    | 最后一次正常摸牌自摸 / 该次摸牌后弃牌点炮                |
 
 `清对`、`清七对`、`清龙七对`、`清金钩钓`是展示名，不是额外番型：分别由上述基础型加清一色导出，绝不重复计分。杠上花是杠后补摸自摸；杠上炮是杠后补摸再弃牌被胡；抢杠胡仅限补杠的第四张，抢杠成功时该补杠不成立，不计根或杠分。
 
@@ -69,17 +69,17 @@
 
 ## 6. Config 清单
 
-| 键 | 标准值 | 备选 |
-|---|---|---|
-| `exchangeThree` | true | false |
-| `capFan` | 4（极中极） | 3 / 5 / `null`（不封顶） |
-| `multiWinOnDiscard` | true（一炮多响） | false（头跳） |
-| `robKong` | true | false |
-| `checkHuaZhu` | true | false |
-| `checkDaJiao` | true | false |
-| `gangRefund` | true | false |
-| `selfDrawBonus` | 'addFan' | 'addBase'（自摸加底） |
-| `mustHuOnLastFour` | false | true（成都比赛细则） |
+| 键                  | 标准值           | 备选                     |
+| ------------------- | ---------------- | ------------------------ |
+| `exchangeThree`     | true             | false                    |
+| `capFan`            | 4（极中极）      | 3 / 5 / `null`（不封顶） |
+| `multiWinOnDiscard` | true（一炮多响） | false（头跳）            |
+| `robKong`           | true             | false                    |
+| `checkHuaZhu`       | true             | false                    |
+| `checkDaJiao`       | true             | false                    |
+| `gangRefund`        | true             | false                    |
+| `selfDrawBonus`     | 'addFan'         | 'addBase'（自摸加底）    |
+| `mustHuOnLastFour`  | false            | true（成都比赛细则）     |
 
 `checkHuaZhu=true` 时 `capFan` 必须为数字（花猪罚分取封顶分）；否则 config 非法。`mustHuOnLastFour=true` 时，牌墙剩余不多于 4 张且某家存在合法胡牌动作，该家必须选择胡牌，不能 `pass` 或继续出牌。地方差异一律通过本表达，不做成结构级 RuleSet 分叉（`decisions.md` D8）。
 
@@ -97,14 +97,14 @@
 
 信封结构见 `contracts/engine-contract.md` §6；垃圾胡的基础 16 种事件本玩法同样具备（形状可能因玩法私有字段不同而略有差异，如 `HuDeclared`/`Settled` 见下），本节只列血战特有的新增事件：
 
-| 事件 | visibility | payload 要点 |
-|---|---|---|
-| ExchangeThreeSelected | seat（仅本人） | 选出的三张 TileId |
-| ExchangeCompleted | public | 交换方向、阶段完成；不含任何 TileId |
-| TilesReceived | seat（仅本人） | 收到的三张 TileId |
-| LackChosen | seat（仅本人） | 自己选择的花色 |
-| HuDeclared | public | 血战版额外携带公开牌面胡牌快照（TileKind）、`activeSeats`；内部快照仍从手牌容器接管 TileId |
-| Settled | public | `reason`、逐座位增减分；`reason` 为 `win`、`gang`、`gangTransfer`、`huaZhu`、`gangRefund` 或 `daJiao` |
+| 事件                  | visibility     | payload 要点                                                                                          |
+| --------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| ExchangeThreeSelected | seat（仅本人） | 选出的三张 TileId                                                                                     |
+| ExchangeCompleted     | public         | 交换方向、阶段完成；不含任何 TileId                                                                   |
+| TilesReceived         | seat（仅本人） | 收到的三张 TileId                                                                                     |
+| LackChosen            | seat（仅本人） | 自己选择的花色                                                                                        |
+| HuDeclared            | public         | 血战版额外携带公开牌面胡牌快照（TileKind）、`activeSeats`；内部快照仍从手牌容器接管 TileId            |
+| Settled               | public         | `reason`、逐座位增减分；`reason` 为 `win`、`gang`、`gangTransfer`、`huaZhu`、`gangRefund` 或 `daJiao` |
 
 `TileDiscarded`、`ClaimWindowOpened`、`PengMade` 等 public 事件只携带 `TileKind`，不得携带可由静态映射反查牌面的 TileId；私有 `TileDrawnPrivate`、选牌事件和内部状态仍可携带 TileId。
 

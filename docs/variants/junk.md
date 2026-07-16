@@ -50,24 +50,24 @@
 
 信封结构（`GameEvent`/`EventVisibility`）见 `contracts/engine-contract.md` §6，本节只列本玩法的具体事件。
 
-| # | 事件 | visibility | payload 要点 |
-|---|---|---|---|
-| 1 | GameStarted | public | config、座次、庄家、各家初始手牌张数、牌墙余量 |
-| 2 | HandDealt | seat（各家各收自己的） | 该家 13/14 张手牌 |
-| 3 | TurnStarted | public | seat |
-| 4 | TileDrawn | 双版本：seat 版含牌面；public 版仅"摸了一张" | seat, tile? |
-| 5 | TileDiscarded | public | seat, tile |
-| 6 | ClaimWindowOpened | seat（仅有权响应者） | 自己的 ClaimOption[] |
-| 7 | ClaimResponded | seat（仅本人） | 本人的响应 |
-| 8 | ClaimWindowResolved | public | 裁决结果 |
-| 9 | ChiMade | public | seat, tiles, from |
-| 10 | PengMade | public | seat, tile, from |
-| 11 | GangMade | public（暗杠不露牌面，双版本） | seat, type, tile?, from? |
-| 12 | GangReplacementDrawn | 双版本（同 TileDrawn） | seat, tile? |
-| 13 | HuDeclared | public | seat, 胡型（点炮/自摸）, 亮出的完整手牌, 点炮者? |
-| 14 | Settled | public | 分数变动明细 |
-| 15 | WallExhausted | public | — |
-| 16 | GameEnded | public | result 摘要 |
+| #   | 事件                 | visibility                                   | payload 要点                                     |
+| --- | -------------------- | -------------------------------------------- | ------------------------------------------------ |
+| 1   | GameStarted          | public                                       | config、座次、庄家、各家初始手牌张数、牌墙余量   |
+| 2   | HandDealt            | seat（各家各收自己的）                       | 该家 13/14 张手牌                                |
+| 3   | TurnStarted          | public                                       | seat                                             |
+| 4   | TileDrawn            | 双版本：seat 版含牌面；public 版仅"摸了一张" | seat, tile?                                      |
+| 5   | TileDiscarded        | public                                       | seat, tile                                       |
+| 6   | ClaimWindowOpened    | seat（仅有权响应者）                         | 自己的 ClaimOption[]                             |
+| 7   | ClaimResponded       | seat（仅本人）                               | 本人的响应                                       |
+| 8   | ClaimWindowResolved  | public                                       | 裁决结果                                         |
+| 9   | ChiMade              | public                                       | seat, tiles, from                                |
+| 10  | PengMade             | public                                       | seat, tile, from                                 |
+| 11  | GangMade             | public（暗杠不露牌面，双版本）               | seat, type, tile?, from?                         |
+| 12  | GangReplacementDrawn | 双版本（同 TileDrawn）                       | seat, tile?                                      |
+| 13  | HuDeclared           | public                                       | seat, 胡型（点炮/自摸）, 亮出的完整手牌, 点炮者? |
+| 14  | Settled              | public                                       | 分数变动明细                                     |
+| 15  | WallExhausted        | public                                       | —                                                |
+| 16  | GameEnded            | public                                       | result 摘要                                      |
 
 `ClaimResponded`（#7）仅本人可见，用于回放调试的输入完整性与窗口中途重连恢复（配套：PlayerView 的 `myClaimResponse` 字段）。
 
@@ -77,10 +77,10 @@
 
 ## 8. Config 清单（均有默认值，已确认：全取默认）
 
-| 选项 | 默认建议 | 说明 |
-|---|---|---|
-| `sevenPairs` | **false ✓** | 七对是否可胡（关：进一步压薄第一个 RuleSet；血战阶段自然会实现） |
-| `robKong` | **false ✓** | 抢杠胡（他家补杠时可胡该张）是否允许 |
+| 选项            | 默认建议         | 说明                                                                     |
+| --------------- | ---------------- | ------------------------------------------------------------------------ |
+| `sevenPairs`    | **false ✓**      | 七对是否可胡（关：进一步压薄第一个 RuleSet；血战阶段自然会实现）         |
+| `robKong`       | **false ✓**      | 抢杠胡（他家补杠时可胡该张）是否允许                                     |
 | `multiHuPolicy` | **'headJump' ✓** | 多家可同时点炮胡时：头跳（按逆时针最近者独胡）或 'all'（均胡）。头跳最简 |
 
 第一版三项全取默认（最简），使垃圾胡 RuleSet 体量最小；config 解析与 fuzz 随机化已按 `decisions.md` D8 口径覆盖三项。

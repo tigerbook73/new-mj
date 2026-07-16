@@ -36,7 +36,13 @@ import { RoomService } from "../rooms/room.service";
  */
 const defaultNickname = (userId: string): string => `Player-${userId.slice(0, 6)}`;
 
-@WebSocketGateway({ namespace: "/", transports: ["websocket"] })
+/**
+ * origin: true reflects the request's Origin header — web/mobile run on a
+ * different port than the server in dev and e2e (D7: non-commercial, no
+ * cookies/credentials involved, auth is the handshake JWT not a session
+ * cookie, so a permissive-but-explicit CORS policy is fine here).
+ */
+@WebSocketGateway({ namespace: "/", transports: ["websocket"], cors: { origin: true } })
 export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   private readonly logger = new Logger(RoomsGateway.name);
 

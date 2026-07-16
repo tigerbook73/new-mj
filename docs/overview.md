@@ -20,18 +20,18 @@
 
 ## 现状
 
-阶段 0–2（规则定稿、core 引擎、server）已完成；阶段 3（web 竖切）尚未开始。本次文档结构重构就发生在这个节点——阶段 3 开工前，边界相对最"干净"，趁早把公共/专用的分界定下来。
+阶段 0–3（规则定稿、core 引擎、server、web 竖切）已完成；阶段 4（垃圾胡打磨到完整可玩：AI 对战 + 界面/操作优化 + 持久化）尚未开始。文档结构本身是在阶段 2 完成、阶段 3 开工前那个节点重构的（当时边界相对最"干净"，趁早把公共/专用的分界定下来），见 `doc-map.md` 的 v2 说明。
 
 ## 阅读地图
 
-| 你是谁 | 怎么读 |
-|---|---|
-| 新人，想快速理解系统 | `architecture/system.md`（系统长什么样）→ `architecture/key-designs.md`（为什么这么设计）→ `decisions.md`（懂取舍） |
-| 想加一个新玩法 | `architecture/variant-boundary.md`（哪些能复用、哪些必须自己写）→ `contracts/engine-contract.md`（要实现哪些接口）→ 抄一份最接近的 `variants/*.md` 做模板 → `testing-strategy.md`（最低验收要求） |
-| 想改协议/房间逻辑 | `contracts/protocol-shared.md` / `contracts/session-mechanics.md` |
-| 想查具体某个玩法的规则 | `variants/junk.md` / `variants/bloodbattle.md` |
-| 想知道某个技术选择的理由 | `decisions.md`（append-only 决策记录，位置不变；精简例外见 `doc-map.md` §2.2） |
-| Claude Code / AI 会话开工 | 根级/包级 `CLAUDE.md`/`AGENTS.md` → `process/plan.md` 状态区 → 按需读契约与规则文档 |
+| 你是谁                    | 怎么读                                                                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 新人，想快速理解系统      | `architecture/system.md`（系统长什么样）→ `architecture/key-designs.md`（为什么这么设计）→ `decisions.md`（懂取舍）                                                                               |
+| 想加一个新玩法            | `architecture/variant-boundary.md`（哪些能复用、哪些必须自己写）→ `contracts/engine-contract.md`（要实现哪些接口）→ 抄一份最接近的 `variants/*.md` 做模板 → `testing-strategy.md`（最低验收要求） |
+| 想改协议/房间逻辑         | `contracts/protocol-shared.md` / `contracts/session-mechanics.md`                                                                                                                                 |
+| 想查具体某个玩法的规则    | `variants/junk.md` / `variants/bloodbattle.md`                                                                                                                                                    |
+| 想知道某个技术选择的理由  | `decisions.md`（append-only 决策记录，位置不变；精简例外见 `doc-map.md` §2.2）                                                                                                                    |
+| Claude Code / AI 会话开工 | 根级/包级 `CLAUDE.md`/`AGENTS.md` → `process/plan.md` 状态区 → 按需读契约与规则文档                                                                                                               |
 
 ## 文档结构总览
 

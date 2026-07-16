@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  AuthHandshakeSchema,
   ERROR_CODES,
+  EventVisibilitySchema,
   GameActionRequestSchema,
+  GameEventEnvelopeSchema,
+  GameSnapshotSchema,
+  PlayerViewBaseSchema,
   RoomCreateRequestSchema,
+  RoomDealerChangedEventSchema,
   RoomInfoSchema,
   RoomJoinRequestSchema,
+  RoomPlayerJoinedEventSchema,
+  RoomReadyChangedEventSchema,
   RoomReadyRequestSchema,
+  RoomScoreUpdatedEventSchema,
+  RoomSessionFinishedEventSchema,
+  RoomStartRequestSchema,
 } from "../src/schemas.ts";
 
 const validRoomInfo = {
@@ -63,6 +74,108 @@ describe("GameActionRequestSchema", () => {
   it("passes through an opaque action payload without validating its shape", () => {
     const payload = { action: { type: "discard", tile: 12 } };
     expect(GameActionRequestSchema.parse(payload)).toEqual(payload);
+  });
+});
+
+describe("RoomStartRequestSchema", () => {
+  it("accepts an empty object (ack is a bare receipt)", () => {
+    expect(RoomStartRequestSchema.parse({})).toEqual({});
+  });
+});
+
+describe("AuthHandshakeSchema", () => {
+  it("accepts token + protocolVersion without resume", () => {
+    const payload = { token: "jwt", protocolVersion: "1.0" };
+    expect(AuthHandshakeSchema.parse(payload)).toEqual(payload);
+  });
+
+  it("accepts an optional resume.roomId", () => {
+    const payload = { token: "jwt", protocolVersion: "1.0", resume: { roomId: "room-1" } };
+    expect(AuthHandshakeSchema.parse(payload)).toEqual(payload);
+  });
+
+  it("rejects a missing token", () => {
+    expect(() => AuthHandshakeSchema.parse({ protocolVersion: "1.0" })).toThrow();
+  });
+});
+
+describe("room:* event schemas", () => {
+  it("RoomPlayerJoinedEventSchema requires seat/nickname/isBot", () => {
+    const payload = { seat: 0 as const, nickname: "Alice", isBot: false };
+    expect(RoomPlayerJoinedEventSchema.parse(payload)).toEqual(payload);
+    expect(() => RoomPlayerJoinedEventSchema.parse({ seat: 0, nickname: "Alice" })).toThrow();
+  });
+
+  it("RoomReadyChangedEventSchema requires seat/ready", () => {
+    expect(RoomReadyChangedEventSchema.parse({ seat: 1, ready: true })).toEqual({
+      seat: 1,
+      ready: true,
+    });
+  });
+
+  it("RoomScoreUpdatedEventSchema requires a 4-tuple of scores", () => {
+    expect(() => RoomScoreUpdatedEventSchema.parse({ scores: [0, 0, 0], gameNumber: 1 })).toThrow();
+  });
+
+  it("RoomDealerChangedEventSchema rejects an out-of-range seat", () => {
+    expect(() => RoomDealerChangedEventSchema.parse({ dealer: 4, gameNumber: 1 })).toThrow();
+  });
+
+  it("RoomSessionFinishedEventSchema requires a valid SessionResult", () => {
+    const payload = {
+      result: { winner: 0 as const, ranking: [], format: "4-round" as const, gamesPlayed: 4 },
+    };
+    expect(RoomSessionFinishedEventSchema.parse(payload)).toEqual(payload);
+  });
+});
+
+describe("EventVisibilitySchema", () => {
+  it("accepts public and seat-scoped visibility", () => {
+    expect(EventVisibilitySchema.parse({ type: "public" })).toEqual({ type: "public" });
+    expect(EventVisibilitySchema.parse({ type: "seat", seats: [0, 2] })).toEqual({
+      type: "seat",
+      seats: [0, 2],
+    });
+  });
+
+  it("rejects an unknown visibility type", () => {
+    expect(() => EventVisibilitySchema.parse({ type: "private" })).toThrow();
+  });
+});
+
+describe("GameEventEnvelopeSchema", () => {
+  it("validates the envelope but leaves payload opaque", () => {
+    const payload = {
+      event: { seq: 1, visibility: { type: "public" as const }, payload: { anything: true } },
+    };
+    expect(GameEventEnvelopeSchema.parse(payload)).toEqual(payload);
+  });
+
+  it("rejects a missing seq", () => {
+    expect(() =>
+      GameEventEnvelopeSchema.parse({ event: { visibility: { type: "public" }, payload: {} } }),
+    ).toThrow();
+  });
+});
+
+describe("GameSnapshotSchema / PlayerViewBaseSchema", () => {
+  it("validates the public skeleton while allowing ruleset-private extra fields", () => {
+    const payload = {
+      view: {
+        seat: 0 as const,
+        hand: [1, 2, 3],
+        seats: [{ handCount: 13 }, { handCount: 13 }, { handCount: 13 }, { handCount: 13 }],
+        wallCount: 40,
+        currentSeat: 0 as const,
+        phase: "playing", // ruleset-private field, must pass through via catchall
+      },
+      seq: 5,
+    };
+    expect(GameSnapshotSchema.parse(payload)).toEqual(payload);
+  });
+
+  it("rejects a view missing the common skeleton", () => {
+    expect(() => PlayerViewBaseSchema.parse({ seat: 0, hand: [] })).toThrow();
   });
 });
 

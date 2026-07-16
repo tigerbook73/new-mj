@@ -61,31 +61,31 @@ finished: 计算排名，对外公开 result
 
 **ack 请求**（已实现，详细 payload 见 `contracts/protocol-shared.md` 的通用信封约定）：
 
-| 消息 | 备注 |
-|---|---|
-| `room:start` | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播 |
-| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）；"进入新上下文"类消息，ack 给快照 |
-| `room:join` | ack 给 `RoomInfo` 快照 |
-| `room:ready` | ack `{}` |
+| 消息          | 备注                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播 |
+| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）；"进入新上下文"类消息，ack 给快照           |
+| `room:join`   | ack 给 `RoomInfo` 快照                                                                 |
+| `room:ready`  | ack `{}`                                                                               |
 
 **未实现/占位**：
 
-| 消息 | 说明 |
-|---|---|
-| `room:leave` | 对局中允许离座：转托管（见 §7 评审点 H），**尚未实现** |
-| `room:addBot` | 仅房主，MVP 简化，**尚未实现** |
+| 消息          | 说明                                                   |
+| ------------- | ------------------------------------------------------ |
+| `room:leave`  | 对局中允许离座：转托管（见 §7 评审点 H），**尚未实现** |
+| `room:addBot` | 仅房主，MVP 简化，**尚未实现**                         |
 
 `nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
 
 **事件推送**（已实现）：
 
-| 消息 | payload | 说明 |
-|---|---|---|
-| `room:playerJoined` | seat、nickname、isBot | |
-| `room:readyChanged` | seat、ready | |
-| `room:scoreUpdated` | scores、gameNumber、totalGames? | 每局结束后 broadcast |
-| `room:dealerChanged` | dealer、gameNumber | 进下一局时 |
-| `room:sessionFinished` | result | 会话结束，公开排名 |
+| 消息                   | payload                         | 说明                 |
+| ---------------------- | ------------------------------- | -------------------- |
+| `room:playerJoined`    | seat、nickname、isBot           |                      |
+| `room:readyChanged`    | seat、ready                     |                      |
+| `room:scoreUpdated`    | scores、gameNumber、totalGames? | 每局结束后 broadcast |
+| `room:dealerChanged`   | dealer、gameNumber              | 进下一局时           |
+| `room:sessionFinished` | result                          | 会话结束，公开排名   |
 
 **未实现**：`room:playerLeft`、`room:starting`。
 

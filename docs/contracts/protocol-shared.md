@@ -26,20 +26,20 @@
 
 ## 3. 对局内通用消息（game:\*，跨玩法共用信封）
 
-| 消息 | payload | 说明 |
-|---|---|---|
-| `game:action` | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED` |
-| `game:event` | `{ event: GameEvent, deadline?: number }` | core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` **尚未实现**（超时代提交 pass 是 MVP 已知限制） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }` | 入座开局/切局时下发的权威快照；断线重连、`deadline` 同上未实现 |
+| 消息            | payload                                                                                                                   | 说明                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                       |
+| `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` **尚未实现**（超时代提交 pass 是 MVP 已知限制） |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 入座开局/切局时下发的权威快照；断线重连、`deadline` 同上未实现                                                          |
 
 身份一律取 `socket.data.userId`，payload 不含也不信任 userId（`decisions.md` D10 铁律）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
 
 ## 4. 未实现/占位（跨房间的通用能力）
 
-| 消息 | payload | data | 说明 |
-|---|---|---|---|
-| `lobby:list` | `{}` | `RoomSummary[]`（id、玩法、人数、状态） | 大厅列表为主动拉取，实时推送留作未来增量 |
-| `profile:get` / `stats:get` | `{}` / `{ userId? }` | 资料 / 战绩 | 阶段 4 才实现，先占位 |
+| 消息                        | payload              | data                                    | 说明                                     |
+| --------------------------- | -------------------- | --------------------------------------- | ---------------------------------------- |
+| `lobby:list`                | `{}`                 | `RoomSummary[]`（id、玩法、人数、状态） | 大厅列表为主动拉取，实时推送留作未来增量 |
+| `profile:get` / `stats:get` | `{}` / `{ userId? }` | 资料 / 战绩                             | 阶段 4 才实现，先占位                    |
 
 ## 5. 错误码（ErrCode）通用部分
 

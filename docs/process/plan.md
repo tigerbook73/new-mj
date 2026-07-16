@@ -1,63 +1,52 @@
 # plan：阶段路线与状态
 
 > 过程性文档：阶段状态与待办在此维护，收尾清理。需求与架构见 `../architecture/*.md` / `../decisions.md`。
-> 本文件随本次文档重构从根目录迁至 `process/`，内容未删改，仅更新了指向已迁移文档的路径引用。
+> 阶段记录约定：当期工作简单时，直接在对应阶段小节记结论 + 验收；复杂到需要分步规划时，本文件只留阶段摘要与状态，详细方案另开文档（设计草案/Project 讨论），定案或完成后再把结论摘要回填——不把推演过程整篇搬进本文件，分流规则见 `../doc-map.md` §5。
 
 ## 需求（不变基线）
 
 1. Web + 移动端 App
 2. 多玩法：垃圾胡（第一，验证架构）→ 血战到底（第二）→ 后续扩展
-3. AI 与真人混桌（必须有真人）；4. 多局并行；5. Google/GitHub 登录
-4. 架构可扩展即可，允许有边界重构；7. 非商用，不做数据兼容（可清对局表，保用户表，单向引用 userId）
+3. AI 与真人混桌（必须有真人）
+4. 多局并行
+5. Google/GitHub 登录
+6. 架构可扩展即可，允许有边界重构
+7. 非商用，不做数据兼容（可清对局表，保用户表，单向引用 userId）
 
 ## 阶段路线
 
-| 阶段 | 内容 | 验收 | 状态 |
-| ---- | ---- | ---- | ---- |
-| 0 | 规则与契约定义 | 四份规格文档定稿 | ✅ |
-| 1 | core 基建 + junk RuleSet + CLI fuzz | CLI 整局 + 1 万局 fuzz 绿 | ✅ |
-| 1.5 | bloodbattle RuleSet（允许一次接口调整） | 番型用例全绿 + fuzz | ✅ |
-| 2 | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk） | 4 模拟客户端整局 | ✅ |
-| 2→3 | 文档结构重构（本次） | 新结构落地，`_legacy/` 存档旧文档 | ✅ |
-| 3 | web：登录/大厅/牌桌（先竖切） | 浏览器真人对局 | |
-| 4 | 持久化：事件日志落 PG/战绩/重连/回放调试页 | | |
-| 5 | mobile（Expo） | | |
+| 阶段 | 内容                                                                                                                                      | 验收                             | 状态 |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ---- |
+| 0    | 规则与契约定义                                                                                                                            | 四份规格文档定稿                 | ✅   |
+| 1    | core 基建 + junk RuleSet + CLI fuzz                                                                                                       | CLI 整局 + 1 万局 fuzz 绿        | ✅   |
+| 1.5  | bloodbattle RuleSet（允许一次接口调整）                                                                                                   | 番型用例全绿 + fuzz              | ✅   |
+| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk）                                                                      | 4 模拟客户端整局                 | ✅   |
+| 2→3  | 文档结构重构                                                                                                                              | 新结构落地，详见 `../doc-map.md` | ✅   |
+| 3    | web：登录/大厅/牌桌（先竖切）                                                                                                             | 浏览器真人对局                   | ✅   |
+| 4    | 垃圾胡打磨到完整可玩：人机对战（AI 可以弱，但必须有）+ 界面/操作优化 + 额外小特性（待补充）+ 持久化（事件日志落 PG/战绩/重连/回放调试页） | 单人能对着 AI 完整打完一局垃圾胡 |      |
+| 5    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI/持久化框架（垃圾胡基本完成后再开工）                                                      | 单人能对着 AI 完整打完一局血战   |      |
+| 6    | mobile（Expo，血战完成后再考虑）                                                                                                          |                                  |      |
 
-> 阶段 2/3 说明：protocol、PlayerView、UI 架构按 `../contracts/engine-contract.md`/`../contracts/protocol-shared.md`/`../variants/*.md` 中已覆盖两套规则的契约实现，但先只接入 junk 的具体规则跑通产品；血战规则接入时应是增量（新增阶段/组件），不重新设计协议或 UI 架构——若届时仍需动老代码，说明契约本身有遗漏，应回头补文档而非默认接受重构。
+> 阶段 4/5 说明：这条顺序延续阶段 2/3 定下的老规矩——先把 junk 一个玩法从"能跑通"打磨到"能完整玩"，验证一遍 AI/UI/持久化这几层要不要按 ruleset 拆分、怎么拆；血战接入阶段 5 时应该是复用这套框架的增量工作，不是重新设计。若届时血战还要大改阶段 4 定下的框架，说明阶段 4 的设计本身有遗漏，应该回头补文档而不是默认接受重构。
 
-## 阶段 1：已完成（tag `phase-1`）
+## 已完成阶段
 
-TypeScript monorepo、纯函数 core、junk RuleSet、CLI 与 fuzz 全部完成并测试通过；实施步骤见 git 历史（`8bd6aa3`…`587693d`）。契约留存于 `../contracts/engine-contract.md`/`../variants/junk.md`，取舍理由见 `../decisions.md`。
+- **阶段 1**（tag `phase-1`）：TypeScript monorepo、纯函数 core、junk RuleSet、CLI 与 fuzz。契约见 `../contracts/engine-contract.md`/`../variants/junk.md`，取舍理由见 `../decisions.md`。
+- **阶段 1.5**：血战 RuleSet 完整实现（换三张/定缺、声明窗口、杠分账本、抢杠胡、呼叫转移、流局结算等），同期完成 D12 接口调整。规则见 `../variants/bloodbattle.md`，契约见 `../contracts/engine-contract.md`，取舍理由见 `../decisions.md`。
+- **阶段 2**（tag `phase-2`）：NestJS + Socket.IO server 落地（GameService/RoomService/EventBus/RoomsGateway），4 客户端整局验收通过。契约见 `../contracts/protocol-shared.md`/`../contracts/session-mechanics.md`，取舍理由见 `../decisions.md` D13/D14；遗留缺口见下方待办。
+- **阶段 2→3**：文档结构重构，详见 `../doc-map.md`。
+- **阶段 3**（tag `phase-3`）：web 登录/选玩法/大厅/牌桌竖切跑通——开发态假登录（D16）、Vite+React 技术栈（D17）、房间生命周期靠 ack 初始快照 + 事件广播增量更新驱动（架构铁律 5，不存在"重新查一次房间状态"的消息）、牌桌渲染 `PlayerViewBase` 公共骨架并对"事实型" `game:event` 做增量更新（D18）。junk 验证到能真实发出并成功执行一个 `game:action`；bloodbattle 验证到公共骨架能正确渲染（换三张/定缺属于玩法专属阶段 UI，留给阶段 5）。12 个 e2e 用例（`apps/server` 5 个 + `apps/web` 7 个）已接入根目录 `pnpm verify`（此前 `turbo.json` 一直没有 `test:e2e` 任务，e2e 从未真正进过根级 DoD 链条，这次一并补上）。契约见 `../contracts/*.md`，实现细节见 `apps/web/AGENTS.md`，取舍理由见 `../decisions.md` D16-D18。
 
-## 阶段 1.5：已完成
+## 当前状态
 
-血战 RuleSet 已完成换三张/定缺、playing 回合、缺门约束、碰/杠/胡声明窗口、头跳/一炮多响、多赢家离场、杠分账本、抢杠胡、呼叫转移、三家胡、牌墙耗尽、查花猪/退税/查大叫和 `mustHuOnLastFour`。已注册进 `engine.ts`，PlayerView 与事件回放保持一致；public 事件含已公开牌的 TileId（支持 UI 精准动画），隐藏牌仅 private 事件包含。
+阶段 4（垃圾胡完整可玩）尚未开工。
 
-验收结果：番型 fixture 20 条，core 测试 57 条通过；junk 1000 局 fuzz 通过；bloodbattle 多配置 10000 局 fuzz 通过；根目录 `pnpm verify`（format:check、typecheck、lint、test）全绿。
-
-本阶段同时完成 D12 接口调整、core package alias、常量整理、测试目录分层、局部 AI 指导文档和 `PlayerViewBase` 类型边界收窄。具体规则与取舍已回写 `../variants/bloodbattle.md`、`../contracts/engine-contract.md`、`../decisions.md`。
-
-## 阶段 2：已完成（tag `phase-2`）
-
-NestJS + Socket.IO server 全部落地：`packages/protocol` 从占位补成 zod schema + tsup 双发 CJS/ESM；`apps/server` 走 CommonJS（D13）——`GameService`（薄封装 core 四签名）、`RoomService`（房间生命周期编排，游戏结束判定读 `GameEnded` 事件而非 `state.phase`）、类型化 `EventBus` 与传输层解耦（D14）、`RoomsGateway`（握手中间件鉴权 + `ConnectionRegistry` 座位单播 + `eventsVisibleTo()` 可见性过滤）。
-
-验收结果：4 个真实 `socket.io-client` 连接跑通完整 4-round 会话（`create → join → ready → start → 4局 → sessionFinished`，用 `playJunkGame` 生成确定性动作序列而非 mock）；单元 + e2e 全绿；根目录 `pnpm verify`（format:check、typecheck、lint、build、test）全绿。契约变更（`GAME_NOT_STARTED` 错误码、`room:start` ack 改纯回执）已回写 `../contracts/protocol-shared.md`/`../contracts/session-mechanics.md`；实施过程中的取舍见 `../decisions.md` D13/D14。`docs/phase-2-server.md` 已按 doc-map 惯例删除，结论分流至 `../decisions.md`/`../architecture/system.md`/`../contracts/session-mechanics.md`/`../contracts/protocol-shared.md`/`apps/server/AGENTS.md`。
-
-**已知缺口**（非阻塞，留给后续阶段）：`room:create`/`room:join` 协议 payload 没有 nickname 字段，当前用 userId 派生占位昵称；AI 补位、断线托管未实现（明确排除在 MVP 外）。
-
-## 阶段 2→3：文档结构重构（本次，已完成）
-
-阶段 2 验收完成、阶段 3 尚未开工，是边界相对干净的节点。把原先扁平、按层/按玩法混切的文档，改成"公共契约按层、玩法专属按玩法聚合"的目录结构；新增 `../architecture/variant-boundary.md`（公共/私有边界台账，现在就保守建立，不等日麻）与 `../testing-strategy.md`（测试策略先定后做）。原始文档移入 `_legacy/`，未删除。详见 `../doc-map.md` v2 与 `../overview.md`。
-
-**下一步第一个动作**：启动阶段 3 web 竖切设计——先定登录（Supabase SDK 直连）+ 大厅 + 牌桌的最小页面流转，复用 `packages/protocol` 的类型对接 `apps/server` 已跑通的 Socket.IO 协议。
+**下一步第一个动作**：规划阶段 4 的子任务拆分。范围明显比阶段 3 更杂（AI 对战、界面/操作优化、额外小特性待补充、持久化四块内容性质都不一样），大概率需要照阶段 3 的做法先开一份独立的 `docs/process/phase-4-*.md`，理清楚这四块的依赖顺序和验收标准，再动手实施——不要在这份文件里直接展开推演。
 
 ## 待办
 
-- [x] 阶段 1.5 前：rules-bloodbattle.md 定稿（番型互斥、杠分、呼叫转移、退税与终局结算顺序已确认）
-- [x] 阶段 2 前：房间与对局关系模型——已决定连续 N 局（非一局即散，见 `../decisions.md` D11）；N=4、庄家轮换等细节已产出至 `../contracts/session-mechanics.md` 并实现
-- [x] 阶段 2→3 之间：文档结构重构（本次）
-- [ ] 阶段 3 前：协议补 nickname 字段（`room:create`/`room:join` payload 目前没有，`apps/server` 用 userId 派生占位昵称）
-- [ ] 阶段 2/3：AI 定位确认（建议：简单启发式补位），MVP 阶段 2 明确未实现
-- [ ] 阶段 5 前：mobile 具体路线（是否 react-native-web 统一）
+- [ ] 阶段 4：协议补 nickname 字段（`room:create`/`room:join` payload 目前没有，`apps/server` 用 userId 派生占位昵称）——界面优化免不了要用真实昵称
+- [ ] 阶段 4 AI 开工前：`packages/ai` 要不要做成只吃 `PlayerView` 的合法性/算分引擎（web 出牌提示和 AI 决策共用一份，而不是分别造轮子），见 `../decisions.md` D18 末尾的讨论。这不是数据泄露问题，纯粹是要不要新增一层公共契约的架构决定，量级接近当初做 `packages/protocol`，需要单独定接口形状（按 ruleset 分别实现、配套一致性测试）
+- [ ] 阶段 6 前：mobile 具体路线（是否 react-native-web 统一）
 - [ ] 真人协作触发时：repo 权限、是否上分支保护
 - [ ] 日麻立项时：按 `../architecture/variant-boundary.md` §2 走一次边界复审，重点是庄家轮换公式与会话排名策略两条"待验证"条目
