@@ -53,7 +53,9 @@
 
 **下一步第一个动作**：阶段 4.5 Replay——先盘点现有内存事件流与可见性过滤边界，确定 replay 日志的最小记录形状。
 
-本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分；保留 `src/schemas.ts` 兼容性 barrel，公共导出与协议行为不变。`pnpm verify` 全绿。
+本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分，公共导出与协议行为不变。`pnpm verify` 全绿。
+
+后续收尾：仓库内没有 `src/schemas.ts` 的生产代码依赖，已删除该兼容性 barrel；schema 测试改从 `src/index.ts` 公共入口导入，32 个测试继续全绿。
 
 **阶段 4.4.3 + 4.4.5**：已完成。`/games` 改为 junk/bloodbattle Tabs，接入 `lobby:list` 房间列表、搜索、命名建房；`/lobby/:roomId` 改为 `room:peek` 驱动的房间页，支持指定座位入座、指定空座位加 bot、ready/start，并保留 ack + 事件广播状态边界。web e2e 9/9 全绿（含 table 验收迁移到新大厅流程）。
 

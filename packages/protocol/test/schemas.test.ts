@@ -22,7 +22,7 @@ import {
   RoomScoreUpdatedEventSchema,
   RoomSessionFinishedEventSchema,
   RoomStartRequestSchema,
-} from "../src/schemas.ts";
+} from "../src/index.ts";
 
 const validRoomInfo = {
   id: "room-1",
