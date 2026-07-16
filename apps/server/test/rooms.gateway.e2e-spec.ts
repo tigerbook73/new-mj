@@ -1,7 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { NestFactory } from "@nestjs/core";
-import type { RoomInfo, Reply } from "@new-mj/protocol";
+import type { Reply, RoomInfo, RoomSummary } from "@new-mj/protocol";
 import { io, type Socket as ClientSocket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { ConfigService } from "../src/config/config.service";
@@ -125,5 +125,55 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     const lonely = await connectAs("user-lonely");
     const result = await ack<object>(lonely, "game:action", { action: {} });
     expect(result).toMatchObject({ ok: false, code: "NOT_IN_ROOM" });
+  });
+
+  it("lobby:list/room:peek/room:leave (phase 4.4.4) work end to end over real sockets", async () => {
+    const host = await connectAs("lobby-host");
+    const guest = await connectAs("lobby-guest");
+
+    const created = await ack<RoomInfo>(host, "room:create", {
+      rulesetId: "junk",
+      name: "Alice's e2e room",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const roomId = created.data.id;
+    expect(created.data.name).toBe("Alice's e2e room");
+
+    const listed = await ack<RoomSummary[]>(guest, "lobby:list", {
+      rulesetId: "junk",
+      search: "alice",
+    });
+    expect(listed.ok).toBe(true);
+    if (listed.ok) {
+      expect(listed.data.map((room) => room.id)).toContain(roomId);
+    }
+
+    const peeked = await ack<RoomInfo>(guest, "room:peek", { roomId });
+    expect(peeked).toMatchObject({ ok: true, data: { id: roomId, name: "Alice's e2e room" } });
+
+    const guestJoined = once<{ seat: number }>(host, "room:playerJoined");
+    const joined = await ack<RoomInfo>(guest, "room:join", { roomId, seat: 3 });
+    expect(joined.ok).toBe(true);
+    await expect(guestJoined).resolves.toMatchObject({ seat: 3 });
+
+    const guestLeft = once<{ seat: number }>(host, "room:playerLeft");
+    const left = await ack<object>(guest, "room:leave", {});
+    expect(left).toEqual({ ok: true, data: {} });
+    await expect(guestLeft).resolves.toMatchObject({ seat: 3 });
+
+    // guest left cleanly — a fresh room:join with the same identity must work
+    // again instead of hitting ALREADY_IN_ROOM (proves the gateway actually
+    // untracked the connection, not just the RoomService-side seat).
+    const rejoined = await ack<RoomInfo>(guest, "room:join", { roomId });
+    expect(rejoined.ok).toBe(true);
+
+    const hostClosed = once<{ reason: string }>(guest, "room:closed");
+    const hostLeft = await ack<object>(host, "room:leave", {});
+    expect(hostLeft).toEqual({ ok: true, data: {} });
+    await expect(hostClosed).resolves.toEqual({ reason: "hostLeft" });
+
+    const peekAfterClose = await ack<RoomInfo>(guest, "room:peek", { roomId });
+    expect(peekAfterClose).toMatchObject({ ok: false, code: "ROOM_NOT_FOUND" });
   });
 });

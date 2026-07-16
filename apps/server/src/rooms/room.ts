@@ -27,6 +27,7 @@ export interface RoomPlayer {
  */
 export interface Room {
   id: string;
+  name: string;
   rulesetId: string;
   config: GameConfig;
   sessionFormat: SessionFormat;

@@ -13,11 +13,15 @@ import type { SeatId } from "@new-mj/core";
 import { eventsVisibleTo } from "@new-mj/core";
 import {
   GameActionRequestSchema,
+  LobbyListRequestSchema,
+  RoomAddBotRequestSchema,
   RoomCreateRequestSchema,
   RoomJoinRequestSchema,
+  RoomPeekRequestSchema,
   RoomReadyRequestSchema,
   type Reply,
   type RoomInfo,
+  type RoomSummary,
 } from "@new-mj/protocol";
 import type { Server, Socket } from "socket.io";
 import { ZodError } from "zod";
@@ -87,6 +91,12 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     this.eventBus.on("room:sessionFinished", (event) => {
       this.server.to(event.roomId).emit("room:sessionFinished", { result: event.result });
     });
+    this.eventBus.on("room:playerLeft", (event) => {
+      this.server.to(event.roomId).emit("room:playerLeft", { seat: event.seat });
+    });
+    this.eventBus.on("room:closed", (event) => {
+      this.server.to(event.roomId).emit("room:closed", { reason: event.reason });
+    });
     this.eventBus.on("game:snapshot", (event) => {
       const socket = this.connections.socketForSeat(event.roomId, event.seat);
       socket?.emit("game:snapshot", { view: event.view, seq: event.seq });
@@ -123,6 +133,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         parsed.rulesetId,
         parsed.config ?? { rulesetId: parsed.rulesetId },
         parsed.sessionFormat,
+        parsed.name,
       );
       // Host is always seated at 0: create() seats the very first player of a fresh room.
       this.connections.track(client, room.id, userId, 0);
@@ -138,11 +149,32 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     return this.reply(() => {
       const userId = this.requireUserId(client);
       const parsed = RoomJoinRequestSchema.parse(payload);
-      const player = this.roomService.join(parsed.roomId, userId, defaultNickname(userId));
+      const player = this.roomService.join(
+        parsed.roomId,
+        userId,
+        defaultNickname(userId),
+        parsed.seat,
+      );
       this.connections.track(client, parsed.roomId, userId, player.seatId);
       // join() throwing ROOM_NOT_FOUND is the only way this could be missing.
       const room = this.roomService.get(parsed.roomId)!;
       return this.roomService.snapshot(room);
+    });
+  }
+
+  @SubscribeMessage("lobby:list")
+  handleLobbyList(@MessageBody() payload: unknown): Reply<RoomSummary[]> {
+    return this.reply(() => {
+      const parsed = LobbyListRequestSchema.parse(payload);
+      return this.roomService.list(parsed.rulesetId, parsed.search);
+    });
+  }
+
+  @SubscribeMessage("room:peek")
+  handleRoomPeek(@MessageBody() payload: unknown): Reply<RoomInfo> {
+    return this.reply(() => {
+      const parsed = RoomPeekRequestSchema.parse(payload);
+      return this.roomService.peek(parsed.roomId);
     });
   }
 
@@ -169,10 +201,25 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   @SubscribeMessage("room:addBot")
-  handleRoomAddBot(@ConnectedSocket() client: Socket): Reply<object> {
+  handleRoomAddBot(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<object> {
     return this.reply(() => {
       const info = this.requireConnection(client);
-      this.roomService.addBot(info.roomId, info.userId);
+      const parsed = RoomAddBotRequestSchema.parse(payload);
+      this.roomService.addBot(info.roomId, info.userId, parsed.seat);
+      return {};
+    });
+  }
+
+  @SubscribeMessage("room:leave")
+  handleRoomLeave(@ConnectedSocket() client: Socket): Reply<object> {
+    return this.reply(() => {
+      const info = this.requireConnection(client);
+      this.roomService.leave(info.roomId, info.userId);
+      client.leave(info.roomId);
+      this.connections.untrack(client);
       return {};
     });
   }

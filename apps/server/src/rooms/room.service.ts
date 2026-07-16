@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { chooseAction } from "@new-mj/ai";
 import type { ApplyResult, GameConfig, GameEvent, SeatId } from "@new-mj/core";
-import type { RankingEntry, RoomInfo, SessionFormat } from "@new-mj/protocol";
+import type { RankingEntry, RoomInfo, RoomSummary, SessionFormat } from "@new-mj/protocol";
 import { GameService } from "../core/game.service";
 import { EventBus } from "./event-bus";
 import type { Room, RoomPlayer } from "./room";
@@ -41,9 +41,11 @@ export class RoomService {
     rulesetId: string,
     config: GameConfig,
     sessionFormat: SessionFormat = "4-round",
+    name?: string,
   ): Room {
     const room: Room = {
       id: randomUUID(),
+      name: name?.trim() || `${hostNickname}'s room`,
       rulesetId,
       config,
       sessionFormat,
@@ -64,12 +66,71 @@ export class RoomService {
     return room;
   }
 
-  join(roomId: string, userId: string, nickname: string): RoomPlayer {
+  /**
+   * lobby:list — only rooms a new player could actually join right now
+   * (MVP has no spectating a room that's already in-game or finished).
+   */
+  list(rulesetId: string, search?: string): RoomSummary[] {
+    const query = search?.trim().toLowerCase();
+    const results: RoomSummary[] = [];
+    for (const room of this.rooms.values()) {
+      if (room.rulesetId !== rulesetId) continue;
+      if (room.phase !== "waiting" || room.status !== "open") continue;
+      if (query && !room.name.toLowerCase().includes(query)) continue;
+      results.push({
+        id: room.id,
+        name: room.name,
+        rulesetId: room.rulesetId,
+        playerCount: room.players.filter((player) => player !== null).length,
+        status: room.status,
+      });
+    }
+    return results;
+  }
+
+  /** room:peek — read-only, does not seat the caller (unlike join()). */
+  peek(roomId: string): RoomInfo {
+    return this.snapshot(this.mustGet(roomId));
+  }
+
+  join(roomId: string, userId: string, nickname: string, seat?: SeatId): RoomPlayer {
     const room = this.mustGet(roomId);
     if (room.players.some((player) => player?.userId === userId)) {
       throw new RoomServiceError("ALREADY_IN_ROOM");
     }
-    return this.seatPlayer(room, userId, nickname);
+    return this.seatPlayer(room, userId, nickname, false, seat);
+  }
+
+  /**
+   * room:leave. `waiting`: host (seat 0) leaving deletes the room outright
+   * (evaluation point H doesn't apply pre-game — nobody's mid-hand yet);
+   * anyone else leaving just frees their seat. `in-game`: same "mark
+   * isAutoPiloted" path as a disconnect (评审点 H — leaving mid-game never
+   * removes the seat or the room, only hands it to autoPlayBots). `finished`:
+   * no-op, there's nothing left to leave.
+   */
+  leave(roomId: string, userId: string): void {
+    const room = this.mustGet(roomId);
+    const seat = room.players.findIndex((player) => player?.userId === userId);
+    if (seat === -1) {
+      throw new RoomServiceError("NOT_IN_ROOM");
+    }
+
+    if (room.phase === "in-game") {
+      this.markAutoPiloted(room, userId);
+      return;
+    }
+    if (room.phase === "finished") {
+      return;
+    }
+
+    if (seat === 0) {
+      this.rooms.delete(roomId);
+      this.eventBus.emit("room:closed", { roomId, reason: "hostLeft" });
+      return;
+    }
+    room.players[seat] = null;
+    this.eventBus.emit("room:playerLeft", { roomId, seat: seat as SeatId });
   }
 
   ready(roomId: string, userId: string, ready: boolean): void {
@@ -114,7 +175,7 @@ export class RoomService {
    * before the game starts — mirrors join()'s seat-filling but marks the
    * seat isBot and auto-readies it (a bot has no UI to click ready with).
    */
-  addBot(roomId: string, requesterUserId: string): RoomPlayer {
+  addBot(roomId: string, requesterUserId: string, seat?: SeatId): RoomPlayer {
     const room = this.mustGet(roomId);
     const requesterSeat = room.players.findIndex((player) => player?.userId === requesterUserId);
     if (requesterSeat !== 0) {
@@ -123,11 +184,11 @@ export class RoomService {
     if (room.phase !== "waiting") {
       throw new RoomServiceError("GAME_IN_PROGRESS", "room already started");
     }
-    const seatIndex = room.players.findIndex((player) => player === null);
+    const seatIndex = seat ?? room.players.findIndex((player) => player === null);
     if (seatIndex === -1) {
       throw new RoomServiceError("ROOM_FULL");
     }
-    const player = this.seatPlayer(room, `bot:${randomUUID()}`, `AI-${seatIndex + 1}`, true);
+    const player = this.seatPlayer(room, `bot:${randomUUID()}`, `AI-${seatIndex + 1}`, true, seat);
     this.ready(room.id, player.userId, true);
     return player;
   }
@@ -207,11 +268,38 @@ export class RoomService {
   handleDisconnect(roomId: string, userId: string): void {
     const room = this.rooms.get(roomId);
     if (!room) return;
+    this.markAutoPiloted(room, userId);
+  }
+
+  /**
+   * Shared by handleDisconnect (socket dropped) and leave()'s in-game branch
+   * (still connected, deliberately leaving) — both reduce to the same thing:
+   * this seat is no longer under real control, autoPlayBots takes it from
+   * here. If that was the last human seat left in the room, there's nobody
+   * to keep the game running for, so it stops instead of playing itself out
+   * to nobody.
+   */
+  private markAutoPiloted(room: Room, userId: string): void {
     if (room.phase !== "in-game") return;
     const player = room.players.find((candidate) => candidate?.userId === userId);
     if (!player || player.isBot) return;
     player.isAutoPiloted = true;
+    if (this.hasNoHumanLeft(room)) {
+      this.closeAbandonedRoom(room);
+      return;
+    }
     this.autoPlayBots(room);
+  }
+
+  private hasNoHumanLeft(room: Room): boolean {
+    return !room.players.some((player) => player && !player.isBot && !player.isAutoPiloted);
+  }
+
+  private closeAbandonedRoom(room: Room): void {
+    room.phase = "finished";
+    room.status = "closed";
+    room.finishedAt = Date.now();
+    this.eventBus.emit("room:closed", { roomId: room.id, reason: "allPlayersLeft" });
   }
 
   accumulateScores(room: Room, scoreDeltas: readonly [number, number, number, number]): void {
@@ -240,6 +328,7 @@ export class RoomService {
   snapshot(room: Room): RoomInfo {
     return {
       id: room.id,
+      name: room.name,
       rulesetId: room.rulesetId,
       config: room.config,
       sessionFormat: room.sessionFormat,
@@ -339,20 +428,30 @@ export class RoomService {
     return deltas;
   }
 
-  private seatPlayer(room: Room, userId: string, nickname: string, isBot = false): RoomPlayer {
-    const seat = room.players.findIndex((player) => player === null);
-    if (seat === -1) {
+  /** `seat` given = must be that exact empty seat (SEAT_TAKEN otherwise); omitted = first empty seat (ROOM_FULL if none). */
+  private seatPlayer(
+    room: Room,
+    userId: string,
+    nickname: string,
+    isBot = false,
+    seat?: SeatId,
+  ): RoomPlayer {
+    const seatIndex = seat ?? room.players.findIndex((player) => player === null);
+    if (seatIndex === -1) {
       throw new RoomServiceError("ROOM_FULL");
+    }
+    if (room.players[seatIndex] !== null) {
+      throw new RoomServiceError("SEAT_TAKEN");
     }
     const player: RoomPlayer = {
       userId,
-      seatId: seat as SeatId,
+      seatId: seatIndex as SeatId,
       nickname,
       isBot,
       isReady: false,
       isAutoPiloted: false,
     };
-    room.players[seat] = player;
+    room.players[seatIndex] = player;
     this.eventBus.emit("room:playerJoined", {
       roomId: room.id,
       seat: player.seatId,

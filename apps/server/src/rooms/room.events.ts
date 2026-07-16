@@ -32,6 +32,17 @@ export interface SessionFinishedEvent {
   result: SessionResult;
 }
 
+export interface PlayerLeftEvent {
+  roomId: string;
+  seat: SeatId;
+}
+
+/** hostLeft: waiting-room host left, room is gone. allPlayersLeft: every seat is now bot/auto-piloted. */
+export interface RoomClosedEvent {
+  roomId: string;
+  reason: "hostLeft" | "allPlayersLeft";
+}
+
 /** Unicast per docs/protocol.md §3 — the gateway resolves `seat` to a single socket. */
 export interface GameSnapshotEvent {
   roomId: string;
@@ -56,6 +67,8 @@ export interface RoomEventMap {
   "room:scoreUpdated": ScoreUpdatedEvent;
   "room:dealerChanged": DealerChangedEvent;
   "room:sessionFinished": SessionFinishedEvent;
+  "room:playerLeft": PlayerLeftEvent;
+  "room:closed": RoomClosedEvent;
   "game:snapshot": GameSnapshotEvent;
   "game:event": GameEventBroadcast;
 }

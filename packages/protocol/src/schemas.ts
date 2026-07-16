@@ -22,6 +22,7 @@ export const ERROR_CODES = [
   "ILLEGAL_ACTION",
   "INVALID_CONFIG",
   "INTERNAL",
+  "SEAT_TAKEN",
 ] as const;
 export const ErrCodeSchema = z.enum(ERROR_CODES);
 export type ErrCode = z.infer<typeof ErrCodeSchema>;
@@ -76,6 +77,7 @@ const nullablePlayerTupleSchema = z.tuple([
  */
 export const RoomInfoSchema = z.object({
   id: z.string(),
+  name: z.string(),
   rulesetId: z.string(),
   config: GameConfigSchema,
   sessionFormat: SessionFormatSchema,
@@ -93,8 +95,10 @@ export const RoomInfoSchema = z.object({
 });
 export type RoomInfo = z.infer<typeof RoomInfoSchema>;
 
+/** lobby:list's response shape — a lighter-weight projection than RoomInfo, one entry per open+waiting room. */
 export const RoomSummarySchema = z.object({
   id: z.string(),
+  name: z.string(),
   rulesetId: z.string(),
   playerCount: z.number(),
   status: z.enum(["open", "closed"]),
@@ -107,14 +111,35 @@ export const RoomCreateRequestSchema = z.object({
   rulesetId: z.string(),
   config: GameConfigSchema.optional(),
   sessionFormat: SessionFormatSchema.optional(),
+  /** Defaults server-side to `${hostNickname}'s room` when omitted. */
+  name: z.string().optional(),
 });
 export type RoomCreateRequest = z.infer<typeof RoomCreateRequestSchema>;
 
-export const RoomJoinRequestSchema = z.object({ roomId: z.string() });
+export const RoomJoinRequestSchema = z.object({
+  roomId: z.string(),
+  /** Omitted = fall back to "first empty seat" (existing behavior); given = must be that exact empty seat or SEAT_TAKEN. */
+  seat: SeatIdSchema.optional(),
+});
 export type RoomJoinRequest = z.infer<typeof RoomJoinRequestSchema>;
 
 export const RoomReadyRequestSchema = z.object({ ready: z.boolean() });
 export type RoomReadyRequest = z.infer<typeof RoomReadyRequestSchema>;
+
+/** seat semantics match RoomJoinRequestSchema.seat. */
+export const RoomAddBotRequestSchema = z.object({ seat: SeatIdSchema.optional() });
+export type RoomAddBotRequest = z.infer<typeof RoomAddBotRequestSchema>;
+
+/** lobby:list — query, no side effect. Only returns rooms that are actually joinable (phase "waiting", status "open"); MVP has no spectating. */
+export const LobbyListRequestSchema = z.object({
+  rulesetId: z.string(),
+  search: z.string().optional(),
+});
+export type LobbyListRequest = z.infer<typeof LobbyListRequestSchema>;
+
+/** room:peek — query, no side effect, does not seat the caller. One-time snapshot for the pre-join room page's seat layout. */
+export const RoomPeekRequestSchema = z.object({ roomId: z.string() });
+export type RoomPeekRequest = z.infer<typeof RoomPeekRequestSchema>;
 
 /**
  * action is intentionally z.unknown(): each ruleset owns its own Action union
@@ -169,6 +194,15 @@ export const RoomSessionFinishedEventSchema = z.object({
   result: SessionResultSchema,
 });
 export type RoomSessionFinishedEvent = z.infer<typeof RoomSessionFinishedEventSchema>;
+
+export const RoomPlayerLeftEventSchema = z.object({ seat: SeatIdSchema });
+export type RoomPlayerLeftEvent = z.infer<typeof RoomPlayerLeftEventSchema>;
+
+/** hostLeft: host left the waiting room, so it's gone. allPlayersLeft: every seat is now bot/auto-piloted, nobody left to watch, so the game was stopped. */
+export const RoomClosedEventSchema = z.object({
+  reason: z.enum(["hostLeft", "allPlayersLeft"]),
+});
+export type RoomClosedEvent = z.infer<typeof RoomClosedEventSchema>;
 
 // --- in-game envelope (server -> client), docs/contracts/engine-contract.md §6-7 ---
 

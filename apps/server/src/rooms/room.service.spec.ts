@@ -9,6 +9,7 @@ import { RoomService } from "./room.service";
 
 const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   id: "room-1",
+  name: "Test Room",
   rulesetId: "junk",
   config: { rulesetId: "junk" },
   sessionFormat: "4-round",
@@ -91,6 +92,45 @@ describe("RoomService — lifecycle", () => {
     const service = newRoomService();
     expect(() => service.join("no-such-room", "p1", "P1")).toThrow(
       expect.objectContaining({ code: "ROOM_NOT_FOUND" }),
+    );
+  });
+
+  it("create defaults the room name from the host nickname when omitted", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    expect(room.name).toBe("Host's room");
+  });
+
+  it("create uses an explicit name when given", () => {
+    const service = newRoomService();
+    const room = service.create(
+      "host",
+      "Host",
+      "junk",
+      { rulesetId: "junk" },
+      "4-round",
+      "Fun room",
+    );
+    expect(room.name).toBe("Fun room");
+  });
+
+  it("join seats a player at an explicitly requested seat", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    const player = service.join(room.id, "p2", "P2", 3);
+
+    expect(player.seatId).toBe(3);
+    expect(room.players[3]).toMatchObject({ userId: "p2" });
+    expect(room.players[1]).toBeNull();
+  });
+
+  it("join rejects an already-occupied explicit seat with SEAT_TAKEN", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    expect(() => service.join(room.id, "p2", "P2", 0)).toThrow(
+      expect.objectContaining({ code: "SEAT_TAKEN" }),
     );
   });
 
@@ -182,6 +222,147 @@ describe("RoomService — addBot", () => {
       expect.objectContaining({ code: "GAME_IN_PROGRESS" }),
     );
   });
+
+  it("seats a bot at an explicitly requested seat", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    const bot = service.addBot(room.id, "host", 2);
+
+    expect(bot.seatId).toBe(2);
+    expect(room.players[1]).toBeNull();
+    expect(room.players[2]).toMatchObject({ isBot: true, nickname: "AI-3" });
+  });
+
+  it("rejects an explicitly requested seat that's already taken", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    expect(() => service.addBot(room.id, "host", 0)).toThrow(
+      expect.objectContaining({ code: "SEAT_TAKEN" }),
+    );
+  });
+});
+
+describe("RoomService — list/peek", () => {
+  it("list only returns waiting+open rooms for the requested ruleset", () => {
+    const service = newRoomService();
+    const waiting = service.create("host", "Host", "junk", { rulesetId: "junk" }, "4-round", "A");
+    service.create("host2", "Host2", "bloodbattle", { rulesetId: "bloodbattle" }, "4-round", "B");
+    const finished = service.create(
+      "host3",
+      "Host3",
+      "junk",
+      { rulesetId: "junk" },
+      "4-round",
+      "C",
+    );
+    finished.phase = "finished";
+    finished.status = "closed";
+
+    const results = service.list("junk");
+
+    expect(results.map((room) => room.id)).toEqual([waiting.id]);
+    expect(results[0]).toMatchObject({ name: "A", playerCount: 1, status: "open" });
+  });
+
+  it("list filters by a case-insensitive substring of the room name", () => {
+    const service = newRoomService();
+    service.create("host", "Host", "junk", { rulesetId: "junk" }, "4-round", "Alice's Table");
+    service.create("host2", "Host2", "junk", { rulesetId: "junk" }, "4-round", "Bob's Table");
+
+    expect(service.list("junk", "alice").map((room) => room.name)).toEqual(["Alice's Table"]);
+    expect(service.list("junk", "table")).toHaveLength(2);
+    expect(service.list("junk", "nonexistent")).toHaveLength(0);
+  });
+
+  it("peek returns the room snapshot without seating the caller", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    const info = service.peek(room.id);
+
+    expect(info.id).toBe(room.id);
+    expect(room.players.filter((player) => player !== null)).toHaveLength(1);
+  });
+
+  it("peek on an unknown room throws ROOM_NOT_FOUND", () => {
+    const service = newRoomService();
+    expect(() => service.peek("no-such-room")).toThrow(
+      expect.objectContaining({ code: "ROOM_NOT_FOUND" }),
+    );
+  });
+});
+
+describe("RoomService — leave (phase 4.4.4)", () => {
+  it("throws NOT_IN_ROOM for a caller who isn't seated", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    expect(() => service.leave(room.id, "stranger")).toThrow(
+      expect.objectContaining({ code: "NOT_IN_ROOM" }),
+    );
+  });
+
+  it("waiting phase: a non-host leaving just frees their seat", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.join(room.id, "p2", "P2");
+
+    service.leave(room.id, "p2");
+
+    expect(room.players[1]).toBeNull();
+    expect(service.get(room.id)).toBeDefined();
+  });
+
+  it("waiting phase: the host leaving deletes the room", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.join(room.id, "p2", "P2");
+
+    service.leave(room.id, "host");
+
+    expect(service.get(room.id)).toBeUndefined();
+  });
+
+  it("in-game phase: leaving marks the seat auto-piloted, same as a disconnect", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    service.leave(room.id, "p2");
+
+    expect(room.players[1]).toMatchObject({ userId: "p2", isAutoPiloted: true });
+    expect(service.get(room.id)).toBeDefined();
+    expect(room.phase).toBe("in-game");
+  });
+
+  it("in-game phase: once every seat is bot/auto-piloted, the room stops and closes", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+    expect(room.phase).toBe("in-game");
+
+    service.leave(room.id, "host");
+
+    expect(room.phase).toBe("finished");
+    expect(room.status).toBe("closed");
+    expect(room.finishedAt).toBeDefined();
+  });
+
+  it("finished phase is a no-op", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    room.phase = "finished";
+
+    expect(() => service.leave(room.id, "host")).not.toThrow();
+    expect(room.players[0]).not.toBeNull();
+  });
 });
 
 describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
@@ -269,6 +450,22 @@ describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", ()
 
     expect(room.phase).toBe("finished");
     expect(room.result?.gamesPlayed).toBe(4);
+  });
+
+  it("closes the room once the last human seat disconnects (nobody left to play for)", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+    expect(room.phase).toBe("in-game");
+
+    service.handleDisconnect(room.id, "host");
+
+    expect(room.phase).toBe("finished");
+    expect(room.status).toBe("closed");
   });
 });
 

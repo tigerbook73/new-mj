@@ -6,12 +6,17 @@ import {
   GameActionRequestSchema,
   GameEventEnvelopeSchema,
   GameSnapshotSchema,
+  LobbyListRequestSchema,
   PlayerViewBaseSchema,
+  RoomAddBotRequestSchema,
+  RoomClosedEventSchema,
   RoomCreateRequestSchema,
   RoomDealerChangedEventSchema,
   RoomInfoSchema,
   RoomJoinRequestSchema,
+  RoomPeekRequestSchema,
   RoomPlayerJoinedEventSchema,
+  RoomPlayerLeftEventSchema,
   RoomReadyChangedEventSchema,
   RoomReadyRequestSchema,
   RoomScoreUpdatedEventSchema,
@@ -21,6 +26,7 @@ import {
 
 const validRoomInfo = {
   id: "room-1",
+  name: "Test Room",
   rulesetId: "bloodbattle",
   config: { rulesetId: "bloodbattle" },
   sessionFormat: "4-round" as const,
@@ -45,11 +51,23 @@ describe("RoomInfoSchema", () => {
   it("rejects a players tuple with the wrong length", () => {
     expect(() => RoomInfoSchema.parse({ ...validRoomInfo, players: [null, null, null] })).toThrow();
   });
+
+  it("requires name", () => {
+    const { name: _drop, ...withoutName } = validRoomInfo;
+    expect(() => RoomInfoSchema.parse(withoutName)).toThrow();
+  });
 });
 
 describe("RoomCreateRequestSchema", () => {
-  it("allows rulesetId alone, config and sessionFormat are optional", () => {
+  it("allows rulesetId alone, config/sessionFormat/name are optional", () => {
     expect(RoomCreateRequestSchema.parse({ rulesetId: "junk" })).toEqual({ rulesetId: "junk" });
+  });
+
+  it("accepts an explicit name", () => {
+    expect(RoomCreateRequestSchema.parse({ rulesetId: "junk", name: "Alice's room" })).toEqual({
+      rulesetId: "junk",
+      name: "Alice's room",
+    });
   });
 
   it("rejects an unknown sessionFormat", () => {
@@ -65,8 +83,53 @@ describe("RoomJoinRequestSchema / RoomReadyRequestSchema", () => {
     expect(RoomJoinRequestSchema.parse({ roomId: "room-1" })).toEqual({ roomId: "room-1" });
   });
 
+  it("accepts an optional seat", () => {
+    expect(RoomJoinRequestSchema.parse({ roomId: "room-1", seat: 2 })).toEqual({
+      roomId: "room-1",
+      seat: 2,
+    });
+    expect(() => RoomJoinRequestSchema.parse({ roomId: "room-1", seat: 4 })).toThrow();
+  });
+
   it("requires ready as a boolean", () => {
     expect(() => RoomReadyRequestSchema.parse({ ready: "yes" })).toThrow();
+  });
+});
+
+describe("RoomAddBotRequestSchema", () => {
+  it("accepts an empty object or an explicit seat", () => {
+    expect(RoomAddBotRequestSchema.parse({})).toEqual({});
+    expect(RoomAddBotRequestSchema.parse({ seat: 1 })).toEqual({ seat: 1 });
+  });
+});
+
+describe("LobbyListRequestSchema / RoomPeekRequestSchema", () => {
+  it("requires rulesetId, search is optional", () => {
+    expect(LobbyListRequestSchema.parse({ rulesetId: "junk" })).toEqual({ rulesetId: "junk" });
+    expect(LobbyListRequestSchema.parse({ rulesetId: "junk", search: "alice" })).toEqual({
+      rulesetId: "junk",
+      search: "alice",
+    });
+  });
+
+  it("requires roomId as a string", () => {
+    expect(() => RoomPeekRequestSchema.parse({})).toThrow();
+    expect(RoomPeekRequestSchema.parse({ roomId: "room-1" })).toEqual({ roomId: "room-1" });
+  });
+});
+
+describe("RoomPlayerLeftEventSchema / RoomClosedEventSchema", () => {
+  it("RoomPlayerLeftEventSchema requires a valid seat", () => {
+    expect(RoomPlayerLeftEventSchema.parse({ seat: 2 })).toEqual({ seat: 2 });
+    expect(() => RoomPlayerLeftEventSchema.parse({ seat: 4 })).toThrow();
+  });
+
+  it("RoomClosedEventSchema only accepts known reasons", () => {
+    expect(RoomClosedEventSchema.parse({ reason: "hostLeft" })).toEqual({ reason: "hostLeft" });
+    expect(RoomClosedEventSchema.parse({ reason: "allPlayersLeft" })).toEqual({
+      reason: "allPlayersLeft",
+    });
+    expect(() => RoomClosedEventSchema.parse({ reason: "somethingElse" })).toThrow();
   });
 });
 
@@ -194,6 +257,7 @@ describe("ERROR_CODES", () => {
       "ILLEGAL_ACTION",
       "INVALID_CONFIG",
       "INTERNAL",
+      "SEAT_TAKEN",
     ]);
   });
 });
