@@ -24,7 +24,7 @@
 | 2→3  | 文档结构重构                                                                                 | 新结构落地，详见 `../doc-map.md`               | ✅   |
 | 3    | web：登录/大厅/牌桌（先竖切）                                                                | 浏览器真人对局                                 | ✅   |
 | 4.1  | AI 补位：`packages/ai` 最简策略 + `room:addBot` + 自动出牌触发机制                           | 单人开房，其余 3 座补 AI，能完整打完一局垃圾胡 | ✅   |
-| 4.2  | 断线托管（复用阶段 4.1 的自动出牌基础设施）                                                  | 模拟断线，房间继续跑，该座位被自动代打到局终   |      |
+| 4.2  | 断线托管（复用阶段 4.1 的自动出牌基础设施）                                                  | 模拟断线，房间继续跑，该座位被自动代打到局终   | ✅   |
 | 4.3  | 小特性打包：黑暗模式 + 明牌模式（gateway 级开关，见下）+ 界面/操作优化（纯前端，不涉及后端） |                                                |      |
 | 4.4  | Replay / 明牌 Replay（内存事件日志，复用直播已有的可见性过滤逻辑）                           |                                                |      |
 | 4.5  | 持久化落地：事件日志搬进 PG（重启后 replay/战绩仍在）/ 战绩查询 / 真正的 Supabase OAuth      |                                                |      |
@@ -43,12 +43,13 @@
 - **阶段 2→3**：文档结构重构，详见 `../doc-map.md`。
 - **阶段 3**（tag `phase-3`）：web 登录/选玩法/大厅/牌桌竖切跑通——开发态假登录（D16）、Vite+React 技术栈（D17）、房间生命周期靠 ack 初始快照 + 事件广播增量更新驱动（架构铁律 5，不存在"重新查一次房间状态"的消息）、牌桌渲染 `PlayerViewBase` 公共骨架并对"事实型" `game:event` 做增量更新（D18）。junk 验证到能真实发出并成功执行一个 `game:action`；bloodbattle 验证到公共骨架能正确渲染（换三张/定缺属于玩法专属阶段 UI，留给阶段 5）。12 个 e2e 用例（`apps/server` 5 个 + `apps/web` 7 个）已接入根目录 `pnpm verify`（此前 `turbo.json` 一直没有 `test:e2e` 任务，e2e 从未真正进过根级 DoD 链条，这次一并补上）。契约见 `../contracts/*.md`，实现细节见 `apps/web/AGENTS.md`，取舍理由见 `../decisions.md` D16-D18。
 - **阶段 4.1**（AI 补位）：新增 `packages/ai`（`chooseAction`：有胡/自摸必胡，否则随机选 `getLegalActions` 里的一项，ruleset-agnostic，纯函数）并接上 tsup 双格式构建（server 是仓库唯一 CJS 包，源码级导入行不通，对齐 core/protocol 的产物形态）；`RoomService` 新增 `addBot`（仅房主、仅 `waiting` 阶段，补空位后复用 `ready()` 让 bot 立即视为已准备）与 `autoPlayBots`（真人动作后、每局开局后循环扫描 bot 座位出牌，直到轮到真人或对局结束）；gateway 加 `room:addBot` 消息；web `LobbyView` 加"补 AI"按钮（复用已有的 `room:playerJoined`/`room:readyChanged` 事件监听，未新增前端状态逻辑）。验收：`RoomService` 单测覆盖单人+3 bot 打完 4 局完整会话；`apps/web` e2e 覆盖房主单人补满 3 个 bot 座位并 start 的大厅流程。契约见 `../contracts/session-mechanics.md` §6，取舍与技术债记录见 `phase-4-junk-complete.md`。
+- **阶段 4.2**（断线托管）：`RoomPlayer` 加 `isAutoPiloted` 字段；`RoomsGateway.handleDisconnect` 在 socket 断开时查出 `{roomId, userId}` 交给新增的 `RoomService.handleDisconnect`——若房间对局中，把该座位标记 `isAutoPiloted` 并立刻跑一次 `autoPlayBots`（`nextBotAction` 现在对 `isBot`/`isAutoPiloted` 一视同仁，复用同一条扫描循环，不是另起一套机制）。这个标记永不清除，MVP 没有重连恢复真人操控的路径（同一 `userId` 再 `room:join` 会被 `ALREADY_IN_ROOM` 拒绝）；等待阶段的断线不触发处理，座位原样留空。验收：`RoomService` 单测覆盖 3 个边界（未知房间/等待阶段/bot 座位都不受影响）+ 断线后单会话打完 4 局；`apps/server` e2e 新增真实 socket 断线场景（`b!.disconnect()` 后仅驱动其余 3 个真实连接，验证真的走到 `RoomsGateway` 的 `disconnect` 生命周期，不是只测 `RoomService` 方法本身）。文档：`session-mechanics.md` §8 评审点 H 标记掉线路径已实现（`room:leave` 主动离座仍未实现，两者共享托管机制只是触发入口不同）。
 
 ## 当前状态
 
-阶段 4 系列的第一个子阶段（4.1 AI 补位）已完成，下一个子阶段是 4.2（断线托管），详细方案见 `phase-4-junk-complete.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。
+阶段 4 系列的前两个子阶段（4.1 AI 补位、4.2 断线托管）已完成，下一个子阶段是 4.3（小特性打包），详细方案见 `phase-4-junk-complete.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。
 
-**下一步第一个动作**：复用阶段 4.1 的 `autoPlayBots` 基础设施——断线时把该座位标记为托管状态，让它像 bot 一样被自动代打到局终或重连。
+**下一步第一个动作**：黑暗模式（shadcn 已有 `.dark` 变量，加个 toggle）+ 明牌模式（房间级 config，gateway 跳过 `eventsVisibleTo` 过滤）+ 其余纯前端界面/操作优化。
 
 ## 待办
 

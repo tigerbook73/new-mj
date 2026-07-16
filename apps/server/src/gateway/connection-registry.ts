@@ -40,7 +40,12 @@ export class ConnectionRegistry {
     return this.seatSockets.get(roomId) ?? new Map();
   }
 
-  /** MVP: just forgets the socket, no AFK takeover (rooms.md "❌ 断线托管", evaluation point H is future work). */
+  /**
+   * Only forgets the socket mapping — the disconnect takeover itself (评审点
+   * H: mark the seat auto-piloted, keep the game moving) is RoomsGateway's
+   * job, driven by RoomService.handleDisconnect(); this registry doesn't
+   * know about rooms/game state, only socket↔seat plumbing.
+   */
   untrack(client: Socket): void {
     const info = this.bySocketId.get(client.id);
     this.bySocketId.delete(client.id);

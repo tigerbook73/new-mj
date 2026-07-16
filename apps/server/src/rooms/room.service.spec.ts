@@ -214,6 +214,64 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
   });
 });
 
+describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", () => {
+  it("is a no-op for an unknown room (best-effort, no ack to fail through)", () => {
+    const service = newRoomService();
+    expect(() => service.handleDisconnect("no-such-room", "p1")).not.toThrow();
+  });
+
+  it("is a no-op while the room is still waiting (评审点 H is mid-game only)", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    service.handleDisconnect(room.id, "host");
+
+    expect(room.players[0]).toMatchObject({ isAutoPiloted: false });
+  });
+
+  it("never marks a bot seat auto-piloted", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    const bot = service.addBot(room.id, "host");
+
+    service.handleDisconnect(room.id, bot.userId);
+
+    expect(room.players[bot.seatId]).toMatchObject({ isBot: true, isAutoPiloted: false });
+  });
+
+  it("a disconnected seat is auto-played through the rest of the session", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    service.handleDisconnect(room.id, "p2");
+    expect(room.players[1]).toMatchObject({ userId: "p2", isAutoPiloted: true });
+
+    // p2 (seat 1) is now driven by autoPlayBots; this loop only ever supplies
+    // actions for the three still-connected seats, in a fixed scan order —
+    // same shape as the bot-only acceptance test above, just with humans.
+    const connectedSeats = [0, 2, 3] as const;
+    let steps = 0;
+    while (room.phase === "in-game" && steps < 2000) {
+      steps += 1;
+      const seat = connectedSeats.find(
+        (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+      );
+      if (seat === undefined) {
+        throw new Error("no connected seat has a legal action — game got stuck");
+      }
+      const legalActions = gameService.getLegalActions(room.gameState, seat);
+      service.applyPlayerAction(room.id, seat, legalActions[0]);
+    }
+
+    expect(room.phase).toBe("finished");
+    expect(room.result?.gamesPlayed).toBe(4);
+  });
+});
+
 describe("RoomService — full 4-round session (real junk engine)", () => {
   it("plays 4 complete games and finishes the session with a ranking", () => {
     const service = newRoomService();

@@ -187,13 +187,31 @@ export class RoomService {
 
   private nextBotAction(room: Room): { seat: SeatId; action: unknown } | undefined {
     for (let seat = 0; seat < ROOM_SIZE; seat += 1) {
-      if (!room.players[seat]?.isBot) continue;
+      const player = room.players[seat];
+      if (!player?.isBot && !player?.isAutoPiloted) continue;
       const legalActions = this.gameService.getLegalActions(room.gameState, seat as SeatId);
       if (legalActions.length > 0) {
         return { seat: seat as SeatId, action: chooseAction(legalActions) };
       }
     }
     return undefined;
+  }
+
+  /**
+   * Best-effort: called from the gateway's disconnect handler, which has no
+   * ack to report a failure through, so this never throws — an unknown room
+   * (already finished and cleaned up, or a stale socket) is simply a no-op.
+   * Only affects seats mid-game (评审点 H is about leaving *during* a game);
+   * a disconnect while still in the waiting lobby leaves the seat as-is.
+   */
+  handleDisconnect(roomId: string, userId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    if (room.phase !== "in-game") return;
+    const player = room.players.find((candidate) => candidate?.userId === userId);
+    if (!player || player.isBot) return;
+    player.isAutoPiloted = true;
+    this.autoPlayBots(room);
   }
 
   accumulateScores(room: Room, scoreDeltas: readonly [number, number, number, number]): void {
@@ -332,6 +350,7 @@ export class RoomService {
       nickname,
       isBot,
       isReady: false,
+      isAutoPiloted: false,
     };
     room.players[seat] = player;
     this.eventBus.emit("room:playerJoined", {

@@ -101,7 +101,11 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket): void {
+    const info = this.connections.get(client);
     this.connections.untrack(client);
+    if (info) {
+      this.roomService.handleDisconnect(info.roomId, info.userId);
+    }
   }
 
   @SubscribeMessage("room:create")

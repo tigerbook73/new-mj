@@ -6,6 +6,7 @@ import type { Reply, RoomInfo, SessionResult } from "@new-mj/protocol";
 import { io, type Socket as ClientSocket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { ConfigService } from "../src/config/config.service";
+import { GameService } from "../src/core/game.service";
 import { RoomService } from "../src/rooms/room.service";
 
 const ack = <T>(socket: ClientSocket, event: string, payload: unknown): Promise<Reply<T>> =>
@@ -116,6 +117,76 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
     expect(result.gamesPlayed).toBe(4);
     expect(result.ranking).toHaveLength(4);
     expect(scoreUpdates.length).toBeGreaterThanOrEqual(4);
+
+    const room = roomService.get(roomId);
+    expect(room?.phase).toBe("finished");
+    expect(room?.status).toBe("closed");
+  }, 30000);
+
+  /**
+   * Phase 4.2 acceptance criterion, exercised over real sockets rather than
+   * calling RoomService.handleDisconnect directly (already unit-tested in
+   * room.service.spec.ts) — this proves RoomsGateway.handleDisconnect is
+   * actually wired to the real Socket.IO `disconnect` lifecycle event.
+   */
+  it("continues and finishes the session after a seat disconnects mid-game", async () => {
+    const gameService = new GameService();
+    const seatSockets = await Promise.all([
+      connectAs("disc-a"),
+      connectAs("disc-b"),
+      connectAs("disc-c"),
+      connectAs("disc-d"),
+    ]);
+    const [a, b, c, d] = seatSockets;
+
+    const created = await ack<RoomInfo>(a!, "room:create", { rulesetId: "junk" });
+    if (!created.ok) throw new Error(`room:create failed: ${created.code}`);
+    const roomId = created.data.id;
+
+    for (const client of [b!, c!, d!]) {
+      const joined = await ack<RoomInfo>(client, "room:join", { roomId });
+      if (!joined.ok) throw new Error(`room:join failed: ${joined.code}`);
+    }
+
+    for (const client of seatSockets) {
+      const ready = await ack<object>(client!, "room:ready", { ready: true });
+      if (!ready.ok) throw new Error(`room:ready failed: ${ready.code}`);
+    }
+
+    const sessionFinished = once<{ result: SessionResult }>(a!, "room:sessionFinished");
+
+    const started = await ack<object>(a!, "room:start", {});
+    if (!started.ok) throw new Error(`room:start failed: ${started.code}`);
+
+    // b joined second, so it's seated at 1 (create()/join() fill seats in
+    // order). Disconnecting it should reach RoomsGateway.handleDisconnect →
+    // RoomService.handleDisconnect and mark that seat auto-piloted.
+    b!.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(roomService.get(roomId)?.players[1]).toMatchObject({ isAutoPiloted: true });
+
+    // Drive only the 3 still-connected seats interactively (fresh
+    // getLegalActions() each step, first option) — seat 1's turns are
+    // handled entirely server-side by autoPlayBots, no socket 1 traffic.
+    const connectedSeats = [0, 2, 3] as const;
+    let steps = 0;
+    while (steps++ < 2000) {
+      const room = roomService.get(roomId);
+      if (!room || room.phase !== "in-game") break;
+      const seat = connectedSeats.find(
+        (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+      );
+      if (seat === undefined) throw new Error("no connected seat has a legal action — stuck?");
+      const legalActions = gameService.getLegalActions(room.gameState, seat);
+      const result = await ack<object>(seatSockets[seat]!, "game:action", {
+        action: legalActions[0],
+      });
+      if (!result.ok)
+        throw new Error(`game:action rejected: ${result.code} ${result.message ?? ""}`);
+    }
+
+    const { result } = await sessionFinished;
+    expect(result.gamesPlayed).toBe(4);
 
     const room = roomService.get(roomId);
     expect(room?.phase).toBe("finished");

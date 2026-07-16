@@ -73,11 +73,13 @@ finished: 计算排名，对外公开 result
 
 | 消息         | 说明                                                   |
 | ------------ | ------------------------------------------------------ |
-| `room:leave` | 对局中允许离座：转托管（见 §7 评审点 H），**尚未实现** |
+| `room:leave` | 对局中允许离座：转托管（见 §8 评审点 H），**尚未实现** |
 
 `nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `process/phase-4-junk-complete.md`。
+
+**断线托管**（评审点 H 的掉线路径）：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`——若房间对局中，把该座位标记 `isAutoPiloted = true` 并立刻跑一次 `autoPlayBots`（复用 bot 自动出牌的同一条扫描循环，`nextBotAction` 对 `isBot` 和 `isAutoPiloted` 一视同仁）。这个标记一旦置位永不清除，MVP 没有"断线重连恢复真人操控"的路径：`room.players` 里那个座位的记录还在（只是 `isAutoPiloted=true`），同一 `userId` 想重新 `room:join` 这个房间会直接被 `ALREADY_IN_ROOM` 拒绝——断线等同于这局及本会话剩余局数都由 bot 代打到底，没有回退方案。房间还在等待阶段（尚未 `room:start`）时断线不触发任何处理，座位原样留空，不在评审点 H 范围内。
 
 **事件推送**（已实现）：
 
@@ -105,17 +107,18 @@ finished: 计算排名，对外公开 result
 - ✅ 4 人轮流对局，分数累加
 - ✅ 简化庄家轮转（顺时针每局）
 - ✅ 4 局完成后排名计算
+- ✅ 断线托管（评审点 H，阶段 4.2）：对局中 socket 断开的座位自动标记 `isAutoPiloted`，复用阶段 4.1 的 `autoPlayBots` 继续代打到会话结束
 
 **MVP 不实现**：
 
 - ❌ Best-of-3 格式（保留配置结构和扩展点，见下）
 - ❌ 赢/输跟踪（4-round 不需要）
-- ❌ 重连恢复（可降级为踢出 + 重新加入）
-- ❌ 断线托管（评审点 H，后续优化）
+- ❌ 重连恢复（掉线后的座位没有"恢复真人操控"路径，`isAutoPiloted` 永不清除；可降级为踢出 + 重新加入）
+- ❌ `room:leave`（对局中主动离座，仍未实现——见下方评审点 H）
 - ❌ 中途替换玩家、再来一轮
 - ❌ 观战、战绩（阶段 4）
 
-**评审点 H【已定：采纳】**：对局中退出 = 转托管代打到局终，掉线与主动离座同路径，不允许中途散局；`room:leave` 转托管本身尚未实现。
+**评审点 H【已定：采纳，掉线路径已实现】**：对局中退出 = 转托管代打到局终，掉线与主动离座同路径，不允许中途散局。掉线路径（`RoomsGateway.handleDisconnect` → `RoomService.handleDisconnect`）已实现；`room:leave`（连接仍在、主动要求离座）尚未实现，两者共享同一套托管机制，只是触发入口不同。
 
 **评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换；`lastSeq` 增量补发是未来可能的优化项，当前不实现。
 
