@@ -11,6 +11,7 @@ export type SessionState = {
   view: PlayerViewBase | null;
   setSocket: (socket: Socket | null) => void;
   setUser: (userId: string, nickname: string) => void;
+  signOut: () => void;
   setRoom: (room: RoomInfo | null) => void;
   setView: (view: PlayerViewBase | null) => void;
   /**
@@ -41,6 +42,11 @@ export const useSessionStore = create<SessionState>((set) => ({
   view: null,
   setSocket: (socket) => set({ socket }),
   setUser: (userId, nickname) => set({ userId, nickname }),
+  signOut: () =>
+    set((state) => {
+      state.socket?.disconnect();
+      return { socket: null, userId: null, nickname: null, room: null, view: null };
+    }),
   setRoom: (room) => set({ room }),
   setView: (view) => set({ view }),
   applyPlayerJoined: (seat, nickname, isBot) =>

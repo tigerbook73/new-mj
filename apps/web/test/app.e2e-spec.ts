@@ -23,3 +23,13 @@ test("submitting an empty nickname shows an inline error and does not navigate",
   await expect(page.getByText("Please enter a nickname")).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test("signing out clears the session and returns to login", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Signout Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("button", { name: "Enter game" })).toBeVisible();
+});
