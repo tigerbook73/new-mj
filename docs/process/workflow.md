@@ -1,6 +1,14 @@
 # workflow：流程细则
 
-> 按需阅读：提交时看 Git 节，收尾时看验收节。文档规则见 doc-map.md。
+> 按需阅读：开工先看会话仪式，提交时看 Git 节，收尾时看验收节。文档规则见 `../doc-map.md`。
+> 本文件随文档重构从根目录迁至 `process/`；本次整理消除了与根 `AGENTS.md` 的重复内容、迁出了 packages/core 专属的代码风格节。测试相关的详细策略见 `../testing-strategy.md`，本文件的 DoD 第 4 条与之对应。
+
+## 会话仪式
+
+开工/收工的基本动作见根 `AGENTS.md`「会话仪式」；本节只补充两条细则：
+
+- "下一步"必须具体到可直接执行，例如"给 RoomManager 补超时代打测试"，不能写"继续开发 XX 模块"这类模糊描述。
+- 收工提交前默认执行 `pnpm verify`。
 
 ## 阶段开场
 
@@ -15,7 +23,7 @@
 1. `pnpm typecheck`（全仓 tsc strict）
 2. `pnpm lint`（ESLint + Prettier 从简配置；core 包含 no-restricted-globals/imports 禁 Date/Math.random/setTimeout/IO；dependency-cruiser 锁包依赖方向）
 3. `pnpm test`（受影响包全部测试）
-4. core 改动：fuzz 冒烟 ≥1000 局；阶段收尾跑全量 ≥1 万局（随机 config）
+4. core 改动：fuzz 冒烟 ≥1000 局；阶段收尾跑全量 ≥1 万局（随机 config）；分层测试策略见 `../testing-strategy.md`
 
 - 测试与实现同 commit；修 bug 先写复现用例（红→绿）
 - fuzz 失败：seed + action log 先固化为回归用例，再修复
@@ -43,18 +51,6 @@
 - 根目录同名脚本通过 Turbo 聚合所有 workspace；CI、阶段验收和提交前检查一律从根目录运行。
 - 格式化使用 Prettier：`pnpm format` 写入格式，`pnpm format:check` 仅校验；提交前不得以 `format` 代替 lint 或 typecheck。
 
-## Core 类型与注释
-
-- 已导出的领域状态、事件和跨模块结果优先定义专门的 `type`/`interface`；这样可复用、可被契约引用，并减少后续接口调整时的漂移。
-- 仅在模块内部使用、语义一次性且不会成为跨包契约的简单结果，允许使用内联返回类型；不为形式统一而制造无意义类型名。
-- 注释只补充代码无法表达的算法、不变量、敏感性或边界语义；契约和规则正文仍以 `docs/` 为准，不在代码注释中复制整段规格。
-
-## 阶段验收
-
-可运行产物跑通 + 全量 fuzz 绿 + doc-map §4 吸纳仪式完成 = 阶段完成，打 tag。
-
-- 阶段 1：CLI 打完整局；阶段 2：socket.io-client 模拟 4 客户端整局；阶段 3：浏览器真人对局竖切
-
 ## Git（单人从简，可回溯）
 
 - trunk-based：日常直接提 main；仅预期失败的实验或接口调整（阶段 1.5）开短命分支
@@ -63,7 +59,8 @@
 - docs/ 变更与对应代码**同一 commit**；每阶段完成打 tag（phase-1、phase-1.5…）
 - 秘密只进 .env（.gitignore），提供 .env.example
 
-## 会话仪式（长周期持续性）
+## 阶段验收
 
-- 开工：读 CLAUDE.md + plan.md 状态区
-- 收工：把"当前进度 + 下一步第一个具体动作"写回 plan.md 并 commit（"下一步"必须具体到可直接执行，如"给 RoomManager 补超时代打测试"）；提交前默认执行 `pnpm verify`。
+可运行产物跑通 + 全量 fuzz 绿 + `../doc-map.md` §6 吸纳仪式完成 = 阶段完成，打 tag。
+
+- 阶段 1：CLI 打完整局；阶段 2：socket.io-client 模拟 4 客户端整局；阶段 3：浏览器真人对局竖切

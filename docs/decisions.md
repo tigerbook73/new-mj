@@ -1,10 +1,12 @@
 # 决策记录（append-only：只增不改）
 
+> 本文件位置不变（仍在根目录），内容原样迁移自 `_legacy/decisions.md`。append-only 是这份文档默认的规则——历史条目里提到的文件路径（如 `docs/rooms.md`、`docs/protocol.md`）是撰写时的真实路径，不因本次目录重构而回改；新条目请使用新路径（`contracts/session-mechanics.md`、`contracts/protocol-shared.md` 等）。少数条目的完整推理已经逐字固化进活文档、且没有其他文档单靠编号引用其独有推理，按 `doc-map.md` §2.2 的精简例外原地替换为指针（编号不复用）。
+
 ## 架构决策
 
 - **D1 不用 Colyseus，用 NestJS + Socket.IO**：Colyseus 的可变 Schema 状态同步与纯函数引擎/事件溯源冲突；其强项是高频状态同步，麻将是低频离散事件。
 - **D2 UI 第一版 DOM + Motion**：回合制牌桌无需游戏引擎渲染；渲染层只消费 PlayerView 与事件流，将来可叠加 Lottie/Pixi/3D 而不动业务。
-- **D3 Render(付费档) + Supabase**：WebSocket 长连接需长驻进程（排除 Vercel serverless）；回合制对延迟不敏感（不需要 Fly.io 多区域）；Supabase 开箱 OAuth+PG。
+- **D3**（已并入 `architecture/system.md` §2，原文见 git 历史）
 - **D4 纯函数状态机 + 事件溯源；Room 有状态对象包裹纯核**：可复现（seed+actions）、可测试（无 I/O）、序列化免费、历史免费；纯度只要求在引擎边界。
 - **D5 优先级进 core，时间留 server，事件带可见性**：规则逻辑 vs 时间/I/O 的分界；超时与主动 pass 同型；server 分发无需理解规则。
 - **D6 core = 基建层 + RuleSet 插件层**：加玩法 = 新增实现而非改核心；牌集配置化、variantState 命名空间、rulesetId 三个零成本结构决定先行。
@@ -26,10 +28,9 @@
 - **D 非法动作不进事件日志**：仅 applyAction 错误返回 + ack 拒绝 + server 错误日志。
 - **E/F 窗口选项按座位私发；ClaimResponded 保留**：回放调试的输入完整性 + 窗口中途重连恢复（PlayerView.myClaimResponse）。
 - **G 事件重建 ≡ 直接派生**：核心测试不变量，快照与事件流一致性的根基。
-- **H 对局中退出 = 转托管代打到局终**：掉线与主动离座同路径，不允许中途散局。
-- **I 重连快照优先**：整体替换最简且绝对一致；lastSeq 增量为将来优化。
+- **H**（已并入 `contracts/session-mechanics.md` §8，原文见 git 历史）
+- **I**（已并入 `contracts/session-mechanics.md` §8，原文见 git 历史）
 - **牌河墓碑模型（DiscardEntry.claimedBy）**：保留被声明牌的原位与完整弃牌历史；UI 渲染自由 + 日麻振听将来直接可用；守恒只计活跃条目。
-- **ack/事件关系**：查询=ack 给数据；命令=ack 给回执、事件给状态（广播含本人，幂等）；进新上下文=ack 给快照。
 - **BB1 血战标准配置**：阶段 1.5 采用大众线上川麻「血战到底 + 换三张」作为黄金路径：私下换三张/定缺、定缺优先出牌、一炮多响、三家胡或流局结束、4 番封顶、自摸加番、直杠 2/补杠各 1/暗杠各 2、呼叫转移、花猪→退税→查大叫。地方差异保留在 `BloodbattleConfig`，不在 server/client 复制规则。
 - **BB2 番型 fixture 写作时定下的三条规则口径**（用户不熟悉血战细则，授权按通用实现处理，非项目方逐条确认）：① 杠上花本质是自摸，`selfDrawBonus='addFan'` 时 `zimo` 与 `gangshanghua` 同时计入，不互斥；② 操作类附加番之间默认可叠加（如杠上炮+海底炮同时成立），只有基础型互斥；③ `rules-bloodbattle.md` 原 `bb-002` 例子的暗杠裸放在 `hand` 里导致牌数少 1 张、凑不出合法分解，已改为记入 `melds`（`type: anGang`）并配平手牌，分数结果不变。
 - **J 胡牌快照走 extraTiles 钩子**：`assertContainerUniqueness`/`assertTileConservation`（`packages/core/src/invariants.ts`）新增可选 `extraTiles(state)` 参数，供 RuleSet 把 variantState 内的胡牌快照等容器计入守恒与去重检查；默认空实现，垃圾胡调用点不变。避免在 GameState 顶层为血战新增专用字段，保持 D6 的 variantState 隔离。
