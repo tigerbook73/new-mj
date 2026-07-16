@@ -22,7 +22,7 @@ const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState =
 };
 
 const playDeterministically = (seed: number): JunkState => {
-  const started = createJunkGame(seed, {
+  const started = createJunkGame(seed, 0, {
     sevenPairs: seed % 2 === 0,
     robKong: seed % 3 === 0,
     multiHuPolicy: seed % 5 === 0 ? "all" : "headJump",
@@ -56,8 +56,8 @@ const playDeterministically = (seed: number): JunkState => {
 };
 
 test("junk opens a deterministic complete game with private hands", () => {
-  const first = createJunkGame(7);
-  const second = createJunkGame(7);
+  const first = createJunkGame(7, 0);
+  const second = createJunkGame(7, 0);
   expect(first).toEqual(second);
   if ("error" in first) throw new Error(first.error.code);
   expect(first.state.seats.map((seat) => seat.hand.length).sort()).toEqual([13, 13, 13, 14]);
@@ -75,13 +75,13 @@ test("junk config accepts supported switches and rejects invalid values", () => 
     config: { rulesetId: "junk", sevenPairs: true, robKong: true, multiHuPolicy: "all" },
   });
   expect(parseJunkConfig({ sevenPairs: "yes" })).toEqual({ error: { code: "INVALID_CONFIG" } });
-  expect(createJunkGame(1, { multiHuPolicy: "invalid" })).toEqual({
+  expect(createJunkGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
     error: { code: "INVALID_CONFIG" },
   });
 });
 
 test("junk accepts a legal discard and preserves the caller state", () => {
-  const started = createJunkGame(11);
+  const started = createJunkGame(11, 0);
   if ("error" in started) throw new Error(started.error.code);
   const before = structuredClone(started.state);
   const seat = started.state.currentSeat;
@@ -98,7 +98,7 @@ test("junk accepts a legal discard and preserves the caller state", () => {
 });
 
 test("views and event filtering do not expose another seat's concealed hand", () => {
-  const started = createJunkGame(17);
+  const started = createJunkGame(17, 0);
   if ("error" in started) throw new Error(started.error.code);
   const viewer = 0 as const;
   const view = junkRuleSet.getPlayerView(started.state, viewer);
@@ -122,7 +122,7 @@ test("views and event filtering do not expose another seat's concealed hand", ()
 // cross-ruleset-invariants.test.ts (parameterized over registered rulesets).
 
 test("public draw and concealed-gang events never contain a TileId", () => {
-  const started = createJunkGame(29);
+  const started = createJunkGame(29, 0);
   if ("error" in started) throw new Error(started.error.code);
   for (const event of started.events) {
     if (event.visibility.type !== "public") continue;
@@ -148,7 +148,7 @@ test("action logs replay a complete game and fuzz reports no failure", () => {
 });
 
 test("illegal actions do not mutate state or consume event sequence", () => {
-  const started = createJunkGame(13);
+  const started = createJunkGame(13, 0);
   if ("error" in started) throw new Error(started.error.code);
   const before = structuredClone(started.state);
   const wrongSeat = ((started.state.currentSeat + 1) % 4) as 0 | 1 | 2 | 3;
@@ -227,8 +227,8 @@ test("1000 seeded games finish while preserving tile conservation", () => {
 }, 20_000);
 
 test("engine-api createGame/applyAction/getLegalActions/getPlayerView dispatch by rulesetId", () => {
-  const started = engineCreateGame({ rulesetId: "junk" }, 7);
-  expect(started).toEqual(createJunkGame(7));
+  const started = engineCreateGame({ rulesetId: "junk" }, 7, 0);
+  expect(started).toEqual(createJunkGame(7, 0));
   if ("error" in started) throw new Error(started.error.code);
   const state = started.state as JunkState;
   const seat = state.currentSeat;

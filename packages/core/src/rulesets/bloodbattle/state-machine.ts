@@ -94,8 +94,11 @@ const mustHuOnLastFour = (state: BloodbattleState, seat: SeatId, tile?: TileId):
 const extraTiles = (state: BloodbattleState): readonly TileId[] =>
   Object.values(state.wins ?? {}).flatMap((win) => win!.hand);
 
-export const createBloodbattleGame = (seed: number, config?: unknown): BloodbattleApplyResult =>
-  createBloodbattlePrelude(seed, config);
+export const createBloodbattleGame = (
+  seed: number,
+  dealer: SeatId,
+  config?: unknown,
+): BloodbattleApplyResult => createBloodbattlePrelude(seed, dealer, config);
 
 export const applyDiscard = (
   state: BloodbattleState,

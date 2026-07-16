@@ -92,8 +92,9 @@ export const playBloodbattleGame = (
   seed: number,
   config: Partial<Omit<BloodbattleConfig, "rulesetId">> = {},
   actionLog: Array<{ seat: SeatId; action: BloodbattleAction }> = [],
+  dealer: SeatId = 0,
 ): PlayedBloodbattleGame | BloodbattleFuzzFailure => {
-  const started = createBloodbattleGame(seed, config);
+  const started = createBloodbattleGame(seed, dealer, config);
   if ("error" in started) return { seed, config, actions: [], error: started.error.code };
   let state = started.state;
   let prng = createPrng(seed ^ 0x9e37_79b9);
@@ -145,6 +146,8 @@ export const fuzzBloodbattleGames = (
     prng = gameSeed.prng;
     const switches = nextInt(prng, 256);
     prng = switches.prng;
+    const dealerPick = nextInt(prng, 4);
+    prng = dealerPick.prng;
     const config = {
       exchangeThree: (switches.value & 1) !== 0,
       multiWinOnDiscard: (switches.value & 2) !== 0,
@@ -155,7 +158,7 @@ export const fuzzBloodbattleGames = (
       selfDrawBonus: (switches.value & 64) !== 0 ? ("addBase" as const) : ("addFan" as const),
       capFan: (switches.value & 128) !== 0 ? 0 : 4,
     };
-    const result = playBloodbattleGame(gameSeed.value, config);
+    const result = playBloodbattleGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
   }
   return undefined;

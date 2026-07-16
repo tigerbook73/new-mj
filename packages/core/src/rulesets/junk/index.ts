@@ -8,6 +8,7 @@ import {
   applyBuGang,
   applyDiscard,
   cloneState,
+  computeNextJunkDealer,
   createJunkGame,
   fail,
   finishWin,
@@ -19,7 +20,7 @@ import { getPlayerView } from "./view.ts";
 import type { JunkAction, JunkApplyResult, JunkState } from "./types.ts";
 
 export { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
-export { createJunkGame } from "./state-machine.ts";
+export { computeNextJunkDealer, createJunkGame } from "./state-machine.ts";
 export { getPlayerView, rebuildPlayerView } from "./view.ts";
 export type {
   JunkAction,
@@ -36,6 +37,7 @@ export type {
 
 export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
   createGame: createJunkGame,
+  computeNextDealer: computeNextJunkDealer,
   getLegalActions: (state, seat) => {
     if (state.phase === "awaiting-claims") {
       const options = state.pendingClaims?.options[seat] ?? [];

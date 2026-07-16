@@ -51,7 +51,7 @@ const playingState = (): BloodbattleState => {
 };
 
 test("bloodbattle is registered in the engine", () => {
-  const result = createGame(config, 7);
+  const result = createGame(config, 7, 0);
   expect("state" in result).toBe(true);
   if ("state" in result)
     expect(result.state).toMatchObject({ config: { rulesetId: "bloodbattle" } });

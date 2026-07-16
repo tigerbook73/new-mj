@@ -56,14 +56,16 @@ const receiverOf = (seat: SeatId, direction: 0 | 1 | 2): SeatId => {
   return ((seat + (direction === 0 ? 1 : 3)) % 4) as SeatId;
 };
 
-export const createBloodbattlePrelude = (seed: number, config: unknown): BloodbattleApplyResult => {
+export const createBloodbattlePrelude = (
+  seed: number,
+  dealer: SeatId,
+  config: unknown,
+): BloodbattleApplyResult => {
   const parsed = parseBloodbattleConfig(config);
   if ("error" in parsed) return parsed;
   const gameConfig: BloodbattleConfig = parsed.config;
 
-  const first = nextInt(createPrng(seed), 4);
-  const dealer = first.value as SeatId;
-  const shuffled = createWall(first.prng, BLOODBATTLE_TILE_SET);
+  const shuffled = createWall(createPrng(seed), BLOODBATTLE_TILE_SET);
   const state: BloodbattleState = {
     config: gameConfig,
     phase: gameConfig.exchangeThree ? "exchanging" : "choosing-lack",
@@ -96,6 +98,12 @@ export const createBloodbattlePrelude = (seed: number, config: unknown): Bloodba
   }
   return { state, events };
 };
+
+// docs/rules-bloodbattle.md 定稿未提连庄：结果不影响庄家，纯顺时针轮转（D15）。
+export const computeNextBloodbattleDealer = (
+  _finished: BloodbattleState,
+  currentDealer: SeatId,
+): SeatId => ((currentDealer + 1) % 4) as SeatId;
 
 export const applyExchangeThree = (
   state: BloodbattleState,

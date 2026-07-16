@@ -1,6 +1,6 @@
 import { assertTileConservation } from "@/lib/invariants";
 import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "@/events";
-import { createPrng, nextInt } from "@/lib/prng";
+import { createPrng } from "@/lib/prng";
 import { STANDARD_TILE_SET } from "@/lib/tiles";
 import { createWall, drawFromHead, drawFromTail } from "@/lib/wall";
 import { isSevenPairsWinningHand, isStandardWinningHand } from "@/lib/win";
@@ -409,12 +409,14 @@ export const applyBuGang = (
   return { state, events };
 };
 
-export const createJunkGame = (seed: number, config: unknown = {}): JunkApplyResult => {
+export const createJunkGame = (
+  seed: number,
+  dealer: SeatId,
+  config: unknown = {},
+): JunkApplyResult => {
   const parsed = parseJunkConfig(config);
   if ("error" in parsed) return parsed;
-  const first = nextInt(createPrng(seed), 4);
-  const dealer = first.value as SeatId;
-  const shuffled = createWall(first.prng);
+  const shuffled = createWall(createPrng(seed));
   const state: JunkState = {
     config: parsed.config,
     phase: "dealing",
@@ -447,3 +449,7 @@ export const createJunkGame = (seed: number, config: unknown = {}): JunkApplyRes
   assertTileConservation(state);
   return { state, events };
 };
+
+// docs/rules-junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
+export const computeNextJunkDealer = (_finished: JunkState, currentDealer: SeatId): SeatId =>
+  ((currentDealer + 1) % 4) as SeatId;

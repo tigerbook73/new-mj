@@ -10,16 +10,12 @@
 { token: string, protocolVersion: string, resume?: { roomId: string } }
 ```
 
-- server 验证 JWT → 绑定 `socket.data.userId`；版本不匹配 → 拒绝连接并附 `VERSION_MISMATCH`（客户端提示刷新）
-- `resume` 存在时：server 校验该用户确在该房间，成功则自动重新加入 socket room 并推送 `game:snapshot`（见 §3）
+- server 验证 JWT → 绑定 `socket.data.userId`；版本不匹配 → 拒绝连接并附 `VERSION_MISMATCH`（客户端提示刷新）；已实现见 `apps/server/src/gateway/auth.middleware.ts`
+- `resume` 存在时：server 校验该用户确在该房间，成功则自动重新加入 socket room 并推送 `game:snapshot`（见 §3）——**尚未实现**，MVP 阶段排除重连（见 `docs/rooms.md` §7"❌ 重连恢复"）
 
 ## 1. 统一信封
 
-```ts
-// ack 响应
-type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: string };
-// 协议包提供封装：request(type, payload): Promise<T>（ok:false 时抛类型化错误）
-```
+`Reply<T>` 见 `packages/protocol/src/schemas.ts`；协议包提供封装：`request(type, payload): Promise<T>`（`ok:false` 时抛类型化错误）。
 
 **核心约定（ack 与事件的关系）**：
 
@@ -29,16 +25,24 @@ type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: st
 
 ## 2. ack 请求类（client → server）
 
-| 消息                        | payload                                                                                              | data（成功时）                          | 主要错误码                                                        |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
-| `lobby:list`                | `{}`                                                                                                 | `RoomSummary[]`（id、玩法、人数、状态） | —                                                                 |
-| `room:create`               | `{ rulesetId, config? }`                                                                             | `RoomInfo` 快照（创建即入座）           | `INVALID_CONFIG`                                                  |
-| `room:join`                 | `{ roomId }`                                                                                         | `RoomInfo` 快照                         | `ROOM_NOT_FOUND` `ROOM_FULL` `ALREADY_IN_ROOM`                    |
-| `room:leave`                | `{}`                                                                                                 | `{}`                                    | `NOT_IN_ROOM`（对局中允许离座：转托管，见评审点 H）               |
-| `room:ready`                | `{ ready: boolean }`                                                                                 | `{}`                                    | `NOT_IN_ROOM`                                                     |
-| `room:addBot`               | `{}`                                                                                                 | `RoomInfo`                              | `ROOM_FULL`（仅房主，MVP 简化）                                   |
-| `game:action`               | `{ action: Action }`（core 按 rulesetId 判别的 Action 联合原样透传，见 core-types-and-events.md §4） | `{}`                                    | `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core 的 RuleViolation code） |
-| `profile:get` / `stats:get` | `{}` / `{ userId? }`                                                                                 | 资料 / 战绩                             | 阶段 4 才实现，先占位                                             |
+已实现（`packages/protocol/src/schemas.ts` + `apps/server/src/gateway/rooms.gateway.ts` 为权威 shape，下表仅摘要）：
+
+| 消息          | payload                                                                                                           | data（成功时）                 | 主要错误码                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------- |
+| `room:create` | `RoomCreateRequestSchema`（rulesetId、config?、sessionFormat?）                                                   | `RoomInfo` 快照（创建即入座）  | `INVALID_CONFIG`                                                                 |
+| `room:join`   | `RoomJoinRequestSchema`（roomId）                                                                                 | `RoomInfo` 快照                | `ROOM_NOT_FOUND` `ROOM_FULL` `ALREADY_IN_ROOM`                                   |
+| `room:ready`  | `RoomReadyRequestSchema`（ready）                                                                                 | `{}`                           | `NOT_IN_ROOM`                                                                    |
+| `room:start`  | `{}`                                                                                                              | `{}`（视图走 `game:snapshot`） | `GAME_IN_PROGRESS` `INVALID_CONFIG`                                              |
+| `game:action` | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，见 core-types-and-events.md §4） | `{}`                           | `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED` |
+
+**尚未实现**（占位，无对应代码）：
+
+| 消息                        | payload              | data（成功时）                          | 主要错误码                                          |
+| --------------------------- | -------------------- | --------------------------------------- | --------------------------------------------------- |
+| `lobby:list`                | `{}`                 | `RoomSummary[]`（id、玩法、人数、状态） | —                                                   |
+| `room:leave`                | `{}`                 | `{}`                                    | `NOT_IN_ROOM`（对局中允许离座：转托管，见评审点 H） |
+| `room:addBot`               | `{}`                 | `RoomInfo`                              | `ROOM_FULL`（仅房主，MVP 简化）                     |
+| `profile:get` / `stats:get` | `{}` / `{ userId? }` | 资料 / 战绩                             | 阶段 4 才实现，先占位                               |
 
 说明：
 
@@ -47,34 +51,34 @@ type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; message?: st
 
 ## 3. 事件推送类（server → client）
 
-**房间事件（room:\*，public 于房间内）**
+**房间事件（room:\*，public 于房间内；已实现的 payload 具名类型见 `apps/server/src/rooms/room.events.ts`）**
 
-| 消息                                    | payload              |
-| --------------------------------------- | -------------------- |
-| `room:playerJoined` / `room:playerLeft` | seat、昵称、是否 bot |
-| `room:readyChanged`                     | seat、ready          |
-| `room:starting`                         | 倒计时或立即         |
+| 消息                   | payload                                                | 状态   |
+| ---------------------- | ------------------------------------------------------ | ------ |
+| `room:playerJoined`    | `PlayerJoinedEvent`（seat、nickname、isBot）           | 已实现 |
+| `room:readyChanged`    | `ReadyChangedEvent`（seat、ready）                     | 已实现 |
+| `room:scoreUpdated`    | `ScoreUpdatedEvent`（scores、gameNumber、totalGames?） | 已实现 |
+| `room:dealerChanged`   | `DealerChangedEvent`（dealer、gameNumber）             | 已实现 |
+| `room:sessionFinished` | `SessionFinishedEvent`（result）                       | 已实现 |
+| `room:playerLeft`      | seat、昵称、是否 bot                                   | 未实现 |
+| `room:starting`        | 倒计时或立即                                           | 未实现 |
 
-**对局事件（对局中主通道）**
+**对局事件（对局中主通道，已实现）**
 
-| 消息            | payload                                                                                                                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `game:event`    | `{ event: GameEvent, deadline?: number }` —— core 事件原样转发（已按 visibility 过滤到本连接应见的版本），deadline 为 server 附加的表态/出牌截止时间戳（epoch ms），驱动客户端倒计时（D5） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }` —— 入座开局时、断线重连时下发的权威快照                                                                                             |
+| 消息            | payload                                                                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `game:event`    | `{ event: GameEvent, deadline?: number }` —— core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` 字段**尚未实现**（超时代提交 pass 是 MVP 已知限制，未落地） |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }` —— 入座开局/切局时下发的权威快照（实现见 `RoomsGateway`/`ConnectionRegistry`）；断线重连、`deadline` 同上未实现           |
 
-**评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换。理由：实现最简、绝对一致（不依赖客户端旧状态正确）、代价仅是重连瞬间无增量动画。lastSeq 补发事件降级为将来的优化项。（规划文档 §1.2/§阶段4 已同步回写。）
+**评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换。理由：实现最简、绝对一致（不依赖客户端旧状态正确）、代价仅是重连瞬间无增量动画。`lastSeq` 补发事件是未来可能的优化项，当前不实现。
 
 ## 4. 错误码（ErrCode）
 
-```
-UNAUTHORIZED  VERSION_MISMATCH
-ROOM_NOT_FOUND  ROOM_FULL  ALREADY_IN_ROOM  NOT_IN_ROOM  GAME_IN_PROGRESS  GAME_NOT_STARTED
-NOT_YOUR_TURN  ILLEGAL_ACTION  INVALID_CONFIG
-INTERNAL
-```
+`ErrCode` 全集见 `packages/protocol/src/schemas.ts` 的 `ERROR_CODES`（权威来源，新增/删除错误码只改这一处，不要在本文档手抄第二份列表）。
 
-- `GAME_IN_PROGRESS`：对一个已经在对局中/已结束的房间发起 `room:start`（阶段 2 补充：与其反义 `GAME_NOT_STARTED` 不是同一个码，不要混用）
-- `GAME_NOT_STARTED`：房间尚未进入 `in-game` 阶段时收到 `game:action`（阶段 2 补充，`apps/server` 的 `RoomService.applyPlayerAction` 使用）
+- `GAME_IN_PROGRESS`：对一个已经在对局中/已结束的房间发起 `room:start`
+- `GAME_NOT_STARTED`：房间尚未进入 `in-game` 阶段时收到 `game:action`（`apps/server` 的 `RoomService.applyPlayerAction` 使用）
+- 这两个码语义相反，不要混用
 - `ILLEGAL_ACTION` 的 `message` 附 core 返回的 RuleViolation code（如 `TILE_NOT_IN_HAND`、`CLAIM_NOT_AVAILABLE`），便于调试；客户端 UI 原则上不应触发它（合法动作由 myClaimOptions/getLegalActions 驱动渲染）
 
 ## 5. 时序示意
@@ -108,4 +112,4 @@ C: （超时）server 代提交 pass
 B ← game:event TurnStarted(B)（B 碰后出牌）
 ```
 
-**评审点 H【已定：采纳】**：`room:leave` 在对局中的语义 = 离座转托管，AI 代打到局终，不允许中途散局；掉线（disconnect）与主动离座走同一托管路径。（规划待办中"中途退出处理"已解决；房间是否连续多局仍留阶段 2 前决定。）
+**评审点 H【已定：采纳】**：`room:leave` 在对局中的语义 = 离座转托管，AI 代打到局终，不允许中途散局；掉线（disconnect）与主动离座走同一托管路径。**注意**：`room:leave` 转托管本身尚未实现（见 §2"尚未实现"）；房间连续多局已由 D11/`docs/rooms.md` 定案并实现。

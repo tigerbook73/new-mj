@@ -96,7 +96,7 @@ export class RoomService {
 
   nextRound(roomId: string): Room {
     const room = this.mustGet(roomId);
-    room.dealer = this.computeNextDealer(room.sessionFormat, room.dealer);
+    room.dealer = this.gameService.computeNextDealer(room.gameState, room.dealer);
     this.beginGame(room);
     this.eventBus.emit("room:dealerChanged", {
       roomId,
@@ -138,11 +138,6 @@ export class RoomService {
       room.scores[2] + scoreDeltas[2],
       room.scores[3] + scoreDeltas[3],
     ];
-  }
-
-  /** rooms.md §4.1 — MVP is simple clockwise rotation; §4.2's "winner stays dealer" is best-of-3-only and not implemented yet. */
-  computeNextDealer(_sessionFormat: SessionFormat, currentDealer: SeatId): SeatId {
-    return ((currentDealer + 1) % ROOM_SIZE) as SeatId;
   }
 
   shouldContinue(room: Room): boolean {
@@ -196,7 +191,7 @@ export class RoomService {
   private beginGame(room: Room): void {
     room.gameNumber += 1;
     room.seed = randomInt(MAX_SEED);
-    const result = this.gameService.createGame(room.config, room.seed);
+    const result = this.gameService.createGame(room.config, room.seed, room.dealer);
     if ("error" in result) {
       throw new RoomServiceError("INVALID_CONFIG", result.error.code);
     }

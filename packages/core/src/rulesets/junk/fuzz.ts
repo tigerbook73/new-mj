@@ -40,8 +40,9 @@ export const playJunkGame = (
   seed: number,
   config: Partial<Omit<JunkConfig, "rulesetId">> = {},
   actionLog: Array<{ seat: SeatId; action: JunkAction }> = [],
+  dealer: SeatId = 0,
 ): PlayedGame | FuzzFailure => {
-  const started = junkRuleSet.createGame(seed, config);
+  const started = junkRuleSet.createGame(seed, dealer, config);
   if ("error" in started) return { seed, config, actions: [], error: started.error.code };
   let state = started.state;
   const events = [...started.events];
@@ -72,12 +73,14 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
     prng = gameSeed.prng;
     const switches = nextInt(prng, 8);
     prng = switches.prng;
+    const dealerPick = nextInt(prng, 4);
+    prng = dealerPick.prng;
     const config = {
       sevenPairs: (switches.value & 1) !== 0,
       robKong: (switches.value & 2) !== 0,
       multiHuPolicy: (switches.value & 4) !== 0 ? ("all" as const) : ("headJump" as const),
     };
-    const result = playJunkGame(gameSeed.value, config);
+    const result = playJunkGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
   }
   return undefined;

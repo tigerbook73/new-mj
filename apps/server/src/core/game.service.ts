@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   applyAction as coreApplyAction,
+  computeNextDealer as coreComputeNextDealer,
   createGame as coreCreateGame,
   getLegalActions as coreGetLegalActions,
   getPlayerView as coreGetPlayerView,
@@ -11,13 +12,18 @@ import {
 } from "@new-mj/core";
 
 /**
- * Thin adapter over @new-mj/core's four engine-api functions (D12). Server
- * orchestration (RoomService) never touches ruleset internals directly.
+ * Thin adapter over @new-mj/core's five engine-api functions (D12, D15).
+ * Server orchestration (RoomService) never touches ruleset internals directly.
  */
 @Injectable()
 export class GameService {
-  createGame(config: GameConfig, seed: number): ApplyResult<unknown> {
-    return coreCreateGame(config, seed);
+  createGame(config: GameConfig, seed: number, dealer: SeatId): ApplyResult<unknown> {
+    return coreCreateGame(config, seed, dealer);
+  }
+
+  computeNextDealer(state: unknown, currentDealer: SeatId): SeatId {
+    // any: see applyAction — server only round-trips opaque state (D12).
+    return coreComputeNextDealer(state as any, currentDealer);
   }
 
   applyAction(state: unknown, seat: SeatId, action: unknown): ApplyResult<unknown> {

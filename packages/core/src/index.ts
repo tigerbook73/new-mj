@@ -18,4 +18,10 @@ export * from "./rulesets/bloodbattle/fuzz.ts";
 // Explicit (not `export *`) so the engine-api's own getPlayerView wins over
 // rulesets/junk's same-named export — see D12 proposal §5 commit5.
 export type { RulesetModule } from "./engine.ts";
-export { applyAction, createGame, getLegalActions, getPlayerView } from "./engine.ts";
+export {
+  applyAction,
+  computeNextDealer,
+  createGame,
+  getLegalActions,
+  getPlayerView,
+} from "./engine.ts";

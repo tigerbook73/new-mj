@@ -37,4 +37,13 @@ for (const ruleset of REGISTERED_RULESETS_FOR_TESTING) {
       }
     }
   });
+
+  test(`${ruleset.id}: computeNextDealer rotates clockwise and wraps 3→0`, () => {
+    const started = ruleset.createGame(19);
+    if ("error" in started) throw new Error(started.error.code);
+    for (const currentDealer of [0, 1, 2, 3] as const) {
+      const next = ruleset.computeNextDealer(started.state, currentDealer);
+      expect(next).toBe((currentDealer + 1) % 4);
+    }
+  });
 }

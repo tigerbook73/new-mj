@@ -12,6 +12,7 @@ type RegisteredRuleset = {
   getLegalActions: (state: ReplayState, seat: SeatId) => readonly unknown[];
   getPlayerView: (state: unknown, seat: SeatId) => unknown;
   rebuildPlayerView: (events: readonly GameEvent[], seat: SeatId) => unknown;
+  computeNextDealer: (state: ReplayState, currentDealer: SeatId) => SeatId;
 };
 
 type ReplayState = { phase: string; currentSeat: SeatId };
@@ -21,7 +22,7 @@ type ReplayState = { phase: string; currentSeat: SeatId };
 export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
   {
     id: "junk",
-    createGame: (seed) => junkRuleSet.createGame(seed) as ApplyResult<ReplayState>,
+    createGame: (seed) => junkRuleSet.createGame(seed, 0) as ApplyResult<ReplayState>,
     applyAction: (state, seat, action) =>
       junkRuleSet.applyAction(
         state as Parameters<typeof junkRuleSet.applyAction>[0],
@@ -33,10 +34,15 @@ export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
     getPlayerView: (state, seat) =>
       junkRuleSet.getPlayerView(state as Parameters<typeof junkRuleSet.getPlayerView>[0], seat),
     rebuildPlayerView,
+    computeNextDealer: (state, currentDealer) =>
+      junkRuleSet.computeNextDealer(
+        state as Parameters<typeof junkRuleSet.computeNextDealer>[0],
+        currentDealer,
+      ),
   },
   {
     id: "bloodbattle",
-    createGame: (seed) => bloodbattleRuleSet.createGame(seed) as ApplyResult<ReplayState>,
+    createGame: (seed) => bloodbattleRuleSet.createGame(seed, 0) as ApplyResult<ReplayState>,
     applyAction: (state, seat, action) =>
       bloodbattleRuleSet.applyAction(
         state as Parameters<typeof bloodbattleRuleSet.applyAction>[0],
@@ -54,5 +60,10 @@ export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
         seat,
       ),
     rebuildPlayerView: rebuildBloodbattlePlayerView,
+    computeNextDealer: (state, currentDealer) =>
+      bloodbattleRuleSet.computeNextDealer(
+        state as Parameters<typeof bloodbattleRuleSet.computeNextDealer>[0],
+        currentDealer,
+      ),
   },
 ] as const;

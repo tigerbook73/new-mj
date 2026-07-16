@@ -98,7 +98,7 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
       if (!room) throw new Error("room disappeared mid-session");
       expect(room.phase).toBe("in-game");
 
-      const played = playJunkGame(room.seed, {}, []);
+      const played = playJunkGame(room.seed, {}, [], room.dealer);
       if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
 
       for (const { seat, action } of played.actions) {

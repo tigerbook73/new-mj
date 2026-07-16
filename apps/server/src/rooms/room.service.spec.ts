@@ -37,12 +37,6 @@ describe("RoomService — pure helpers", () => {
     expect(room.scores).toEqual([150, -30, -15, -105]);
   });
 
-  it("computeNextDealer rotates clockwise (rooms.md §4.1)", () => {
-    const service = newRoomService();
-    expect(service.computeNextDealer("4-round", 0)).toBe(1);
-    expect(service.computeNextDealer("4-round", 3)).toBe(0);
-  });
-
   it("shouldContinue is true until gameNumber reaches totalGames for 4-round", () => {
     const service = newRoomService();
     expect(service.shouldContinue(makeRoom({ gameNumber: 3, totalGames: 4 }))).toBe(true);
@@ -151,8 +145,9 @@ describe("RoomService — full 4-round session (real junk engine)", () => {
     for (let round = 0; round < 4; round++) {
       expect(room.phase).toBe("in-game");
       expect(room.gameNumber).toBe(round + 1);
+      expect(room.dealer).toBe(round as 0 | 1 | 2 | 3);
 
-      const played = playJunkGame(room.seed, {}, []);
+      const played = playJunkGame(room.seed, {}, [], room.dealer);
       if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
 
       for (const { seat, action } of played.actions) {

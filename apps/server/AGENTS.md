@@ -27,7 +27,7 @@
 - `src/app.module.ts`：根 DI 容器。
 - `src/config/`：`ConfigModule`/`ConfigService`，`protocolVersion`/`jwtSecret` 等环境变量。
 - `src/health/`：自定义 `/health` controller。
-- `src/core/`：`GameService`，薄封装 `createGame`/`applyAction`/`getLegalActions`/`getPlayerView`。
+- `src/core/`：`GameService`，薄封装 `createGame`/`applyAction`/`getLegalActions`/`getPlayerView`/`computeNextDealer`。
 - `src/rooms/`：`RoomService`（房间生命周期与编排）、`room.ts`（内部状态类型）、`room.events.ts`/`event-bus.ts`（类型化 EventBus）、`room-service.error.ts`（携带 `ErrCode` 的异常）。
 - `src/gateway/`：`RoomsGateway`（消息路由 + EventBus 订阅）、`auth.middleware.ts`（握手鉴权）、`connection-registry.ts`（座位↔socket 映射）、`gateway.module.ts`。
 
