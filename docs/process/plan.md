@@ -53,6 +53,8 @@
 
 **下一步第一个动作**：阶段 4.5 Replay——先盘点现有内存事件流与可见性过滤边界，确定 replay 日志的最小记录形状。
 
+本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分；保留 `src/schemas.ts` 兼容性 barrel，公共导出与协议行为不变。`pnpm verify` 全绿。
+
 **阶段 4.4.3 + 4.4.5**：已完成。`/games` 改为 junk/bloodbattle Tabs，接入 `lobby:list` 房间列表、搜索、命名建房；`/lobby/:roomId` 改为 `room:peek` 驱动的房间页，支持指定座位入座、指定空座位加 bot、ready/start，并保留 ack + 事件广播状态边界。web e2e 9/9 全绿（含 table 验收迁移到新大厅流程）。
 
 **阶段 4.4.6**：已完成。等待阶段和 table 页均提供 `Leave room`；等待阶段非房主离开释放座位，房主离开关闭房间并把其他玩家带回大厅显示提示；对局中离开复用 `room:leave` 的托管路径，其他真人继续留在牌桌。房主仅在仍有其他玩家时需要确认，普通玩家、observer 与独自离开的房主直接离开。房间页补充 owner、真人成员头像/tooltip、observer 实时进入离开同步，并明确 BOT 不加入成员列表。web e2e 17/17 全绿。
