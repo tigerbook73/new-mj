@@ -3,5 +3,5 @@
   "compilerOptions": {
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

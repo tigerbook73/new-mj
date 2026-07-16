@@ -55,7 +55,9 @@
 
 本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分，公共导出与协议行为不变。`pnpm verify` 全绿。
 
-后续收尾：仓库内没有 `src/schemas.ts` 的生产代码依赖，已删除该兼容性 barrel；schema 测试改从 `src/index.ts` 公共入口导入，32 个测试继续全绿。
+后续收尾：仓库内没有 `src/schemas.ts` 的生产代码依赖，已删除该兼容性 barrel；schema 测试改从 `src/index.ts` 公共入口导入，迁移前的 32 个测试当时全绿。
+
+本次重构：protocol 单元测试已按 `src` 下的模块 colocate（common/auth/room-models/room-requests/room-events/game），补充模型、请求和事件边界用例；package 的 typecheck/lint 仅扫描 `src`，`pnpm verify` 全绿。
 
 **阶段 4.4.3 + 4.4.5**：已完成。`/games` 改为 junk/bloodbattle Tabs，接入 `lobby:list` 房间列表、搜索、命名建房；`/lobby/:roomId` 改为 `room:peek` 驱动的房间页，支持指定座位入座、指定空座位加 bot、ready/start，并保留 ack + 事件广播状态边界。web e2e 9/9 全绿（含 table 验收迁移到新大厅流程）。
 
