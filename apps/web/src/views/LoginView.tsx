@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { LoginForm } from "@/components/login-form";
 import { connect } from "@/lib/socket";
 import { deriveUserId, signDevToken } from "@/lib/devAuth";
 import { useSessionStore } from "@/store/session";
@@ -40,21 +39,15 @@ export function LoginView() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={(event) => void handleSubmit(event)} className="flex w-64 flex-col gap-4">
-        <h1 className="text-lg font-medium">Online Mahjong · Login</h1>
-        <Input
-          value={nickname}
-          onChange={(event) => setNickname(event.target.value)}
-          placeholder="Enter nickname"
-          disabled={pending}
-          autoFocus
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" disabled={pending}>
-          {pending ? "Connecting…" : "Enter game"}
-        </Button>
-      </form>
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <LoginForm
+        className="w-full max-w-sm"
+        nickname={nickname}
+        onNicknameChange={setNickname}
+        onSubmit={(event) => void handleSubmit(event)}
+        pending={pending}
+        error={error}
+      />
     </div>
   );
 }

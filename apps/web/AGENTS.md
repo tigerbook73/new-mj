@@ -33,7 +33,8 @@
 - `src/lib/`：`socket.ts`（连接 + ack/事件封装）、`devAuth.ts`（开发态假登录）、`theme.ts`（黑暗模式：`getInitialTheme` 读 localStorage，没有则退回 `prefers-color-scheme`；`applyTheme` 切 `.dark` class 并持久化，`main.tsx` 在挂载 React 前先调一次避免首屏闪烁）。
 - `src/views/`：`LoginView`/`GamePickerView`/`LobbyView`/`TableView`（`TableView` 只渲染 `PlayerViewBase` 公共骨架，不按 `rulesetId` 分支，血战定缺/换三张这类专属阶段没有对应 UI，卡在那个阶段发不出动作是预期行为）。
 - `src/components/ThemeToggle.tsx`：固定右上角的黑暗模式切换按钮，本地 `useState` + `useEffect` 调 `theme.ts`，不进 Zustand store（跟 session 状态无关，不需要跨组件同步）。
-- `src/components/ui/`：shadcn 生成的基础组件。
+- `src/components/login-form.tsx`：shadcn `login-03` block 生成后手动改的产物（block 不是 `ui/` 基础组件，改动是预期用法）——去掉了原版的社交登录按钮/邮箱密码字段/条款页脚，改成单一昵称输入，实际登录逻辑（`devAuth`/`connect`/`navigate`）仍留在 `LoginView` 里，这个文件只管展示。
+- `src/components/ui/`：shadcn 生成的基础组件，`login-03` 引入时新增了 `card.tsx`/`label.tsx`/`separator.tsx`/`field.tsx`（`separator.tsx` 目前没在用，block 自带、留着无害）。
 - `test/*.e2e-spec.ts`：Playwright e2e 用例，`lobby.e2e-spec.ts`/`table.e2e-spec.ts` 用多 `browser.newContext()` 模拟多个真人玩家；`table.e2e-spec.ts` 里 junk 验证到真的发出一个 `discard` 并被接受，bloodbattle 只验证到公共骨架渲染（原因见上一条）。
 
 ## apps/web DoD
