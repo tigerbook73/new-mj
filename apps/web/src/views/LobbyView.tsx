@@ -52,7 +52,11 @@ export function LobbyView() {
     const onClosed = ({ reason }: { reason: string }) => {
       setRoom(null);
       setNotice(reason === "hostLeft" ? "The host closed this room." : "This room was closed.");
-      void navigate("/games");
+      void navigate("/games", {
+        state: {
+          notice: reason === "hostLeft" ? "The host closed this room." : "This room was closed.",
+        },
+      });
     };
     socket.on("room:playerJoined", onPlayerJoined);
     socket.on("room:readyChanged", onReadyChanged);

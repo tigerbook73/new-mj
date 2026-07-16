@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import type { RoomInfo, RoomSummary } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ const RULESETS = [
 
 export function GamePickerView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const socket = useSessionStore((state) => state.socket)!;
   const setRoom = useSessionStore((state) => state.setRoom);
   const [rulesetId, setRulesetId] = useState<string>(RULESETS[0].id);
@@ -21,6 +22,10 @@ export function GamePickerView() {
   const [search, setSearch] = useState("");
   const [roomName, setRoomName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const navigationNotice =
+    typeof location.state === "object" && location.state !== null && "notice" in location.state
+      ? String(location.state.notice)
+      : null;
 
   const loadRooms = useCallback(async () => {
     const result = await ack<RoomSummary[]>(socket, "lobby:list", {
@@ -61,6 +66,9 @@ export function GamePickerView() {
         <header>
           <p className="text-sm text-muted-foreground">Online Mahjong</p>
           <h1 className="text-3xl font-semibold tracking-tight">Game lobby</h1>
+          {navigationNotice && (
+            <p className="mt-2 text-sm text-muted-foreground">{navigationNotice}</p>
+          )}
         </header>
         <Tabs value={rulesetId} onValueChange={(value) => setRulesetId(value)}>
           <TabsList aria-label="Game variants">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import type { GameEventEnvelope, GameSnapshot, SeatId } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
 import { ack } from "@/lib/socket";
@@ -14,8 +15,10 @@ type ClaimOption = { action: Record<string, unknown> };
 type ViewExtras = { phase?: string; myClaimOptions?: ClaimOption[] };
 
 export function TableView() {
+  const navigate = useNavigate();
   const socket = useSessionStore((state) => state.socket);
   const view = useSessionStore((state) => state.view);
+  const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
 
   const [log, setLog] = useState<string[]>([]);
@@ -80,6 +83,17 @@ export function TableView() {
     }
   };
 
+  const leave = async () => {
+    setError(null);
+    const result = await ack(activeSocket, "room:leave", {});
+    if (!result.ok) {
+      setError(result.code);
+      return;
+    }
+    setRoom(null);
+    void navigate("/games");
+  };
+
   if (!view) {
     return <div className="p-6">Waiting for game data…</div>;
   }
@@ -90,7 +104,12 @@ export function TableView() {
 
   return (
     <div className="flex min-h-screen flex-col gap-4 p-6">
-      <h1 className="text-lg font-medium">Table (Seat {view.seat})</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-medium">Table (Seat {view.seat})</h1>
+        <Button variant="outline" onClick={() => void leave()}>
+          Leave room
+        </Button>
+      </div>
       {sessionResult != null && (
         <p className="text-sm">Session finished: {JSON.stringify(sessionResult)}</p>
       )}

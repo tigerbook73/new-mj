@@ -72,3 +72,68 @@ test("switching tabs changes the active game lobby", async ({ browser }) => {
   await openVariant(page, "Junk Hu");
   await page.context().close();
 });
+
+test("a guest can leave a waiting room and return to the lobby", async ({ browser }) => {
+  const [host, guest] = await Promise.all([
+    loginAs(browser, "leave-host"),
+    loginAs(browser, "leave-guest"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await host.getByLabel("Room name").fill("Guest leaves");
+  await host.getByRole("button", { name: "Create room" }).click();
+  await openVariant(guest, "Junk Hu");
+  await guest.getByRole("button", { name: "Refresh" }).click();
+  await guest.getByRole("button", { name: "Guest leaves" }).click();
+  await guest.getByRole("button", { name: "Sit in seat 2" }).click();
+  await guest.getByRole("button", { name: "Leave room" }).click();
+  await expect(guest).toHaveURL(/\/games$/);
+  await expect(host.getByText("Seat 2 · Empty")).toBeVisible();
+  await host.context().close();
+  await guest.context().close();
+});
+
+test("the host leaving a waiting room closes it for everyone", async ({ browser }) => {
+  const [host, guest] = await Promise.all([
+    loginAs(browser, "close-host"),
+    loginAs(browser, "close-guest"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await host.getByLabel("Room name").fill("Host leaves");
+  await host.getByRole("button", { name: "Create room" }).click();
+  await openVariant(guest, "Junk Hu");
+  await guest.getByRole("button", { name: "Refresh" }).click();
+  await guest.getByRole("button", { name: "Host leaves" }).click();
+  await guest.getByRole("button", { name: "Sit in seat 2" }).click();
+  await host.getByRole("button", { name: "Leave room" }).click();
+  await expect(host).toHaveURL(/\/games$/);
+  await expect(guest).toHaveURL(/\/games$/);
+  await expect(guest.getByText("The host closed this room.")).toBeVisible();
+  await host.context().close();
+  await guest.context().close();
+});
+
+test("leaving an in-game room keeps the other human in the match", async ({ browser }) => {
+  const [host, guest] = await Promise.all([
+    loginAs(browser, "game-leave-host"),
+    loginAs(browser, "game-leave-guest"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await host.getByLabel("Room name").fill("Game leaves");
+  await host.getByRole("button", { name: "Create room" }).click();
+  await host.getByRole("button", { name: "Add bot to seat 3" }).click();
+  await host.getByRole("button", { name: "Add bot to seat 4" }).click();
+  await openVariant(guest, "Junk Hu");
+  await guest.getByRole("button", { name: "Refresh" }).click();
+  await guest.getByRole("button", { name: "Game leaves" }).click();
+  await guest.getByRole("button", { name: "Sit in seat 2" }).click();
+  await host.getByRole("checkbox", { name: "Ready" }).check();
+  await guest.getByRole("checkbox", { name: "Ready" }).check();
+  await host.getByRole("button", { name: "Start game" }).click();
+  await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
+  await expect(guest).toHaveURL(/\/room\//, { timeout: 10_000 });
+  await host.getByRole("button", { name: "Leave room" }).click();
+  await expect(host).toHaveURL(/\/games$/);
+  await expect(guest).toHaveURL(/\/room\//);
+  await host.context().close();
+  await guest.context().close();
+});
