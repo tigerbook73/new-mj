@@ -34,6 +34,7 @@ import {
 import type { Server, Socket } from "socket.io";
 import { ZodError } from "zod";
 import { ConfigService } from "../config/config.service";
+import { PersistenceService } from "../persistence/persistence.service";
 import { createAuthMiddleware } from "./auth.middleware";
 import { ConnectionRegistry, type ConnectionInfo } from "./connection-registry";
 import { EventBus } from "../rooms/event-bus";
@@ -76,10 +77,11 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     private readonly connections: ConnectionRegistry,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly persistenceService: PersistenceService,
   ) {}
 
   afterInit(server: Server): void {
-    server.use(createAuthMiddleware(this.jwtService, this.configService));
+    server.use(createAuthMiddleware(this.jwtService, this.configService, this.persistenceService));
 
     this.eventBus.on("room:playerJoined", (event) => {
       this.server.to(event.roomId).emit("room:playerJoined", {

@@ -6,10 +6,12 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
 /**
- * Adapted from shadcn's login-03 block: this app has no email/password or
- * social auth, just a nickname (dev-mode fake login, decisions.md D16) — the
- * social buttons, separator, password field, and terms footer from the
- * original block are dropped, keeping the Card/Field visual scaffold.
+ * Adapted from shadcn's login-03 block: dev-mode fake login only (nickname,
+ * decisions.md D16), the password field and terms footer from the original
+ * block are dropped, keeping the Card/Field visual scaffold. Phase 5:
+ * real sign-in moved to social-login-form.tsx (the block's original social
+ * buttons, reinstated); this form now only renders behind
+ * `import.meta.env.DEV` in LoginView, as a dev/e2e-test-only fallback.
  */
 export function LoginForm({
   className,

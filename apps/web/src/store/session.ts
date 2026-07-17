@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
 import type { PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
+import { supabase } from "@/lib/supabase";
 
 // 骨架先行：字段形状由 3c（socket/user）、3d（room）、3e（view）逐步填充实现。
 export type SessionState = {
@@ -45,6 +46,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   signOut: () =>
     set((state) => {
       state.socket?.disconnect();
+      // Best-effort, and a no-op when supabase is undefined (unconfigured,
+      // or the dev nickname login path which never establishes a Supabase
+      // session) — local state below is cleared either way.
+      void supabase?.auth.signOut();
       return { socket: null, userId: null, nickname: null, room: null, view: null };
     }),
   setRoom: (room) => set({ room }),
