@@ -4,9 +4,11 @@ import {
   computeNextDealer as coreComputeNextDealer,
   createGame as coreCreateGame,
   getLegalActions as coreGetLegalActions,
+  getOmniscientView as coreGetOmniscientView,
   getPlayerView as coreGetPlayerView,
   type ApplyResult,
   type GameConfig,
+  type OmniscientView,
   type PlayerViewBase,
   type SeatId,
 } from "@new-mj/core";
@@ -41,5 +43,15 @@ export class GameService {
   getPlayerView(state: unknown, seat: SeatId): PlayerViewBase | undefined {
     // any: see applyAction.
     return coreGetPlayerView(state as any, seat);
+  }
+
+  /**
+   * Dev/test-only escape hatch (decisions.md D19) — not one of the four
+   * engine-api signatures, deliberately bypasses getPlayerView's visibility
+   * filtering. Callers must gate access themselves.
+   */
+  getOmniscientView(state: unknown): OmniscientView {
+    // any: see applyAction.
+    return coreGetOmniscientView(state as any);
   }
 }

@@ -10,6 +10,7 @@ export * from "./lib/prng.ts";
 export * from "./lib/wall.ts";
 export * from "./lib/win.ts";
 export * from "./lib/invariants.ts";
+export * from "./lib/omniscient.ts";
 export * from "./lib/constants.ts";
 export * from "./rulesets/junk/index.ts";
 export * from "./rulesets/junk/fuzz.ts";

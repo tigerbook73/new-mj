@@ -22,6 +22,7 @@ import {
   RoomReadyRequestSchema,
   RoomRemoveBotRequestSchema,
   RoomRemovePlayerRequestSchema,
+  type DebugOmniscientView,
   type Reply,
   type RoomInfo,
   type RoomParticipant,
@@ -312,6 +313,22 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       const seat = this.seatOf(info);
       this.roomService.applyPlayerAction(info.roomId, seat, parsed.action);
       return {};
+    });
+  }
+
+  /**
+   * Dev/test-only escape hatch (decisions.md D19, protocol-shared.md §7) —
+   * gated by ALLOW_DEBUG_OMNISCIENT, never reachable from production UI.
+   * Deliberately bypasses getPlayerView's visibility filtering.
+   */
+  @SubscribeMessage("debug:omniscientView")
+  handleDebugOmniscientView(@ConnectedSocket() client: Socket): Reply<DebugOmniscientView> {
+    return this.reply(() => {
+      if (!this.configService.allowDebugOmniscient) throw new RoomServiceError("UNAUTHORIZED");
+      const info = this.requireConnection(client);
+      this.seatOf(info);
+      const view = this.roomService.getOmniscientView(info.roomId);
+      return { wall: [...view.wall], hands: view.hands.map((hand) => [...hand]) };
     });
   }
 

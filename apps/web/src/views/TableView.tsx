@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Dialog } from "@base-ui/react/dialog";
-import type { GameEventEnvelope, GameSnapshot, SeatId } from "@new-mj/protocol";
+import type {
+  DebugOmniscientView,
+  GameEventEnvelope,
+  GameSnapshot,
+  SeatId,
+} from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
 import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
@@ -28,6 +33,7 @@ export function TableView() {
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<unknown>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
 
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
@@ -93,6 +99,19 @@ export function TableView() {
     if (!result.ok) {
       setError(result.code);
     }
+  };
+
+  // Dev/test-only escape hatch (decisions.md D19, protocol-shared.md §7) —
+  // raw TileIds, no tile-face rendering; server rejects unless
+  // ALLOW_DEBUG_OMNISCIENT is set, so this is a no-op against a normal deploy.
+  const fetchDebugOmniscientView = async () => {
+    setError(null);
+    const result = await ack<DebugOmniscientView>(activeSocket, "debug:omniscientView", {});
+    if (!result.ok) {
+      setError(result.code);
+      return;
+    }
+    setDebugView(result.data);
   };
 
   const leave = async () => {
@@ -203,6 +222,20 @@ export function TableView() {
           </Dialog.Popup>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {import.meta.env.DEV && (
+        <div>
+          <h2 className="text-sm font-medium">Debug: omniscient view (dev-only)</h2>
+          <Button variant="outline" size="sm" onClick={() => void fetchDebugOmniscientView()}>
+            Show all hands + wall
+          </Button>
+          {debugView && (
+            <pre className="mt-2 max-w-full overflow-x-auto text-xs text-muted-foreground">
+              {JSON.stringify(debugView, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
 
       <div>
         <h2 className="text-sm font-medium">Recent events</h2>

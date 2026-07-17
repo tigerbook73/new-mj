@@ -13,7 +13,7 @@ export class InvariantViolation extends Error {
   }
 }
 
-type TileContainerState = {
+export type TileContainerState = {
   wall: readonly TileId[];
   seats: readonly SeatState[];
 };

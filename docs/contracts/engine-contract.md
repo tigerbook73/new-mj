@@ -63,3 +63,7 @@
 - **事件重建 ≡ 直接派生**（`decisions.md` 评审点 G）：任意时刻，事件流重建的视图必须等于直接调用 `getPlayerView` 的结果。测试参数化遍历已注册的 ruleset（`packages/core/test/cross-ruleset-invariants.test.ts`），新增玩法只需要把自己的 ruleset 加进注册表，不必重写测试——测试策略见 `testing-strategy.md`。
 
 这两条不变量本身是公共契约的一部分：任何新玩法都必须满足，不因玩法而异。
+
+## 8. 调试/测试专用逃生舱（不属于本契约）
+
+`packages/core/src/lib/omniscient.ts` 的 `getOmniscientView(state)` **不是**第 3 节四签名的一部分，也不是第 4 节 `RulesetModule` 的 dispatch 方法——它是一个跨玩法通用的结构化纯函数（对 `{ wall, seats }` 形状的泛型约束，做法与 `lib/invariants.ts` 的 `assertContainerUniqueness` 相同），故意暴露隐藏手牌与未摸牌墙的 TileId，仅供 server 侧的调试/测试通道使用（取舍理由见 `decisions.md` D19）。新增玩法若破坏 `{ wall, seats }` 这个结构假设，该函数会编译失败，与 `assertContainerUniqueness` 承担的是同一类技术债，不是本契约新增的风险面。

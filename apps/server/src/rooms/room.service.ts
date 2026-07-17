@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { chooseAction } from "@new-mj/ai";
-import type { ApplyResult, GameConfig, GameEvent, SeatId } from "@new-mj/core";
+import type { ApplyResult, GameConfig, GameEvent, OmniscientView, SeatId } from "@new-mj/core";
 import type { RankingEntry, RoomInfo, RoomSummary, SessionFormat } from "@new-mj/protocol";
 import { GameService } from "../core/game.service";
 import { EventBus } from "./event-bus";
@@ -431,6 +431,20 @@ export class RoomService {
 
   get(roomId: string): Room | undefined {
     return this.rooms.get(roomId);
+  }
+
+  /**
+   * Dev/test-only escape hatch (decisions.md D19) — caller (RoomsGateway) is
+   * responsible for the `ALLOW_DEBUG_OMNISCIENT` gate and for validating the
+   * requester is a seated player in this room; this method only checks the
+   * room itself is in a state where a gameState exists.
+   */
+  getOmniscientView(roomId: string): OmniscientView {
+    const room = this.mustGet(roomId);
+    if (room.phase !== "in-game") {
+      throw new RoomServiceError("GAME_NOT_STARTED", "no game in progress");
+    }
+    return this.gameService.getOmniscientView(room.gameState);
   }
 
   private beginGame(room: Room): void {

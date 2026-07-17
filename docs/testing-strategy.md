@@ -7,7 +7,7 @@
 | 层           | 覆盖什么                                          | 工具                                                                              |
 | ------------ | ------------------------------------------------- | --------------------------------------------------------------------------------- |
 | 单元         | core 纯函数（不变量、单个规则判定）               | Vitest（`packages/core`）                                                         |
-| fixture      | 番型/规则黄金路径用例（人工设计，覆盖已知规则点） | Vitest，fixture 为内联 TS 数组字面量（`test.each`）                              |
+| fixture      | 番型/规则黄金路径用例（人工设计，覆盖已知规则点） | Vitest，fixture 为内联 TS 数组字面量（`test.each`）                               |
 | fuzz         | 随机 config 扫组合，暴露黄金路径没覆盖到的边界    | Vitest，seed + action 序列可复现                                                  |
 | e2e          | 真实 socket.io-client 连接跑通完整会话            | Jest（`apps/server`，遵循 NestJS 官方测试生态）                                   |
 | 跨玩法不变量 | 容器唯一性、事件重建≡直接派生                     | 参数化遍历已注册 ruleset（`packages/core/test/cross-ruleset-invariants.test.ts`） |

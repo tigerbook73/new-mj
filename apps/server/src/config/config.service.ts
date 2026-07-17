@@ -20,4 +20,13 @@ export class ConfigService {
     const parsed = raw ? Number(raw) : NaN;
     return Number.isInteger(parsed) ? parsed : 3000;
   }
+
+  /**
+   * Dev/test-only escape hatch (decisions.md D19, protocol-shared.md §7):
+   * gates the `debug:omniscientView` channel. Defaults off — must be
+   * explicitly opted into, never set in a shipped deployment.
+   */
+  get allowDebugOmniscient(): boolean {
+    return process.env["ALLOW_DEBUG_OMNISCIENT"] === "true";
+  }
 }

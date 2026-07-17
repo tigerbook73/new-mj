@@ -45,4 +45,14 @@ describe("GameService", () => {
     expect(service.computeNextDealer(created.state, 0)).toBe(1);
     expect(service.computeNextDealer(created.state, 3)).toBe(0);
   });
+
+  it("getOmniscientView exposes the wall and all four hands (D19, dev/test-only)", () => {
+    const created = service.createGame({ rulesetId: "junk" }, 1, 0);
+    if (!("state" in created)) throw new Error("expected createGame to succeed");
+
+    const view = service.getOmniscientView(created.state);
+
+    expect(Array.isArray(view.wall)).toBe(true);
+    expect(view.hands).toHaveLength(4);
+  });
 });

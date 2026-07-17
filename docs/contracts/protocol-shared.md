@@ -16,7 +16,7 @@
 
 ## 2. 统一信封与 ack/事件关系
 
-`Reply<T>` 见 `packages/protocol/src/schemas.ts`；协议包提供封装：`request(type, payload): Promise<T>`（`ok:false` 时抛类型化错误）。
+`Reply<T>` 见 `packages/protocol/src/common.ts`；协议包提供封装：`request(type, payload): Promise<T>`（`ok:false` 时抛类型化错误）。
 
 **核心约定**：
 
@@ -44,7 +44,7 @@
 
 ## 5. 错误码（ErrCode）通用部分
 
-`ErrCode` 全集见 `packages/protocol/src/schemas.ts` 的 `ERROR_CODES`（权威来源，新增/删除错误码只改这一处，不要在文档手抄第二份列表）。
+`ErrCode` 全集见 `packages/protocol/src/common.ts` 的 `ERROR_CODES`（权威来源，新增/删除错误码只改这一处，不要在文档手抄第二份列表）。
 
 - `ILLEGAL_ACTION` 的 `message` 附 core 返回的 RuleViolation code（如 `TILE_NOT_IN_HAND`、`CLAIM_NOT_AVAILABLE`），便于调试；客户端 UI 原则上不应触发它（合法动作由 `myClaimOptions`/`getLegalActions` 驱动渲染）
 - 房间生命周期相关的错误码（`GAME_IN_PROGRESS`/`GAME_NOT_STARTED` 等）见 `session-mechanics.md`
@@ -65,3 +65,13 @@ B ← game:event TurnStarted(B)（B 碰后出牌）
 **顺序保证**：同连接消息有序（Socket.IO 单连接按发送序送达）；每房间操作串行处理，快照之后无漏事件的缝隙——这是重连"快照优先"策略（`contracts/session-mechanics.md` §8）成立的前提。
 
 具体某个玩法的声明优先级顺序、Action 种类，见对应 `variants/*.md`。
+
+## 7. 调试专用消息（dev-only，不属于正式产品面）
+
+| 消息                   | payload | data（`DebugOmniscientViewSchema`）     | 说明                                                                                           |
+| ---------------------- | ------- | --------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `debug:omniscientView` | `{}`    | `{ wall: number[], hands: number[][] }` | 查询式 ack；返回原始 TileId，不做牌面渲染。仅用于本地调试/测试，不出现在任何正式产品 UI 入口。 |
+
+- 门控：server 侧 `ConfigService.allowDebugOmniscient`（读环境变量 `ALLOW_DEBUG_OMNISCIENT`，默认 `false`）关闭时一律拒绝。
+- 鉴权/成员校验复用现有机制，不新增错误码：开关关闭或请求者不是该房间已入座玩家 → `UNAUTHORIZED`（座位未找到细化为 `NOT_IN_ROOM`）；游戏未开始 → `GAME_NOT_STARTED`。
+- 故意绕开 core `getPlayerView` 的可见性过滤，直接读取隐藏手牌与未摸牌墙——这是显式受控的例外，不是"public 事件携带隐藏牌 id"（本消息不是 public 事件，是按需查询的单播 ack），不违反第 1 节以外的可见性铁律。取舍理由见 `decisions.md` D19，core 侧契约说明见 `engine-contract.md` §8。
