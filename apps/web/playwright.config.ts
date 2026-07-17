@@ -37,18 +37,16 @@ export default defineConfig({
       // detection and the ~5-8s runtime are unaffected). stderr stays piped
       // so an actual crash is still visible.
       command: "pnpm --filter @new-mj/server start",
-      env: { PORT: String(SERVER_PORT) },
+      // NODE_ENV=test makes dotenv-flow load .env.test (blanks Supabase/DB vars, see decisions.md D23) and skip .env.development.local.
+      env: { PORT: String(SERVER_PORT), NODE_ENV: "test" },
       stdout: "ignore",
       stderr: "pipe",
       timeout: 180_000,
       wait: { stdout: /Nest application successfully started/ },
     },
     {
-      command: `pnpm exec vite --port ${WEB_PORT} --strictPort`,
-      // JWT_SECRET intentionally not overridden: web's dev-mode fake login
-      // (D16) and server's ConfigService.jwtSecret share the same
-      // dev-only-insecure-secret fallback when unset, so no coordination
-      // is needed here — only the connection URL differs for e2e.
+      command: `pnpm exec vite --port ${WEB_PORT} --strictPort --mode test`,
+      // JWT_SECRET intentionally not set (shared dev-only fallback, D16); --mode test loads .env.test the same way as the server entry above.
       env: { VITE_SERVER_URL: `http://localhost:${SERVER_PORT}` },
       stdout: "ignore",
       stderr: "pipe",

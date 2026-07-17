@@ -13,7 +13,10 @@ export class ConfigService {
    * must set real values.
    */
   get jwtSecret(): string {
-    return process.env["JWT_SECRET"] ?? "dev-only-insecure-secret";
+    // `||` not `??`: an empty-value `JWT_SECRET=` line in an env file must
+    // fall back too, same as the unset case (matches supabaseUrl/
+    // supabaseServiceKey's falsy checks below).
+    return process.env["JWT_SECRET"] || "dev-only-insecure-secret";
   }
 
   get port(): number {

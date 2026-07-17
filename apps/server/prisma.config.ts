@@ -1,16 +1,20 @@
-// Prisma 7's CLI no longer auto-loads .env (unlike v5/v6) — this file is
-// how `prisma migrate`/`prisma generate` learn DATABASE_URL and where the
-// schema lives. Not consumed at NestJS runtime; ConfigService/main.ts load
-// .env separately for that (see apps/server/src/main.ts).
-import "dotenv/config";
+// Prisma 7's CLI no longer auto-loads .env — loads repo-root .env* here (root found via find-root, not hand-counted `..`; main.ts does the same for NestJS runtime).
+import { findRootSync } from "@manypkg/find-root";
+import { config as loadEnv } from "dotenv-flow";
 import { defineConfig } from "prisma/config";
+
+loadEnv({ path: findRootSync(__dirname).rootDir, default_node_env: "development" });
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
-  datasource: {
-    url: process.env["DATABASE_URL"],
-  },
+  // Ensure we don't assign a possibly-undefined value to `url` (TS
+  // exactOptionalPropertyTypes). Omit the property when DATABASE_URL is
+  // not set.
+  datasource: (() => {
+    const dbUrl = process.env["DATABASE_URL"];
+    return dbUrl ? { url: dbUrl } : {};
+  })(),
 });

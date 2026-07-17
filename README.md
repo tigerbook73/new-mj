@@ -28,6 +28,10 @@ pnpm fuzz --seed 47 --games 10000
 
 `CLAUDE.md` 为 AI 会话规范，不在人的必读路径。
 
+## 部署
+
+变量名清单见 `.env.example`；生产环境变量由部署平台（Render）直接注入，不读取仓库里的文件。需要在本地留一份生产环境变量的备份/核对副本时，命名为 `.env.production.local`（gitignored，不需要现在创建）。
+
 ## 状态
 
 阶段 1（引擎基建 + junk RuleSet + CLI fuzz）已完成。下一阶段是血战到底 RuleSet；阶段路线见 `docs/plan.md`。
