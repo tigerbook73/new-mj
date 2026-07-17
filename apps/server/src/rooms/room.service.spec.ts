@@ -466,12 +466,12 @@ describe("RoomService — getReplay (phase 4.5 step 3)", () => {
     return room;
   };
 
-  it("returns the seated player's reconstructed view + filtered events for their own game", () => {
+  it("returns the seated player's reconstructed view + filtered events for their own game", async () => {
     const service = newRoomService();
     const gameService = new GameService();
     const room = playOneFinishedGame(service, gameService);
 
-    const result = service.getReplay(room.id, 1, "host");
+    const result = await service.getReplay(room.id, 1, "host");
 
     expect(result.gameNumber).toBe(1);
     expect(result.finalView).toMatchObject({ seat: 0 });
@@ -479,33 +479,33 @@ describe("RoomService — getReplay (phase 4.5 step 3)", () => {
     expect(result.events[0]?.payload).toMatchObject({ type: "GameStarted" });
   });
 
-  it("throws GAME_NOT_FOUND for a gameNumber this room never archived", () => {
+  it("throws GAME_NOT_FOUND for a gameNumber this room never archived", async () => {
     const service = newRoomService();
     const gameService = new GameService();
     const room = playOneFinishedGame(service, gameService);
 
-    expect(() => service.getReplay(room.id, 99, "host")).toThrow(RoomServiceError);
+    await expect(service.getReplay(room.id, 99, "host")).rejects.toThrow(RoomServiceError);
     try {
-      service.getReplay(room.id, 99, "host");
+      await service.getReplay(room.id, 99, "host");
     } catch (error) {
       expect((error as RoomServiceError).code).toBe("GAME_NOT_FOUND");
     }
   });
 
-  it("throws UNAUTHORIZED for a userId who was never seated in that game", () => {
+  it("throws UNAUTHORIZED for a userId who was never seated in that game", async () => {
     const service = newRoomService();
     const gameService = new GameService();
     const room = playOneFinishedGame(service, gameService);
 
     try {
-      service.getReplay(room.id, 1, "someone-else");
+      await service.getReplay(room.id, 1, "someone-else");
       throw new Error("expected getReplay to throw");
     } catch (error) {
       expect((error as RoomServiceError).code).toBe("UNAUTHORIZED");
     }
   });
 
-  it("uses the archived seatUserIds snapshot, not room.players' current occupancy", () => {
+  it("uses the archived seatUserIds snapshot, not room.players' current occupancy", async () => {
     const service = newRoomService();
     const gameService = new GameService();
     const room = playOneFinishedGame(service, gameService);
@@ -515,9 +515,9 @@ describe("RoomService — getReplay (phase 4.5 step 3)", () => {
     // mid-session), but the archive must stay correct if that ever changes.
     room.players[1] = { ...room.players[1]!, userId: "someone-new" };
 
-    const result = service.getReplay(room.id, 1, originalSeat1UserId!);
+    const result = await service.getReplay(room.id, 1, originalSeat1UserId!);
     expect(result.finalView).toMatchObject({ seat: 1 });
-    expect(() => service.getReplay(room.id, 1, "someone-new")).toThrow(RoomServiceError);
+    await expect(service.getReplay(room.id, 1, "someone-new")).rejects.toThrow(RoomServiceError);
   });
 });
 
@@ -538,12 +538,12 @@ describe("RoomService — getReplayOmniscientView (phase 4.5 step 5)", () => {
     return room;
   };
 
-  it("reconstructs all four hands + wall from the archived finalState (fed straight into getOmniscientView, no event replay)", () => {
+  it("reconstructs all four hands + wall from the archived finalState (fed straight into getOmniscientView, no event replay)", async () => {
     const service = newRoomService();
     const gameService = new GameService();
     const room = playOneFinishedGame(service, gameService);
 
-    const view = service.getReplayOmniscientView(room.id, 1);
+    const view = await service.getReplayOmniscientView(room.id, 1);
 
     expect(view.hands).toHaveLength(4);
     // Game already finished (won), so melds/discards also hold physical
@@ -555,13 +555,13 @@ describe("RoomService — getReplayOmniscientView (phase 4.5 step 5)", () => {
     expect(allIds.length).toBeLessThanOrEqual(136);
   });
 
-  it("throws GAME_NOT_FOUND for a gameNumber this room never archived", () => {
+  it("throws GAME_NOT_FOUND for a gameNumber this room never archived", async () => {
     const service = newRoomService();
     const gameService = new GameService();
     const room = playOneFinishedGame(service, gameService);
 
     try {
-      service.getReplayOmniscientView(room.id, 99);
+      await service.getReplayOmniscientView(room.id, 99);
       throw new Error("expected getReplayOmniscientView to throw");
     } catch (error) {
       expect((error as RoomServiceError).code).toBe("GAME_NOT_FOUND");

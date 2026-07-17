@@ -462,27 +462,48 @@ export class RoomService {
   }
 
   /**
+   * phase 5.3 — Room objects are never evicted from memory while the
+   * process is up (a `finished` room just sits there, see
+   * contracts/session-mechanics.md §10), so an in-memory miss here only
+   * ever means "server restarted since this game finished" — falls back to
+   * the PG archive (phase 5.2) rather than the room existing-but-game-
+   * missing case, which is a genuine bad gameNumber and stays a lookup
+   * inside the in-memory room (no DB round-trip needed when the room is
+   * right there).
+   */
+  private async findArchivedGame(
+    roomId: string,
+    gameNumber: number,
+  ): Promise<{ rulesetId: string; log: FinishedGameLog } | null> {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      const log = room.finishedGames.find((entry) => entry.gameNumber === gameNumber);
+      return log ? { rulesetId: room.rulesetId, log } : null;
+    }
+    const archived = await this.persistenceService.findGame(roomId, gameNumber);
+    if (!archived) return null;
+    const { rulesetId, ...log } = archived;
+    return { rulesetId, log };
+  }
+
+  /**
    * phase 4.5 step 3 — real product feature (unlike
    * getOmniscientView): any userId who was seated in that specific
    * archived game may fetch its replay, regardless of whether they're
    * still in this room right now (seatUserIds is that game's own
    * snapshot, not current room.players occupancy).
    */
-  getReplay(
+  async getReplay(
     roomId: string,
     gameNumber: number,
     userId: string,
-  ): { gameNumber: number; finalView: PlayerViewBase; events: GameEvent[] } {
-    const room = this.mustGet(roomId);
-    const log = room.finishedGames.find((entry) => entry.gameNumber === gameNumber);
-    if (!log) throw new RoomServiceError("GAME_NOT_FOUND");
+  ): Promise<{ gameNumber: number; finalView: PlayerViewBase; events: GameEvent[] }> {
+    const found = await this.findArchivedGame(roomId, gameNumber);
+    if (!found) throw new RoomServiceError("GAME_NOT_FOUND");
+    const { rulesetId, log } = found;
     const seat = log.seatUserIds.findIndex((seatUserId) => seatUserId === userId);
     if (seat === -1) throw new RoomServiceError("UNAUTHORIZED");
-    const finalView = this.gameService.rebuildPlayerView(
-      room.rulesetId,
-      log.events,
-      seat as SeatId,
-    );
+    const finalView = this.gameService.rebuildPlayerView(rulesetId, log.events, seat as SeatId);
     if (!finalView) throw new RoomServiceError("INTERNAL");
     return { gameNumber, finalView, events: eventsVisibleTo(log.events, seat as SeatId) };
   }
@@ -495,13 +516,16 @@ export class RoomService {
    * game. End-of-game only: feeds the archived finalState straight into
    * getOmniscientView instead of reconstructing state from events (that
    * would need a new core capability — out of scope, see
-   * phase 4.5 "衔接问题").
+   * phase 4.5 "衔接问题"). DB fallback (phase 5.3) is structurally
+   * unreachable here in practice — the gateway's ALLOW_DEBUG_OMNISCIENT +
+   * current-room-membership gate already requires a live connection/seat,
+   * which can't exist for a room that isn't in memory — but shares
+   * findArchivedGame rather than duplicating the in-memory-only lookup.
    */
-  getReplayOmniscientView(roomId: string, gameNumber: number): OmniscientView {
-    const room = this.mustGet(roomId);
-    const log = room.finishedGames.find((entry) => entry.gameNumber === gameNumber);
-    if (!log) throw new RoomServiceError("GAME_NOT_FOUND");
-    return this.gameService.getOmniscientView(log.finalState);
+  async getReplayOmniscientView(roomId: string, gameNumber: number): Promise<OmniscientView> {
+    const found = await this.findArchivedGame(roomId, gameNumber);
+    if (!found) throw new RoomServiceError("GAME_NOT_FOUND");
+    return this.gameService.getOmniscientView(found.log.finalState);
   }
 
   private beginGame(room: Room): void {

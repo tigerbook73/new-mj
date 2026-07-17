@@ -345,8 +345,8 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   handleReplayGet(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: unknown,
-  ): Reply<ReplayGetResponse> {
-    return this.reply(() => {
+  ): Promise<Reply<ReplayGetResponse>> {
+    return this.replyAsync(() => {
       const userId = this.requireUserId(client);
       const parsed = ReplayGetRequestSchema.parse(payload);
       return this.roomService.getReplay(parsed.roomId, parsed.gameNumber, userId);
@@ -362,13 +362,13 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   handleDebugReplayOmniscientView(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: unknown,
-  ): Reply<DebugOmniscientView> {
-    return this.reply(() => {
+  ): Promise<Reply<DebugOmniscientView>> {
+    return this.replyAsync(async () => {
       if (!this.configService.allowDebugOmniscient) throw new RoomServiceError("UNAUTHORIZED");
       const info = this.requireConnection(client);
       this.seatOf(info);
       const parsed = DebugReplayOmniscientViewRequestSchema.parse(payload);
-      const view = this.roomService.getReplayOmniscientView(info.roomId, parsed.gameNumber);
+      const view = await this.roomService.getReplayOmniscientView(info.roomId, parsed.gameNumber);
       return { wall: [...view.wall], hands: view.hands.map((hand) => [...hand]) };
     });
   }
@@ -437,6 +437,26 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   private reply<T>(fn: () => T): Reply<T> {
     try {
       return { ok: true, data: fn() };
+    } catch (error) {
+      if (error instanceof RoomServiceError) {
+        return { ok: false, code: error.code, message: error.message };
+      }
+      if (error instanceof ZodError) {
+        return { ok: false, code: "INVALID_CONFIG", message: error.message };
+      }
+      this.logger.error(error);
+      return { ok: false, code: "INTERNAL" };
+    }
+  }
+
+  /**
+   * phase 5.3 — only the two handlers that may fall back to a DB read
+   * (replay:get / debug:replayOmniscientView) need this; every other
+   * handler stays on the synchronous `reply()` above unchanged.
+   */
+  private async replyAsync<T>(fn: () => Promise<T>): Promise<Reply<T>> {
+    try {
+      return { ok: true, data: await fn() };
     } catch (error) {
       if (error instanceof RoomServiceError) {
         return { ok: false, code: error.code, message: error.message };
