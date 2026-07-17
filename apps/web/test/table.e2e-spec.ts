@@ -59,9 +59,10 @@ test("junk table renders hands and a discard action succeeds", async ({ browser 
   const { players } = await createAndStartRoom(browser, "junk");
   const [host] = players;
 
-  await expect(host.getByText(/^Seat 0: /)).toBeVisible({ timeout: 10_000 });
+  const myBadge = host.getByTestId("player-badge").filter({ hasText: "(you)" });
+  await expect(myBadge).toBeVisible({ timeout: 10_000 });
   const handTiles = host.getByTestId("hand-tile");
-  await expect(handTiles.first()).toBeEnabled({ timeout: 10_000 });
+  await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
   const tileCountBefore = await handTiles.count();
 
   await handTiles.first().click();
@@ -71,7 +72,7 @@ test("junk table renders hands and a discard action succeeds", async ({ browser 
   // 才刷新——这两个断言本身就证明了动作真的被 server 接受，不需要额外去检查
   // 有没有报错文案。
   await expect(handTiles).toHaveCount(tileCountBefore - 1, { timeout: 10_000 });
-  await expect(host.getByText(/^Seat 0: 13 tiles/)).toBeVisible({ timeout: 10_000 });
+  await expect(myBadge.getByTestId("player-hand-count")).toHaveText("13", { timeout: 10_000 });
 
   for (const page of players) {
     await page.context().close();

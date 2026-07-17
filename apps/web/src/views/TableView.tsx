@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Dialog } from "@base-ui/react/dialog";
 import type {
@@ -9,8 +9,15 @@ import type {
   SessionResult,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
+import { DiscardPile, type DiscardEntry } from "@/components/mahjong/DiscardPile";
+import { HandRow } from "@/components/mahjong/HandRow";
+import { MeldGroup, type Meld } from "@/components/mahjong/MeldGroup";
+import { PlayerBadge } from "@/components/mahjong/PlayerBadge";
+import { WallStack } from "@/components/mahjong/WallStack";
 import { ack } from "@/lib/socket";
+import { seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
 import { useSessionStore } from "@/store/session";
+import { useTableLayoutStore } from "@/store/tableLayout";
 
 /**
  * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myClaimOptions），
@@ -19,7 +26,13 @@ import { useSessionStore } from "@/store/session";
  * 读取，不 import 任何 ruleset 专属类型（架构铁律 6）。
  */
 type ClaimOption = { action: Record<string, unknown> };
-type ViewExtras = { phase?: string; myClaimOptions?: ClaimOption[] };
+type JunkSeatExtra = { handCount: number; melds: Meld[]; discards: DiscardEntry[] };
+type ViewExtras = { phase?: string; myClaimOptions?: ClaimOption[]; seats?: JunkSeatExtra[] };
+
+const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [] };
+
+/** Grid unit ~= container width / 20 (mj-next's convention: 4 hand rows + gutters per side). */
+const TILE_UNIT_DIVISOR = 20;
 
 export function TableView() {
   const navigate = useNavigate();
@@ -29,12 +42,26 @@ export function TableView() {
   const view = useSessionStore((state) => state.view);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
+  const setTileUnit = useTableLayoutStore((state) => state.setTileUnit);
+  const tileUnit = useTableLayoutStore((state) => state.tileUnit);
 
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
+
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el) return;
+    const updateUnit = () => setTileUnit(el.clientWidth / TILE_UNIT_DIVISOR);
+    const observer = new ResizeObserver(updateUnit);
+    observer.observe(el);
+    updateUnit();
+    return () => observer.disconnect();
+  }, [setTileUnit]);
 
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
@@ -139,6 +166,10 @@ export function TableView() {
     (player, seat) => player !== null && seat !== view.seat,
   );
 
+  const seatData = (seat: SeatId): JunkSeatExtra => extras.seats?.[seat] ?? EMPTY_SEAT;
+  const playerInfo = (seat: SeatId) => room?.players[seat];
+  const wallPerSide = Math.floor(view.wallCount / 4);
+
   return (
     <div className="flex min-h-screen flex-col gap-4 p-6">
       <div className="flex items-center justify-between gap-4 pr-20">
@@ -153,6 +184,7 @@ export function TableView() {
           Leave room
         </Button>
       </div>
+
       {sessionResult != null && (
         <div className="text-sm">
           <p>Session finished: {JSON.stringify(sessionResult)}</p>
@@ -171,50 +203,124 @@ export function TableView() {
           </div>
         </div>
       )}
-      <p className="text-sm">
-        Phase: {extras.phase ?? "unknown"} | Current turn: seat {view.currentSeat} | Wall remaining:{" "}
-        {view.wallCount}
-      </p>
-      <ul className="flex gap-4 text-sm">
-        {view.seats.map((seat, index) => (
-          <li key={index}>
-            Seat {index}: {seat.handCount} tiles{index === view.seat ? " (you)" : ""}
-          </li>
-        ))}
-      </ul>
 
-      <div>
-        <h2 className="text-sm font-medium">Your hand</h2>
-        <div className="flex flex-wrap gap-1">
-          {view.hand.map((tile, index) => (
-            <Button
-              key={`${tile}-${index}`}
-              data-testid="hand-tile"
-              variant="outline"
-              size="sm"
-              disabled={!isMyTurn}
-              onClick={() => void sendAction({ type: "discard", tile })}
-            >
-              {tile}
-            </Button>
-          ))}
-        </div>
-      </div>
+      {/* Three nested grids (outer=hands, middle=wall stacks, inner=discards+melds),
+          mirroring the mj-next reference layout. tileUnit === 0 means the
+          ResizeObserver hasn't measured yet — skip rendering to avoid a frame of
+          zero-sized tiles. */}
+      <div
+        ref={tableRef}
+        className="mx-auto grid aspect-square w-full max-w-3xl min-w-[320px] grid-cols-[10%_1fr_10%] grid-rows-[10%_1fr_10%] overflow-hidden rounded-lg bg-green-800 ring-2 ring-border dark:bg-green-950"
+      >
+        {tileUnit > 0 &&
+          SEAT_DIRECTIONS.map((direction) => {
+            const seat = seatAt(view.seat, direction);
+            const data = seatData(seat);
+            const player = playerInfo(seat);
+            const isBottom = direction === "bottom";
+            const gridArea: Record<SeatDirection, string> = {
+              top: "col-start-2 row-start-1",
+              left: "col-start-1 row-start-2",
+              right: "col-start-3 row-start-2",
+              bottom: "col-start-2 row-start-3",
+            };
+            const badge = (
+              <PlayerBadge
+                nickname={player?.nickname ?? `Seat ${seat}`}
+                handCount={data.handCount}
+                isCurrentTurn={view.currentSeat === seat}
+                isBot={player?.isBot ?? false}
+                isSelf={seat === view.seat}
+              />
+            );
+            const hand = (
+              <HandRow
+                direction={direction}
+                hand={isBottom ? view.hand : undefined}
+                handCount={data.handCount}
+                interactive={isBottom && isMyTurn}
+                onDiscard={(tile) => void sendAction({ type: "discard", tile })}
+              />
+            );
+            // Badge sits on the outer edge, hand tiles sit closer to the wall.
+            return (
+              <div
+                key={direction}
+                className={`flex items-center justify-center gap-1 overflow-hidden ${gridArea[direction]} ${direction === "top" || direction === "bottom" ? "flex-col" : "flex-row"}`}
+              >
+                {direction === "top" || direction === "left" ? (
+                  <>
+                    {badge}
+                    {hand}
+                  </>
+                ) : (
+                  <>
+                    {hand}
+                    {badge}
+                  </>
+                )}
+              </div>
+            );
+          })}
 
-      {claimOptions.length > 0 && (
-        <div>
-          <h2 className="text-sm font-medium">Claims</h2>
-          <div className="flex gap-2">
-            {claimOptions.map((option, index) => (
-              <Button key={index} onClick={() => void sendAction(option.action)}>
-                {String(option.action["type"])}
-              </Button>
-            ))}
+        <div className="col-start-2 row-start-2 grid grid-cols-[13%_1fr_13%] grid-rows-[13%_1fr_13%] overflow-hidden">
+          {SEAT_DIRECTIONS.map((direction) => {
+            const gridArea: Record<SeatDirection, string> = {
+              top: "col-start-2 row-start-1",
+              left: "col-start-1 row-start-2",
+              right: "col-start-3 row-start-2",
+              bottom: "col-start-2 row-start-3",
+            };
+            return (
+              <div
+                key={direction}
+                className={`flex items-center justify-center overflow-hidden ${gridArea[direction]}`}
+              >
+                <WallStack direction={direction} count={wallPerSide} />
+              </div>
+            );
+          })}
+
+          <div className="col-start-2 row-start-2 grid grid-cols-[15%_1fr_15%] grid-rows-[15%_1fr_15%] overflow-hidden">
+            {SEAT_DIRECTIONS.map((direction) => {
+              const seat = seatAt(view.seat, direction);
+              const data = seatData(seat);
+              const gridArea: Record<SeatDirection, string> = {
+                top: "col-start-2 row-start-1",
+                left: "col-start-1 row-start-2",
+                right: "col-start-3 row-start-2",
+                bottom: "col-start-2 row-start-3",
+              };
+              return (
+                <div
+                  key={direction}
+                  className={`flex items-center justify-center gap-1 overflow-hidden ${gridArea[direction]} ${direction === "top" || direction === "bottom" ? "flex-col" : "flex-row"}`}
+                >
+                  <MeldGroup direction={direction} melds={data.melds} />
+                  <DiscardPile direction={direction} discards={data.discards} />
+                </div>
+              );
+            })}
+
+            <div className="col-start-2 row-start-2 flex flex-col items-center justify-center gap-2 overflow-auto bg-background/90 p-2 text-center text-xs">
+              <p>
+                Phase: {extras.phase ?? "unknown"} | Turn: seat {view.currentSeat} | Wall:{" "}
+                {view.wallCount}
+              </p>
+              {claimOptions.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1">
+                  {claimOptions.map((option, index) => (
+                    <Button key={index} size="sm" onClick={() => void sendAction(option.action)}>
+                      {String(option.action["type"])}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {error && <p className="text-destructive">{error}</p>}
+            </div>
           </div>
         </div>
-      )}
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
 
       <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
         <Dialog.Portal>

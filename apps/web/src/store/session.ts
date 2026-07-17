@@ -73,9 +73,14 @@ export const useSessionStore = create<SessionState>((set) => ({
   applyTileDiscarded: (seat, tile) =>
     set((state) => {
       if (!state.view) return state;
-      const seats = state.view.seats.map((entry, index) =>
-        index === seat ? { ...entry, handCount: entry.handCount - 1 } : entry,
-      );
+      const seats = state.view.seats.map((entry, index) => {
+        if (index !== seat) return entry;
+        // junk-private field (discards), see TableView's ViewExtras comment —
+        // not on every ruleset's seats shape, so only append when present.
+        const extra = entry as { discards?: { tile: number; claimedBy?: SeatId }[] };
+        const discards = extra.discards ? [...extra.discards, { tile }] : extra.discards;
+        return { ...entry, handCount: entry.handCount - 1, ...(discards && { discards }) };
+      });
       const hand =
         seat === state.view.seat ? state.view.hand.filter((t) => t !== tile) : state.view.hand;
       return { view: { ...state.view, seats, hand } };
