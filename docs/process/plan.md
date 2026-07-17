@@ -49,9 +49,9 @@
 
 ## 当前状态
 
-阶段 4 系列的前三个子阶段（4.1 AI 补位、4.2 断线托管、4.3 黑暗模式）已完成，4.4（UI/操作优化）定案为"大厅/房间 UI 重做"，拆成 6 个子步骤，详细方案见 `phase-4.4-lobby-room-ui.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。4.5 Replay 已完成盘点、子步骤 1-3（server 侧事件归档、protocol `replay:get` schema、server gateway handler），最小记录形状与子步骤路线见 `phase-4.5-replay.md`（同一收尾规则）；子步骤 3 顺带把 `rebuildPlayerView` 补成 `RulesetModule` 第三个 dispatch 方法（D20）。
+阶段 4 系列的前三个子阶段（4.1 AI 补位、4.2 断线托管、4.3 黑暗模式）已完成，4.4（UI/操作优化）定案为"大厅/房间 UI 重做"，拆成 6 个子步骤，详细方案见 `phase-4.4-lobby-room-ui.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。4.5 Replay 已完成盘点、子步骤 1-4（server 侧事件归档、protocol `replay:get` schema、server gateway handler、web 回放播放器），最小记录形状与子步骤路线见 `phase-4.5-replay.md`（同一收尾规则）；子步骤 3 顺带把 `rebuildPlayerView` 补成 `RulesetModule` 第三个 dispatch 方法（D20）。子步骤 4 实现时发现 `TableView` 目前没有 `zimo`/`anGang`/`buGang` 的 UI 入口，纯浏览器点击无法保证打完一整局，因此没能补一条"完整打完一局→点击 Replay 链接"的自动化 e2e（已用真实浏览器手测确认 `/replay/...` 页面本身工作正常）——这是 `TableView` 现存缺口，与 replay 无关，留作已知待办，不在本阶段修。
 
-**下一步第一个动作**：阶段 4.5 Replay 子步骤 4——web 回放播放器（时间轴/单步前进，调用 `replay:get` 展示历史事件，见 `phase-4.5-replay.md` 子步骤路线表）。
+**下一步第一个动作**：阶段 4.5 Replay 子步骤 5——明牌 replay，复用 `debug:omniscientView` 同一套 `ALLOW_DEBUG_OMNISCIENT` 门控；范围（局终 vs 任意步）待定，见 `phase-4.5-replay.md` 子步骤路线表"衔接问题"一节。
 
 本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分，公共导出与协议行为不变。`pnpm verify` 全绿。
 
@@ -73,3 +73,4 @@
 - [ ] 阶段 6 前：mobile 具体路线（是否 react-native-web 统一）
 - [ ] 真人协作触发时：repo 权限、是否上分支保护
 - [ ] 日麻立项时：按 `../architecture/variant-boundary.md` §2 走一次边界复审，重点是庄家轮换公式与会话排名策略两条"待验证"条目
+- [ ] `TableView` 补 `zimo`/`anGang`/`buGang` 的 UI 入口（阶段 3 竖切遗留缺口，4.5 步骤 4 验证 replay 时发现：目前纯点击可能卡在只能自摸/补杠却没按钮的状态，打不完一整局）

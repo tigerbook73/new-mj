@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Dialog } from "@base-ui/react/dialog";
 import type {
   DebugOmniscientView,
   GameEventEnvelope,
   GameSnapshot,
   SeatId,
+  SessionResult,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
 import { ack } from "@/lib/socket";
@@ -31,7 +32,7 @@ export function TableView() {
 
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [sessionResult, setSessionResult] = useState<unknown>(null);
+  const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
 
@@ -73,7 +74,8 @@ export function TableView() {
           break;
       }
     };
-    const onSessionFinished = (message: { result: unknown }) => setSessionResult(message.result);
+    const onSessionFinished = (message: { result: SessionResult }) =>
+      setSessionResult(message.result);
     const onClosed = ({ reason }: { reason: string }) => {
       const notice =
         reason === "hostLeft" ? "The owner closed this room." : "This room was closed.";
@@ -152,7 +154,22 @@ export function TableView() {
         </Button>
       </div>
       {sessionResult != null && (
-        <p className="text-sm">Session finished: {JSON.stringify(sessionResult)}</p>
+        <div className="text-sm">
+          <p>Session finished: {JSON.stringify(sessionResult)}</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
+              (gameNumber) => (
+                <Link
+                  key={gameNumber}
+                  to={`/replay/${room?.id}/${gameNumber}`}
+                  className="underline"
+                >
+                  Replay game {gameNumber}
+                </Link>
+              ),
+            )}
+          </div>
+        </div>
       )}
       <p className="text-sm">
         Phase: {extras.phase ?? "unknown"} | Current turn: seat {view.currentSeat} | Wall remaining:{" "}
