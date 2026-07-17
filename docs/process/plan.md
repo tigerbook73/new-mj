@@ -29,10 +29,12 @@
 | 4.4  | UI/操作优化：大厅/房间 UI 重做，拆成 6 个子步骤                                                                                                   | 见下方"已完成阶段"小节                         | ✅   |
 | 4.5  | Replay / 明牌 Replay（内存事件日志，复用直播已有的可见性过滤逻辑 + 调试用 `getOmniscientView`）                                                   | 见下方"已完成阶段"小节                         | ✅   |
 | 4.7  | Junk 牌桌 UI 重做（视觉层）：真实牌面 + 布局，参考姊妹项目 `mj-next`                                                                              | 浏览器手测：真人对局能看到布局/牌面/牌河       | ✅   |
-| 5    | 持久化落地：事件日志/replay/战绩搬进 PG（重启后仍在）+ 真正的 Supabase OAuth（D16 触发条件）——原编号 4.6，从阶段 4 系列拉出单独立项（见下方说明） | 重启 server 后历史对局的 replay/战绩仍可查     |      |
+| 5    | 持久化落地：事件日志/replay/战绩搬进 PG（重启后仍在）+ 真正的 Supabase OAuth（D16 触发条件）——原编号 4.6，从阶段 4 系列拉出单独立项（见下方说明） | 重启 server 后历史对局的 replay/战绩仍可查     | ✅\* |
 | 6    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI 框架（垃圾胡基本完成后再开工）                                                                    | 单人能对着 AI 完整打完一局血战                 |      |
 | 7    | mobile（Expo，血战完成后再考虑）                                                                                                                  |                                                |      |
 
+> \* 阶段 5 代码已完成（4 个子步骤，见下方"已完成阶段"），但 Google/GitHub 按钮点击后的完整 OAuth 跳转需要用户提供真实 OAuth Client secret 才能端到端验证，尚未验证，见下方"下一步"。
+>
 > 编号没有 4.6：原计划里持久化落地排在阶段 4 系列最后一项（编号 4.6），理由是"不是新功能，是让已经跑起来的东西扛得住重启"。4.1-4.5、4.7 做完后，用户决定把持久化整个拉出来单独立项为阶段 5（血战、mobile 依次顺延为 6、7）——持久化需要一个真实的 Supabase 项目（URL/anon key/PG 连接串），跟前面纯代码就能推进的子阶段性质不同，值得独立排期而不是继续算在"阶段 4 系列"里。4.6 这个编号不再使用（避免和已经出现在 commit 历史/代码注释里的"4.7"产生错位）。
 >
 > 阶段 4 系列拆分依据：AI 是唯一"卡住能不能玩"的一块，优先级最高、单独先做；断线托管跟 AI 共享"自动出牌"这同一套基础设施，紧跟着做；小特性大多互相独立可并行；UI/操作优化（4.4）插在小特性之后、Replay 之前——用户选择现在就逐项列出具体条目，而不是等后面阶段跑完再收集反馈。详细方案见 `phase-4-junk-complete.md`（阶段 4 系列收尾后已删除，耐久内容见 `decisions.md`/`contracts/session-mechanics.md`/本文件"已完成阶段"）。
@@ -52,12 +54,15 @@
 - **阶段 4.4**（大厅/房间 UI 重做，6 个子步骤）：i18n（非 table 页文案全英文）；`LoginView` 换 shadcn `login-03` block；`/games` 改 junk/bloodbattle Tabs + `lobby:list` 房间列表/搜索/命名建房；`/lobby/:roomId`（原 `/lobby/:rulesetId`）改 `room:peek` 驱动的房间页，支持指定座位入座、为指定空座位加 bot；新增 `room:leave`（`waiting` 阶段房主离开删房/非房主离开清空座位，`in-game` 阶段等同断线转托管，全部真人退出自动关房）。协议新增 `lobby:list`/`room:peek`/`room:leave`、`room:playerLeft`/`room:closed` 事件、`SEAT_TAKEN` 错误码，完整契约见 `contracts/session-mechanics.md` §6。web e2e 17/17 全绿。
 - **阶段 4.5**（Replay / 明牌 Replay，5 个子步骤）：`Room` 新增 `finishedGames: FinishedGameLog[]`，每局结束归档 `{gameNumber, seatUserIds, events, finalState}`；`replay:get`（正式产品功能，参与过的玩家可查，不要求当前仍在房间）复用 core 的 `rebuildPlayerView` 重建终局视图 + 过滤后事件时间轴；`debug:replayOmniscientView`（调试专用，只支持局终，直接读 `finalState` 喂 `getOmniscientView`）。web 新增 `/replay/:roomId/:gameNumber` 播放器（`ReplayView`，单步前进/后退）。过程中把 `rebuildPlayerView` 补成 `RulesetModule` 第三个 dispatch 方法（`decisions.md` D20）。完整契约见 `contracts/session-mechanics.md` §10、`contracts/protocol-shared.md` §7。
 - **阶段 4.7**（Junk 牌桌 UI 重做，视觉层）：参考姊妹项目 `mj-next`（同一开发者的另一个麻将练习项目）复用其 `public/tiles/Regular/*.svg` 真实牌面素材；新增 `apps/web/src/lib/mahjongTiles.ts`（TileId→文件名映射，独立实现不 import `@new-mj/core`）、`src/lib/seatLayout.ts`、`src/store/tableLayout.ts`（`tileUnit` + `ResizeObserver`，选 store 方案而非纯 CSS container query 是因为 `apps/mobile` 未来无论如何都要用 JS 测量布局）、`src/components/mahjong/`（`Tile`/`HandRow`/`DiscardPile`/`MeldGroup`/`PlayerBadge`/`WallStack`）。`TableView` 重排成三层嵌套 CSS Grid，出牌交互不变。范围：只做 junk（bloodbattle 沿用公共骨架，D18 现状不变）、不做动画、不补 `zimo`/`anGang`/`buGang`（core PlayerView 契约缺口，见下方待办）。web e2e 17/17 全绿。
+- **阶段 5**（持久化，4 个子步骤，代码完成，OAuth 端到端验证待用户提供真实 secret）：参考姊妹项目 `../ai/rag-local` 的 Supabase 方案，Prisma 放进 `apps/server`（不建独立 `packages/db`）+ `profiles`/`room_sessions`/`game_logs` 三表无 FK；`RoomService.handleGameEnd`/会话结束 fire-and-forget 归档；`replay:get`/`debug:replayOmniscientView` 内存找不到时（进程重启过）DB 兜底，两者改 `async`，`RoomsGateway` 新增 `replyAsync`；`auth.middleware.ts` 按 `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` 是否配置在真实 Supabase 校验（`auth.getUser(token)`）和 D16 开发态校验之间分支，web `LoginView` 加回 Google/GitHub 按钮（`login-03` 原有社交按钮，D16 时为配合假登录去掉过）+ 新 `/auth/callback` 路由，dev 昵称登录收进 `import.meta.env.DEV` 门控区块继续给 e2e 用。已用本地 `npx supabase start`（Docker）验证 schema/迁移/持久化读写/GoTrue 真实签发 token 的校验逻辑本身（直连 GoTrue 容器）；该沙盒的 Kong 代理层对 `/auth/v1/*` 稳定 500（与本仓库代码无关），Google/GitHub 按钮点击后的完整跳转未验证。完整契约见 `contracts/session-mechanics.md` §11，取舍记录见 `decisions.md` D22。
 
 ## 当前状态
 
 阶段 4 系列（4.1-4.5、4.7，编号里没有 4.6，原因见上方阶段路线的说明）全部完成，已按 `../doc-map.md` §6 收尾：耐久内容吸纳进 `decisions.md`（D19-D21）、`contracts/session-mechanics.md`（§10 新增）、`contracts/protocol-shared.md`（§7 新增消息）与本文件"已完成阶段"，`phase-4-junk-complete.md`/`phase-4.4-lobby-room-ui.md`/`phase-4.5-replay.md` 三份过程文档已删除。`TableView` 缺 `zimo`/`anGang`/`buGang` 按钮（阶段 3 竖切遗留缺口，4.5 验证 replay 时发现）仍是已知待办，见下方"待办"。
 
-**下一步第一个动作**：阶段 5 持久化落地——先盘点 `Room.finishedGames`/`gameState` 现有内存形状，确定 Prisma schema 草案（对局/事件日志/用户表），需要用户提供真实 Supabase 项目凭据（URL/anon key/PG 连接串）才能接真正的 Supabase OAuth 部分；PG 持久化本身不依赖这个，可以先用本地/自建 PG 验证 schema。
+阶段 5（持久化 + 真正的 Supabase OAuth）代码已完成并提交（4 个子步骤），耐久内容已吸纳进 `decisions.md` D22、`contracts/session-mechanics.md` §11、`contracts/protocol-shared.md` §4、`architecture/data-model.md` §3、`architecture/system.md`。本沙盒用本地 `supabase start` 验证了 schema/持久化读写/GoTrue 真实 token 校验逻辑，但没能验证经 Kong 代理的完整 `/auth/v1/*` 请求（该沙盒 Kong 层的环境问题，非代码问题）以及 Google/GitHub 按钮点击后的真实 OAuth 跳转（需要用户提供的真实 OAuth Client secret）。
+
+**下一步第一个动作**：等用户提供真实 Supabase 项目 URL/anon key/service role key，以及 Google/GitHub OAuth Client ID/Secret（填进 `.env`，参考 `.env.example`），端到端验证一遍登录→大厅→牌桌的真实 OAuth 流程，确认无误后阶段 5 正式收尾（按 `../doc-map.md` §6）；OAuth secret 到位前，可以先开始阶段 6 血战到底的打磨（两者互不阻塞）。
 
 ## 待办
 

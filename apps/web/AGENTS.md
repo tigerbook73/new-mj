@@ -7,7 +7,7 @@
 - web 是 core engine 的纯消费者：只依赖 `@new-mj/protocol` 的类型对接 `apps/server` 的 Socket.IO 协议，不 import `@new-mj/core`，不实现任何玩法规则（架构铁律 6）。`getLegalActions` 是 core 内部函数，web 拿不到；能拿到的只有 server 已经算好塞进 `PlayerView` 的 `myClaimOptions` 这类字段。
 - UI 由 server 下发的 `PlayerView`（`myClaimOptions` 等 ruleset 自带字段）驱动，不在前端重新判断合法性——**这不是为了防泄密**（可见性过滤在事件下发时就做完了，前端懂不懂规则不影响谁能看到什么数据），纯粹是为了不让两份规则代码打架。要不要把这条边界正式确立成一层新的公共契约（PlayerView-only 的合法性/算分实现，web 提示和 AI 共用）在阶段 4.1 AI 落地时已经决定**不做**（`decisions.md` D21）：AI 直接跑在 server 进程里拿完整 `state`，这层契约暂时还是口头约定不是结构性保证，留作已知技术债。
 - 阶段 3 只接入 junk + bloodbattle 两个玩法的**通用骨架**牌桌（`PlayerViewBase` 公共字段）；阶段 4.7 把 junk 的牌桌 UI 重做成真实牌面+布局（见下方 `src/components/mahjong/`），bloodbattle 仍停在通用骨架，玩法专属阶段 UI（血战定缺/换三张等）留到阶段 6。
-- 阶段 3 用开发态假登录（本地签 JWT，见 `docs/decisions.md` D16），不接入真正的 Supabase OAuth。
+- 阶段 3 用开发态假登录（本地签 JWT，见 `docs/decisions.md` D16）；阶段 5 接入真正的 Supabase OAuth（Google/GitHub），`LoginView` 的开发态昵称表单没有删除，收进 `import.meta.env.DEV` 门控区块继续给 e2e 用（见 `docs/decisions.md` D22）。
 
 ## 代码约定
 
@@ -27,15 +27,16 @@
 
 - `src/main.tsx`：入口，挂载 `<App/>`。
 - `src/App.tsx`：挂载 `RouterProvider` + 全局 `<ThemeToggle/>`（不放进任何路由，所有页面都要看得到）。
-- `src/router.tsx`：路由表（`/login` `/games` `/lobby/:roomId` `/room/:roomId` `/replay/:roomId/:gameNumber`），`/games` 及以后的路由都包了 `RequireAuth`。
+- `src/router.tsx`：路由表（`/login` `/auth/callback` `/games` `/lobby/:roomId` `/room/:roomId` `/replay/:roomId/:gameNumber`），`/games` 及以后的路由都包了 `RequireAuth`；`/auth/callback`（阶段 5 新增）跟 `/login` 一样不包 `RequireAuth`——OAuth 重定向落地时还没连上 socket，谈不上"已登录"。
 - `src/components/RequireAuth.tsx`：未登录（`store.socket` 为空）重定向回 `/login`；单独成文件是因为和 `router.tsx` 放一起会触发 `react-refresh/only-export-components`（路由表本身不是组件导出）。
 - `src/store/session.ts`：`useSessionStore`（socket 实例、用户、房间、`PlayerView`），`applyPlayerJoined`/`applyReadyChanged`/`applyTurnStarted`/`applyTileDiscarded`/`applyClaimWindowOpened`/`applyClaimWindowResolved` 是给事件监听器用的增量更新 action。
 - `src/store/tableLayout.ts`：`useTableLayoutStore`（阶段 4.7 新增），只存一个 `tileUnit`（牌桌容器宽度换算出的缩放单位，由 `TableView` 的 `ResizeObserver` 写入），`src/components/mahjong/Tile.tsx` 读它算最终像素尺寸；跟 `useSessionStore` 无关故意分开建 store。
-- `src/lib/`：`socket.ts`（连接 + ack/事件封装）、`devAuth.ts`（开发态假登录）、`theme.ts`（黑暗模式：`getInitialTheme` 读 localStorage，没有则退回 `prefers-color-scheme`；`applyTheme` 切 `.dark` class 并持久化，`main.tsx` 在挂载 React 前先调一次避免首屏闪烁）、`mahjongTiles.ts`（阶段 4.7 新增，TileId→牌面 SVG 文件名映射，本地复制了一份 `TILE_KINDS` 静态换算表，这是公开的换算公式不是规则代码，不违反不 import `@new-mj/core`）、`seatLayout.ts`（阶段 4.7 新增，`seatAt(mySeat, direction)` 把绝对 `SeatId` 换算成"我下方/左/上/右"的相对方向）。
-- `src/views/`：`LoginView`/`GamePickerView`/`LobbyView`/`TableView`/`ReplayView`。`GamePickerView` 负责玩法 Tabs、`lobby:list`、搜索和建房；`LobbyView` 使用 `/lobby/:roomId` 的 `room:peek`，支持指定座位入座/加 bot/离开；`TableView` 对 junk 用真实牌面+布局渲染（阶段 4.7 重做，见 `src/components/mahjong/`），bloodbattle 仍只渲染 `PlayerViewBase` 公共骨架，不按 `rulesetId` 分支具体规则 UI，血战定缺/换三张这类专属阶段没有对应操作按钮，卡在那个阶段发不出动作是预期行为；`ReplayView`（阶段 4.5 新增，`/replay/:roomId/:gameNumber`）逐事件步进回放已结束的对局，JSON-only 渲染不复用 `mahjong/` 牌面组件。
+- `src/lib/`：`socket.ts`（连接 + ack/事件封装）、`devAuth.ts`（开发态假登录）、`theme.ts`（黑暗模式：`getInitialTheme` 读 localStorage，没有则退回 `prefers-color-scheme`；`applyTheme` 切 `.dark` class 并持久化，`main.tsx` 在挂载 React 前先调一次避免首屏闪烁）、`mahjongTiles.ts`（阶段 4.7 新增，TileId→牌面 SVG 文件名映射，本地复制了一份 `TILE_KINDS` 静态换算表，这是公开的换算公式不是规则代码，不违反不 import `@new-mj/core`）、`seatLayout.ts`（阶段 4.7 新增，`seatAt(mySeat, direction)` 把绝对 `SeatId` 换算成"我下方/左/上/右"的相对方向）、`supabase.ts`（阶段 5 新增，`SupabaseClient | undefined`——`createClient` 对空字符串 URL 会**同步抛错**，不像 server 侧的 `jwtSecret` 能给一个安全的开发态默认值，所以未配置时导出 `undefined` 而不是一个假客户端，调用方必须显式处理"没配置"这个分支，见 `LoginView`/`AuthCallbackView`/`store/session.ts` 的用法）。
+- `src/views/`：`LoginView`/`GamePickerView`/`LobbyView`/`TableView`/`ReplayView`/`AuthCallbackView`。`GamePickerView` 负责玩法 Tabs、`lobby:list`、搜索和建房；`LobbyView` 使用 `/lobby/:roomId` 的 `room:peek`，支持指定座位入座/加 bot/离开；`TableView` 对 junk 用真实牌面+布局渲染（阶段 4.7 重做，见 `src/components/mahjong/`），bloodbattle 仍只渲染 `PlayerViewBase` 公共骨架，不按 `rulesetId` 分支具体规则 UI，血战定缺/换三张这类专属阶段没有对应操作按钮，卡在那个阶段发不出动作是预期行为；`ReplayView`（阶段 4.5 新增，`/replay/:roomId/:gameNumber`）逐事件步进回放已结束的对局，JSON-only 渲染不复用 `mahjong/` 牌面组件；`AuthCallbackView`（阶段 5 新增，`/auth/callback`）接住 `signInWithOAuth` 的重定向，读 Supabase session、`connect()`、跳 `/games`，跟 `LoginView` 的开发态假登录殊途同归到同一个 `connect(token)`。
 - `src/components/mahjong/`：阶段 4.7 新增的牌桌视觉组件，跟 `components/ui/`（shadcn 生成物）和顶层 app-shell 组件分开。`Tile.tsx`（单张牌，cva 变体处理 selected/disabled 等状态，尺寸从 `useTableLayoutStore` 读）、`HandRow.tsx`（一个座位的手牌区）、`DiscardPile.tsx`（一个座位的牌河，`DiscardEntry.claimedBy` 的墓碑用变暗/删除线表示，不从数组移除）、`MeldGroup.tsx`（一个座位的副露）、`PlayerBadge.tsx`（座位信息卡片）、`WallStack.tsx`（纯装饰牌墙层，只吃 `wallCount`，不涉及任何具体牌身份）。
 - `src/components/ThemeToggle.tsx`：固定右上角的黑暗模式切换按钮，本地 `useState` + `useEffect` 调 `theme.ts`，不进 Zustand store（跟 session 状态无关，不需要跨组件同步）。
-- `src/components/login-form.tsx`：shadcn `login-03` block 生成后手动改的产物（block 不是 `ui/` 基础组件，改动是预期用法）——去掉了原版的社交登录按钮/邮箱密码字段/条款页脚，改成单一昵称输入，实际登录逻辑（`devAuth`/`connect`/`navigate`）仍留在 `LoginView` 里，这个文件只管展示。
+- `src/components/login-form.tsx`：shadcn `login-03` block 生成后手动改的产物（block 不是 `ui/` 基础组件，改动是预期用法）——去掉了原版的邮箱密码字段/条款页脚，改成单一昵称输入，实际登录逻辑（`devAuth`/`connect`/`navigate`）仍留在 `LoginView` 里，这个文件只管展示。阶段 5：只在 `LoginView` 的 `import.meta.env.DEV` 区块里渲染，是 dev/e2e-test-only 的登录路径，不是主入口——原版自带的社交登录按钮当初为配合这个昵称表单被去掉，阶段 5 在 `social-login-form.tsx` 里接回真正的 OAuth，见下。
+- `src/components/social-login-form.tsx`（阶段 5 新增）：`LoginView` 的主登录入口，Google/GitHub 两个按钮调 `supabase.auth.signInWithOAuth`；`supabase` 未配置（`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` 为空）时按钮仍渲染，点击后内联报错而不是崩溃。
 - `src/components/ui/`：shadcn 生成的基础组件，`login-03` 引入时新增了 `card.tsx`/`label.tsx`/`separator.tsx`/`field.tsx`（`separator.tsx` 目前没在用，block 自带、留着无害）。
 - `test/*.e2e-spec.ts`：Playwright e2e 用例，`lobby.e2e-spec.ts`/`table.e2e-spec.ts` 用多 `browser.newContext()` 模拟多个真人玩家；`table.e2e-spec.ts` 里 junk 验证到真的发出一个 `discard` 并被接受，bloodbattle 只验证到公共骨架渲染（原因见上一条）。
 

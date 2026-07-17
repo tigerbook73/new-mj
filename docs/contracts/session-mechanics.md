@@ -114,6 +114,7 @@ finished: 计算排名，对外公开 result
 - ✅ `lobby:list`/`room:peek`（阶段 4.4）：一次性查询快照，不做实时推送
 - ✅ 房间名称（阶段 4.4）：`room:create` 可选 `name`，`room:join`/`room:addBot` 可选 `seat` 指定座位
 - ✅ Replay（阶段 4.5）：每局归档事件日志 + 终局状态快照，参与过的玩家可回放；明牌 replay 走独立调试通道，见 §10
+- ✅ 持久化（阶段 5）：事件日志/战绩落 PG，重启后 `replay:get` 仍可查；真正的 Supabase OAuth，见 §11
 
 **MVP 不实现**：
 
@@ -122,7 +123,7 @@ finished: 计算排名，对外公开 result
 - ❌ 重连恢复（掉线/离座后的座位没有"恢复真人操控"路径，`isAutoPiloted` 永不清除；可降级为踢出 + 重新加入）
 - ❌ 中途替换玩家、再来一轮
 - ❌ 观战（根 `AGENTS.md` 不做清单，非某个具体阶段的"待做"，是长期不做）
-- ❌ 战绩查询、持久化（事件日志/replay 目前只在内存里，重启即丢；见独立立项的持久化阶段，`process/plan.md`）
+- ❌ 战绩聚合查询接口（`stats:get`/`profile:get`，`contracts/protocol-shared.md` §4 仍是占位）：阶段 5 落地的是持久化层本身（schema + 写入 + `replay:get` 的 DB 兜底读取），不是一个新的聚合查询 API/UI，见 §11
 - ❌ `lobby:list` 实时推送（仍是查询快照，不随他人建房/离开自动刷新）
 
 **评审点 H【已定：采纳，已实现】**：对局中退出 = 转托管代打到局终，掉线与主动离座同路径，不允许中途散局。掉线路径（`RoomsGateway.handleDisconnect` → `RoomService.handleDisconnect`）和主动离座路径（`room:leave` → 同一条内部标记逻辑）都已实现，共享同一套托管机制，只是触发入口不同；`waiting` 阶段不适用这条规则（还没开局，谈不上"中途"），离座直接清空座位或删房，见 §6。
@@ -206,4 +207,12 @@ Player C: room:leave {}
   - `finalState`：这局打完那一刻的 core 引擎状态——`handleGameEnd` 在下一局 `beginGame()` 覆盖 `room.gameState` 之前存的快照，只给调试用的明牌 replay 用（见下）。
 - **`replay:get`**（查询，ack 给数据；正式产品功能，非调试专用）：请求 `{ roomId, gameNumber }`；鉴权只看请求者 `userId` 是否出现在该局的 `seatUserIds` 里——**不要求当前还在这个房间**（`seatUserIds` 是快照，已经离开房间的玩家仍能查自己参与过的对局，跟"当前房间连接注册表"完全脱钩，这点跟本文件其余 `room:*` 消息都要求当前在房间不同）。响应 `{ gameNumber, finalView, events }`：`finalView` 是该座位视角的终局 `PlayerView`，`events` 是 `eventsVisibleTo` 过滤后该座位可见的事件序列，供客户端单步/拖动播放——响应形状故意跟 `game:snapshot`（一次全量快照 + 后续事件增量）的心智模型对齐，不发明新协议形状。错误码：`gameNumber` 未归档 → `GAME_NOT_FOUND`；请求者不在 `seatUserIds` 里 → `UNAUTHORIZED`。
 - **明牌 replay**（`debug:replayOmniscientView`）是调试/测试专用逃生舱，只支持局终（直接读 `finalState` 喂 `getOmniscientView`，不做事件重放），鉴权模型完全不同于 `replay:get`（要求当前是房间已入座玩家，跟直播版全明牌一致），不进正式产品 UI——完整说明见 `contracts/protocol-shared.md` §7、`decisions.md` D19。
-- 事件日志/`finalState` 目前只存内存（`RoomService` 内部 `Map`）：`finished` 的房间对象不会被主动清理，一直留在内存里直到进程重启才整体清空（服务端目前没有任何房间过期/回收机制，是已知的 MVP 限制，不是持久化的替代品）——持久化（重启后仍可查，且能限制内存占用）是独立立项的下一阶段，见 `process/plan.md`。
+- 事件日志/`finalState` 存内存的同时，`handleGameEnd`/会话结束也会 fire-and-forget 归档进 PG（阶段 5，见 §11）——内存副本仍是活跃房间期间的权威来源，`finished` 的房间对象不会被主动清理，一直留在内存里直到进程重启才整体清空（服务端目前没有任何房间过期/回收机制，是已知的 MVP 限制）；PG 副本是重启后 `replay:get` 兜底读取的来源，两者不是互斥关系。
+
+## 11. 持久化（阶段 5）
+
+- **三张表，Prisma 管理，无跨表外键**（`apps/server/prisma/schema.prisma`）：`profiles`（`id` = 真实 Supabase `auth.users.id`，`nickname`/`avatar`，只在真实 Supabase 登录成功后由 `auth.middleware.ts` upsert，dev 假登录不写这张表）、`room_sessions`（`id` = roomId，`rulesetId`/`sessionFormat`/`result: SessionResult`/`finishedAt`，会话结束时归档一行）、`game_logs`（`roomId`+`gameNumber` 复合唯一，`rulesetId`/`seatUserIds`/`events`/`finalState`，每局结束归档一行，跟 §10 的内存 `FinishedGameLog` 同形状 + 多一个 `rulesetId` 字段，让归档记录不依赖 `room_sessions` 行是否存在就能自解释）。三表互相之间、和 `auth.users` 之间都不建外键——`game_logs` 行必然先于对应 `room_sessions` 行写入（局结束 vs 会话结束不是同一时刻），硬 FK 会拒绝这些插入；`decisions.md` D7"单向引用 userId"的精神延伸到这里，一致性由应用层保证，不靠数据库约束。
+- **写入路径 fire-and-forget**：`RoomService.handleGameEnd`（每局结束）和会话结束时分别调 `PersistenceService.archiveGame`/`archiveSession`，都不 `await`——失败只记日志，绝不能让"存历史记录"这件事有能力打断正在进行的对局逻辑（对局本身的正确性不依赖持久化是否成功）。`PersistenceService` 在 `DATABASE_URL` 未配置时每个方法直接短路成 no-op/`null`，不会让 Prisma 真的尝试连接。
+- **读取路径**：`replay:get`/`debug:replayOmniscientView` 在内存里的 `room.finishedGames` 找不到对应局时（即该房间对象不在 `RoomService` 的内存 `Map` 里——按上面的说明，这只可能是"进程重启过"），退回查 `game_logs` 表；查到则照常走 `rebuildPlayerView`/`getOmniscientView` 重建返回值。`RoomService.getReplay`/`getReplayOmniscientView` 因此是 `async`，`RoomsGateway` 用只服务这两个 handler 的 `replyAsync`（其余 handler 保持同步 `reply()`，不受影响）。
+- **鉴权**：`auth.middleware.ts` 按 `ConfigService.supabaseUrl`/`supabaseServiceKey` 是否配置分支——配置了就用 `@supabase/supabase-js` 的 `auth.getUser(token)` 委托 Supabase 自己的服务器验证真实 token（`socket.data.userId` = Supabase 返回的 `user.id`，同时 fire-and-forget upsert 一行 `profiles`）；未配置就回退 D16 的开发态共享 HS256 校验——两条路径共用同一个中间件函数，靠配置存在与否分支，不是新增一个"测试模式"开关，现有全部 e2e（不设 `SUPABASE_URL`）零改动继续用旧路径。
+- 完整取舍记录见 `decisions.md` D22。
