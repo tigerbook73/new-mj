@@ -1,7 +1,15 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { chooseAction } from "@new-mj/ai";
-import type { ApplyResult, GameConfig, GameEvent, OmniscientView, SeatId } from "@new-mj/core";
+import {
+  eventsVisibleTo,
+  type ApplyResult,
+  type GameConfig,
+  type GameEvent,
+  type OmniscientView,
+  type PlayerViewBase,
+  type SeatId,
+} from "@new-mj/core";
 import type { RankingEntry, RoomInfo, RoomSummary, SessionFormat } from "@new-mj/protocol";
 import { GameService } from "../core/game.service";
 import { EventBus } from "./event-bus";
@@ -449,6 +457,32 @@ export class RoomService {
       throw new RoomServiceError("GAME_NOT_STARTED", "no game in progress");
     }
     return this.gameService.getOmniscientView(room.gameState);
+  }
+
+  /**
+   * phase-4.5-replay.md step 3 — real product feature (unlike
+   * getOmniscientView): any userId who was seated in that specific
+   * archived game may fetch its replay, regardless of whether they're
+   * still in this room right now (seatUserIds is that game's own
+   * snapshot, not current room.players occupancy).
+   */
+  getReplay(
+    roomId: string,
+    gameNumber: number,
+    userId: string,
+  ): { gameNumber: number; finalView: PlayerViewBase; events: GameEvent[] } {
+    const room = this.mustGet(roomId);
+    const log = room.finishedGames.find((entry) => entry.gameNumber === gameNumber);
+    if (!log) throw new RoomServiceError("GAME_NOT_FOUND");
+    const seat = log.seatUserIds.findIndex((seatUserId) => seatUserId === userId);
+    if (seat === -1) throw new RoomServiceError("UNAUTHORIZED");
+    const finalView = this.gameService.rebuildPlayerView(
+      room.rulesetId,
+      log.events,
+      seat as SeatId,
+    );
+    if (!finalView) throw new RoomServiceError("INTERNAL");
+    return { gameNumber, finalView, events: eventsVisibleTo(log.events, seat as SeatId) };
   }
 
   private beginGame(room: Room): void {

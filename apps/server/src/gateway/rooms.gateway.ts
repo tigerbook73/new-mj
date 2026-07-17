@@ -14,6 +14,7 @@ import { eventsVisibleTo } from "@new-mj/core";
 import {
   GameActionRequestSchema,
   LobbyListRequestSchema,
+  ReplayGetRequestSchema,
   RoomAddBotRequestSchema,
   RoomCreateRequestSchema,
   RoomEnterRequestSchema,
@@ -24,6 +25,7 @@ import {
   RoomRemovePlayerRequestSchema,
   type DebugOmniscientView,
   type Reply,
+  type ReplayGetResponse,
   type RoomInfo,
   type RoomParticipant,
   type RoomSummary,
@@ -329,6 +331,24 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       this.seatOf(info);
       const view = this.roomService.getOmniscientView(info.roomId);
       return { wall: [...view.wall], hands: view.hands.map((hand) => [...hand]) };
+    });
+  }
+
+  /**
+   * phase-4.5-replay.md step 3 — query, not gated by the room membership
+   * registry (a player who already left the room may still replay a game
+   * they were seated in), only by handshake identity + RoomService's own
+   * seatUserIds check for that specific archived game.
+   */
+  @SubscribeMessage("replay:get")
+  handleReplayGet(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<ReplayGetResponse> {
+    return this.reply(() => {
+      const userId = this.requireUserId(client);
+      const parsed = ReplayGetRequestSchema.parse(payload);
+      return this.roomService.getReplay(parsed.roomId, parsed.gameNumber, userId);
     });
   }
 

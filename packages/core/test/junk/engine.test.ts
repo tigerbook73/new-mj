@@ -7,6 +7,7 @@ import {
   eventsVisibleTo,
   getLegalActions as engineGetLegalActions,
   getPlayerView as engineGetPlayerView,
+  rebuildPlayerView as engineRebuildPlayerView,
   junkRuleSet,
   allTileIds,
   createPrng,
@@ -234,6 +235,10 @@ test("engine-api createGame/applyAction/getLegalActions/getPlayerView dispatch b
   const seat = state.currentSeat;
   expect(engineGetLegalActions(state, seat)).toEqual(junkRuleSet.getLegalActions(state, seat));
   expect(engineGetPlayerView(state, seat)).toEqual(junkRuleSet.getPlayerView(state, seat));
+  expect(engineRebuildPlayerView("junk", started.events, seat)).toEqual(
+    junkRuleSet.rebuildPlayerView(started.events, seat),
+  );
+  expect(engineRebuildPlayerView("unknown-ruleset", started.events, seat)).toBeUndefined();
   const tile = state.seats[seat]!.hand[0]!;
   const viaEngine = engineApplyAction(state, seat, { type: "discard", tile });
   const viaRuleSet = junkRuleSet.applyAction(state, seat, { type: "discard", tile });

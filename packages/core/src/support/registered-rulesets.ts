@@ -1,6 +1,5 @@
 import { bloodbattleRuleSet } from "@/rulesets/bloodbattle/index";
-import { rebuildPlayerView as rebuildBloodbattlePlayerView } from "@/rulesets/bloodbattle/view";
-import { junkRuleSet, rebuildPlayerView } from "@/rulesets/junk/index";
+import { junkRuleSet } from "@/rulesets/junk/index";
 import type { GameEvent } from "@/events";
 import type { SeatId } from "@/lib/ids";
 import type { ApplyResult } from "@/types";
@@ -33,7 +32,7 @@ export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
       junkRuleSet.getLegalActions(state as Parameters<typeof junkRuleSet.getLegalActions>[0], seat),
     getPlayerView: (state, seat) =>
       junkRuleSet.getPlayerView(state as Parameters<typeof junkRuleSet.getPlayerView>[0], seat),
-    rebuildPlayerView,
+    rebuildPlayerView: junkRuleSet.rebuildPlayerView,
     computeNextDealer: (state, currentDealer) =>
       junkRuleSet.computeNextDealer(
         state as Parameters<typeof junkRuleSet.computeNextDealer>[0],
@@ -59,7 +58,7 @@ export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
         state as Parameters<typeof bloodbattleRuleSet.getPlayerView>[0],
         seat,
       ),
-    rebuildPlayerView: rebuildBloodbattlePlayerView,
+    rebuildPlayerView: bloodbattleRuleSet.rebuildPlayerView,
     computeNextDealer: (state, currentDealer) =>
       bloodbattleRuleSet.computeNextDealer(
         state as Parameters<typeof bloodbattleRuleSet.computeNextDealer>[0],

@@ -25,4 +25,5 @@ export {
   createGame,
   getLegalActions,
   getPlayerView,
+  rebuildPlayerView,
 } from "./engine.ts";

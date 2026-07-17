@@ -1,7 +1,7 @@
 import type { RulesetModule } from "@/engine";
 import { applyAction, createBloodbattleGame, getLegalActions } from "./state-machine.ts";
 import { computeNextBloodbattleDealer } from "./prelude.ts";
-import { getPlayerView } from "./view.ts";
+import { getPlayerView, rebuildPlayerView } from "./view.ts";
 import type { BloodbattleAction, BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 
 export {
@@ -38,4 +38,5 @@ export const bloodbattleRuleSet: RulesetModule<
   applyAction,
   getLegalActions,
   getPlayerView,
+  rebuildPlayerView,
 };

@@ -16,12 +16,12 @@ import {
   sameKind,
 } from "./state-machine.ts";
 import { applyClaimResponse } from "./claims.ts";
-import { getPlayerView } from "./view.ts";
+import { getPlayerView, rebuildPlayerView } from "./view.ts";
 import type { JunkAction, JunkApplyResult, JunkState } from "./types.ts";
 
 export { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 export { computeNextJunkDealer, createJunkGame } from "./state-machine.ts";
-export { getPlayerView, rebuildPlayerView } from "./view.ts";
+export { getPlayerView } from "./view.ts";
 export type {
   JunkAction,
   JunkApplyResult,
@@ -83,4 +83,5 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
     return result;
   },
   getPlayerView,
+  rebuildPlayerView,
 };

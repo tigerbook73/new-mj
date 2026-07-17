@@ -1,3 +1,4 @@
+import type { GameEvent } from "./events.ts";
 import type { SeatId } from "./lib/ids.ts";
 import { junkRuleSet } from "./rulesets/junk/index.ts";
 import { bloodbattleRuleSet } from "./rulesets/bloodbattle/index.ts";
@@ -23,6 +24,17 @@ export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
    * (e.g. dealer continuation) without touching server orchestration.
    */
   computeNextDealer: (finishedState: TState, currentDealer: SeatId) => SeatId;
+  /**
+   * Reconstructs a seat's view by replaying a stored event stream instead of
+   * deriving it from live state — same event-reconstruction logic
+   * getPlayerView's caller would see live (decisions.md D-事件重建≡直接派生),
+   * just fed historical events. Ruleset-owned (payload interpretation is
+   * ruleset-private), unlike getOmniscientView (D19) which is generic
+   * because it only reads the common `{ wall, seats }` shape — replaying
+   * events requires understanding what each event type means, so this can't
+   * be a single cross-ruleset function. Used by phase-4.5-replay.md.
+   */
+  rebuildPlayerView: (events: readonly GameEvent[], seat: SeatId) => TView;
 };
 
 type StateWithConfig = { config: GameConfig };
@@ -63,3 +75,10 @@ export const getPlayerView = (state: StateWithConfig, seat: SeatId): PlayerViewB
 
 export const computeNextDealer = (state: StateWithConfig, currentDealer: SeatId): SeatId =>
   getRuleset(state.config.rulesetId)?.computeNextDealer(state, currentDealer) ?? currentDealer;
+
+/** Dispatches by rulesetId (no state to read it from — replay has no live state). */
+export const rebuildPlayerView = (
+  rulesetId: string,
+  events: readonly GameEvent[],
+  seat: SeatId,
+): PlayerViewBase | undefined => getRuleset(rulesetId)?.rebuildPlayerView(events, seat);

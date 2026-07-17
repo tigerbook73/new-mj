@@ -1,7 +1,7 @@
 # 阶段 4.5：Replay / 明牌 Replay
 
 > 过程性文档：本子阶段的详细实施计划，由 `plan.md`/`phase-4-junk-complete.md` 链接过来。收尾时把耐久内容按 `doc-map.md` §6 吸纳到对应文档，再删除本文件。
-> 当前状态：盘点完成，最小记录形状已确定，子步骤 1（server 侧事件归档）、子步骤 2（protocol `replay:get` schema）已完成；子步骤 3-5 留待下一轮确认（照 4.4 拆成多个子步骤逐个做的先例）。
+> 当前状态：盘点完成，最小记录形状已确定，子步骤 1-3（server 侧事件归档、protocol `replay:get` schema、server gateway handler）已完成；子步骤 4-5 留待下一轮确认（照 4.4 拆成多个子步骤逐个做的先例）。
 
 ## 用户确认过的设计点
 
@@ -40,7 +40,7 @@ type GameReplayRecord = {
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------- | ---- |
 | 1    | server：`Room` 加归档字段（`FinishedGameLog[]`），`beginGame` 记录 `seatUserIds` 快照，`runAction`/`handleGameEnd` 累积/归档 `events` | ✅   |
 | 2    | protocol：新增查询式消息（如 `replay:get`），入参 `{roomId, gameNumber}`；鉴权校验请求者 `userId` 出现在该局的 `seatUserIds` 里       | ✅   |
-| 3    | server gateway：新增 handler，复用 `rebuildPlayerView`（需要先在 server 侧接一层薄封装，类似 `GameService` 现在对四签名的封装）       |      |
+| 3    | server gateway：新增 handler，复用 `rebuildPlayerView`（需要先在 server 侧接一层薄封装，类似 `GameService` 现在对四签名的封装）       | ✅   |
 | 4    | web：回放播放器（时间轴/单步前进，展示历史事件）                                                                                      |      |
 | 5    | 明牌 replay：复用 `debug:omniscientView` 同一套环境变量门控；范围（局终 vs 任意步）待第 1-4 步落地后再定                              |      |
 
@@ -48,6 +48,10 @@ type GameReplayRecord = {
 
 **步骤 2 实现记录**：新文件 `packages/protocol/src/replay.ts`——`ReplayGetRequestSchema`（`{roomId, gameNumber}`）与 `ReplayGetResponseSchema`（`{gameNumber, finalView, events}`）。响应形状故意跟 `GameSnapshotSchema` 对齐（`finalView: PlayerViewBaseSchema` + `events: GameEventSchema[]`）——直播是"入座给一次全量快照 + 后续事件增量"，回放对应"进入回放给一次终局快照 + 完整事件时间轴供单步/拖动"，复用同一套心智模型，不发明新协议形状。`finalView`/`events` 复用 `game.ts` 现成的 schema，没有新增字段类型。协议层还不做鉴权（鉴权是 server 的事，见步骤 3），这一步只定数据形状。
 
+**步骤 3 实现记录**：实施时发现 `rebuildPlayerView` 之前不是 `RulesetModule` 的正式契约——只是 junk/bloodbattle 各自 `view.ts` 里的裸导出，没有按 `rulesetId` dispatch 的入口（不像 `getPlayerView`/`computeNextDealer`）。这跟 D19 的 `getOmniscientView` 正相反：`getOmniscientView` 不需要 dispatch 是因为它只做结构化读取、没有规则语义；`rebuildPlayerView` 要解释事件 payload，天然是玩法私有逻辑，所以补齐处理方式是让它成为 `RulesetModule` 的第三个 dispatch 方法（跟 `computeNextDealer` 同类），而不是绕开契约。已同步更新 `engine-contract.md` §4、`decisions.md`（复用 D19 的判定标准："是否有规则语义"）。
+
+`RoomService.getReplay(roomId, gameNumber, userId)`：查 `finishedGames` 对应 `gameNumber`（找不到 → `GAME_NOT_FOUND`，新增错误码，`common.ts` 是唯一权威定义）；`userId` 不在该局 `seatUserIds` 里 → `UNAUTHORIZED`；用 `eventsVisibleTo` 过滤事件、`GameService.rebuildPlayerView` 重建终局视图。Gateway 的 `replay:get` handler 故意只用 `requireUserId`（读握手身份），不用 `requireConnection`/`seatOf`（那两个依赖当前房间连接注册表）——已经离开房间的玩家应该仍能查自己参与过的对局。测试：`room.service.spec.ts` 新增 4 条（正常返回、`GAME_NOT_FOUND`、`UNAUTHORIZED`、快照不受 `room.players` 后续变化影响）；新增 e2e `test/replay-get.e2e-spec.ts` 4 条（含验证不依赖连接注册表的场景）。
+
 ## 状态
 
-步骤 1（server 侧事件归档）、步骤 2（protocol `replay:get` schema）已完成并通过各自 `pnpm verify`。步骤 3-5 待下一轮确认后继续。
+步骤 1（server 侧事件归档）、步骤 2（protocol `replay:get` schema）、步骤 3（server gateway handler + core `rebuildPlayerView` dispatch）已完成并通过各自 `pnpm verify`。步骤 4-5 待下一轮确认后继续。

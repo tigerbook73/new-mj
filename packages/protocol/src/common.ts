@@ -23,6 +23,7 @@ export const ERROR_CODES = [
   "INVALID_CONFIG",
   "INTERNAL",
   "SEAT_TAKEN",
+  "GAME_NOT_FOUND",
 ] as const;
 export const ErrCodeSchema = z.enum(ERROR_CODES);
 export type ErrCode = z.infer<typeof ErrCodeSchema>;

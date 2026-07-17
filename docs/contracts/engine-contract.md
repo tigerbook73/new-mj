@@ -36,12 +36,13 @@
 - `applyAction(state, seat, action)`：非法即返回 `RuleViolation`（含机器可读 code），state 不变；server 超时代提交的 `pass` 与玩家主动 `pass` 完全同型（`decisions.md` D5）
 - `getPlayerView(state, seat)`：引擎按 `state.config.rulesetId` 分发到具体 ruleset，返回值收窄为 `PlayerViewBase`；调用方若需要玩法私有字段，用具体 ruleset 的 `getPlayerView` 或做类型收窄
 
-## 4. 跨局 dispatch：`RulesetModule` 的扩展点
+## 4. `RulesetModule` 的扩展点（跨局 dispatch + 事件重建）
 
-除了单局内的四签名，`RulesetModule` 还承担"跨局但仍属于麻将规则"的 dispatch 职责——**这里只列契约签名，具体公式属于玩法私有，见各 `variants/*.md`**：
+除了单局内的四签名，`RulesetModule` 还承担其他 dispatch 职责——**这里只列契约签名，具体公式/解释逻辑属于玩法私有，见各 `variants/*.md`**：
 
-- `computeNextDealer(finishedState, currentDealer) → SeatId`：给定上一局怎么打完的，下一局谁坐庄。`finishedState` 就是刚打完那局的最终状态，不是新发明的类型。第 1 局的庄家（房主座位）不经过这个方法，由房间层直接决定，见 `session-mechanics.md`。
-- 会话排名策略：**当前尚未拆成 dispatch 方法**，现状是房间层（`RoomService.computeRanking`）直接实现，两个玩法共用同一份代码——这是待验证的私有决策，不是确认的公共契约，见 `architecture/variant-boundary.md`。新增玩法如果排名逻辑与现状不同，这里预期会新增一个 dispatch 方法（可能命名为 `computeRanking`），而不是分支硬编码进房间层。
+- `computeNextDealer(finishedState, currentDealer) → SeatId`（跨局）：给定上一局怎么打完的，下一局谁坐庄。`finishedState` 就是刚打完那局的最终状态，不是新发明的类型。第 1 局的庄家（房主座位）不经过这个方法，由房间层直接决定，见 `session-mechanics.md`。
+- 会话排名策略（跨局）：**当前尚未拆成 dispatch 方法**，现状是房间层（`RoomService.computeRanking`）直接实现，两个玩法共用同一份代码——这是待验证的私有决策，不是确认的公共契约，见 `architecture/variant-boundary.md`。新增玩法如果排名逻辑与现状不同，这里预期会新增一个 dispatch 方法（可能命名为 `computeRanking`），而不是分支硬编码进房间层。
+- `rebuildPlayerView(events, seat) → TView`（局内，非跨局）：不经过实时 `state`，直接从一段历史事件流重建某座位的 view——跟 `getPlayerView` 是同一个不变量的两种入口（`decisions.md` "事件重建 ≡ 直接派生"），区别只是数据来源是存量事件而非当前 state。事件 payload 的解释逻辑是玩法私有的，所以（跟 `computeNextDealer` 同理）必须走 dispatch，不能像 `getOmniscientView`（D19，§8）那样做成跨玩法通用的结构化纯函数。`packages/core/src/engine.ts` 导出的顶层 `rebuildPlayerView(rulesetId, events, seat)` 按 `rulesetId` 显式 dispatch（没有 `state` 可读，不能像其余函数那样从 `state.config.rulesetId` 取）。供 `docs/process/phase-4.5-replay.md` 使用。
 
 新增玩法时，只需要在自己的 ruleset 里实现这些方法（哪怕实现内容和别的玩法一样也要各自写一份，见 `architecture/variant-boundary.md`），不动 `RoomService`/`RoomsGateway` 等编排代码。
 

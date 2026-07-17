@@ -6,8 +6,10 @@ import {
   getLegalActions as coreGetLegalActions,
   getOmniscientView as coreGetOmniscientView,
   getPlayerView as coreGetPlayerView,
+  rebuildPlayerView as coreRebuildPlayerView,
   type ApplyResult,
   type GameConfig,
+  type GameEvent,
   type OmniscientView,
   type PlayerViewBase,
   type SeatId,
@@ -53,5 +55,14 @@ export class GameService {
   getOmniscientView(state: unknown): OmniscientView {
     // any: see applyAction.
     return coreGetOmniscientView(state as any);
+  }
+
+  /** phase-4.5-replay.md — reconstructs a seat's view from a stored event log. */
+  rebuildPlayerView(
+    rulesetId: string,
+    events: readonly GameEvent[],
+    seat: SeatId,
+  ): PlayerViewBase | undefined {
+    return coreRebuildPlayerView(rulesetId, events, seat);
   }
 }
