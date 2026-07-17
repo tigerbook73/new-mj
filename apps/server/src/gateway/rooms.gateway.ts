@@ -12,6 +12,7 @@ import {
 import type { SeatId } from "@new-mj/core";
 import { eventsVisibleTo } from "@new-mj/core";
 import {
+  DebugReplayOmniscientViewRequestSchema,
   GameActionRequestSchema,
   LobbyListRequestSchema,
   ReplayGetRequestSchema,
@@ -349,6 +350,26 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       const userId = this.requireUserId(client);
       const parsed = ReplayGetRequestSchema.parse(payload);
       return this.roomService.getReplay(parsed.roomId, parsed.gameNumber, userId);
+    });
+  }
+
+  /**
+   * phase-4.5-replay.md step 5 — 明牌 replay, end-of-game only. Same gate as
+   * handleDebugOmniscientView above (ALLOW_DEBUG_OMNISCIENT + current room
+   * membership), not the "any past participant" model handleReplayGet uses.
+   */
+  @SubscribeMessage("debug:replayOmniscientView")
+  handleDebugReplayOmniscientView(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<DebugOmniscientView> {
+    return this.reply(() => {
+      if (!this.configService.allowDebugOmniscient) throw new RoomServiceError("UNAUTHORIZED");
+      const info = this.requireConnection(client);
+      this.seatOf(info);
+      const parsed = DebugReplayOmniscientViewRequestSchema.parse(payload);
+      const view = this.roomService.getReplayOmniscientView(info.roomId, parsed.gameNumber);
+      return { wall: [...view.wall], hands: view.hands.map((hand) => [...hand]) };
     });
   }
 

@@ -11,3 +11,17 @@ export const DebugOmniscientViewSchema = z.object({
   hands: z.array(z.array(z.number())),
 });
 export type DebugOmniscientView = z.infer<typeof DebugOmniscientViewSchema>;
+
+/**
+ * phase-4.5-replay.md step 5 — 明牌 replay, end-of-game only, same
+ * ALLOW_DEBUG_OMNISCIENT gate as the live debug:omniscientView above. No
+ * roomId (unlike replay:get): scoped to whatever room this connection is
+ * currently in, same "current room" convention as debug:omniscientView.
+ * Response reuses DebugOmniscientViewSchema (identical shape).
+ */
+export const DebugReplayOmniscientViewRequestSchema = z.object({
+  gameNumber: z.number(),
+});
+export type DebugReplayOmniscientViewRequest = z.infer<
+  typeof DebugReplayOmniscientViewRequestSchema
+>;

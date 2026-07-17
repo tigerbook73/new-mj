@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import type { ReplayGetResponse } from "@new-mj/protocol";
+import type { DebugOmniscientView, ReplayGetResponse } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
 import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
@@ -17,6 +17,8 @@ export function ReplayView() {
   const [replay, setReplay] = useState<ReplayGetResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
+  const [debugOmniscientView, setDebugOmniscientView] = useState<DebugOmniscientView | null>(null);
+  const [debugError, setDebugError] = useState<string | null>(null);
 
   useEffect(() => {
     void ack<ReplayGetResponse>(socket, "replay:get", {
@@ -27,6 +29,21 @@ export function ReplayView() {
       else setError(result.code);
     });
   }, [socket, roomId, gameNumber]);
+
+  // Dev/test-only escape hatch (phase-4.5-replay.md step 5, D19) — end-of-game
+  // only, raw TileIds, no tile-face rendering. Server rejects unless
+  // ALLOW_DEBUG_OMNISCIENT is set, so this is a no-op against a normal deploy.
+  const fetchDebugOmniscientView = async () => {
+    setDebugError(null);
+    const result = await ack<DebugOmniscientView>(socket, "debug:replayOmniscientView", {
+      gameNumber: Number(gameNumber),
+    });
+    if (!result.ok) {
+      setDebugError(result.code);
+      return;
+    }
+    setDebugOmniscientView(result.data);
+  };
 
   if (error) {
     return (
@@ -89,6 +106,21 @@ export function ReplayView() {
           {JSON.stringify(replay.finalView, null, 2)}
         </pre>
       </div>
+
+      {import.meta.env.DEV && (
+        <div>
+          <h2 className="text-sm font-medium">Debug: 明牌 replay (dev-only, end-of-game only)</h2>
+          <Button variant="outline" size="sm" onClick={() => void fetchDebugOmniscientView()}>
+            Show all hands + wall
+          </Button>
+          {debugError && <p className="text-sm text-destructive">{debugError}</p>}
+          {debugOmniscientView && (
+            <pre className="mt-2 max-w-full overflow-x-auto text-xs text-muted-foreground">
+              {JSON.stringify(debugOmniscientView, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }

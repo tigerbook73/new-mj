@@ -485,6 +485,23 @@ export class RoomService {
     return { gameNumber, finalView, events: eventsVisibleTo(log.events, seat as SeatId) };
   }
 
+  /**
+   * phase-4.5-replay.md step 5 — 明牌 replay, gated the same way as D19's
+   * live getOmniscientView (dev/test-only, caller checks
+   * ALLOW_DEBUG_OMNISCIENT + current room membership), unlike getReplay
+   * above which is a real product feature open to anyone who played that
+   * game. End-of-game only: feeds the archived finalState straight into
+   * getOmniscientView instead of reconstructing state from events (that
+   * would need a new core capability — out of scope, see
+   * phase-4.5-replay.md "衔接问题").
+   */
+  getReplayOmniscientView(roomId: string, gameNumber: number): OmniscientView {
+    const room = this.mustGet(roomId);
+    const log = room.finishedGames.find((entry) => entry.gameNumber === gameNumber);
+    if (!log) throw new RoomServiceError("GAME_NOT_FOUND");
+    return this.gameService.getOmniscientView(log.finalState);
+  }
+
   private beginGame(room: Room): void {
     room.gameNumber += 1;
     room.seed = randomInt(MAX_SEED);
@@ -525,6 +542,7 @@ export class RoomService {
       gameNumber: room.gameNumber,
       seatUserIds: room.currentGameSeatUserIds,
       events: room.currentGameEvents,
+      finalState: room.gameState,
     });
 
     this.eventBus.emit("room:scoreUpdated", {

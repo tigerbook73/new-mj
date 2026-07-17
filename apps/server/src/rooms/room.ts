@@ -17,6 +17,17 @@ export interface FinishedGameLog {
   gameNumber: number;
   seatUserIds: [string | null, string | null, string | null, string | null];
   events: GameEvent[];
+  /**
+   * Opaque final core state (same shape as `Room.gameState`), captured right
+   * before `beginGame()` overwrites it for the next round. 明牌 replay
+   * (phase-4.5-replay.md step 5) feeds this straight into
+   * `getOmniscientView` — cheaper than reconstructing state from `events`
+   * (which would need a new "replay to omniscient state" core capability;
+   * this sidesteps that by keeping the state snapshot instead). Debug/test-
+   * only, same as the live D19 escape hatch — not part of the normal replay
+   * (`RoomService.getReplay`) response.
+   */
+  finalState: unknown;
 }
 
 export interface RoomPlayer {

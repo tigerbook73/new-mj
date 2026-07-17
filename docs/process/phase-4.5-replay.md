@@ -1,7 +1,7 @@
 # 阶段 4.5：Replay / 明牌 Replay
 
 > 过程性文档：本子阶段的详细实施计划，由 `plan.md`/`phase-4-junk-complete.md` 链接过来。收尾时把耐久内容按 `doc-map.md` §6 吸纳到对应文档，再删除本文件。
-> 当前状态：盘点完成，最小记录形状已确定，子步骤 1-4（server 侧事件归档、protocol `replay:get` schema、server gateway handler、web 回放播放器）已完成；子步骤 5（明牌 replay）留待下一轮确认（照 4.4 拆成多个子步骤逐个做的先例）。
+> 当前状态：全部 5 个子步骤已完成，阶段 4.5 收尾。收尾时按文件头的约定把耐久内容吸纳到对应契约文档后删除本文件（尚未执行）。
 
 ## 用户确认过的设计点
 
@@ -42,7 +42,7 @@ type GameReplayRecord = {
 | 2    | protocol：新增查询式消息（如 `replay:get`），入参 `{roomId, gameNumber}`；鉴权校验请求者 `userId` 出现在该局的 `seatUserIds` 里       | ✅   |
 | 3    | server gateway：新增 handler，复用 `rebuildPlayerView`（需要先在 server 侧接一层薄封装，类似 `GameService` 现在对四签名的封装）       | ✅   |
 | 4    | web：回放播放器（时间轴/单步前进，展示历史事件）                                                                                      | ✅   |
-| 5    | 明牌 replay：复用 `debug:omniscientView` 同一套环境变量门控；范围（局终 vs 任意步）待第 1-4 步落地后再定                              |      |
+| 5    | 明牌 replay：复用 `debug:omniscientView` 同一套环境变量门控；范围（局终 vs 任意步）待第 1-4 步落地后再定                              | ✅   |
 
 **步骤 1 实现记录**：`FinishedGameLog`（`apps/server/src/rooms/room.ts`）不带 `roomId`（记录已经挂在具体 `Room` 实例的 `finishedGames` 数组下，字段冗余）；`Room` 新增 `currentGameEvents`/`currentGameSeatUserIds`（进行中该局的累积区）与 `finishedGames`（归档数组）。`beginGame()` 用 `createGame` 自身返回的 `result.events` 播种 `currentGameEvents`（这批事件从不重播为 `game:event`，遗漏会导致 `rebuildPlayerView` 缺少 `GameStarted` 起点）并快照 `room.players` 的 userId；`runAction()` 每次 `applyAction` 后把新事件追加进 `currentGameEvents`；`handleGameEnd()` 在归零下一局前把当局完整记录 push 进 `finishedGames`。新增测试 `room.service.spec.ts`「RoomService — replay log archiving」验证 4 局会话产出 4 条记录，`seq` 从 1 连续、首事件是 `GameStarted`、`seatUserIds` 与实际入座一致。
 
@@ -56,6 +56,10 @@ type GameReplayRecord = {
 
 验证覆盖：`pnpm --filter @new-mj/web verify`（typecheck/lint/test/test:e2e/build）全绿，17 个既有 e2e 用例不受影响。**未新增浏览器端到端用例**——尝试过用 Playwright 完整打完一局真人对局来验证"点击 Replay 链接→看到回放"这条链路，过程中发现 `TableView` 目前只有 discard 和声明（吃/碰/杠/胡）两类按钮，`zimo`（自摸）/`anGang`/`buGang` 完全没有 UI 入口（阶段 3 竖切时就没做全，e2e 现状也只验证到"能发出一个 discard"）——纯 UI 点击无法保证一定能把一局真的打完（可能卡在只能自摸/补杠的状态，没有按钮可点）。这是 `TableView` 现存缺口，跟本次 replay 功能无关，不在这次范围内修；已用真实浏览器手测确认 `/replay/...` 页面本身（路由、组件挂载、`replay:get` 请求、错误态展示、Prev/Next 按钮）工作正常，只是没能走到"完整打完一局→点击 Replay 链接"这条全链路的自动化验证。真正验证过"回放数据正确"的是 server 侧 4 条 e2e（`replay-get.e2e-spec.ts`）。
 
+**步骤 5 实现记录**：实施时确认了"衔接问题"一节留的判断——`getOmniscientView` 吃状态不吃事件，而 `room.gameState` 在下一局 `beginGame()` 一开局就会被覆盖，所以哪怕只做"局终"也不能靠"现有状态还留着"蒙混过去。选了盘点阶段判断的更便宜路径：`FinishedGameLog` 新增 `finalState: unknown` 字段，`handleGameEnd()` 在 `beginGame()` 覆盖 `room.gameState` 之前，把这局刚打完的最终状态原样存进 `finalState`；明牌 replay 直接 `getOmniscientView(log.finalState)`，不用任何事件重放或新 core 能力。范围因此天然是"只支持局终"（不支持"回放到任意中间步骤都能看全知视角"——那个仍然需要从事件流重建完整 state 的新 core 能力，超出这次范围，未来若要做留意这条）。
+
+`RoomService.getReplayOmniscientView(roomId, gameNumber)`：查 `finishedGames` 对应 `gameNumber`（找不到 → `GAME_NOT_FOUND`），直接 `gameService.getOmniscientView(log.finalState)`，不做 `seatUserIds` 鉴权（这是明牌变体，鉴权模型跟 `getReplay` 不同）。Protocol 新增 `DebugReplayOmniscientViewRequestSchema`（`packages/protocol/src/debug.ts`，只有 `{gameNumber}`，没有 `roomId`——沿用 `debug:omniscientView` "当前连接所在房间"的约定，不是 `replay:get` 那种"可能已经离开房间也能查"的模型）。Gateway `debug:replayOmniscientView` handler 门控与 `debug:omniscientView`（D19）完全一致：`ALLOW_DEBUG_OMNISCIENT` + `requireConnection`/`seatOf`（必须是当前房间已入座玩家），不是 `replay:get` 用的"曾经参与过就行"模型。web `ReplayView.tsx` 加了 dev-only 的"明牌 replay"调试按钮，跟 `TableView` 的 D19 调试面板同一套样式。测试：`room.service.spec.ts` 新增 2 条（还原全部四家手牌+牌墙、`GAME_NOT_FOUND`）；新增 e2e `test/replay-omniscient-view.e2e-spec.ts` 3 条（开关关闭拒绝、未归档局拒绝、正常返回且守恒）。
+
 ## 状态
 
-步骤 1-4（server 事件归档、protocol schema、server gateway handler + `rebuildPlayerView` dispatch、web 回放播放器）已完成并通过各自 `pnpm verify`。步骤 5（明牌 replay）待下一轮确认后继续。
+阶段 4.5 Replay 全部 5 个子步骤已完成（server 事件归档、protocol schema、server gateway handler + `rebuildPlayerView` dispatch、web 回放播放器、明牌 replay）。均通过各自 `pnpm verify`。

@@ -505,6 +505,54 @@ describe("RoomService — getReplay (phase-4.5-replay.md step 3)", () => {
   });
 });
 
+describe("RoomService — getReplayOmniscientView (phase-4.5-replay.md step 5)", () => {
+  const playOneFinishedGame = (service: RoomService, gameService: GameService): Room => {
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+    let steps = 0;
+    while (room.finishedGames.length < 1 && steps < 500) {
+      steps += 1;
+      const legalActions = gameService.getLegalActions(room.gameState, 0);
+      service.applyPlayerAction(room.id, 0, legalActions[0]);
+    }
+    return room;
+  };
+
+  it("reconstructs all four hands + wall from the archived finalState (fed straight into getOmniscientView, no event replay)", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = playOneFinishedGame(service, gameService);
+
+    const view = service.getReplayOmniscientView(room.id, 1);
+
+    expect(view.hands).toHaveLength(4);
+    // Game already finished (won), so melds/discards also hold physical
+    // tiles by now — wall+hands is a subset of the 136-tile set, not the
+    // whole thing (that only holds for a state with none dealt out yet).
+    const allIds = [...view.wall, ...view.hands.flat()];
+    expect(new Set(allIds).size).toBe(allIds.length);
+    expect(allIds.length).toBeGreaterThan(0);
+    expect(allIds.length).toBeLessThanOrEqual(136);
+  });
+
+  it("throws GAME_NOT_FOUND for a gameNumber this room never archived", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = playOneFinishedGame(service, gameService);
+
+    try {
+      service.getReplayOmniscientView(room.id, 99);
+      throw new Error("expected getReplayOmniscientView to throw");
+    } catch (error) {
+      expect((error as RoomServiceError).code).toBe("GAME_NOT_FOUND");
+    }
+  });
+});
+
 describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", () => {
   it("is a no-op for an unknown room (best-effort, no ack to fail through)", () => {
     const service = newRoomService();

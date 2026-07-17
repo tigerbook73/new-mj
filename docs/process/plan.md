@@ -26,8 +26,8 @@
 | 4.1  | AI 补位：`packages/ai` 最简策略 + `room:addBot` + 自动出牌触发机制                              | 单人开房，其余 3 座补 AI，能完整打完一局垃圾胡 | ✅   |
 | 4.2  | 断线托管（复用阶段 4.1 的自动出牌基础设施）                                                     | 模拟断线，房间继续跑，该座位被自动代打到局终   | ✅   |
 | 4.3  | 黑暗模式（明牌模式已取消，见下）                                                                | 浏览器手测：暗色主题能切换                     | ✅   |
-| 4.4  | UI/操作优化：用户逐项描述具体条目，收集中，未收尾前内容不当定案                                 | 待条目收集完毕后补充                           |      |
-| 4.5  | Replay / 明牌 Replay（内存事件日志，复用直播已有的可见性过滤逻辑 + 调试用 `getOmniscientView`） |                                                |      |
+| 4.4  | UI/操作优化：大厅/房间 UI 重做，拆成 6 个子步骤，详见 `phase-4.4-lobby-room-ui.md`              | 见该文档各子步骤验收                           | ✅   |
+| 4.5  | Replay / 明牌 Replay（内存事件日志，复用直播已有的可见性过滤逻辑 + 调试用 `getOmniscientView`） | 见 `phase-4.5-replay.md` 子步骤路线表          | ✅   |
 | 4.6  | 持久化落地：事件日志搬进 PG（重启后 replay/战绩仍在）/ 战绩查询 / 真正的 Supabase OAuth         |                                                |      |
 | 4.7  | Junk 牌桌 UI 重做（视觉层）：真实牌面 + 布局，参考姊妹项目 `mj-next`                            | 浏览器手测：真人对局能看到布局/牌面/牌河       | ✅   |
 | 5    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI/持久化框架（垃圾胡基本完成后再开工）            | 单人能对着 AI 完整打完一局血战                 |      |
@@ -51,9 +51,9 @@
 
 ## 当前状态
 
-阶段 4 系列的前三个子阶段（4.1 AI 补位、4.2 断线托管、4.3 黑暗模式）已完成，4.4（UI/操作优化）定案为"大厅/房间 UI 重做"，拆成 6 个子步骤，详细方案见 `phase-4.4-lobby-room-ui.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。4.5 Replay 已完成盘点、子步骤 1-4（server 侧事件归档、protocol `replay:get` schema、server gateway handler、web 回放播放器），最小记录形状与子步骤路线见 `phase-4.5-replay.md`（同一收尾规则）；子步骤 3 顺带把 `rebuildPlayerView` 补成 `RulesetModule` 第三个 dispatch 方法（D20）。子步骤 4 实现时发现 `TableView` 目前没有 `zimo`/`anGang`/`buGang` 的 UI 入口，纯浏览器点击无法保证打完一整局，因此没能补一条"完整打完一局→点击 Replay 链接"的自动化 e2e（已用真实浏览器手测确认 `/replay/...` 页面本身工作正常）——这是 `TableView` 现存缺口，与 replay 无关，留作已知待办，不在本阶段修。用户随后插入 4.7（Junk 牌桌 UI 重做，参考姊妹项目 `mj-next`）先做完再回到 4.5，已完成，见"已完成阶段"。
+阶段 4 系列的 4.1-4.5、4.7 均已完成：4.1 AI 补位、4.2 断线托管、4.3 黑暗模式；4.4（UI/操作优化，"大厅/房间 UI 重做"6 个子步骤，详见 `phase-4.4-lobby-room-ui.md`）；4.5 Replay（server 事件归档、protocol `replay:get`、gateway handler + `rebuildPlayerView` dispatch（D20）、web 回放播放器、明牌 replay，全部 5 个子步骤，详见 `phase-4.5-replay.md`）；4.7（Junk 牌桌 UI 重做，参考姊妹项目 `mj-next`，插在 4.5 子步骤 4 和 5 之间做完）。4.4/4.5 两份子阶段文档尚未按"阶段 4 系列收尾后吸纳耐久内容并删除"的约定收尾——这个动作要等 4.6 也做完、整个阶段 4 系列结束时一起做，不是每个子阶段各自单独收尾。`TableView` 缺 `zimo`/`anGang`/`buGang` 按钮（阶段 3 竖切遗留，4.5 步骤 4 验证 replay 时发现）仍是已知待办，见下方"待办"。
 
-**下一步第一个动作**：回到阶段 4.5 Replay 子步骤 5——明牌 replay，复用 `debug:omniscientView` 同一套 `ALLOW_DEBUG_OMNISCIENT` 门控；范围（局终 vs 任意步）待定，见 `phase-4.5-replay.md` 子步骤路线表"衔接问题"一节。
+**下一步第一个动作**：阶段 4.6 持久化落地——事件日志从内存搬进 PG（重启后 replay/战绩仍在），战绩查询，真正的 Supabase OAuth（D16 触发条件）。这是阶段 4 系列最后一项，做完后按 `../doc-map.md` §6 把 `phase-4-junk-complete.md`/`phase-4.4-lobby-room-ui.md`/`phase-4.5-replay.md` 三份过程文档的耐久内容吸纳进对应契约文档再删除。
 
 本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分，公共导出与协议行为不变。`pnpm verify` 全绿。
 
