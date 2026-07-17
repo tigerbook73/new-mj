@@ -13,7 +13,7 @@ export const DebugOmniscientViewSchema = z.object({
 export type DebugOmniscientView = z.infer<typeof DebugOmniscientViewSchema>;
 
 /**
- * phase-4.5-replay.md step 5 — 明牌 replay, end-of-game only, same
+ * phase 4.5 step 5 — 明牌 replay, end-of-game only, same
  * ALLOW_DEBUG_OMNISCIENT gate as the live debug:omniscientView above. No
  * roomId (unlike replay:get): scoped to whatever room this connection is
  * currently in, same "current room" convention as debug:omniscientView.

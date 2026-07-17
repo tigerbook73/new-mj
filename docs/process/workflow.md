@@ -41,7 +41,7 @@
 - 保持 pnpm 为唯一包管理器；测试运行时按包的生态选择，不要求全仓库使用同一个 runner。
 - `packages/core`、`packages/protocol`、`packages/ai` 优先使用 Vitest，便于 TypeScript、参数化用例和 fuzz 测试。
 - `apps/server` 使用 NestJS 时采用 Jest，遵循 NestJS 官方测试生态；server 测试不得因此把 Jest 依赖引入 core。
-- `apps/web` 用 Vitest 做单元测试、Playwright 做 e2e（`test/*.e2e-spec.ts`，与 `apps/server` 的 e2e 命名一致；`playwright.config.ts` 自动拉起独立于开发者手动 `pnpm dev` 的一套 web+server 进程，端口隔离细节见 `apps/web/AGENTS.md`）；mobile 待阶段 6 立项时再定。跨包测试从根脚本统一调度。
+- `apps/web` 用 Vitest 做单元测试、Playwright 做 e2e（`test/*.e2e-spec.ts`，与 `apps/server` 的 e2e 命名一致；`playwright.config.ts` 自动拉起独立于开发者手动 `pnpm dev` 的一套 web+server 进程，端口隔离细节见 `apps/web/AGENTS.md`）；mobile 待阶段 7 立项时再定。跨包测试从根脚本统一调度。
 
 ## 检查与格式化边界
 

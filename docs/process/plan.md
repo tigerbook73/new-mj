@@ -15,27 +15,29 @@
 
 ## 阶段路线
 
-| 阶段 | 内容                                                                                            | 验收                                           | 状态 |
-| ---- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
-| 0    | 规则与契约定义                                                                                  | 四份规格文档定稿                               | ✅   |
-| 1    | core 基建 + junk RuleSet + CLI fuzz                                                             | CLI 整局 + 1 万局 fuzz 绿                      | ✅   |
-| 1.5  | bloodbattle RuleSet（允许一次接口调整）                                                         | 番型用例全绿 + fuzz                            | ✅   |
-| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk）                            | 4 模拟客户端整局                               | ✅   |
-| 2→3  | 文档结构重构                                                                                    | 新结构落地，详见 `../doc-map.md`               | ✅   |
-| 3    | web：登录/大厅/牌桌（先竖切）                                                                   | 浏览器真人对局                                 | ✅   |
-| 4.1  | AI 补位：`packages/ai` 最简策略 + `room:addBot` + 自动出牌触发机制                              | 单人开房，其余 3 座补 AI，能完整打完一局垃圾胡 | ✅   |
-| 4.2  | 断线托管（复用阶段 4.1 的自动出牌基础设施）                                                     | 模拟断线，房间继续跑，该座位被自动代打到局终   | ✅   |
-| 4.3  | 黑暗模式（明牌模式已取消，见下）                                                                | 浏览器手测：暗色主题能切换                     | ✅   |
-| 4.4  | UI/操作优化：大厅/房间 UI 重做，拆成 6 个子步骤，详见 `phase-4.4-lobby-room-ui.md`              | 见该文档各子步骤验收                           | ✅   |
-| 4.5  | Replay / 明牌 Replay（内存事件日志，复用直播已有的可见性过滤逻辑 + 调试用 `getOmniscientView`） | 见 `phase-4.5-replay.md` 子步骤路线表          | ✅   |
-| 4.6  | 持久化落地：事件日志搬进 PG（重启后 replay/战绩仍在）/ 战绩查询 / 真正的 Supabase OAuth         |                                                |      |
-| 4.7  | Junk 牌桌 UI 重做（视觉层）：真实牌面 + 布局，参考姊妹项目 `mj-next`                            | 浏览器手测：真人对局能看到布局/牌面/牌河       | ✅   |
-| 5    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI/持久化框架（垃圾胡基本完成后再开工）            | 单人能对着 AI 完整打完一局血战                 |      |
-| 6    | mobile（Expo，血战完成后再考虑）                                                                |                                                |      |
+| 阶段 | 内容                                                                                                                                              | 验收                                           | 状态 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
+| 0    | 规则与契约定义                                                                                                                                    | 四份规格文档定稿                               | ✅   |
+| 1    | core 基建 + junk RuleSet + CLI fuzz                                                                                                               | CLI 整局 + 1 万局 fuzz 绿                      | ✅   |
+| 1.5  | bloodbattle RuleSet（允许一次接口调整）                                                                                                           | 番型用例全绿 + fuzz                            | ✅   |
+| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk）                                                                              | 4 模拟客户端整局                               | ✅   |
+| 2→3  | 文档结构重构                                                                                                                                      | 新结构落地，详见 `../doc-map.md`               | ✅   |
+| 3    | web：登录/大厅/牌桌（先竖切）                                                                                                                     | 浏览器真人对局                                 | ✅   |
+| 4.1  | AI 补位：`packages/ai` 最简策略 + `room:addBot` + 自动出牌触发机制                                                                                | 单人开房，其余 3 座补 AI，能完整打完一局垃圾胡 | ✅   |
+| 4.2  | 断线托管（复用阶段 4.1 的自动出牌基础设施）                                                                                                       | 模拟断线，房间继续跑，该座位被自动代打到局终   | ✅   |
+| 4.3  | 黑暗模式（明牌模式取消，见 `decisions.md` D19）                                                                                                   | 浏览器手测：暗色主题能切换                     | ✅   |
+| 4.4  | UI/操作优化：大厅/房间 UI 重做，拆成 6 个子步骤                                                                                                   | 见下方"已完成阶段"小节                         | ✅   |
+| 4.5  | Replay / 明牌 Replay（内存事件日志，复用直播已有的可见性过滤逻辑 + 调试用 `getOmniscientView`）                                                   | 见下方"已完成阶段"小节                         | ✅   |
+| 4.7  | Junk 牌桌 UI 重做（视觉层）：真实牌面 + 布局，参考姊妹项目 `mj-next`                                                                              | 浏览器手测：真人对局能看到布局/牌面/牌河       | ✅   |
+| 5    | 持久化落地：事件日志/replay/战绩搬进 PG（重启后仍在）+ 真正的 Supabase OAuth（D16 触发条件）——原编号 4.6，从阶段 4 系列拉出单独立项（见下方说明） | 重启 server 后历史对局的 replay/战绩仍可查     |      |
+| 6    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI 框架（垃圾胡基本完成后再开工）                                                                    | 单人能对着 AI 完整打完一局血战                 |      |
+| 7    | mobile（Expo，血战完成后再考虑）                                                                                                                  |                                                |      |
 
-> 阶段 4 系列拆分依据：AI 是唯一"卡住能不能玩"的一块，优先级最高、单独先做；断线托管跟 AI 共享"自动出牌"这同一套基础设施，紧跟着做；小特性大多互相独立可并行；UI/操作优化（4.4）插在小特性之后、Replay 之前——用户选择现在就逐项列出具体条目，而不是等后面阶段跑完再收集反馈；Replay 依赖"先有事件日志"但不需要等 PG，先做内存版；持久化不是新功能，是让已经跑起来的东西"扛得住重启"，放最后。详细方案见 `phase-4-junk-complete.md`。
+> 编号没有 4.6：原计划里持久化落地排在阶段 4 系列最后一项（编号 4.6），理由是"不是新功能，是让已经跑起来的东西扛得住重启"。4.1-4.5、4.7 做完后，用户决定把持久化整个拉出来单独立项为阶段 5（血战、mobile 依次顺延为 6、7）——持久化需要一个真实的 Supabase 项目（URL/anon key/PG 连接串），跟前面纯代码就能推进的子阶段性质不同，值得独立排期而不是继续算在"阶段 4 系列"里。4.6 这个编号不再使用（避免和已经出现在 commit 历史/代码注释里的"4.7"产生错位）。
 >
-> 阶段 4/5 说明：这条顺序延续阶段 2/3 定下的老规矩——先把 junk 一个玩法从"能跑通"打磨到"能完整玩"，验证一遍 AI/UI/持久化这几层要不要按 ruleset 拆分、怎么拆；血战接入阶段 5 时应该是复用这套框架的增量工作，不是重新设计。若届时血战还要大改阶段 4 定下的框架，说明阶段 4 的设计本身有遗漏，应该回头补文档而不是默认接受重构。
+> 阶段 4 系列拆分依据：AI 是唯一"卡住能不能玩"的一块，优先级最高、单独先做；断线托管跟 AI 共享"自动出牌"这同一套基础设施，紧跟着做；小特性大多互相独立可并行；UI/操作优化（4.4）插在小特性之后、Replay 之前——用户选择现在就逐项列出具体条目，而不是等后面阶段跑完再收集反馈。详细方案见 `phase-4-junk-complete.md`（阶段 4 系列收尾后已删除，耐久内容见 `decisions.md`/`contracts/session-mechanics.md`/本文件"已完成阶段"）。
+>
+> 阶段 4/6 说明：这条顺序延续阶段 2/3 定下的老规矩——先把 junk 一个玩法从"能跑通"打磨到"能完整玩"，验证一遍 AI/UI 这几层要不要按 ruleset 拆分、怎么拆；血战接入阶段 6 时应该是复用这套框架的增量工作，不是重新设计。若届时血战还要大改阶段 4 定下的框架，说明阶段 4 的设计本身有遗漏，应该回头补文档而不是默认接受重构。
 
 ## 已完成阶段
 
@@ -43,36 +45,24 @@
 - **阶段 1.5**：血战 RuleSet 完整实现（换三张/定缺、声明窗口、杠分账本、抢杠胡、呼叫转移、流局结算等），同期完成 D12 接口调整。规则见 `../variants/bloodbattle.md`，契约见 `../contracts/engine-contract.md`，取舍理由见 `../decisions.md`。
 - **阶段 2**（tag `phase-2`）：NestJS + Socket.IO server 落地（GameService/RoomService/EventBus/RoomsGateway），4 客户端整局验收通过。契约见 `../contracts/protocol-shared.md`/`../contracts/session-mechanics.md`，取舍理由见 `../decisions.md` D13/D14；遗留缺口见下方待办。
 - **阶段 2→3**：文档结构重构，详见 `../doc-map.md`。
-- **阶段 3**（tag `phase-3`）：web 登录/选玩法/大厅/牌桌竖切跑通——开发态假登录（D16）、Vite+React 技术栈（D17）、房间生命周期靠 ack 初始快照 + 事件广播增量更新驱动（架构铁律 5，不存在"重新查一次房间状态"的消息）、牌桌渲染 `PlayerViewBase` 公共骨架并对"事实型" `game:event` 做增量更新（D18）。junk 验证到能真实发出并成功执行一个 `game:action`；bloodbattle 验证到公共骨架能正确渲染（换三张/定缺属于玩法专属阶段 UI，留给阶段 5）。12 个 e2e 用例（`apps/server` 5 个 + `apps/web` 7 个）已接入根目录 `pnpm verify`（此前 `turbo.json` 一直没有 `test:e2e` 任务，e2e 从未真正进过根级 DoD 链条，这次一并补上）。契约见 `../contracts/*.md`，实现细节见 `apps/web/AGENTS.md`，取舍理由见 `../decisions.md` D16-D18。
-- **阶段 4.1**（AI 补位）：新增 `packages/ai`（`chooseAction`：有胡/自摸必胡，否则随机选 `getLegalActions` 里的一项，ruleset-agnostic，纯函数）并接上 tsup 双格式构建（server 是仓库唯一 CJS 包，源码级导入行不通，对齐 core/protocol 的产物形态）；`RoomService` 新增 `addBot`（仅房主、仅 `waiting` 阶段，补空位后复用 `ready()` 让 bot 立即视为已准备）与 `autoPlayBots`（真人动作后、每局开局后循环扫描 bot 座位出牌，直到轮到真人或对局结束）；gateway 加 `room:addBot` 消息；web `LobbyView` 加"补 AI"按钮（复用已有的 `room:playerJoined`/`room:readyChanged` 事件监听，未新增前端状态逻辑）。验收：`RoomService` 单测覆盖单人+3 bot 打完 4 局完整会话；`apps/web` e2e 覆盖房主单人补满 3 个 bot 座位并 start 的大厅流程。契约见 `../contracts/session-mechanics.md` §6，取舍与技术债记录见 `phase-4-junk-complete.md`。
+- **阶段 3**（tag `phase-3`）：web 登录/选玩法/大厅/牌桌竖切跑通——开发态假登录（D16）、Vite+React 技术栈（D17）、房间生命周期靠 ack 初始快照 + 事件广播增量更新驱动（架构铁律 5，不存在"重新查一次房间状态"的消息）、牌桌渲染 `PlayerViewBase` 公共骨架并对"事实型" `game:event` 做增量更新（D18）。junk 验证到能真实发出并成功执行一个 `game:action`；bloodbattle 验证到公共骨架能正确渲染（换三张/定缺属于玩法专属阶段 UI，留给阶段 6 血战）。12 个 e2e 用例（`apps/server` 5 个 + `apps/web` 7 个）已接入根目录 `pnpm verify`（此前 `turbo.json` 一直没有 `test:e2e` 任务，e2e 从未真正进过根级 DoD 链条，这次一并补上）。契约见 `../contracts/*.md`，实现细节见 `apps/web/AGENTS.md`，取舍理由见 `../decisions.md` D16-D18。
+- **阶段 4.1**（AI 补位）：新增 `packages/ai`（`chooseAction`：有胡/自摸必胡，否则随机选 `getLegalActions` 里的一项，ruleset-agnostic，纯函数）并接上 tsup 双格式构建（server 是仓库唯一 CJS 包，源码级导入行不通，对齐 core/protocol 的产物形态）；`RoomService` 新增 `addBot`（仅房主、仅 `waiting` 阶段，补空位后复用 `ready()` 让 bot 立即视为已准备）与 `autoPlayBots`（真人动作后、每局开局后循环扫描 bot 座位出牌，直到轮到真人或对局结束）；gateway 加 `room:addBot` 消息；web `LobbyView` 加"补 AI"按钮（复用已有的 `room:playerJoined`/`room:readyChanged` 事件监听，未新增前端状态逻辑）。验收：`RoomService` 单测覆盖单人+3 bot 打完 4 局完整会话；`apps/web` e2e 覆盖房主单人补满 3 个 bot 座位并 start 的大厅流程。契约见 `../contracts/session-mechanics.md` §6，AI 直接跑在 server 进程里拿完整 `state`（不走 `PlayerView`-only 契约）的取舍与技术债记录见 `../decisions.md` D21。
 - **阶段 4.2**（断线托管）：`RoomPlayer` 加 `isAutoPiloted` 字段；`RoomsGateway.handleDisconnect` 在 socket 断开时查出 `{roomId, userId}` 交给新增的 `RoomService.handleDisconnect`——若房间对局中，把该座位标记 `isAutoPiloted` 并立刻跑一次 `autoPlayBots`（`nextBotAction` 现在对 `isBot`/`isAutoPiloted` 一视同仁，复用同一条扫描循环，不是另起一套机制）。这个标记永不清除，MVP 没有重连恢复真人操控的路径（同一 `userId` 再 `room:join` 会被 `ALREADY_IN_ROOM` 拒绝）；等待阶段的断线不触发处理，座位原样留空。验收：`RoomService` 单测覆盖 3 个边界（未知房间/等待阶段/bot 座位都不受影响）+ 断线后单会话打完 4 局；`apps/server` e2e 新增真实 socket 断线场景（`b!.disconnect()` 后仅驱动其余 3 个真实连接，验证真的走到 `RoomsGateway` 的 `disconnect` 生命周期，不是只测 `RoomService` 方法本身）。文档：`session-mechanics.md` §8 评审点 H 标记掉线路径已实现（`room:leave` 主动离座仍未实现，两者共享托管机制只是触发入口不同）。
-- **阶段 4.3**（黑暗模式；明牌模式取消，见下）：`src/lib/theme.ts`（`getInitialTheme`/`applyTheme`，localStorage 优先、否则退回 `prefers-color-scheme`）+ `src/components/ThemeToggle.tsx`（固定右上角，本地 state，不进 Zustand）+ `main.tsx` 挂载前先应用一次避免首屏闪烁。验收：新增 e2e 用例（`theme.e2e-spec.ts`）验证切换即时生效且刷新页面后保持。
-- **阶段 4.7**（Junk 牌桌 UI 重做）：参考姊妹项目 `mj-next`（同一开发者的另一个麻将练习项目）——复用其 `public/tiles/Regular/*.svg` 真实牌面素材（34 张 kind + Back，命名对应 `TILE_KINDS`）；新增 `apps/web/src/lib/mahjongTiles.ts`（TileId→文件名映射，独立实现不 import `@new-mj/core`，理由是 id→kind 是静态公开公式不是规则代码）、`src/lib/seatLayout.ts`（座位相对方向）、`src/store/tableLayout.ts`（`tileUnit` + `ResizeObserver` 测量牌桌容器宽度，参考 mj-next 的 store 方案而非纯 CSS container query——理由是 `apps/mobile` 未来无论如何都要用 JS 测量布局，mobile 路线是否用 react-native-web 统一还未定，store 方案的"测量→存→读"模式更容易移植）、`src/components/mahjong/`（`Tile`/`HandRow`/`DiscardPile`/`MeldGroup`/`PlayerBadge`/`WallStack`）。`TableView` 重排成三层嵌套 CSS Grid（外层手牌、中层装饰性牌墙——只吃 `wallCount` 不泄露墙牌身份、内层牌河+副露），出牌交互（单击立即出牌）与既有状态/事件逻辑不变。顺带修了一个发现的 bug：`useSessionStore.applyTileDiscarded` 之前只增量更新 `handCount`，没把新弃的牌追加进 `discards` 数组，导致牌河 UI 在对局中永远是空的（要等下一次 snapshot 才补上）——现在一起补上追加逻辑。范围：只做 junk（bloodbattle 沿用公共骨架，D18 现状不变）、不做动画（mj-next 用 framer-motion，这轮跳过）、不补 `zimo`/`anGang`/`buGang`（core PlayerView 契约缺口，见 4.5 记录，留作独立待办）。验收：`apps/web/test/table.e2e-spec.ts` 更新断言（`data-testid="player-badge"`/`player-hand-count`）后 17 个 e2e 全绿；浏览器手测确认真实牌面/牌河/副露渲染正确、窗口缩放时整桌跟着平滑缩放、暗色模式正常。
+- **阶段 4.3**（黑暗模式）：`src/lib/theme.ts`（`getInitialTheme`/`applyTheme`，localStorage 优先、否则退回 `prefers-color-scheme`）+ `src/components/ThemeToggle.tsx`（固定右上角，本地 state，不进 Zustand）+ `main.tsx` 挂载前先应用一次避免首屏闪烁。验收：新增 e2e 用例（`theme.e2e-spec.ts`）验证切换即时生效且刷新页面后保持。原计划还包含"明牌模式"，实施中判断代价过高取消，后来以调试/测试专用逃生舱复活，完整取舍过程见 `decisions.md` D19。
+- **阶段 4.4**（大厅/房间 UI 重做，6 个子步骤）：i18n（非 table 页文案全英文）；`LoginView` 换 shadcn `login-03` block；`/games` 改 junk/bloodbattle Tabs + `lobby:list` 房间列表/搜索/命名建房；`/lobby/:roomId`（原 `/lobby/:rulesetId`）改 `room:peek` 驱动的房间页，支持指定座位入座、为指定空座位加 bot；新增 `room:leave`（`waiting` 阶段房主离开删房/非房主离开清空座位，`in-game` 阶段等同断线转托管，全部真人退出自动关房）。协议新增 `lobby:list`/`room:peek`/`room:leave`、`room:playerLeft`/`room:closed` 事件、`SEAT_TAKEN` 错误码，完整契约见 `contracts/session-mechanics.md` §6。web e2e 17/17 全绿。
+- **阶段 4.5**（Replay / 明牌 Replay，5 个子步骤）：`Room` 新增 `finishedGames: FinishedGameLog[]`，每局结束归档 `{gameNumber, seatUserIds, events, finalState}`；`replay:get`（正式产品功能，参与过的玩家可查，不要求当前仍在房间）复用 core 的 `rebuildPlayerView` 重建终局视图 + 过滤后事件时间轴；`debug:replayOmniscientView`（调试专用，只支持局终，直接读 `finalState` 喂 `getOmniscientView`）。web 新增 `/replay/:roomId/:gameNumber` 播放器（`ReplayView`，单步前进/后退）。过程中把 `rebuildPlayerView` 补成 `RulesetModule` 第三个 dispatch 方法（`decisions.md` D20）。完整契约见 `contracts/session-mechanics.md` §10、`contracts/protocol-shared.md` §7。
+- **阶段 4.7**（Junk 牌桌 UI 重做，视觉层）：参考姊妹项目 `mj-next`（同一开发者的另一个麻将练习项目）复用其 `public/tiles/Regular/*.svg` 真实牌面素材；新增 `apps/web/src/lib/mahjongTiles.ts`（TileId→文件名映射，独立实现不 import `@new-mj/core`）、`src/lib/seatLayout.ts`、`src/store/tableLayout.ts`（`tileUnit` + `ResizeObserver`，选 store 方案而非纯 CSS container query 是因为 `apps/mobile` 未来无论如何都要用 JS 测量布局）、`src/components/mahjong/`（`Tile`/`HandRow`/`DiscardPile`/`MeldGroup`/`PlayerBadge`/`WallStack`）。`TableView` 重排成三层嵌套 CSS Grid，出牌交互不变。范围：只做 junk（bloodbattle 沿用公共骨架，D18 现状不变）、不做动画、不补 `zimo`/`anGang`/`buGang`（core PlayerView 契约缺口，见下方待办）。web e2e 17/17 全绿。
 
 ## 当前状态
 
-阶段 4 系列的 4.1-4.5、4.7 均已完成：4.1 AI 补位、4.2 断线托管、4.3 黑暗模式；4.4（UI/操作优化，"大厅/房间 UI 重做"6 个子步骤，详见 `phase-4.4-lobby-room-ui.md`）；4.5 Replay（server 事件归档、protocol `replay:get`、gateway handler + `rebuildPlayerView` dispatch（D20）、web 回放播放器、明牌 replay，全部 5 个子步骤，详见 `phase-4.5-replay.md`）；4.7（Junk 牌桌 UI 重做，参考姊妹项目 `mj-next`，插在 4.5 子步骤 4 和 5 之间做完）。4.4/4.5 两份子阶段文档尚未按"阶段 4 系列收尾后吸纳耐久内容并删除"的约定收尾——这个动作要等 4.6 也做完、整个阶段 4 系列结束时一起做，不是每个子阶段各自单独收尾。`TableView` 缺 `zimo`/`anGang`/`buGang` 按钮（阶段 3 竖切遗留，4.5 步骤 4 验证 replay 时发现）仍是已知待办，见下方"待办"。
+阶段 4 系列（4.1-4.5、4.7，编号里没有 4.6，原因见上方阶段路线的说明）全部完成，已按 `../doc-map.md` §6 收尾：耐久内容吸纳进 `decisions.md`（D19-D21）、`contracts/session-mechanics.md`（§10 新增）、`contracts/protocol-shared.md`（§7 新增消息）与本文件"已完成阶段"，`phase-4-junk-complete.md`/`phase-4.4-lobby-room-ui.md`/`phase-4.5-replay.md` 三份过程文档已删除。`TableView` 缺 `zimo`/`anGang`/`buGang` 按钮（阶段 3 竖切遗留缺口，4.5 验证 replay 时发现）仍是已知待办，见下方"待办"。
 
-**下一步第一个动作**：阶段 4.6 持久化落地——事件日志从内存搬进 PG（重启后 replay/战绩仍在），战绩查询，真正的 Supabase OAuth（D16 触发条件）。这是阶段 4 系列最后一项，做完后按 `../doc-map.md` §6 把 `phase-4-junk-complete.md`/`phase-4.4-lobby-room-ui.md`/`phase-4.5-replay.md` 三份过程文档的耐久内容吸纳进对应契约文档再删除。
-
-本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分，公共导出与协议行为不变。`pnpm verify` 全绿。
-
-后续收尾：仓库内没有 `src/schemas.ts` 的生产代码依赖，已删除该兼容性 barrel；schema 测试改从 `src/index.ts` 公共入口导入，迁移前的 32 个测试当时全绿。
-
-本次重构：protocol 单元测试已按 `src` 下的模块 colocate（common/auth/room-models/room-requests/room-events/game），补充模型、请求和事件边界用例；package 的 typecheck/lint 仅扫描 `src`，`pnpm verify` 全绿。
-
-**阶段 4.4.3 + 4.4.5**：已完成。`/games` 改为 junk/bloodbattle Tabs，接入 `lobby:list` 房间列表、搜索、命名建房；`/lobby/:roomId` 改为 `room:peek` 驱动的房间页，支持指定座位入座、指定空座位加 bot、ready/start，并保留 ack + 事件广播状态边界。web e2e 9/9 全绿（含 table 验收迁移到新大厅流程）。
-
-**阶段 4.4.6**：已完成。等待阶段和 table 页均提供 `Leave room`；等待阶段非房主离开释放座位，房主离开关闭房间并把其他玩家带回大厅显示提示；对局中离开复用 `room:leave` 的托管路径，其他真人继续留在牌桌。房主仅在仍有其他玩家时需要确认，普通玩家、observer 与独自离开的房主直接离开。房间页补充 owner、真人成员头像/tooltip、observer 实时进入离开同步，并明确 BOT 不加入成员列表。web e2e 17/17 全绿。
-
-> 4.3/4.4 范围调整：原计划里的"界面/操作优化"一开始没有具体条目（用户原话只圈定了"纯 UI、不涉及后端"这个边界），先决定拆出去推迟到有具体反馈再排期；随后用户改主意，改为单独立项为 4.4，由用户逐项描述具体内容——最终定案为 6 条（i18n / `login-03` / 标签页大厅 / 协议+server 加座位选择与 `room:leave` / 大厅列表+房间页 / 离开房间），table 页重做明确排除在外。原 4.4 Replay / 4.5 持久化各自顺延为 4.5 / 4.6。
->
-> **明牌模式取消，后以调试/测试专用逃生舱复活**：4.3 实现过程中曾判断"打的时候看到墙牌"必须新增一个 core 能力（`getOmniscientView`，会动到 `engine-contract.md`"冻结的四签名"之外的契约面），完整实现过一版（core 的 junk/bloodbattle 两个 ruleset + protocol schema + server 部分接线）后用户权衡认为复杂度不值得，整版撤销（`git restore`，未提交过），4.3 收窄为只做黑暗模式。后续重新分析发现该判断把需求错误当成了需要 `RulesetModule` dispatch 方法——实际上"读牌墙+所有座位手牌"没有规则语义，跟 `lib/invariants.ts` 的 `assertContainerUniqueness` 一样只需一个泛型纯函数，不碰四签名契约面（`decisions.md` D19）。以此为基础落地了一个**仅调试/测试用**的轻量版本：不进正式产品 UI，靠环境变量 `ALLOW_DEBUG_OMNISCIENT` + 调试专用协议消息 `debug:omniscientView` 门控（见 `contracts/protocol-shared.md` §7）。4.5 的"明牌 replay"可直接复用 `getOmniscientView`（对任意符合结构的 state 生效），届时只需接上 replay 重建出的历史 state，不需要重新设计。
+**下一步第一个动作**：阶段 5 持久化落地——先盘点 `Room.finishedGames`/`gameState` 现有内存形状，确定 Prisma schema 草案（对局/事件日志/用户表），需要用户提供真实 Supabase 项目凭据（URL/anon key/PG 连接串）才能接真正的 Supabase OAuth 部分；PG 持久化本身不依赖这个，可以先用本地/自建 PG 验证 schema。
 
 ## 待办
 
 - [ ] 阶段 4：协议补 nickname 字段（`room:create`/`room:join` payload 目前没有，`apps/server` 用 userId 派生占位昵称）——界面优化免不了要用真实昵称
-- [ ] 阶段 6 前：mobile 具体路线（是否 react-native-web 统一）
+- [ ] 阶段 7 前：mobile 具体路线（是否 react-native-web 统一）
 - [ ] 真人协作触发时：repo 权限、是否上分支保护
 - [ ] 日麻立项时：按 `../architecture/variant-boundary.md` §2 走一次边界复审，重点是庄家轮换公式与会话排名策略两条"待验证"条目
 - [ ] `TableView` 补 `zimo`/`anGang`/`buGang` 的 UI 入口（阶段 3 竖切遗留缺口，4.5 步骤 4 验证 replay 时发现：目前纯点击可能卡在只能自摸/补杠却没按钮的状态，打不完一整局）

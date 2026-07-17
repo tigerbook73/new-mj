@@ -74,7 +74,7 @@ finished: 计算排名，对外公开 result
 
 `nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
 
-**bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `process/phase-4-junk-complete.md`。
+**bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `decisions.md` D21。
 
 **断线托管**（评审点 H 的掉线路径）：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`——若房间对局中，把该座位标记 `isAutoPiloted = true` 并立刻跑一次 `autoPlayBots`（复用 bot 自动出牌的同一条扫描循环，`nextBotAction` 对 `isBot` 和 `isAutoPiloted` 一视同仁）。这个标记一旦置位永不清除，MVP 没有"断线重连恢复真人操控"的路径：`room.players` 里那个座位的记录还在（只是 `isAutoPiloted=true`），同一 `userId` 想重新 `room:join` 这个房间会直接被 `ALREADY_IN_ROOM` 拒绝——断线等同于这局及本会话剩余局数都由 bot 代打到底，没有回退方案。房间还在等待阶段（尚未 `room:start`）时断线不触发任何处理，座位原样留空，不在评审点 H 范围内。`room:leave`（主动离座，见下）在 `in-game` 阶段复用同一条内部标记逻辑，跟断线是同一个效果。
 
@@ -113,6 +113,7 @@ finished: 计算排名，对外公开 result
 - ✅ `room:leave`（阶段 4.4）：`waiting` 阶段主动离座/房主关房，`in-game` 阶段等同断线（同一套托管机制）；全部真人退出即自动关房，见 §6
 - ✅ `lobby:list`/`room:peek`（阶段 4.4）：一次性查询快照，不做实时推送
 - ✅ 房间名称（阶段 4.4）：`room:create` 可选 `name`，`room:join`/`room:addBot` 可选 `seat` 指定座位
+- ✅ Replay（阶段 4.5）：每局归档事件日志 + 终局状态快照，参与过的玩家可回放；明牌 replay 走独立调试通道，见 §10
 
 **MVP 不实现**：
 
@@ -120,7 +121,8 @@ finished: 计算排名，对外公开 result
 - ❌ 赢/输跟踪（4-round 不需要）
 - ❌ 重连恢复（掉线/离座后的座位没有"恢复真人操控"路径，`isAutoPiloted` 永不清除；可降级为踢出 + 重新加入）
 - ❌ 中途替换玩家、再来一轮
-- ❌ 观战、战绩（阶段 4.7/4.6）
+- ❌ 观战（根 `AGENTS.md` 不做清单，非某个具体阶段的"待做"，是长期不做）
+- ❌ 战绩查询、持久化（事件日志/replay 目前只在内存里，重启即丢；见独立立项的持久化阶段，`process/plan.md`）
 - ❌ `lobby:list` 实时推送（仍是查询快照，不随他人建房/离开自动刷新）
 
 **评审点 H【已定：采纳，已实现】**：对局中退出 = 转托管代打到局终，掉线与主动离座同路径，不允许中途散局。掉线路径（`RoomsGateway.handleDisconnect` → `RoomService.handleDisconnect`）和主动离座路径（`room:leave` → 同一条内部标记逻辑）都已实现，共享同一套托管机制，只是触发入口不同；`waiting` 阶段不适用这条规则（还没开局，谈不上"中途"），离座直接清空座位或删房，见 §6。
@@ -195,3 +197,13 @@ Player C: room:leave {}
   [座位 2 标记 isAutoPiloted=true，autoPlayBots 接管，房间继续跑；
    若这是房间里最后一个真人座位，改为广播 room:closed { reason: "allPlayersLeft" }]
 ```
+
+## 10. 对局历史与回放（阶段 4.5）
+
+- **归档时机**：每局结束（`RoomService.handleGameEnd`）时，把这局的完整信息存进 `Room.finishedGames: FinishedGameLog[]`——`{ gameNumber, seatUserIds, events, finalState }`：
+  - `seatUserIds`：开局时的座位→userId 快照。跟 `room.players` 当前占用是两回事——房间跨多局运行，理论上中途座位会变化，一局自己的记录必须自包含，不能指望回放时去读"现在"的座位表。
+  - `events`：未经视角过滤的完整事件数组，`seq` 从 1 开始（含 `createGame` 自身产生、从不重播为 `game:event` 的那批事件），直接喂 core 的 `rebuildPlayerView(rulesetId, events, seat)` 即可重建任意座位视角。
+  - `finalState`：这局打完那一刻的 core 引擎状态——`handleGameEnd` 在下一局 `beginGame()` 覆盖 `room.gameState` 之前存的快照，只给调试用的明牌 replay 用（见下）。
+- **`replay:get`**（查询，ack 给数据；正式产品功能，非调试专用）：请求 `{ roomId, gameNumber }`；鉴权只看请求者 `userId` 是否出现在该局的 `seatUserIds` 里——**不要求当前还在这个房间**（`seatUserIds` 是快照，已经离开房间的玩家仍能查自己参与过的对局，跟"当前房间连接注册表"完全脱钩，这点跟本文件其余 `room:*` 消息都要求当前在房间不同）。响应 `{ gameNumber, finalView, events }`：`finalView` 是该座位视角的终局 `PlayerView`，`events` 是 `eventsVisibleTo` 过滤后该座位可见的事件序列，供客户端单步/拖动播放——响应形状故意跟 `game:snapshot`（一次全量快照 + 后续事件增量）的心智模型对齐，不发明新协议形状。错误码：`gameNumber` 未归档 → `GAME_NOT_FOUND`；请求者不在 `seatUserIds` 里 → `UNAUTHORIZED`。
+- **明牌 replay**（`debug:replayOmniscientView`）是调试/测试专用逃生舱，只支持局终（直接读 `finalState` 喂 `getOmniscientView`，不做事件重放），鉴权模型完全不同于 `replay:get`（要求当前是房间已入座玩家，跟直播版全明牌一致），不进正式产品 UI——完整说明见 `contracts/protocol-shared.md` §7、`decisions.md` D19。
+- 事件日志/`finalState` 目前只存内存（`RoomService` 内部 `Map`）：`finished` 的房间对象不会被主动清理，一直留在内存里直到进程重启才整体清空（服务端目前没有任何房间过期/回收机制，是已知的 MVP 限制，不是持久化的替代品）——持久化（重启后仍可查，且能限制内存占用）是独立立项的下一阶段，见 `process/plan.md`。

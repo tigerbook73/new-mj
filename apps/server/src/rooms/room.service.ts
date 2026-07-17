@@ -460,7 +460,7 @@ export class RoomService {
   }
 
   /**
-   * phase-4.5-replay.md step 3 — real product feature (unlike
+   * phase 4.5 step 3 — real product feature (unlike
    * getOmniscientView): any userId who was seated in that specific
    * archived game may fetch its replay, regardless of whether they're
    * still in this room right now (seatUserIds is that game's own
@@ -486,14 +486,14 @@ export class RoomService {
   }
 
   /**
-   * phase-4.5-replay.md step 5 — 明牌 replay, gated the same way as D19's
+   * phase 4.5 step 5 — 明牌 replay, gated the same way as D19's
    * live getOmniscientView (dev/test-only, caller checks
    * ALLOW_DEBUG_OMNISCIENT + current room membership), unlike getReplay
    * above which is a real product feature open to anyone who played that
    * game. End-of-game only: feeds the archived finalState straight into
    * getOmniscientView instead of reconstructing state from events (that
    * would need a new core capability — out of scope, see
-   * phase-4.5-replay.md "衔接问题").
+   * phase 4.5 "衔接问题").
    */
   getReplayOmniscientView(roomId: string, gameNumber: number): OmniscientView {
     const room = this.mustGet(roomId);
@@ -514,7 +514,7 @@ export class RoomService {
     room.phase = "in-game";
     room.lastEventSeq = 0;
     this.trackEventSeq(room, result.events);
-    // phase-4.5-replay.md: seed the archive with createGame's own events
+    // phase 4.5: seed the archive with createGame's own events
     // (GameStarted etc.) — those are never re-broadcast as game:event, so
     // rebuildPlayerView's expected starting point would be missing otherwise.
     room.currentGameEvents = [...result.events];

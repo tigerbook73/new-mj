@@ -336,7 +336,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   /**
-   * phase-4.5-replay.md step 3 — query, not gated by the room membership
+   * phase 4.5 step 3 — query, not gated by the room membership
    * registry (a player who already left the room may still replay a game
    * they were seated in), only by handshake identity + RoomService's own
    * seatUserIds check for that specific archived game.
@@ -354,7 +354,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   /**
-   * phase-4.5-replay.md step 5 — 明牌 replay, end-of-game only. Same gate as
+   * phase 4.5 step 5 — 明牌 replay, end-of-game only. Same gate as
    * handleDebugOmniscientView above (ALLOW_DEBUG_OMNISCIENT + current room
    * membership), not the "any past participant" model handleReplayGet uses.
    */

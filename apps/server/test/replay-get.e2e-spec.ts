@@ -11,7 +11,7 @@ import { RoomService } from "../src/rooms/room.service";
 const ack = <T>(socket: ClientSocket, event: string, payload: unknown): Promise<Reply<T>> =>
   new Promise((resolve) => socket.emit(event, payload, resolve));
 
-describe("replay:get (e2e, socket.io-client — phase-4.5-replay.md step 3)", () => {
+describe("replay:get (e2e, socket.io-client — phase 4.5 step 3)", () => {
   let app: INestApplication;
   let baseUrl: string;
   let roomService: RoomService;

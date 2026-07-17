@@ -1,7 +1,7 @@
 /**
  * Deliberately weak, ruleset-agnostic strategy: always takes a win when one
  * is legal, otherwise picks uniformly at random. Phase 4's only requirement
- * is "AI can be weak, but must exist" (docs/process/phase-4-junk-complete.md)
+ * is "AI can be weak, but must exist" (phase 4)
  * — this is the simplest thing that finishes a game without ever missing an
  * obvious win.
  */

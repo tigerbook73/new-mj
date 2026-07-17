@@ -32,7 +32,7 @@ export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
    * ruleset-private), unlike getOmniscientView (D19) which is generic
    * because it only reads the common `{ wall, seats }` shape — replaying
    * events requires understanding what each event type means, so this can't
-   * be a single cross-ruleset function. Used by phase-4.5-replay.md.
+   * be a single cross-ruleset function. Used by phase 4.5.
    */
   rebuildPlayerView: (events: readonly GameEvent[], seat: SeatId) => TView;
 };

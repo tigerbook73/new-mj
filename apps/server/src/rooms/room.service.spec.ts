@@ -400,7 +400,7 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
   });
 });
 
-describe("RoomService — replay log archiving (phase-4.5-replay.md step 1)", () => {
+describe("RoomService — replay log archiving (phase 4.5 step 1)", () => {
   it("archives one FinishedGameLog per game, seeded with createGame's own events", () => {
     const service = newRoomService();
     const gameService = new GameService();
@@ -433,7 +433,7 @@ describe("RoomService — replay log archiving (phase-4.5-replay.md step 1)", ()
   });
 });
 
-describe("RoomService — getReplay (phase-4.5-replay.md step 3)", () => {
+describe("RoomService — getReplay (phase 4.5 step 3)", () => {
   const playOneFinishedGame = (service: RoomService, gameService: GameService): Room => {
     const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
     service.addBot(room.id, "host");
@@ -505,7 +505,7 @@ describe("RoomService — getReplay (phase-4.5-replay.md step 3)", () => {
   });
 });
 
-describe("RoomService — getReplayOmniscientView (phase-4.5-replay.md step 5)", () => {
+describe("RoomService — getReplayOmniscientView (phase 4.5 step 5)", () => {
   const playOneFinishedGame = (service: RoomService, gameService: GameService): Room => {
     const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
     service.addBot(room.id, "host");

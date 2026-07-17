@@ -57,7 +57,7 @@ export class GameService {
     return coreGetOmniscientView(state as any);
   }
 
-  /** phase-4.5-replay.md — reconstructs a seat's view from a stored event log. */
+  /** phase 4.5 — reconstructs a seat's view from a stored event log. */
   rebuildPlayerView(
     rulesetId: string,
     events: readonly GameEvent[],

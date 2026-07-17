@@ -11,9 +11,9 @@
 
 ## 代码约定
 
-- 目录：`src/config`（环境变量/常量）、`src/health`（自定义健康检查）、`src/core`（GameService，纯薄封装 `@new-mj/core` 四个引擎函数，不加业务逻辑）、`src/rooms`（RoomService/房间状态机/EventBus）、`src/gateway`（RoomsGateway/鉴权中间件/ConnectionRegistry）。
+- 目录：`src/config`（环境变量/常量）、`src/health`（自定义健康检查）、`src/core`（GameService，纯薄封装 `@new-mj/core` 引擎函数，不加业务逻辑）、`src/rooms`（RoomService/房间状态机/EventBus）、`src/gateway`（RoomsGateway/鉴权中间件/ConnectionRegistry）。
 - 日志统一用 Nest 内置 `Logger`（每个 `Injectable` 用 `new Logger(XxxService.name)`），不引入 pino/winston 等第三方日志库。
-- 数据库/ORM 占位：phase 4 落地时用 Prisma + Supabase Postgres；目前（phase 3 完成，phase 4 未开工）不接入任何持久化代码，房间状态用内存 `Map`，重启即丢。
+- 数据库/ORM 占位：阶段 5 落地时用 Prisma + Supabase Postgres；目前（阶段 4 完成，阶段 5 未开工）不接入任何持久化代码，房间状态（含 `finishedGames` 事件日志）用内存 `Map`/数组，重启即丢。
 - 测试文件位置/命名遵循根 AGENTS.md 全局约定（`docs/testing-strategy.md` §1.1），server 专属偏离是单元测试后缀用 `*.spec.ts`（NestJS 官方 Jest 生态）；e2e 用 `socket.io-client` 模拟客户端（真实起 `NestFactory` app + 真实 socket 连接，不 mock 传输层）。
 - `apps/server` 是本仓库唯一的 CommonJS 包（其余全 ESM，D13），用 Nest 官方默认的 `nest build`/`nest start`，不引入自定义 ESM 编译方案；相对导入按 Nest/CJS 惯例正常写（不需要 `.ts` 后缀）。`nest-cli.json` 的 `deleteOutDir: true` 与 `tsconfig` 的 `incremental: true` 组合过——会因为 `.tsbuildinfo` 缓存没跟着 `dist/` 一起清而静默产出空目录，本仓库因此不开 `incremental`。
 - 鉴权用 Socket.IO 握手中间件（`server.use()`，`gateway/auth.middleware.ts`），不是 Nest 的 `CanActivate` 守卫——守卫只保护单条消息，握手阶段不经过它（D14）。
@@ -28,8 +28,8 @@
 - `src/app.module.ts`：根 DI 容器。
 - `src/config/`：`ConfigModule`/`ConfigService`，`protocolVersion`/`jwtSecret` 等环境变量。
 - `src/health/`：自定义 `/health` controller。
-- `src/core/`：`GameService`，薄封装 `createGame`/`applyAction`/`getLegalActions`/`getPlayerView`/`computeNextDealer`。
-- `src/rooms/`：`RoomService`（房间生命周期与编排）、`room.ts`（内部状态类型）、`room.events.ts`/`event-bus.ts`（类型化 EventBus）、`room-service.error.ts`（携带 `ErrCode` 的异常）。
+- `src/core/`：`GameService`，薄封装 `createGame`/`applyAction`/`getLegalActions`/`getPlayerView`/`computeNextDealer`（engine-api 四签名 + `computeNextDealer` 扩展点）以及 `getOmniscientView`（D19，调试专用）/`rebuildPlayerView`（D20，replay 用）。
+- `src/rooms/`：`RoomService`（房间生命周期与编排，含 `getReplay`/`getReplayOmniscientView` 等 replay 查询方法）、`room.ts`（内部状态类型，`Room.finishedGames: FinishedGameLog[]` 是每局归档的事件日志+终局状态快照，见 `contracts/session-mechanics.md` §10）、`room.events.ts`/`event-bus.ts`（类型化 EventBus）、`room-service.error.ts`（携带 `ErrCode` 的异常）。
 - `src/gateway/`：`RoomsGateway`（消息路由 + EventBus 订阅）、`auth.middleware.ts`（握手鉴权）、`connection-registry.ts`（座位↔socket 映射）、`gateway.module.ts`。
 
 ## apps/server DoD

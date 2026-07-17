@@ -5,7 +5,7 @@ export type RoomPhase = "waiting" | "in-game" | "finished";
 export type RoomStatus = "open" | "closed";
 
 /**
- * Archived per-game event log (phase-4.5-replay.md's minimal record shape).
+ * Archived per-game event log (phase 4.5's minimal record shape).
  * `seatUserIds` is a snapshot taken at that game's start — `room.players`
  * only reflects *current* occupancy, and a game's own record must stay
  * self-sufficient even if seats change after it ends. No `seed`: replay
@@ -20,7 +20,7 @@ export interface FinishedGameLog {
   /**
    * Opaque final core state (same shape as `Room.gameState`), captured right
    * before `beginGame()` overwrites it for the next round. 明牌 replay
-   * (phase-4.5-replay.md step 5) feeds this straight into
+   * (phase 4.5 step 5) feeds this straight into
    * `getOmniscientView` — cheaper than reconstructing state from `events`
    * (which would need a new "replay to omniscient state" core capability;
    * this sidesteps that by keeping the state snapshot instead). Debug/test-

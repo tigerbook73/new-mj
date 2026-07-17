@@ -2,7 +2,7 @@ import { z } from "zod";
 import { GameEventSchema, PlayerViewBaseSchema } from "./game.ts";
 
 /**
- * docs/process/phase-4.5-replay.md — query for a finished game's replay.
+ * phase 4.5 — query for a finished game's replay.
  * Ack-only (query = ack gives data): server resolves `gameNumber` against
  * the room's archived FinishedGameLog, checks the requester's userId was
  * seated in that game, then returns the seat-filtered event stream plus the

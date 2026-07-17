@@ -5,7 +5,7 @@
 ## 1. 系统图
 
 ```
- web (React SPA，阶段 3 已交付)      mobile (Expo, 阶段 6)
+ web (React SPA，阶段 3-4 已交付)    mobile (Expo, 阶段 7)
         \                /
          Socket.IO（唯一业务通道；OAuth 走 Supabase SDK 直连）
                  |
@@ -18,7 +18,7 @@
    core（纯函数引擎，零依赖）
    applyAction(state, seat, action) → { state', events } | { error }
                  |
-   PG(Supabase)：用户表 + 对局事件日志（阶段 4）
+   PG(Supabase)：用户表 + 对局事件日志（阶段 5）
 ```
 
 ## 2. 部署视图
@@ -26,7 +26,7 @@
 - **server**：Render（付费档）。原因是 WebSocket 长连接需要长驻进程，排除了 Vercel 一类 serverless 平台；回合制麻将对延迟不敏感，不需要 Fly.io 式多区域部署。
 - **鉴权 + 数据库**：Supabase，开箱提供 OAuth（Google/GitHub）与 PG。
 - **web**：静态托管（SPA），阶段 3 已交付（Vite + React + React Router + Tailwind + shadcn/ui + Zustand，见 D17 与 `apps/web/AGENTS.md`）。
-- **mobile**：Expo，阶段 6 交付，路线未定（是否 react-native-web 统一见 `process/plan.md` 待办）。
+- **mobile**：Expo，阶段 7 交付，路线未定（是否 react-native-web 统一见 `process/plan.md` 待办）。
 - **除 OAuth 外全走 Socket.IO**：没有独立的 REST/tRPC 层，查询用 ack 模式实现；服务端仅暴露 `/health`。
 
 ## 3. 包拓扑（依赖方向 = 架构本体，dependency-cruiser 强制）

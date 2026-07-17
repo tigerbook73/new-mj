@@ -11,7 +11,7 @@ import { RoomService } from "../src/rooms/room.service";
 const ack = <T>(socket: ClientSocket, event: string, payload: unknown): Promise<Reply<T>> =>
   new Promise((resolve) => socket.emit(event, payload, resolve));
 
-describe("debug:replayOmniscientView (e2e, socket.io-client — phase-4.5-replay.md step 5)", () => {
+describe("debug:replayOmniscientView (e2e, socket.io-client — phase 4.5 step 5)", () => {
   let app: INestApplication;
   let baseUrl: string;
   let roomService: RoomService;

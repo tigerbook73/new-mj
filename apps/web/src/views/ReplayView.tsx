@@ -6,7 +6,7 @@ import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
 
 /**
- * MVP step-through player (phase-4.5-replay.md step 4): no real tile-face
+ * MVP step-through player (phase 4.5 step 4): no real tile-face
  * rendering and no per-step state reconstruction (same scope decision as
  * D19's live debug view) — just the raw event at each step plus the final
  * reconstructed view, both shown as JSON.
@@ -30,7 +30,7 @@ export function ReplayView() {
     });
   }, [socket, roomId, gameNumber]);
 
-  // Dev/test-only escape hatch (phase-4.5-replay.md step 5, D19) — end-of-game
+  // Dev/test-only escape hatch (phase 4.5 step 5, D19) — end-of-game
   // only, raw TileIds, no tile-face rendering. Server rejects unless
   // ALLOW_DEBUG_OMNISCIENT is set, so this is a no-op against a normal deploy.
   const fetchDebugOmniscientView = async () => {
