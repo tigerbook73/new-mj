@@ -1,0 +1,64 @@
+// Generator uses the classic `prisma-client-js` provider (not the new
+// `prisma-client` default) so the generated client is plain compiled CJS in
+// node_modules/@prisma/client, requiring zero extra tsc/module wiring —
+// apps/server is this repo's only CommonJS package (D13), and the new
+// generator's default output is ESM TypeScript source meant for a
+// tsx/bundler toolchain, not `nest build`'s tsc-based CJS compile.
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: no `url` here anymore — Migrate's connection comes from
+// prisma.config.ts, the running PrismaClient's connection comes from the
+// `adapter` passed to its constructor (PrismaService, driver adapters
+// pattern). See https://pris.ly/d/prisma7-client-config.
+datasource db {
+  provider = "postgresql"
+}
+
+// No FK to GameLog/RoomSession or to auth.users — see decisions.md phase 5
+// entry ("单向引用 userId" precedent, D7). Only ever written for real
+// Supabase-authenticated users (dev fake-login never calls upsertProfile),
+// so `id` can safely be typed as a UUID.
+model Profile {
+  id        String   @id @db.Uuid
+  nickname  String
+  avatar    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}
+
+// One row per finished multi-game session (Room, in apps/server terms).
+// Written once, when the session ends — no relation to GameLog: a session's
+// GameLog rows are written earlier, one per finished game, so a hard FK
+// here would reject those inserts (this row doesn't exist yet).
+model RoomSession {
+  id            String   @id
+  rulesetId     String   @map("ruleset_id")
+  sessionFormat String   @map("session_format")
+  result        Json
+  finishedAt    DateTime @map("finished_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("room_sessions")
+}
+
+// One row per finished game, archived at game-end (mirrors apps/server's
+// in-memory FinishedGameLog). Self-sufficient: carries its own rulesetId so
+// a replay can be rebuilt even if the owning RoomSession row doesn't exist
+// yet (session still in progress) or ever (server crashed mid-session).
+model GameLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomId      String   @map("room_id")
+  gameNumber  Int      @map("game_number")
+  rulesetId   String   @map("ruleset_id")
+  seatUserIds Json     @map("seat_user_ids")
+  events      Json
+  finalState  Json     @map("final_state")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([roomId, gameNumber])
+  @@map("game_logs")
+}

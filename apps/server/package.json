@@ -10,7 +10,9 @@
     "lint": "eslint src",
     "test": "jest --passWithNoTests",
     "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build"
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -22,6 +24,10 @@
     "@new-mj/ai": "workspace:*",
     "@new-mj/core": "workspace:*",
     "@new-mj/protocol": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
@@ -31,7 +37,9 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/jest": "^30.0.0",
+    "@types/pg": "^8.20.0",
     "jest": "^30.0.0",
+    "prisma": "^7.8.0",
     "socket.io-client": "^4.8.3",
     "ts-jest": "^29.2.5"
   },
