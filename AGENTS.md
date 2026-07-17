@@ -26,7 +26,7 @@
 
 ## DoD（细则见 workflow.md）
 
-默认执行 `pnpm verify` 并全绿，提交时**贴出运行结果**；core 改动加 fuzz 冒烟（≥1000 局）。测试与实现同 commit；修 bug 先写复现用例。依赖维护细则见 `workflow.md`「依赖维护」节，不在此复述。
+默认执行 `pnpm verify` 并全绿，提交时**贴出运行结果**；core 改动加 fuzz 冒烟（≥1000 局）。测试与实现同 commit；修 bug 先写复现用例。测试文件位置（全 package 统一）：单元测试贴近实现放 `src/`；集成/契约/fuzz/e2e 等跨模块测试放独立 `test/`；具体后缀/框架差异见各目录 `AGENTS.md`，细则见 `docs/testing-strategy.md`。依赖维护细则见 `workflow.md`「依赖维护」节，不在此复述。
 
 ## 护栏
 

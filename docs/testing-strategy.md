@@ -7,12 +7,18 @@
 | 层           | 覆盖什么                                          | 工具                                                                              |
 | ------------ | ------------------------------------------------- | --------------------------------------------------------------------------------- |
 | 单元         | core 纯函数（不变量、单个规则判定）               | Vitest（`packages/core`）                                                         |
-| fixture      | 番型/规则黄金路径用例（人工设计，覆盖已知规则点） | Vitest + YAML fixture 加载器                                                      |
+| fixture      | 番型/规则黄金路径用例（人工设计，覆盖已知规则点） | Vitest，fixture 为内联 TS 数组字面量（`test.each`）                              |
 | fuzz         | 随机 config 扫组合，暴露黄金路径没覆盖到的边界    | Vitest，seed + action 序列可复现                                                  |
 | e2e          | 真实 socket.io-client 连接跑通完整会话            | Jest（`apps/server`，遵循 NestJS 官方测试生态）                                   |
 | 跨玩法不变量 | 容器唯一性、事件重建≡直接派生                     | 参数化遍历已注册 ruleset（`packages/core/test/cross-ruleset-invariants.test.ts`） |
 
 web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调度（Turbo）。
+
+### 1.1 测试文件位置与命名（全 package 统一原则）
+
+- **位置**：单元测试贴近实现放 `src/`（只放真正贴近实现细节、不跨模块的用例）；集成/契约/fuzz/e2e 等跨模块或跨进程测试放独立的 `test/` 目录。这条原则对 `packages/core`、`packages/protocol`、`packages/ai`、`apps/web`、`apps/server` 一致适用。
+- **命名后缀随包内测试框架而定**：Vitest 生态（`packages/core`、`packages/protocol`、`packages/ai`、`apps/web` 单元测试）统一用 `*.test.ts`（`apps/web` 组件测试用 `*.test.tsx`）；`apps/server` 遵循 NestJS 官方 Jest 生态，单元测试用 `*.spec.ts` 与源码同目录。
+- **e2e 统一放 `test/*.e2e-spec.ts`**：`apps/server`（`socket.io-client` 模拟客户端）与 `apps/web`（Playwright）在这条命名上刻意保持一致，便于跨包查找。
 
 ## 2. 黄金路径 vs fuzz 的分工原则
 
@@ -38,4 +44,4 @@ web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调
 ## 5. 测试与文档的关系
 
 - 契约和规则正文以 `contracts/*.md`、`variants/*.md` 为准，测试代码里的注释不复制整段规格。
-- fixture 文件本身（YAML 用例）是权威测试输入，不在文档里重复贴运行结果；文档只讲"怎么写 fixture、约定是什么"（如 `variants/bloodbattle.md` §10 的 fixture 格式约定）。
+- fixture 数据本身（内联 TS 用例数组）是权威测试输入，不在文档里重复贴运行结果；文档只讲"怎么写 fixture、约定是什么"（如 `variants/bloodbattle.md` §10 的 fixture 格式约定）。

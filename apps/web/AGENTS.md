@@ -16,7 +16,7 @@
 - `src/components/ui/`（含 `src/lib/utils.ts` 的 `cn()` helper）是 shadcn CLI `add` 生成的产物，**不手改**；需要改行为就重新走 `npx shadcn@latest add <component>` 或调 `components.json` 配置后重新生成。这个目录被 eslint 单独豁免了 `react-refresh/only-export-components` 规则（根 `eslint.config.mjs`），因为 shadcn 的 cva 变体导出模式本身就会触发这条规则。
 - `src/lib/`：非 UI 的纯逻辑（socket 连接封装、开发态鉴权等）。`src/store/`：Zustand store。`src/views/`：路由级页面组件。`src/router.tsx`：路由表。
 - 目前不引入除 React Router 外的路由/状态管理库（Redux 等）；Zustand store 只有一个 `useSessionStore`，规模到需要跨模块拆分时再评估。
-- 测试文件命名：单元测试贴近实现放 `src/`（`*.test.tsx`/`*.test.ts`，Vitest）；e2e 测试放 `test/*.e2e-spec.ts`（Playwright，与 `apps/server` 的 `test/*.e2e-spec.ts` 命名一致）。
+- 测试文件位置/命名遵循根 AGENTS.md 全局约定（`docs/testing-strategy.md` §1.1）：单元测试用 Vitest，e2e 用 Playwright；无 web 专属偏离。
 - **e2e 测试里跳转路由一律用点击（触发 React Router 的客户端跳转），不要用 `page.goto("/lobby/...")`**：`page.goto` 是整页重新加载，会清空内存里的 Zustand session（`socket`/`userId`），`RequireAuth` 守卫会把你弹回 `/login`——踩过一次坑，见 `test/lobby.e2e-spec.ts` 的写法。
 - `RoomInfo`/`PlayerView` 等房间与对局状态**只能靠 ack 的初始快照 + 后续事件增量更新**（`applyPlayerJoined`/`applyReadyChanged` 这类 store action），不存在"重新查一次房间当前状态"的协议消息，也不允许拿命令 ack 当状态来源（架构铁律 5）——`room:ready`/`room:start` 的 ack 都是空对象 `{}`，真正的状态变化只能等 `room:readyChanged`/`game:snapshot` 广播/单播。
 - **`game:event` 只处理"事实型"事件，不处理"规则型"事件**：`apps/server` 的 `applyPlayerAction` 只广播原始 `game:event`（每次动作后**不会**重发 `game:snapshot`），而"怎么从事件流正确重建 PlayerView"这份逻辑（`rebuildPlayerView`）是按玩法分开写在 core 里的，web 不让 import。折中方案：`TableView` 只对"客观事实、跟规则无关"的事件类型（`TurnStarted`/`TileDiscarded`/`ClaimWindowOpened`/`ClaimWindowResolved`——谁的回合、谁打了什么牌、我能声明什么）做增量更新（`applyTurnStarted` 等 store action）；吃/碰/杠成立、胡牌、结算这类真正需要"判断"的事件只记一行日志，不解析、不试图还原画面，等下一次 `game:snapshot`（下一局开始）整体对齐。这不是数据泄露顾虑（可见性过滤已经在事件下发时做完），纯粹是不想在前端重新实现规则判断。

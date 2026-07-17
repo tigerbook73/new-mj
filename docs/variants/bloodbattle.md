@@ -120,7 +120,7 @@
 
 ## 10. 番型 fixture 约定（测试相关，配套 `testing-strategy.md`）
 
-用例即测试 fixture，YAML 格式，字段：`id`/`desc`/`config`/`hand`/`melds`/`lack`/`win`/`context`/`expect`。约定：
+用例即测试 fixture，内联 TS 数组字面量（见 `packages/core/test/bloodbattle/scoring.test.ts`），字段：`id`/`desc`/`config`/`hand`/`melds`/`lack`/`win`/`context`/`expect`。约定：
 
 - `expect.fanTypes` 为集合语义（顺序无关，重复项表多个根）；基础型即使贡献 0 番也不能省略
 - 封顶用例须同时给出 `fan`（原始）与 `cappedAt`；`cappedAt` 只在触及封顶时出现

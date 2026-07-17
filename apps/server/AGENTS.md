@@ -14,7 +14,7 @@
 - 目录：`src/config`（环境变量/常量）、`src/health`（自定义健康检查）、`src/core`（GameService，纯薄封装 `@new-mj/core` 四个引擎函数，不加业务逻辑）、`src/rooms`（RoomService/房间状态机/EventBus）、`src/gateway`（RoomsGateway/鉴权中间件/ConnectionRegistry）。
 - 日志统一用 Nest 内置 `Logger`（每个 `Injectable` 用 `new Logger(XxxService.name)`），不引入 pino/winston 等第三方日志库。
 - 数据库/ORM 占位：phase 4 落地时用 Prisma + Supabase Postgres；目前（phase 3 完成，phase 4 未开工）不接入任何持久化代码，房间状态用内存 `Map`，重启即丢。
-- 测试遵循 NestJS 官方 Jest 生态：单元测试 `*.spec.ts` 与源码同目录；集成/E2E 放 `test/*.e2e-spec.ts`，用 `socket.io-client` 模拟客户端（真实起 `NestFactory` app + 真实 socket 连接，不 mock 传输层）。
+- 测试文件位置/命名遵循根 AGENTS.md 全局约定（`docs/testing-strategy.md` §1.1），server 专属偏离是单元测试后缀用 `*.spec.ts`（NestJS 官方 Jest 生态）；e2e 用 `socket.io-client` 模拟客户端（真实起 `NestFactory` app + 真实 socket 连接，不 mock 传输层）。
 - `apps/server` 是本仓库唯一的 CommonJS 包（其余全 ESM，D13），用 Nest 官方默认的 `nest build`/`nest start`，不引入自定义 ESM 编译方案；相对导入按 Nest/CJS 惯例正常写（不需要 `.ts` 后缀）。`nest-cli.json` 的 `deleteOutDir: true` 与 `tsconfig` 的 `incremental: true` 组合过——会因为 `.tsbuildinfo` 缓存没跟着 `dist/` 一起清而静默产出空目录，本仓库因此不开 `incremental`。
 - 鉴权用 Socket.IO 握手中间件（`server.use()`，`gateway/auth.middleware.ts`），不是 Nest 的 `CanActivate` 守卫——守卫只保护单条消息，握手阶段不经过它（D14）。
 - 座位↔socket 的映射由 `gateway/connection-registry.ts` 维护，不进 `RoomService`/`Room` 类型（D14）；房间内广播用 Socket.IO 原生房间功能，只有 `game:snapshot`/`game:event` 按座位单播才查这张表。
