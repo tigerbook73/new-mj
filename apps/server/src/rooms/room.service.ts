@@ -12,8 +12,9 @@ import {
 } from "@new-mj/core";
 import type { RankingEntry, RoomInfo, RoomSummary, SessionFormat } from "@new-mj/protocol";
 import { GameService } from "../core/game.service";
+import { PersistenceService } from "../persistence/persistence.service";
 import { EventBus } from "./event-bus";
-import type { Room, RoomPlayer } from "./room";
+import type { FinishedGameLog, Room, RoomPlayer } from "./room";
 import { RoomServiceError } from "./room-service.error";
 
 const ROOM_SIZE = 4;
@@ -41,6 +42,7 @@ export class RoomService {
   constructor(
     private readonly gameService: GameService,
     private readonly eventBus: EventBus,
+    private readonly persistenceService: PersistenceService,
   ) {}
 
   create(
@@ -538,12 +540,19 @@ export class RoomService {
   }
 
   private handleGameEnd(room: Room): void {
-    room.finishedGames.push({
+    const gameLog: FinishedGameLog = {
       gameNumber: room.gameNumber,
       seatUserIds: room.currentGameSeatUserIds,
       events: room.currentGameEvents,
       finalState: room.gameState,
-    });
+    };
+    room.finishedGames.push(gameLog);
+    // Fire-and-forget: archival must never be able to interrupt this
+    // synchronous game-processing flow (decisions.md phase 5 entry).
+    this.persistenceService.fireAndForget(
+      this.persistenceService.archiveGame(room.id, { ...gameLog, rulesetId: room.rulesetId }),
+      `archiveGame(${room.id}, ${gameLog.gameNumber})`,
+    );
 
     this.eventBus.emit("room:scoreUpdated", {
       roomId: room.id,
@@ -563,6 +572,15 @@ export class RoomService {
         format: room.sessionFormat,
         gamesPlayed: room.gameNumber,
       };
+      this.persistenceService.fireAndForget(
+        this.persistenceService.archiveSession(room.id, {
+          rulesetId: room.rulesetId,
+          sessionFormat: room.sessionFormat,
+          result: room.result,
+          finishedAt: room.finishedAt,
+        }),
+        `archiveSession(${room.id})`,
+      );
       this.eventBus.emit("room:sessionFinished", { roomId: room.id, result: room.result });
       return;
     }

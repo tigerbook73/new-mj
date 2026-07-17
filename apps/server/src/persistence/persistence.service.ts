@@ -27,10 +27,18 @@ export interface ArchivedSession {
 @Injectable()
 export class PersistenceService {
   private readonly logger = new Logger(PersistenceService.name);
+  // No DATABASE_URL (dev/test/CI without a local Postgres running) short-
+  // circuits every method to a fast no-op/null instead of letting Prisma
+  // attempt a real connection — an unreachable host doesn't fail fast in
+  // every sandbox (some silently hang on the TCP handshake instead of an
+  // immediate ECONNREFUSED), which would otherwise hang fire-and-forget
+  // writes and any test that plays a game through to completion.
+  private readonly enabled = Boolean(process.env["DATABASE_URL"]);
 
   constructor(private readonly prisma: PrismaService) {}
 
   async archiveGame(roomId: string, game: ArchivedGame): Promise<void> {
+    if (!this.enabled) return;
     await this.prisma.gameLog.upsert({
       where: { roomId_gameNumber: { roomId, gameNumber: game.gameNumber } },
       create: {
@@ -46,6 +54,7 @@ export class PersistenceService {
   }
 
   async findGame(roomId: string, gameNumber: number): Promise<ArchivedGame | null> {
+    if (!this.enabled) return null;
     const row = await this.prisma.gameLog.findUnique({
       where: { roomId_gameNumber: { roomId, gameNumber } },
     });
@@ -60,6 +69,7 @@ export class PersistenceService {
   }
 
   async archiveSession(roomId: string, session: ArchivedSession): Promise<void> {
+    if (!this.enabled) return;
     await this.prisma.roomSession.upsert({
       where: { id: roomId },
       create: {
@@ -74,6 +84,7 @@ export class PersistenceService {
   }
 
   async findSession(roomId: string): Promise<ArchivedSession | null> {
+    if (!this.enabled) return null;
     const row = await this.prisma.roomSession.findUnique({ where: { id: roomId } });
     if (!row) return null;
     return {
@@ -85,6 +96,7 @@ export class PersistenceService {
   }
 
   async upsertProfile(userId: string, nickname: string, avatar?: string): Promise<void> {
+    if (!this.enabled) return;
     const avatarValue = avatar ?? null;
     await this.prisma.profile.upsert({
       where: { id: userId },
@@ -94,6 +106,7 @@ export class PersistenceService {
   }
 
   async findProfile(userId: string): Promise<{ nickname: string; avatar: string | null } | null> {
+    if (!this.enabled) return null;
     const row = await this.prisma.profile.findUnique({ where: { id: userId } });
     if (!row) return null;
     return { nickname: row.nickname, avatar: row.avatar };

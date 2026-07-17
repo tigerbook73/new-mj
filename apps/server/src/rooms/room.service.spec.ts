@@ -2,10 +2,25 @@ import { playJunkGame } from "@new-mj/core";
 import { GameService } from "../core/game.service";
 // GameService is used directly (not via RoomService) so the acceptance test
 // below can inspect legal actions without exposing gameService as public API.
+import type { PersistenceService } from "../persistence/persistence.service";
 import { EventBus } from "./event-bus";
 import type { Room } from "./room";
 import { RoomServiceError } from "./room-service.error";
 import { RoomService } from "./room.service";
+
+// RoomService only ever fire-and-forgets through this — no real DB needed
+// for these in-memory-behavior tests (persistence read/write itself is
+// covered separately, against a real local Postgres).
+const fakePersistenceService = (): PersistenceService =>
+  ({
+    archiveGame: async () => undefined,
+    archiveSession: async () => undefined,
+    findGame: async () => null,
+    findSession: async () => null,
+    upsertProfile: async () => undefined,
+    findProfile: async () => null,
+    fireAndForget: () => undefined,
+  }) as unknown as PersistenceService;
 
 const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   id: "room-1",
@@ -31,7 +46,8 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   ...overrides,
 });
 
-const newRoomService = () => new RoomService(new GameService(), new EventBus());
+const newRoomService = () =>
+  new RoomService(new GameService(), new EventBus(), fakePersistenceService());
 
 describe("RoomService — pure helpers", () => {
   it("accumulateScores adds deltas seat-wise across multiple calls", () => {
