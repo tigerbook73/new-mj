@@ -1,7 +1,7 @@
 # 阶段 4.5：Replay / 明牌 Replay
 
 > 过程性文档：本子阶段的详细实施计划，由 `plan.md`/`phase-4-junk-complete.md` 链接过来。收尾时把耐久内容按 `doc-map.md` §6 吸纳到对应文档，再删除本文件。
-> 当前状态：盘点完成，最小记录形状已确定，子步骤 1（server 侧事件归档）已完成；子步骤 2-5 留待下一轮确认（照 4.4 拆成多个子步骤逐个做的先例）。
+> 当前状态：盘点完成，最小记录形状已确定，子步骤 1（server 侧事件归档）、子步骤 2（protocol `replay:get` schema）已完成；子步骤 3-5 留待下一轮确认（照 4.4 拆成多个子步骤逐个做的先例）。
 
 ## 用户确认过的设计点
 
@@ -39,13 +39,15 @@ type GameReplayRecord = {
 | 步骤 | 内容                                                                                                                                  | 状态 |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------- | ---- |
 | 1    | server：`Room` 加归档字段（`FinishedGameLog[]`），`beginGame` 记录 `seatUserIds` 快照，`runAction`/`handleGameEnd` 累积/归档 `events` | ✅   |
-| 2    | protocol：新增查询式消息（如 `replay:get`），入参 `{roomId, gameNumber}`；鉴权校验请求者 `userId` 出现在该局的 `seatUserIds` 里       |      |
+| 2    | protocol：新增查询式消息（如 `replay:get`），入参 `{roomId, gameNumber}`；鉴权校验请求者 `userId` 出现在该局的 `seatUserIds` 里       | ✅   |
 | 3    | server gateway：新增 handler，复用 `rebuildPlayerView`（需要先在 server 侧接一层薄封装，类似 `GameService` 现在对四签名的封装）       |      |
 | 4    | web：回放播放器（时间轴/单步前进，展示历史事件）                                                                                      |      |
 | 5    | 明牌 replay：复用 `debug:omniscientView` 同一套环境变量门控；范围（局终 vs 任意步）待第 1-4 步落地后再定                              |      |
 
 **步骤 1 实现记录**：`FinishedGameLog`（`apps/server/src/rooms/room.ts`）不带 `roomId`（记录已经挂在具体 `Room` 实例的 `finishedGames` 数组下，字段冗余）；`Room` 新增 `currentGameEvents`/`currentGameSeatUserIds`（进行中该局的累积区）与 `finishedGames`（归档数组）。`beginGame()` 用 `createGame` 自身返回的 `result.events` 播种 `currentGameEvents`（这批事件从不重播为 `game:event`，遗漏会导致 `rebuildPlayerView` 缺少 `GameStarted` 起点）并快照 `room.players` 的 userId；`runAction()` 每次 `applyAction` 后把新事件追加进 `currentGameEvents`；`handleGameEnd()` 在归零下一局前把当局完整记录 push 进 `finishedGames`。新增测试 `room.service.spec.ts`「RoomService — replay log archiving」验证 4 局会话产出 4 条记录，`seq` 从 1 连续、首事件是 `GameStarted`、`seatUserIds` 与实际入座一致。
 
+**步骤 2 实现记录**：新文件 `packages/protocol/src/replay.ts`——`ReplayGetRequestSchema`（`{roomId, gameNumber}`）与 `ReplayGetResponseSchema`（`{gameNumber, finalView, events}`）。响应形状故意跟 `GameSnapshotSchema` 对齐（`finalView: PlayerViewBaseSchema` + `events: GameEventSchema[]`）——直播是"入座给一次全量快照 + 后续事件增量"，回放对应"进入回放给一次终局快照 + 完整事件时间轴供单步/拖动"，复用同一套心智模型，不发明新协议形状。`finalView`/`events` 复用 `game.ts` 现成的 schema，没有新增字段类型。协议层还不做鉴权（鉴权是 server 的事，见步骤 3），这一步只定数据形状。
+
 ## 状态
 
-步骤 1（server 侧事件归档）已完成并通过 `pnpm --filter @new-mj/server verify`。步骤 2-5 待下一轮确认后继续。
+步骤 1（server 侧事件归档）、步骤 2（protocol `replay:get` schema）已完成并通过各自 `pnpm verify`。步骤 3-5 待下一轮确认后继续。

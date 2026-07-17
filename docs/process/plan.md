@@ -49,9 +49,9 @@
 
 ## 当前状态
 
-阶段 4 系列的前三个子阶段（4.1 AI 补位、4.2 断线托管、4.3 黑暗模式）已完成，4.4（UI/操作优化）定案为"大厅/房间 UI 重做"，拆成 6 个子步骤，详细方案见 `phase-4.4-lobby-room-ui.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。4.5 Replay 已完成盘点与子步骤 1（server 侧事件归档），最小记录形状与子步骤路线见 `phase-4.5-replay.md`（同一收尾规则）。
+阶段 4 系列的前三个子阶段（4.1 AI 补位、4.2 断线托管、4.3 黑暗模式）已完成，4.4（UI/操作优化）定案为"大厅/房间 UI 重做"，拆成 6 个子步骤，详细方案见 `phase-4.4-lobby-room-ui.md`（阶段 4 系列收尾后按 `../doc-map.md` §6 吸纳耐久内容并删除）。4.5 Replay 已完成盘点、子步骤 1（server 侧事件归档）、子步骤 2（protocol `replay:get` schema），最小记录形状与子步骤路线见 `phase-4.5-replay.md`（同一收尾规则）。
 
-**下一步第一个动作**：阶段 4.5 Replay 子步骤 2——protocol 新增查询式消息 `replay:get`（`{roomId, gameNumber}` → 鉴权校验请求者 `userId` 出现在该局 `seatUserIds` 里，见 `phase-4.5-replay.md` 子步骤路线表）。
+**下一步第一个动作**：阶段 4.5 Replay 子步骤 3——server gateway 新增 `replay:get` handler：查 `room.finishedGames` 对应 `gameNumber`、校验请求者 `userId` 出现在该局 `seatUserIds` 里，复用 `rebuildPlayerView` 算出 `finalView`，`eventsVisibleTo` 过滤 `events`（见 `phase-4.5-replay.md` 子步骤路线表）。
 
 本次收尾：`packages/protocol` schema 已按 common、room models/requests/events、game、auth 拆分，公共导出与协议行为不变。`pnpm verify` 全绿。
 
