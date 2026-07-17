@@ -62,6 +62,9 @@ export class RoomService {
       seed: 0,
       lastEventSeq: 0,
       createdAt: Date.now(),
+      currentGameEvents: [],
+      currentGameSeatUserIds: [null, null, null, null],
+      finishedGames: [],
     };
     this.rooms.set(room.id, room);
     this.seatPlayer(room, hostUserId, hostNickname);
@@ -288,6 +291,7 @@ export class RoomService {
 
     room.gameState = result.state;
     this.trackEventSeq(room, result.events);
+    room.currentGameEvents.push(...result.events);
     this.accumulateScores(room, this.extractScoreDeltas(result.events));
     for (const event of result.events) {
       this.eventBus.emit("game:event", { roomId: room.id, event });
@@ -459,6 +463,16 @@ export class RoomService {
     room.phase = "in-game";
     room.lastEventSeq = 0;
     this.trackEventSeq(room, result.events);
+    // phase-4.5-replay.md: seed the archive with createGame's own events
+    // (GameStarted etc.) — those are never re-broadcast as game:event, so
+    // rebuildPlayerView's expected starting point would be missing otherwise.
+    room.currentGameEvents = [...result.events];
+    room.currentGameSeatUserIds = room.players.map((player) => player?.userId ?? null) as [
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+    ];
 
     for (let seat = 0; seat < ROOM_SIZE; seat++) {
       const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
@@ -473,6 +487,12 @@ export class RoomService {
   }
 
   private handleGameEnd(room: Room): void {
+    room.finishedGames.push({
+      gameNumber: room.gameNumber,
+      seatUserIds: room.currentGameSeatUserIds,
+      events: room.currentGameEvents,
+    });
+
     this.eventBus.emit("room:scoreUpdated", {
       roomId: room.id,
       scores: room.scores,

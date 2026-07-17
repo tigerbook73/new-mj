@@ -25,6 +25,9 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   seed: 1,
   lastEventSeq: 0,
   createdAt: Date.now(),
+  currentGameEvents: [],
+  currentGameSeatUserIds: [null, null, null, null],
+  finishedGames: [],
   ...overrides,
 });
 
@@ -394,6 +397,39 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
 
     expect(room.phase).toBe("finished");
     expect(room.result?.gamesPlayed).toBe(4);
+  });
+});
+
+describe("RoomService — replay log archiving (phase-4.5-replay.md step 1)", () => {
+  it("archives one FinishedGameLog per game, seeded with createGame's own events", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    const expectedSeatUserIds = room.players.map((player) => player?.userId ?? null);
+
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+
+    let steps = 0;
+    while (room.phase === "in-game" && steps < 500) {
+      steps += 1;
+      const legalActions = gameService.getLegalActions(room.gameState, 0);
+      service.applyPlayerAction(room.id, 0, legalActions[0]);
+    }
+
+    expect(room.phase).toBe("finished");
+    expect(room.finishedGames).toHaveLength(4);
+    room.finishedGames.forEach((log, index) => {
+      expect(log.gameNumber).toBe(index + 1);
+      expect(log.seatUserIds).toEqual(expectedSeatUserIds);
+      expect(log.events.length).toBeGreaterThan(0);
+      expect(log.events[0]?.payload).toMatchObject({ type: "GameStarted" });
+      // seq must be gapless from 1 — this is what rebuildPlayerView expects.
+      log.events.forEach((event, seqIndex) => expect(event.seq).toBe(seqIndex + 1));
+    });
   });
 });
 

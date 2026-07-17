@@ -1,8 +1,23 @@
-import type { GameConfig, SeatId } from "@new-mj/core";
+import type { GameConfig, GameEvent, SeatId } from "@new-mj/core";
 import type { SessionFormat, SessionResult } from "@new-mj/protocol";
 
 export type RoomPhase = "waiting" | "in-game" | "finished";
 export type RoomStatus = "open" | "closed";
+
+/**
+ * Archived per-game event log (phase-4.5-replay.md's minimal record shape).
+ * `seatUserIds` is a snapshot taken at that game's start — `room.players`
+ * only reflects *current* occupancy, and a game's own record must stay
+ * self-sufficient even if seats change after it ends. No `seed`: replay
+ * replays events (rebuildPlayerView), it never re-runs applyAction, so the
+ * seed that produced the wall order isn't needed here (fuzz repro is a
+ * separate, unrelated use of seed).
+ */
+export interface FinishedGameLog {
+  gameNumber: number;
+  seatUserIds: [string | null, string | null, string | null, string | null];
+  events: GameEvent[];
+}
 
 export interface RoomPlayer {
   userId: string;
@@ -48,4 +63,8 @@ export interface Room {
   createdAt: number;
   finishedAt?: number;
   result?: SessionResult;
+  /** Events for the game currently in progress; archived into `finishedGames` on GameEnded. */
+  currentGameEvents: GameEvent[];
+  currentGameSeatUserIds: [string | null, string | null, string | null, string | null];
+  finishedGames: FinishedGameLog[];
 }
