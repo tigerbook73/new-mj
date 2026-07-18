@@ -6,6 +6,9 @@ interface PlayerBadgeProps {
   isCurrentTurn: boolean;
   isBot: boolean;
   isSelf: boolean;
+  avatar?: string | undefined;
+  isDisconnected?: boolean | undefined;
+  isAutoPiloted?: boolean | undefined;
 }
 
 export function PlayerBadge({
@@ -14,6 +17,9 @@ export function PlayerBadge({
   isCurrentTurn,
   isBot,
   isSelf,
+  avatar,
+  isDisconnected = false,
+  isAutoPiloted = false,
 }: PlayerBadgeProps) {
   return (
     <div
@@ -23,10 +29,18 @@ export function PlayerBadge({
         isCurrentTurn ? "border-primary bg-primary/10 font-medium" : "border-border bg-background",
       )}
     >
+      {avatar ? (
+        <img src={avatar} alt="" className="size-5 rounded-full" />
+      ) : (
+        <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px]">
+          {nickname.slice(0, 2).toUpperCase()}
+        </span>
+      )}
       <span>
         {nickname}
         {isSelf ? " (you)" : ""}
         {isBot ? " · BOT" : ""}
+        {isDisconnected ? " · DISCONNECTED" : isAutoPiloted ? " · AI" : ""}
       </span>
       <span className="text-muted-foreground" data-testid="player-hand-count">
         {handCount}

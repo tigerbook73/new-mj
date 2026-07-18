@@ -3,27 +3,32 @@ import type { Socket } from "socket.io";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { ConfigService } from "../config/config.service";
 import type { PersistenceService } from "../persistence/persistence.service";
+import type { SessionRegistry } from "./session-registry";
 
 interface HandshakeAuth {
   token?: unknown;
   protocolVersion?: unknown;
+  takeover?: unknown;
 }
 
 export class WsAuthError extends Error {
-  constructor(public readonly code: "UNAUTHORIZED" | "VERSION_MISMATCH") {
+  constructor(public readonly code: "UNAUTHORIZED" | "VERSION_MISMATCH" | "SESSION_EXISTS") {
     super(code);
     this.name = "WsAuthError";
   }
 }
 
-const deriveNickname = (user: User): string => {
-  const metaName = user.user_metadata["full_name"] ?? user.user_metadata["name"];
-  if (typeof metaName === "string" && metaName.trim()) return metaName;
+export const deriveNickname = (user: User): string => {
+  const meta = user.user_metadata;
+  for (const key of ["user_name", "name", "full_name"]) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
   return user.email?.split("@")[0] ?? "player";
 };
 
-const deriveAvatar = (user: User): string | undefined => {
-  const avatar = user.user_metadata["avatar_url"];
+export const deriveAvatar = (user: User): string | undefined => {
+  const avatar = user.user_metadata["avatar_url"] ?? user.user_metadata["picture"];
   return typeof avatar === "string" ? avatar : undefined;
 };
 
@@ -37,6 +42,7 @@ export const createAuthMiddleware = (
   jwtService: JwtService,
   configService: ConfigService,
   persistenceService: PersistenceService,
+  sessionRegistry?: SessionRegistry,
 ) => {
   const supabaseUrl = configService.supabaseUrl;
   const supabaseServiceKey = configService.supabaseServiceKey;
@@ -61,6 +67,8 @@ export const createAuthMiddleware = (
         return;
       }
       socket.data.userId = data.user.id;
+      socket.data.nickname = deriveNickname(data.user);
+      socket.data.avatar = deriveAvatar(data.user);
       persistenceService.fireAndForget(
         persistenceService.upsertProfile(
           data.user.id,
@@ -69,6 +77,11 @@ export const createAuthMiddleware = (
         ),
         `upsertProfile(${data.user.id})`,
       );
+      if (
+        sessionRegistry &&
+        !registerSession(socket, data.user.id, auth.takeover === true, sessionRegistry, next)
+      )
+        return;
       next();
       return;
     }
@@ -78,9 +91,44 @@ export const createAuthMiddleware = (
         secret: configService.jwtSecret,
       });
       socket.data.userId = payload.sub;
+      socket.data.nickname = defaultNickname(payload.sub);
+      if (
+        sessionRegistry &&
+        !registerSession(socket, payload.sub, auth.takeover === true, sessionRegistry, next)
+      )
+        return;
       next();
     } catch {
       next(new WsAuthError("UNAUTHORIZED"));
     }
   };
+};
+
+const defaultNickname = (userId: string): string =>
+  userId
+    .replace(/-[a-z0-9]{6}$/, "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join(" ") || "User";
+
+const registerSession = (
+  socket: Socket,
+  userId: string,
+  takeover: boolean,
+  registry: SessionRegistry,
+  next: (err?: Error) => void,
+): boolean => {
+  const existing = registry.get(userId);
+  if (existing && existing !== socket) {
+    if (!takeover) {
+      next(new WsAuthError("SESSION_EXISTS"));
+      return false;
+    }
+    existing.emit("session:kicked", { reason: "takeover" });
+    existing.disconnect(true);
+  }
+  registry.set(userId, socket);
+  socket.once("disconnect", () => registry.deleteIfSame(userId, socket));
+  return true;
 };

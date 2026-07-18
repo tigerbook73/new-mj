@@ -231,6 +231,9 @@ export function TableView() {
                 isCurrentTurn={view.currentSeat === seat}
                 isBot={player?.isBot ?? false}
                 isSelf={seat === view.seat}
+                avatar={player?.avatar}
+                isDisconnected={player?.isDisconnected}
+                isAutoPiloted={player?.isAutoPiloted}
               />
             );
             const hand = (

@@ -41,6 +41,9 @@ export type RoomSessionFinishedEvent = z.infer<typeof RoomSessionFinishedEventSc
 export const RoomPlayerLeftEventSchema = z.object({ seat: SeatIdSchema });
 export type RoomPlayerLeftEvent = z.infer<typeof RoomPlayerLeftEventSchema>;
 
+export const RoomPlayerConnectionEventSchema = z.object({ seat: SeatIdSchema });
+export type RoomPlayerConnectionEvent = z.infer<typeof RoomPlayerConnectionEventSchema>;
+
 /** hostLeft closes a waiting room; allPlayersLeft stops a game with no human left to watch. */
 export const RoomClosedEventSchema = z.object({
   reason: z.enum(["hostLeft", "allPlayersLeft"]),

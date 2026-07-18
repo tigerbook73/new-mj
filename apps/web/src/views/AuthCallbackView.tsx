@@ -1,15 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { connect } from "@/lib/socket";
+import { ack, connectWithTakeoverPrompt } from "@/lib/socket";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
-
-/** Mirrors apps/server's auth.middleware.ts deriveNickname — same fallback order. */
-function deriveNickname(user: { email?: string; user_metadata: Record<string, unknown> }): string {
-  const metaName = user.user_metadata["full_name"] ?? user.user_metadata["name"];
-  if (typeof metaName === "string" && metaName.trim()) return metaName;
-  return user.email?.split("@")[0] ?? "player";
-}
 
 /**
  * Lands here after signInWithOAuth's redirect (LoginView) completes —
@@ -40,14 +33,23 @@ export function AuthCallbackView() {
       }
 
       const { session } = data;
-      const result = await connect(session.access_token);
+      const result = await connectWithTakeoverPrompt(session.access_token);
       if (cancelled) return;
       if (!result.ok) {
         setError(result.code);
         return;
       }
 
-      setUser(session.user.id, deriveNickname(session.user));
+      const identity = await ack<{ userId: string; nickname: string }>(
+        result.socket,
+        "session:identity",
+        {},
+      );
+      if (!identity.ok) {
+        setError(identity.code);
+        return;
+      }
+      setUser(identity.data.userId, identity.data.nickname);
       setSocket(result.socket);
       void navigate("/games", { replace: true });
     })();

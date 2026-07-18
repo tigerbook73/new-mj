@@ -61,36 +61,39 @@ finished: 计算排名，对外公开 result
 
 **ack 请求**（已实现，详细 payload 见 `contracts/protocol-shared.md` 的通用信封约定）：
 
-| 消息          | 备注                                                                                                                                                                                                                                    |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播                                                                                                                                                  |
-| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）、房间名称（不填给默认值）；"进入新上下文"类消息，ack 给快照                                                                                                                                  |
-| `room:join`   | 可选 `seat`：给了必须是当前空座位（否则 `SEAT_TAKEN`），不给沿用"自动找第一个空位"；ack 给 `RoomInfo` 快照                                                                                                                              |
-| `room:ready`  | ack `{}`                                                                                                                                                                                                                                |
-| `room:addBot` | 仅房主（座位 0）、仅 `waiting` 阶段可调用；可选 `seat`（语义同 `room:join`），不给补入下一个空位；bot 立即视为已 ready；ack `{}`                                                                                                        |
-| `lobby:list`  | 查询，无副作用；`{ rulesetId, search? }` → `RoomSummary[]`，只返回 `phase==="waiting" && status==="open"` 的房间（MVP 不做观战/大厅列表实时推送，是一次性查询快照，search 按房间名称大小写不敏感子串匹配）                              |
-| `room:peek`   | 查询，无副作用，不占座；`{ roomId }` → `RoomInfo` 快照——房间页在玩家真正选座位前用它展示当前座位占用情况                                                                                                                                |
-| `room:leave`  | 无 payload，身份取自连接；`waiting` 阶段房主离开删整个房间（广播 `room:closed`），非房主离开只清空自己的座位（广播 `room:playerLeft`）；`in-game` 阶段等同断线（转托管，见评审点 H），不删房、不清座位；`finished` 阶段 no-op；ack `{}` |
+| 消息          | 备注                                                                                                                                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播                                                                                                                                  |
+| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）、房间名称（不填给默认值）；"进入新上下文"类消息，ack 给快照                                                                                                                  |
+| `room:join`   | 可选 `seat`：给了必须是当前空座位（否则 `SEAT_TAKEN`），不给沿用"自动找第一个空位"；ack 给 `RoomInfo` 快照                                                                                                              |
+| `room:ready`  | ack `{}`                                                                                                                                                                                                                |
+| `room:addBot` | 仅房主（座位 0）、仅 `waiting` 阶段可调用；可选 `seat`（语义同 `room:join`），不给补入下一个空位；bot 立即视为已 ready；ack `{}`                                                                                        |
+| `lobby:list`  | 查询，无副作用；`{ rulesetId, search? }` → `RoomSummary[]`，只返回 `phase==="waiting" && status==="open"` 的房间（MVP 不做观战/大厅列表实时推送，是一次性查询快照，search 按房间名称大小写不敏感子串匹配）              |
+| `room:peek`   | 查询，无副作用，不占座；`{ roomId }` → `RoomInfo` 快照——房间页在玩家真正选座位前用它展示当前座位占用情况                                                                                                                |
+| `room:leave`  | 无 payload，身份取自连接；`waiting` 阶段房主离开删整个房间（广播 `room:closed`），非房主离开只清空自己的座位（广播 `room:playerLeft`）；`in-game` 阶段立即转永久托管，不删房、不清座位；`finished` 阶段 no-op；ack `{}` |
 
 `nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `decisions.md` D21。
 
-**断线托管**（评审点 H 的掉线路径）：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`——若房间对局中，把该座位标记 `isAutoPiloted = true` 并立刻跑一次 `autoPlayBots`（复用 bot 自动出牌的同一条扫描循环，`nextBotAction` 对 `isBot` 和 `isAutoPiloted` 一视同仁）。这个标记一旦置位永不清除，MVP 没有"断线重连恢复真人操控"的路径：`room.players` 里那个座位的记录还在（只是 `isAutoPiloted=true`），同一 `userId` 想重新 `room:join` 这个房间会直接被 `ALREADY_IN_ROOM` 拒绝——断线等同于这局及本会话剩余局数都由 bot 代打到底，没有回退方案。房间还在等待阶段（尚未 `room:start`）时断线不触发任何处理，座位原样留空，不在评审点 H 范围内。`room:leave`（主动离座，见下）在 `in-game` 阶段复用同一条内部标记逻辑，跟断线是同一个效果。
+**断线宽限期与永久托管（评审点 H 修订）**：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`。若房间对局中，座位只标记 `isDisconnected = true` 并启动 server 独有的 60 秒定时器；宽限期内不设置 `isAutoPiloted`、不跑 bot，对局轮到该座位时保持等待。原 userId 在宽限期内通过 `room:enter` 重连时清除定时器、恢复真人控制，并在 ack 中携带该座位的 `{ view, seq }`。定时器到期后才置 `isAutoPiloted = true`、广播托管事件并补跑 bot。主动 `room:leave`/sign out 不经过宽限期，立即走永久托管路径。
 
 **全部真人退出即关房**：`handleDisconnect` 和 `room:leave` 的 `in-game` 分支共享同一个私有方法（`RoomService.markAutoPiloted`）——标记完 `isAutoPiloted` 之后，如果房间里已经没有任何真人座位（每个座位要么本来就是 `isBot`，要么都被标了 `isAutoPiloted`），就不再调用 `autoPlayBots` 继续跑，直接把房间标 `phase: "finished"`/`status: "closed"`，广播 `room:closed { reason: "allPlayersLeft" }`——避免没有任何人观战的房间里 bot 互相打到底白白占用 server 资源。
 
 **事件推送**（已实现）：
 
-| 消息                   | payload                                  | 说明                                                 |
-| ---------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `room:playerJoined`    | seat、nickname、isBot                    |                                                      |
-| `room:readyChanged`    | seat、ready                              |                                                      |
-| `room:scoreUpdated`    | scores、gameNumber、totalGames?          | 每局结束后 broadcast                                 |
-| `room:dealerChanged`   | dealer、gameNumber                       | 进下一局时                                           |
-| `room:sessionFinished` | result                                   | 会话结束，公开排名                                   |
-| `room:playerLeft`      | seat                                     | `waiting` 阶段非房主主动离开                         |
-| `room:closed`          | reason（`hostLeft` \| `allPlayersLeft`） | 房间不再存在：房主等待阶段离开，或对局中全部真人退出 |
+| 消息                      | payload                                  | 说明                                                 |
+| ------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `room:playerJoined`       | seat、nickname、isBot                    |                                                      |
+| `room:playerDisconnected` | seat                                     | 断线宽限期开始                                       |
+| `room:playerReconnected`  | seat                                     | 宽限期内恢复真人控制                                 |
+| `room:playerAutoPiloted`  | seat                                     | 到期或主动离开，永久转 AI 代打                       |
+| `room:readyChanged`       | seat、ready                              |                                                      |
+| `room:scoreUpdated`       | scores、gameNumber、totalGames?          | 每局结束后 broadcast                                 |
+| `room:dealerChanged`      | dealer、gameNumber                       | 进下一局时                                           |
+| `room:sessionFinished`    | result                                   | 会话结束，公开排名                                   |
+| `room:playerLeft`         | seat                                     | `waiting` 阶段非房主主动离开                         |
+| `room:closed`             | reason（`hostLeft` \| `allPlayersLeft`） | 房间不再存在：房主等待阶段离开，或对局中全部真人退出 |
 
 **未实现**：`room:starting`。
 
@@ -126,7 +129,9 @@ finished: 计算排名，对外公开 result
 - ❌ 战绩聚合查询接口（`stats:get`/`profile:get`，`contracts/protocol-shared.md` §4 仍是占位）：阶段 5 落地的是持久化层本身（schema + 写入 + `replay:get` 的 DB 兜底读取），不是一个新的聚合查询 API/UI，见 §11
 - ❌ `lobby:list` 实时推送（仍是查询快照，不随他人建房/离开自动刷新）
 
-**评审点 H【已定：采纳，已实现】**：对局中退出 = 转托管代打到局终，掉线与主动离座同路径，不允许中途散局。掉线路径（`RoomsGateway.handleDisconnect` → `RoomService.handleDisconnect`）和主动离座路径（`room:leave` → 同一条内部标记逻辑）都已实现，共享同一套托管机制，只是触发入口不同；`waiting` 阶段不适用这条规则（还没开局，谈不上"中途"），离座直接清空座位或删房，见 §6。
+**评审点 H【已定：采纳，2026-07 修订】**：对局中 socket 断开先进入 60 秒可逆宽限期，期间纯等待、不代打；同一 userId 通过 `room:enter` ack 恢复座位与快照。宽限期到期才永久转 AI 并补跑当前动作。主动 `room:leave`/sign out 立即永久托管。两态分别由 `isDisconnected` 与 `isAutoPiloted` 表示，`waiting` 阶段断线不处理。
+
+**账号级并发连接约束**：server 维护 `SessionRegistry(userId -> socket)`。同一账号已有活跃连接时，握手默认以 `SESSION_EXISTS` 拒绝；客户端确认接管后带 `takeover:true`，server 发送尽力而为的 `session:kicked` 并断开旧 socket，新连接再通过 `room:enter` 命中宽限期。旧 socket 断线走普通断线路径，不触发主动离座托管；registry 摘除必须比较 socket 引用，避免旧连接延迟清理误删新登记。
 
 **评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换；`lastSeq` 增量补发是未来可能的优化项，当前不实现。
 

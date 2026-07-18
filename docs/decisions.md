@@ -29,6 +29,9 @@
 - **D23**：根目录单一 `.env` + `dotenv-flow` 级联加载（`.env` → `.env.[NODE_ENV]` → `.env.local` → `.env.[NODE_ENV].local`），不做 symlink；`.env` 提交进 git 只放 Supabase CLI 固定 demo 值，真实本地值放 `.env.development.local`（gitignored）；`.env.test` 只服务 Playwright，Jest/Vitest 不加载任何 `.env`。
 - **D24 shared package 开发态直接消费 `src`（`development` export 条件），生产态不变仍消费 `dist`**：只监听 `dist/*.d.ts` 曾实测在"改实现不改签名"时不触发 `tsc --watch` 重新编译，改成让真实源码进入监听范围更可靠。前提是 `packages/core` 去掉了内部 `@/*` 别名（Node/Vite 不认识 tsconfig `paths`）。
 
+- **D25**：评审点 H 修订为断线 60 秒宽限期。断线期间只标记 `isDisconnected` 并等待，不代打；到期才转 `isAutoPiloted` 并补跑 bot。主动离座仍立即托管。
+- **D26**：账号级并发连接由握手层 `SessionRegistry` 去重。同账号第二连接默认以 `SESSION_EXISTS` 拒绝，用户确认后通过 `takeover:true` 踢旧连接并复用断线宽限期恢复房间座位；不引入 REST。
+
 ## 规格级决策（评审点，详情见规格文档定稿）
 
 - **A 牌用实例 ID（TileId）**：React/Motion 需要稳定 key；守恒不变量精确化。代价：可见性过滤须视 id 与牌面同级敏感。

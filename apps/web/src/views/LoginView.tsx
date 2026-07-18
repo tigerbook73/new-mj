@@ -1,14 +1,15 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { LoginForm } from "@/components/login-form";
 import { SocialLoginForm } from "@/components/social-login-form";
-import { connect } from "@/lib/socket";
+import { connectWithTakeoverPrompt } from "@/lib/socket";
 import { deriveUserId, signDevToken } from "@/lib/devAuth";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 
 export function LoginView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setUser = useSessionStore((state) => state.setUser);
   const setSocket = useSessionStore((state) => state.setSocket);
   const [nickname, setNickname] = useState("");
@@ -50,10 +51,12 @@ export function LoginView() {
     setError(null);
     const userId = deriveUserId(trimmed);
     const token = await signDevToken(userId);
-    const result = await connect(token);
+    localStorage.setItem("new-mj:dev-session", JSON.stringify({ token, nickname: trimmed }));
+    const result = await connectWithTakeoverPrompt(token);
     setPending(false);
 
     if (!result.ok) {
+      localStorage.removeItem("new-mj:dev-session");
       setError(result.code);
       return;
     }
@@ -66,6 +69,11 @@ export function LoginView() {
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
       <div className="flex w-full max-w-sm flex-col gap-6">
+        {new URLSearchParams(location.search).get("kicked") === "1" && (
+          <p className="rounded-md border border-destructive p-3 text-sm text-destructive">
+            Your account was taken over by another connection.
+          </p>
+        )}
         <SocialLoginForm
           onGoogle={() => void handleOAuth("google")}
           onGithub={() => void handleOAuth("github")}

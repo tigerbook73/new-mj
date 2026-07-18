@@ -5,11 +5,12 @@ import { PersistenceModule } from "../persistence/persistence.module";
 import { RoomsModule } from "../rooms/rooms.module";
 import { ConnectionRegistry } from "./connection-registry";
 import { RoomsGateway } from "./rooms.gateway";
+import { SessionRegistry } from "./session-registry";
 
 @Module({
   // secret is passed per-call (configService.jwtSecret) instead of at
   // module-registration time, so JwtModule doesn't need registerAsync here.
   imports: [RoomsModule, ConfigModule, PersistenceModule, JwtModule.register({})],
-  providers: [RoomsGateway, ConnectionRegistry],
+  providers: [RoomsGateway, ConnectionRegistry, SessionRegistry],
 })
 export class GatewayModule {}

@@ -30,6 +30,7 @@ import {
   type RoomInfo,
   type RoomParticipant,
   type RoomSummary,
+  type RoomEnterResponse,
 } from "@new-mj/protocol";
 import type { Server, Socket } from "socket.io";
 import { ZodError } from "zod";
@@ -40,6 +41,7 @@ import { ConnectionRegistry, type ConnectionInfo } from "./connection-registry";
 import { EventBus } from "../rooms/event-bus";
 import { RoomServiceError } from "../rooms/room-service.error";
 import { RoomService } from "../rooms/room.service";
+import { SessionRegistry } from "./session-registry";
 
 /**
  * Payload has no nickname field yet (docs/protocol.md's room:create/room:join
@@ -78,10 +80,18 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly persistenceService: PersistenceService,
+    private readonly sessions: SessionRegistry,
   ) {}
 
   afterInit(server: Server): void {
-    server.use(createAuthMiddleware(this.jwtService, this.configService, this.persistenceService));
+    server.use(
+      createAuthMiddleware(
+        this.jwtService,
+        this.configService,
+        this.persistenceService,
+        this.sessions,
+      ),
+    );
 
     this.eventBus.on("room:playerJoined", (event) => {
       this.server.to(event.roomId).emit("room:playerJoined", {
@@ -114,6 +124,15 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     this.eventBus.on("room:playerLeft", (event) => {
       this.server.to(event.roomId).emit("room:playerLeft", { seat: event.seat });
     });
+    for (const eventName of [
+      "room:playerDisconnected",
+      "room:playerReconnected",
+      "room:playerAutoPiloted",
+    ] as const) {
+      this.eventBus.on(eventName, (event) =>
+        this.server.to(event.roomId).emit(eventName, { seat: event.seat }),
+      );
+    }
     this.eventBus.on("room:closed", (event) => {
       this.server.to(event.roomId).emit("room:closed", { reason: event.reason });
       for (const socket of this.connections.allSocketsByRoom(event.roomId)) {
@@ -153,7 +172,8 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     return this.reply(() => {
       const userId = this.requireUserId(client);
       const parsed = RoomCreateRequestSchema.parse(payload);
-      const nickname = defaultNickname(userId);
+      const nickname = this.identity(client).nickname;
+      const avatar = this.identity(client).avatar;
       const room = this.roomService.create(
         userId,
         nickname,
@@ -161,9 +181,10 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         parsed.config ?? { rulesetId: parsed.rulesetId },
         parsed.sessionFormat,
         parsed.name,
+        avatar,
       );
       // Host is always seated at 0: create() seats the very first player of a fresh room.
-      this.connections.track(client, room.id, userId, nickname, 0);
+      this.connections.track(client, room.id, userId, nickname, 0, avatar);
       return this.snapshotWithParticipants(room.id);
     });
   }
@@ -179,11 +200,19 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       const player = this.roomService.join(
         parsed.roomId,
         userId,
-        defaultNickname(userId),
+        this.identity(client).nickname,
         parsed.seat,
+        this.identity(client).avatar,
       );
-      const nickname = defaultNickname(userId);
-      this.connections.track(client, parsed.roomId, userId, nickname, player.seatId);
+      const nickname = this.identity(client).nickname;
+      this.connections.track(
+        client,
+        parsed.roomId,
+        userId,
+        nickname,
+        player.seatId,
+        this.identity(client).avatar,
+      );
       this.emitParticipantJoined(parsed.roomId, userId, nickname, true, false);
       // join() throwing ROOM_NOT_FOUND is the only way this could be missing.
       const room = this.roomService.get(parsed.roomId)!;
@@ -199,6 +228,15 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage("session:identity")
+  handleSessionIdentity(
+    @ConnectedSocket() client: Socket,
+  ): Reply<{ userId: string; nickname: string; avatar?: string }> {
+    const userId = this.requireUserId(client);
+    const identity = this.identity(client);
+    return { ok: true, data: { userId, ...identity } };
+  }
+
   @SubscribeMessage("room:peek")
   handleRoomPeek(@MessageBody() payload: unknown): Reply<RoomInfo> {
     return this.reply(() => {
@@ -211,16 +249,18 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   handleRoomEnter(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: unknown,
-  ): Reply<RoomInfo> {
+  ): Reply<RoomInfo | RoomEnterResponse> {
     return this.reply(() => {
       const userId = this.requireUserId(client);
       const parsed = RoomEnterRequestSchema.parse(payload);
       const room = this.roomService.get(parsed.roomId);
       if (!room) throw new RoomServiceError("ROOM_NOT_FOUND");
-      const nickname = defaultNickname(userId);
-      this.connections.enter(client, parsed.roomId, userId, nickname);
-      this.emitParticipantJoined(parsed.roomId, userId, nickname, false, false);
-      return this.snapshotWithParticipants(parsed.roomId);
+      const identity = this.identity(client);
+      const resumed = this.roomService.reconnect(parsed.roomId, userId);
+      this.connections.enter(client, parsed.roomId, userId, identity.nickname, identity.avatar);
+      this.emitParticipantJoined(parsed.roomId, userId, identity.nickname, false, false);
+      const roomInfo = this.snapshotWithParticipants(parsed.roomId);
+      return resumed ? { room: roomInfo, view: resumed.view, seq: resumed.seq } : roomInfo;
     });
   }
 
@@ -397,6 +437,15 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     return userId;
   }
 
+  private identity(client: Socket): { nickname: string; avatar?: string } {
+    const userId = this.requireUserId(client);
+    const avatar = client.data.avatar as string | undefined;
+    return {
+      nickname: (client.data.nickname as string | undefined) ?? defaultNickname(userId),
+      ...(avatar ? { avatar } : {}),
+    };
+  }
+
   private snapshotWithParticipants(roomId: string): RoomInfo {
     const room = this.roomService.get(roomId);
     if (!room) throw new RoomServiceError("ROOM_NOT_FOUND");
@@ -416,6 +465,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       participants.set(info.userId, {
         userId: info.userId,
         nickname: info.nickname,
+        ...(info.avatar ? { avatar: info.avatar } : {}),
         isSeated: room.players.some((player) => player?.userId === info.userId),
         isBot: false,
       });

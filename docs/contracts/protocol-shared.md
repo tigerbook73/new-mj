@@ -8,11 +8,12 @@
 
 ```ts
 // 连接时 auth 载荷
-{ token: string, protocolVersion: string, resume?: { roomId: string } }
+{ token: string, protocolVersion: string, takeover?: boolean }
 ```
 
 - server 验证 JWT → 绑定 `socket.data.userId`；版本不匹配 → 拒绝连接并附 `VERSION_MISMATCH`（客户端提示刷新）；已实现见 `apps/server/src/gateway/auth.middleware.ts`
-- `resume` 存在时：server 校验该用户确在该房间，成功则自动重新加入 socket room 并推送 `game:snapshot`——**尚未实现**，MVP 阶段排除重连（见 `session-mechanics.md` "MVP 不实现"）
+- 重连不使用握手 `resume` 字段；客户端恢复登录后调用 `room:enter`，由该消息 ack 携带必要的 `RoomInfo` 与（命中 60 秒宽限期时）`{ view, seq }` 快照。
+- `takeover?: true` 仅用于账号已有活跃 socket 时确认接管；未确认时握手以 `SESSION_EXISTS` 拒绝。
 
 ## 2. 统一信封与 ack/事件关系
 
@@ -30,7 +31,7 @@
 | --------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                       |
 | `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` **尚未实现**（超时代提交 pass 是 MVP 已知限制） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 入座开局/切局时下发的权威快照；断线重连、`deadline` 同上未实现                                                          |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 入座开局/切局时下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }`                                   |
 
 身份一律取 `socket.data.userId`，payload 不含也不信任 userId（`decisions.md` D10 铁律）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
 

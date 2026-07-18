@@ -570,6 +570,8 @@ describe("RoomService — getReplayOmniscientView (phase 4.5 step 5)", () => {
 });
 
 describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
   it("is a no-op for an unknown room (best-effort, no ack to fail through)", () => {
     const service = newRoomService();
     expect(() => service.handleDisconnect("no-such-room", "p1")).not.toThrow();
@@ -603,7 +605,13 @@ describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", ()
     service.start(room.id);
 
     service.handleDisconnect(room.id, "p2");
-    expect(room.players[1]).toMatchObject({ userId: "p2", isAutoPiloted: true });
+    expect(room.players[1]).toMatchObject({
+      userId: "p2",
+      isDisconnected: true,
+      isAutoPiloted: false,
+    });
+    jest.advanceTimersByTime(60_000);
+    expect(room.players[1]).toMatchObject({ isAutoPiloted: true, isDisconnected: false });
 
     // p2 (seat 1) is now driven by autoPlayBots; this loop only ever supplies
     // actions for the three still-connected seats, in a fixed scan order —
@@ -637,6 +645,7 @@ describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", ()
     expect(room.phase).toBe("in-game");
 
     service.handleDisconnect(room.id, "host");
+    jest.advanceTimersByTime(60_000);
 
     expect(room.phase).toBe("finished");
     expect(room.status).toBe("closed");

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
 import type { PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
+import { ack } from "@/lib/socket";
 import { supabase } from "@/lib/supabase";
 
 // 骨架先行：字段形状由 3c（socket/user）、3d（room）、3e（view）逐步填充实现。
@@ -10,11 +11,13 @@ export type SessionState = {
   nickname: string | null;
   room: RoomInfo | null;
   view: PlayerViewBase | null;
+  restoring: boolean;
   setSocket: (socket: Socket | null) => void;
   setUser: (userId: string, nickname: string) => void;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   setRoom: (room: RoomInfo | null) => void;
   setView: (view: PlayerViewBase | null) => void;
+  setRestoring: (restoring: boolean) => void;
   /**
    * room:playerJoined 事件只带 {seat,nickname,isBot}，没有 userId——client 不
    * 需要知道别人的 userId（自己的座位号靠自己的 userId 在初始快照里就能定位，
@@ -41,24 +44,42 @@ export const useSessionStore = create<SessionState>((set) => ({
   nickname: null,
   room: null,
   view: null,
+  restoring: true,
   setSocket: (socket) => set({ socket }),
   setUser: (userId, nickname) => set({ userId, nickname }),
-  signOut: () =>
-    set((state) => {
-      state.socket?.disconnect();
-      // Best-effort, and a no-op when supabase is undefined (unconfigured,
-      // or the dev nickname login path which never establishes a Supabase
-      // session) — local state below is cleared either way.
-      void supabase?.auth.signOut();
-      return { socket: null, userId: null, nickname: null, room: null, view: null };
-    }),
-  setRoom: (room) => set({ room }),
+  signOut: async () => {
+    const { socket, room } = useSessionStore.getState();
+    if (socket && room)
+      await Promise.race([
+        ack(socket, "room:leave", {}),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]);
+    await supabase?.auth.signOut();
+    localStorage.removeItem("new-mj:dev-session");
+    socket?.disconnect();
+    set({ socket: null, userId: null, nickname: null, room: null, view: null });
+  },
+  setRoom: (room) => {
+    if (room) localStorage.setItem("new-mj:last-room", room.id);
+    else localStorage.removeItem("new-mj:last-room");
+    set({ room });
+  },
   setView: (view) => set({ view }),
+  setRestoring: (restoring) => set({ restoring }),
   applyPlayerJoined: (seat, nickname, isBot, avatar) =>
     set((state) => {
       if (!state.room) return state;
       const players = [...state.room.players] as RoomInfo["players"];
-      players[seat] = { userId: "", seatId: seat, nickname, isBot, isReady: false, avatar };
+      players[seat] = {
+        userId: "",
+        seatId: seat,
+        nickname,
+        isBot,
+        isReady: false,
+        isAutoPiloted: false,
+        isDisconnected: false,
+        ...(avatar ? { avatar } : {}),
+      };
       return { room: { ...state.room, players } };
     }),
   applyReadyChanged: (seat, ready) =>

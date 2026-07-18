@@ -35,11 +35,21 @@ export function LobbyView() {
     if (room?.id === roomId) {
       return;
     }
-    void ack<RoomInfo>(socket, "room:enter", { roomId }).then((result) => {
-      if (result.ok) setPreview(result.data);
-      else setError(result.code);
+    void ack<
+      RoomInfo | { room: RoomInfo; view?: import("@new-mj/protocol").PlayerViewBase; seq?: number }
+    >(socket, "room:enter", { roomId }).then((result) => {
+      if (result.ok) {
+        const data = result.data;
+        const enteredRoom = "room" in data ? data.room : data;
+        setPreview(enteredRoom);
+        if ("room" in data && data.view) {
+          useSessionStore.getState().setRoom(enteredRoom);
+          useSessionStore.getState().setView(data.view);
+          void navigate(`/room/${roomId}`);
+        }
+      } else setError(result.code);
     });
-  }, [room?.id, roomId, setRoom, socket]);
+  }, [navigate, room?.id, roomId, setRoom, socket]);
 
   useEffect(() => {
     const onPlayerJoined = (event: RoomPlayerJoinedEvent) => {
@@ -55,6 +65,8 @@ export function LobbyView() {
           nickname: event.nickname,
           isBot: event.isBot,
           isReady: false,
+          isAutoPiloted: false,
+          isDisconnected: false,
           ...(event.avatar ? { avatar: event.avatar } : {}),
         };
         return { ...current, players };

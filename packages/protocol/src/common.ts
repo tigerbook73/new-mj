@@ -11,6 +11,7 @@ export const PROTOCOL_VERSION = "1.0";
 /** docs/contracts/protocol-shared.md §5 — the full ErrCode enum; do not invent new codes outside this list. */
 export const ERROR_CODES = [
   "UNAUTHORIZED",
+  "SESSION_EXISTS",
   "VERSION_MISMATCH",
   "ROOM_NOT_FOUND",
   "ROOM_FULL",

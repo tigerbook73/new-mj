@@ -4,6 +4,6 @@ import { z } from "zod";
 export const AuthHandshakeSchema = z.object({
   token: z.string(),
   protocolVersion: z.string(),
-  resume: z.object({ roomId: z.string() }).optional(),
+  takeover: z.boolean().optional(),
 });
 export type AuthHandshake = z.infer<typeof AuthHandshakeSchema>;

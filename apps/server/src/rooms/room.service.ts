@@ -20,6 +20,7 @@ import { RoomServiceError } from "./room-service.error";
 const ROOM_SIZE = 4;
 const DEFAULT_TOTAL_GAMES = 4;
 const MAX_SEED = 2 ** 31;
+export const DISCONNECT_GRACE_MS = 60_000;
 
 interface SettledPayload {
   type: "Settled";
@@ -38,6 +39,7 @@ const isGameEndedPayload = (payload: unknown): boolean =>
 @Injectable()
 export class RoomService {
   private readonly rooms = new Map<string, Room>();
+  private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly gameService: GameService,
@@ -52,6 +54,7 @@ export class RoomService {
     config: GameConfig,
     sessionFormat: SessionFormat = "4-round",
     name?: string,
+    avatar?: string,
   ): Room {
     const room: Room = {
       id: randomUUID(),
@@ -77,7 +80,7 @@ export class RoomService {
       finishedGames: [],
     };
     this.rooms.set(room.id, room);
-    this.seatPlayer(room, hostUserId, hostNickname);
+    this.seatPlayer(room, hostUserId, hostNickname, false, undefined, avatar);
     return room;
   }
 
@@ -110,7 +113,13 @@ export class RoomService {
     return this.snapshot(this.mustGet(roomId));
   }
 
-  join(roomId: string, userId: string, nickname: string, seat?: SeatId): RoomPlayer {
+  join(
+    roomId: string,
+    userId: string,
+    nickname: string,
+    seat?: SeatId,
+    avatar?: string,
+  ): RoomPlayer {
     const room = this.mustGet(roomId);
     const currentSeat = room.players.findIndex((player) => player?.userId === userId);
     if (currentSeat >= 0) {
@@ -144,10 +153,11 @@ export class RoomService {
         seat,
         nickname: player.nickname,
         isBot: player.isBot,
+        ...(player.avatar ? { avatar: player.avatar } : {}),
       });
       return player;
     }
-    return this.seatPlayer(room, userId, nickname, false, seat);
+    return this.seatPlayer(room, userId, nickname, false, seat, avatar);
   }
 
   /**
@@ -352,7 +362,39 @@ export class RoomService {
   handleDisconnect(roomId: string, userId: string): void {
     const room = this.rooms.get(roomId);
     if (!room) return;
-    this.markAutoPiloted(room, userId);
+    if (room.phase !== "in-game") return;
+    const player = room.players.find((candidate) => candidate?.userId === userId);
+    if (!player || player.isBot || player.isAutoPiloted) return;
+    const key = this.disconnectKey(roomId, userId);
+    this.clearDisconnectTimer(key);
+    player.isDisconnected = true;
+    player.disconnectedAt = Date.now();
+    this.eventBus.emit("room:playerDisconnected", { roomId, seat: player.seatId });
+    const timer = setTimeout(() => {
+      this.disconnectTimers.delete(key);
+      const current = this.rooms.get(roomId);
+      const currentPlayer = current?.players.find((candidate) => candidate?.userId === userId);
+      if (current && currentPlayer?.isDisconnected) this.markAutoPiloted(current, userId);
+    }, DISCONNECT_GRACE_MS);
+    timer.unref();
+    this.disconnectTimers.set(key, timer);
+  }
+
+  reconnect(
+    roomId: string,
+    userId: string,
+  ): { seat: SeatId; view: PlayerViewBase; seq: number } | undefined {
+    const room = this.rooms.get(roomId);
+    if (!room || room.phase !== "in-game") return undefined;
+    const player = room.players.find((candidate) => candidate?.userId === userId);
+    if (!player?.isDisconnected || player.isAutoPiloted) return undefined;
+    this.clearDisconnectTimer(this.disconnectKey(roomId, userId));
+    player.isDisconnected = false;
+    delete player.disconnectedAt;
+    this.eventBus.emit("room:playerReconnected", { roomId, seat: player.seatId });
+    const view = this.gameService.getPlayerView(room.gameState, player.seatId);
+    if (!view) return undefined;
+    return { seat: player.seatId, view, seq: room.lastEventSeq };
   }
 
   /**
@@ -367,7 +409,12 @@ export class RoomService {
     if (room.phase !== "in-game") return;
     const player = room.players.find((candidate) => candidate?.userId === userId);
     if (!player || player.isBot) return;
+    this.clearDisconnectTimer(this.disconnectKey(room.id, userId));
+    player.isDisconnected = false;
+    delete player.disconnectedAt;
+    if (player.isAutoPiloted) return;
     player.isAutoPiloted = true;
+    this.eventBus.emit("room:playerAutoPiloted", { roomId: room.id, seat: player.seatId });
     if (this.hasNoHumanLeft(room)) {
       this.closeAbandonedRoom(room);
       return;
@@ -377,6 +424,16 @@ export class RoomService {
 
   private hasNoHumanLeft(room: Room): boolean {
     return !room.players.some((player) => player && !player.isBot && !player.isAutoPiloted);
+  }
+
+  private disconnectKey(roomId: string, userId: string): string {
+    return `${roomId}:${userId}`;
+  }
+
+  private clearDisconnectTimer(key: string): void {
+    const timer = this.disconnectTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.disconnectTimers.delete(key);
   }
 
   private closeAbandonedRoom(room: Room): void {
@@ -428,6 +485,8 @@ export class RoomService {
               nickname: player.nickname,
               isBot: player.isBot,
               isReady: player.isReady,
+              isAutoPiloted: player.isAutoPiloted,
+              isDisconnected: player.isDisconnected,
               ...(player.avatar ? { avatar: player.avatar } : {}),
             }
           : null,
@@ -617,6 +676,7 @@ export class RoomService {
     nickname: string,
     isBot = false,
     seat?: SeatId,
+    avatar?: string,
   ): RoomPlayer {
     const seatIndex = seat ?? room.players.findIndex((player) => player === null);
     if (seatIndex === -1) {
@@ -629,9 +689,11 @@ export class RoomService {
       userId,
       seatId: seatIndex as SeatId,
       nickname,
+      ...(avatar ? { avatar } : {}),
       isBot,
       isReady: false,
       isAutoPiloted: false,
+      isDisconnected: false,
     };
     room.players[seatIndex] = player;
     this.eventBus.emit("room:playerJoined", {
@@ -639,6 +701,7 @@ export class RoomService {
       seat: player.seatId,
       nickname,
       isBot,
+      ...(player.avatar ? { avatar: player.avatar } : {}),
     });
     return player;
   }

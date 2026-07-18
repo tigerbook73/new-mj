@@ -162,7 +162,9 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
     // order). Disconnecting it should reach RoomsGateway.handleDisconnect →
     // RoomService.handleDisconnect and mark that seat auto-piloted.
     b!.disconnect();
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Disconnect enters the 60-second grace period; advance past it before
+    // asserting the irreversible handoff to AI.
+    await new Promise((resolve) => setTimeout(resolve, 60_100));
     expect(roomService.get(roomId)?.players[1]).toMatchObject({ isAutoPiloted: true });
 
     // Drive only the 3 still-connected seats interactively (fresh
@@ -191,5 +193,5 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
     const room = roomService.get(roomId);
     expect(room?.phase).toBe("finished");
     expect(room?.status).toBe("closed");
-  }, 30000);
+  }, 90_000);
 });

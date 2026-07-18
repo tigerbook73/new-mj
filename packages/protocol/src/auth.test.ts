@@ -7,8 +7,8 @@ describe("AuthHandshakeSchema", () => {
     expect(AuthHandshakeSchema.parse(payload)).toEqual(payload);
   });
 
-  it("accepts an optional resume room", () => {
-    const payload = { token: "jwt", protocolVersion: "1.0", resume: { roomId: "room-1" } };
+  it("accepts an optional takeover flag", () => {
+    const payload = { token: "jwt", protocolVersion: "1.0", takeover: true };
     expect(AuthHandshakeSchema.parse(payload)).toEqual(payload);
   });
 

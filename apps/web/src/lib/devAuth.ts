@@ -7,9 +7,7 @@ import { SignJWT } from "jose";
 const DEV_JWT_SECRET = import.meta.env["VITE_DEV_JWT_SECRET"] ?? "dev-only-insecure-secret";
 
 /**
- * The protocol has no nickname field yet (same gap apps/server's
- * defaultNickname works around) — folding the nickname into userId is a
- * cheap way to make it show up somewhere recognizable until that's added.
+ * Deterministic ids make a nickname a stateful local pseudo-account.
  */
 export function deriveUserId(nickname: string): string {
   const slug =
@@ -19,7 +17,7 @@ export function deriveUserId(nickname: string): string {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 20) || "player";
-  return `${slug}-${Math.random().toString(36).slice(2, 8)}`;
+  return `dev:${slug}`;
 }
 
 export async function signDevToken(userId: string): Promise<string> {

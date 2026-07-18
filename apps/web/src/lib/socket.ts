@@ -11,10 +11,10 @@ export type ConnectResult = { ok: true; socket: Socket } | { ok: false; code: st
  * `error.message` — UNAUTHORIZED/VERSION_MISMATCH — before `connection`
  * fires). Mirrors the pattern apps/server's own e2e tests use.
  */
-export function connect(token: string): Promise<ConnectResult> {
+export function connect(token: string, takeover = false): Promise<ConnectResult> {
   const socket = io(SERVER_URL, {
     transports: ["websocket"],
-    auth: { token, protocolVersion: PROTOCOL_VERSION },
+    auth: { token, protocolVersion: PROTOCOL_VERSION, ...(takeover ? { takeover: true } : {}) },
   });
 
   return new Promise((resolve) => {
@@ -24,6 +24,14 @@ export function connect(token: string): Promise<ConnectResult> {
       resolve({ ok: false, code: error.message });
     });
   });
+}
+
+export async function connectWithTakeoverPrompt(token: string): Promise<ConnectResult> {
+  const first = await connect(token);
+  if (first.ok || first.code !== "SESSION_EXISTS") return first;
+  if (!window.confirm("This account is already connected. Take over the other connection?"))
+    return first;
+  return connect(token, true);
 }
 
 /** ack<T>: emits a command/query and resolves with the server's Reply<T> envelope. */

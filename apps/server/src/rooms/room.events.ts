@@ -38,6 +38,11 @@ export interface PlayerLeftEvent {
   seat: SeatId;
 }
 
+export interface PlayerConnectionEvent {
+  roomId: string;
+  seat: SeatId;
+}
+
 /** hostLeft: waiting-room host left, room is gone. allPlayersLeft: every seat is now bot/auto-piloted. */
 export interface RoomClosedEvent {
   roomId: string;
@@ -69,6 +74,9 @@ export interface RoomEventMap {
   "room:dealerChanged": DealerChangedEvent;
   "room:sessionFinished": SessionFinishedEvent;
   "room:playerLeft": PlayerLeftEvent;
+  "room:playerDisconnected": PlayerConnectionEvent;
+  "room:playerReconnected": PlayerConnectionEvent;
+  "room:playerAutoPiloted": PlayerConnectionEvent;
   "room:closed": RoomClosedEvent;
   "game:snapshot": GameSnapshotEvent;
   "game:event": GameEventBroadcast;
