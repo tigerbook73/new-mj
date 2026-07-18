@@ -57,7 +57,15 @@ export function LoginView() {
 
     if (!result.ok) {
       localStorage.removeItem("new-mj:dev-session");
-      setError(result.code);
+      if (result.code === "SESSION_EXISTS_SAME_BROWSER") {
+        void navigate("/session-blocked");
+        return;
+      }
+      setError(
+        result.code === "SESSION_EXISTS"
+          ? "This account is signed in on a different browser. Sign in with a different account, or submit again and confirm the takeover."
+          : result.code,
+      );
       return;
     }
 

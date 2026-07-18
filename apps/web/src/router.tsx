@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { RequireAuth } from "@/components/RequireAuth";
 import { LoginView } from "@/views/LoginView";
 import { AuthCallbackView } from "@/views/AuthCallbackView";
+import { SessionBlockedView } from "@/views/SessionBlockedView";
 import { GamePickerView } from "@/views/GamePickerView";
 import { LobbyView } from "@/views/LobbyView";
 import { TableView } from "@/views/TableView";
@@ -14,6 +15,9 @@ export const router = createBrowserRouter([
   // app's sense (no socket/userId set) until this page itself finishes
   // connecting, same as /login.
   { path: "/auth/callback", element: <AuthCallbackView /> },
+  // Dead end for SESSION_EXISTS_SAME_BROWSER — not wrapped in RequireAuth,
+  // reached before this tab ever gets a socket.
+  { path: "/session-blocked", element: <SessionBlockedView /> },
   {
     path: "/games",
     element: (

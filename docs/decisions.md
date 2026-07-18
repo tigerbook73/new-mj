@@ -19,7 +19,7 @@
 - **D13**：`apps/server` 是 monorepo 里唯一的 CommonJS 包，跟随 NestJS 官方 CJS-first 立场；`packages/core`/`packages/protocol` 用 tsup 双发 CJS+ESM 兼容。持续生效的约束，新增 package 时仍需判断走哪边。
 - **D14**：server 房间编排（`RoomService`）与 Socket.IO 传输层解耦——`RoomService` 只发域事件，座位↔socket 映射由 `RoomsGateway` 的 `ConnectionRegistry` 维护；鉴权放握手中间件而非 Nest 守卫（守卫护不住握手阶段）。
 - **D15**（已并入 `contracts/session-mechanics.md` §5 与 `contracts/engine-contract.md` §4，原文见 git 历史）
-- **D16**（已被阶段 5 真实 Supabase OAuth 取代）：dev 假登录降级为无 `SUPABASE_URL` 时的开发态 fallback，机制见 `apps/server/src/gateway/auth.middleware.ts`。
+- **D16**（已被阶段 5 真实 Supabase OAuth 取代）：dev 假登录降级为无 `SUPABASE_URL` 时的开发态 fallback，机制见 `apps/server/src/gateway/auth.middleware.ts`。阶段 5.1 补充：配置了 Supabase 但 `auth.getUser` 校验失败时，仅在非生产环境（`ConfigService.isProduction` 为 false，即 `NODE_ENV !== "production"`）会重试这条 D16 校验作为兜底——根因是 D23 提交进 git 的 `.env` 带着 Supabase CLI demo 配置，导致本地 `pnpm dev` 的假昵称登录一律被判 unauthorized；生产环境必须设 `NODE_ENV=production`，该分支不触发，避免泄露的 dev secret 绕过真实鉴权。
 - **D17**（技术栈选型已落地稳定，不再逐项展开）：web 定为 Vite + React + React Router + Tailwind v4 + shadcn/ui + Zustand + Vitest + Playwright。
 - **D18**：web `game:event` 只增量更新"事实型"事件（回合/出牌/声明窗口），"规则型"事件（吃碰杠成立、胡牌、结算）只记日志、等下一次 `game:snapshot` 整体对齐——避免把 core 的规则解释逻辑在前端复制一份。
 - **D19 全明牌（调试/测试专用）是一个泛型纯函数，不新增 `RulesetModule` dispatch 方法**：判定标准（供未来类似需求参考）是**是否有规则语义**——`computeNextDealer` 的公式因玩法而异，必须 dispatch；`getOmniscientView` 只是对 `{ wall, seats }` 结构的泛型读取，玩法之间没有分歧，一个纯函数天然覆盖所有玩法，不需要每个 ruleset 各自实现。访问上是受控技术债：`ALLOW_DEBUG_OMNISCIENT` 环境变量门控 + 复用房间成员校验，不进正式产品 UI。
@@ -31,6 +31,7 @@
 
 - **D25**：评审点 H 修订为断线 60 秒宽限期。断线期间只标记 `isDisconnected` 并等待，不代打；到期才转 `isAutoPiloted` 并补跑 bot。主动离座仍立即托管。
 - **D26**：账号级并发连接由握手层 `SessionRegistry` 去重。同账号第二连接默认以 `SESSION_EXISTS` 拒绝，用户确认后通过 `takeover:true` 踢旧连接并复用断线宽限期恢复房间座位；不引入 REST。
+- **D27【2026-07 修订】账号级并发连接升级为三态仲裁**（同 tab / 同浏览器 / 不同浏览器），握手新增 `tabId`/`browserId`、`PROTOCOL_VERSION` bump 到 `"1.1"`。原理见 `architecture/system.md` §6，完整分支逻辑见 `contracts/session-mechanics.md`"账号级并发连接约束"。
 
 ## 规格级决策（评审点，详情见规格文档定稿）
 

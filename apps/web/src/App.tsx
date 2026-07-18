@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { RouterProvider } from "react-router";
 import { applyTheme, getInitialTheme } from "@/lib/theme";
 import { router } from "@/router";
-import { ack, connectWithTakeoverPrompt } from "@/lib/socket";
+import { ack, connect } from "@/lib/socket";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 
@@ -32,12 +32,34 @@ export function App() {
           /* stale local data */
         }
       }
-      if (!token || cancelled) {
+      // Bail without touching the store when this closure is the StrictMode
+      // dev double-invoke's throwaway first run — calling setRestoring(false)
+      // here (even with no token) would flip the *shared* store to "not
+      // restoring" while the real (second) invocation is still mid-connect,
+      // and RequireAuth would bounce to /login out from under it.
+      if (cancelled) return;
+      if (!token) {
         setRestoring(false);
         return;
       }
-      const result = await connectWithTakeoverPrompt(token);
-      if (!result.ok || cancelled) {
+      // A same-tab reconnect (refresh) resolves in this single attempt —
+      // the server tells same tab / same browser / different browser apart
+      // by tabId/browserId, so there's no client-side takeover guess left
+      // to make here (see docs/contracts/session-mechanics.md).
+      const result = await connect(token);
+      if (!result.ok) {
+        setRestoring(false);
+        // A sibling tab in this browser is already connected — this tab is
+        // a dead end by design, not an error to recover from (see A1 in the
+        // plan: a soft SESSION_EXISTS here would mean a genuinely different
+        // browser somehow has this token, which shouldn't happen; falls
+        // back to the normal unauthenticated state like any other code).
+        if (result.code === "SESSION_EXISTS_SAME_BROWSER") {
+          window.location.assign("/session-blocked");
+        }
+        return;
+      }
+      if (cancelled) {
         setRestoring(false);
         return;
       }

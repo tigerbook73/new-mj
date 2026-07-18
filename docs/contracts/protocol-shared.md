@@ -8,12 +8,13 @@
 
 ```ts
 // 连接时 auth 载荷
-{ token: string, protocolVersion: string, takeover?: boolean }
+{ token: string, protocolVersion: string, tabId: string, browserId: string, takeover?: boolean }
 ```
 
 - server 验证 JWT → 绑定 `socket.data.userId`；版本不匹配 → 拒绝连接并附 `VERSION_MISMATCH`（客户端提示刷新）；已实现见 `apps/server/src/gateway/auth.middleware.ts`
 - 重连不使用握手 `resume` 字段；客户端恢复登录后调用 `room:enter`，由该消息 ack 携带必要的 `RoomInfo` 与（命中 60 秒宽限期时）`{ view, seq }` 快照。
-- `takeover?: true` 仅用于账号已有活跃 socket 时确认接管；未确认时握手以 `SESSION_EXISTS` 拒绝。
+- `tabId`（客户端 `sessionStorage` 持久化，同 tab 刷新不变、新开 tab 换新值）/`browserId`（客户端 `localStorage` 持久化，同源全部 tab 共享）是账号级并发连接仲裁用的身份信号，握手**必带**，缺失/非字符串直接 `UNAUTHORIZED`；生成逻辑见 `apps/web/src/lib/clientIdentity.ts`。
+- `takeover?: true` 仅用于"不同浏览器"这一种冲突（`browserId` 不匹配）下确认接管；`tabId` 相同（同一 tab 刷新）无条件静默接管，不看这个字段；`browserId` 相同但 `tabId` 不同（同浏览器另一个活跃 tab）无条件拒绝，这个字段也不起作用。完整仲裁逻辑与新增错误码 `SESSION_EXISTS_SAME_BROWSER` 见 `session-mechanics.md` "账号级并发连接约束"。
 
 ## 2. 统一信封与 ack/事件关系
 

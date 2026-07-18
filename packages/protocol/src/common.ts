@@ -6,12 +6,13 @@ import { z } from "zod";
  * refresh. Single source of truth: apps/server's ConfigService and
  * apps/web's handshake both import this instead of hardcoding "1.0".
  */
-export const PROTOCOL_VERSION = "1.0";
+export const PROTOCOL_VERSION = "1.1";
 
 /** docs/contracts/protocol-shared.md §5 — the full ErrCode enum; do not invent new codes outside this list. */
 export const ERROR_CODES = [
   "UNAUTHORIZED",
   "SESSION_EXISTS",
+  "SESSION_EXISTS_SAME_BROWSER",
   "VERSION_MISMATCH",
   "ROOM_NOT_FOUND",
   "ROOM_FULL",

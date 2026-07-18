@@ -55,6 +55,8 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
       auth: {
         token: jwtService.sign({ sub: userId }, { secret: configService.jwtSecret }),
         protocolVersion: configService.protocolVersion,
+        tabId: crypto.randomUUID(),
+        browserId: crypto.randomUUID(),
       },
     });
     clients.push(client);

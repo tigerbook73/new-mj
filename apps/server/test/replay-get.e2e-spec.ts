@@ -48,7 +48,13 @@ describe("replay:get (e2e, socket.io-client — phase 4.5 step 3)", () => {
   const connectAs = (userId: string, takeover = false): Promise<ClientSocket> => {
     const client = io(baseUrl, {
       transports: ["websocket"],
-      auth: { token: makeToken(userId), protocolVersion, ...(takeover ? { takeover: true } : {}) },
+      auth: {
+        token: makeToken(userId),
+        protocolVersion,
+        tabId: crypto.randomUUID(),
+        browserId: crypto.randomUUID(),
+        ...(takeover ? { takeover: true } : {}),
+      },
     });
     clients.push(client);
     return new Promise((resolve, reject) => {

@@ -36,7 +36,15 @@ export function AuthCallbackView() {
       const result = await connectWithTakeoverPrompt(session.access_token);
       if (cancelled) return;
       if (!result.ok) {
-        setError(result.code);
+        if (result.code === "SESSION_EXISTS_SAME_BROWSER") {
+          void navigate("/session-blocked", { replace: true });
+          return;
+        }
+        setError(
+          result.code === "SESSION_EXISTS"
+            ? "This account is signed in on a different browser. Sign in with a different account, or try again and confirm the takeover."
+            : result.code,
+        );
         return;
       }
 

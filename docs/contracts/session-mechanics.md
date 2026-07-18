@@ -131,7 +131,14 @@ finished: 计算排名，对外公开 result
 
 **评审点 H【已定：采纳，2026-07 修订】**：对局中 socket 断开先进入 60 秒可逆宽限期，期间纯等待、不代打；同一 userId 通过 `room:enter` ack 恢复座位与快照。宽限期到期才永久转 AI 并补跑当前动作。主动 `room:leave`/sign out 立即永久托管。两态分别由 `isDisconnected` 与 `isAutoPiloted` 表示，`waiting` 阶段断线不处理。
 
-**账号级并发连接约束**：server 维护 `SessionRegistry(userId -> socket)`。同一账号已有活跃连接时，握手默认以 `SESSION_EXISTS` 拒绝；客户端确认接管后带 `takeover:true`，server 发送尽力而为的 `session:kicked` 并断开旧 socket，新连接再通过 `room:enter` 命中宽限期。旧 socket 断线走普通断线路径，不触发主动离座托管；registry 摘除必须比较 socket 引用，避免旧连接延迟清理误删新登记。
+**账号级并发连接约束（三态仲裁，2026-07 修订）**：server 维护 `SessionRegistry(userId -> { socket, tabId, browserId })`（`apps/server/src/gateway/session-registry.ts`）。`tabId`/`browserId` 是客户端握手时**必带**的身份信号（见 `protocol-shared.md` §1），server 按下述优先级确定性判断新连接跟已有连接的关系，不再靠"猜大概率是自己刷新前的旧连接"这类概率性推断：
+
+1. **同一个 tab**（`tabId` 相同，典型是刷新）→ 无条件静默踢旧连接、接受新连接，第一次握手就成功，不看 `takeover` 字段——这吃掉了旧版"刷新时 race 到旧连接还没清理完"的问题，因为判断不再依赖"registry 里有没有残留项"这种时序敏感的信号，而是直接比对身份。
+2. **同一个浏览器、不同 tab**（`browserId` 相同、`tabId` 不同）、且旧连接仍在 registry 里（即仍活跃）→ 无条件拒绝，握手以新错误码 `SESSION_EXISTS_SAME_BROWSER` 失败，`takeover:true` 在这条分支不起作用（没有接管入口）。客户端（无论是走 `App.tsx` 整页恢复还是 `LoginView`/`AuthCallbackView` 显式登录撞上这个码）一律跳转独立的 `/session-blocked` 死路页（`apps/web/src/views/SessionBlockedView.tsx`）：只尝试 `window.close()`（对非脚本打开的普通 tab 是 best-effort，大概率静默失败），**不清任何本地凭证**——`localStorage` 里的 dev-session token / Supabase session 是同浏览器全部 tab 共享的，旧连接那个 tab 还在用同一份凭证，清掉会把它一起挤下线；即使这个死路页所在的 tab 被刷新，`tabId` 仍是同一个值（`sessionStorage` 语义），会再次确定性地撞回同一个错误码，不存在"死页面里刷新反而抢到会话"的风险。
+3. **不同浏览器**（`browserId` 不同）→ 沿用旧版 `SESSION_EXISTS` 语义：默认拒绝；客户端确认接管后带 `takeover:true`，server 发送尽力而为的 `session:kicked` 并断开旧 socket，新连接再通过 `room:enter` 命中宽限期。**"确认接管"仅限有用户手势的显式登录路径**（`LoginView` 提交、OAuth 回调，`connectWithTakeoverPrompt`）——`App.tsx` 的整页加载会话恢复没有用户手势，理论上不会合法地撞上这条分支（本地能读到 token 就意味着这就是当年登录过的那个浏览器），万一出现就按"没有可用 token"处理，直接掉回未登录态，不弹确认、不静默接管。用户在 `confirm()` 里拒绝接管时，停留在原登录页面，内联提示改用其他账号登录（表单/OAuth 按钮继续可用），不跳转、不锁死。
+4. **无冲突** → 现有流程，直接放行。
+
+旧 socket 被踢后走普通断线路径，不触发主动离座托管；`registry.deleteIfSame` 摘除必须比较 socket 引用，避免旧连接延迟清理误删新登记。
 
 **评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换；`lastSeq` 增量补发是未来可能的优化项，当前不实现。
 
@@ -219,5 +226,5 @@ Player C: room:leave {}
 - **三张表，Prisma 管理，无跨表外键**（`apps/server/prisma/schema.prisma`）：`profiles`（`id` = 真实 Supabase `auth.users.id`，`nickname`/`avatar`，只在真实 Supabase 登录成功后由 `auth.middleware.ts` upsert，dev 假登录不写这张表）、`room_sessions`（`id` = roomId，`rulesetId`/`sessionFormat`/`result: SessionResult`/`finishedAt`，会话结束时归档一行）、`game_logs`（`roomId`+`gameNumber` 复合唯一，`rulesetId`/`seatUserIds`/`events`/`finalState`，每局结束归档一行，跟 §10 的内存 `FinishedGameLog` 同形状 + 多一个 `rulesetId` 字段，让归档记录不依赖 `room_sessions` 行是否存在就能自解释）。三表互相之间、和 `auth.users` 之间都不建外键——`game_logs` 行必然先于对应 `room_sessions` 行写入（局结束 vs 会话结束不是同一时刻），硬 FK 会拒绝这些插入；`decisions.md` D7"单向引用 userId"的精神延伸到这里，一致性由应用层保证，不靠数据库约束。
 - **写入路径 fire-and-forget**：`RoomService.handleGameEnd`（每局结束）和会话结束时分别调 `PersistenceService.archiveGame`/`archiveSession`，都不 `await`——失败只记日志，绝不能让"存历史记录"这件事有能力打断正在进行的对局逻辑（对局本身的正确性不依赖持久化是否成功）。`PersistenceService` 在 `DATABASE_URL` 未配置时每个方法直接短路成 no-op/`null`，不会让 Prisma 真的尝试连接。
 - **读取路径**：`replay:get`/`debug:replayOmniscientView` 在内存里的 `room.finishedGames` 找不到对应局时（即该房间对象不在 `RoomService` 的内存 `Map` 里——按上面的说明，这只可能是"进程重启过"），退回查 `game_logs` 表；查到则照常走 `rebuildPlayerView`/`getOmniscientView` 重建返回值。`RoomService.getReplay`/`getReplayOmniscientView` 因此是 `async`，`RoomsGateway` 用只服务这两个 handler 的 `replyAsync`（其余 handler 保持同步 `reply()`，不受影响）。
-- **鉴权**：`auth.middleware.ts` 按 `ConfigService.supabaseUrl`/`supabaseServiceKey` 是否配置分支——配置了就用 `@supabase/supabase-js` 的 `auth.getUser(token)` 委托 Supabase 自己的服务器验证真实 token（`socket.data.userId` = Supabase 返回的 `user.id`，同时 fire-and-forget upsert 一行 `profiles`）；未配置就回退 D16 的开发态共享 HS256 校验——两条路径共用同一个中间件函数，靠配置存在与否分支，不是新增一个"测试模式"开关，现有全部 e2e（不设 `SUPABASE_URL`）零改动继续用旧路径。
+- **鉴权**：`auth.middleware.ts` 按 `ConfigService.supabaseUrl`/`supabaseServiceKey` 是否配置分支——配置了就优先用 `@supabase/supabase-js` 的 `auth.getUser(token)` 委托 Supabase 自己的服务器验证真实 token（`socket.data.userId` = Supabase 返回的 `user.id`，同时 fire-and-forget upsert 一行 `profiles`）；未配置就走 D16 的开发态共享 HS256 校验。**Supabase 校验失败时**，若 `ConfigService.isProduction` 为 false（`NODE_ENV !== "production"`），再尝试同一份 D16 HS256 校验作为兜底（`decisions.md` D16）——这是为了让 D23 提交进 git 的 Supabase CLI demo 配置不会挡住本地 `pnpm dev` 的假昵称登录；生产部署必须设置 `NODE_ENV=production`，该兜底分支永不触发。两条主路径仍共用同一个中间件函数，靠配置存在与否分支，不是新增一个"测试模式"开关，现有全部 e2e（不设 `SUPABASE_URL`）零改动继续用旧路径。
 - 完整取舍记录见 `decisions.md` D22。

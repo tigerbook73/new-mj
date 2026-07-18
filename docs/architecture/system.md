@@ -48,4 +48,8 @@ core ← server → protocol
 
 玩家点"碰"：client 发 `game:action {peng}`（ack 仅回执受理）→ Room 将其入队（每房间串行）→ 调 `applyAction` → 得到新 state 与 events → Room 替换 state 引用 → 按每个事件的 visibility 标注分发（含发起者本人）→ 各客户端把事件应用到本地视图。客户端状态永远 = 入局快照 + 事件流；服务端持唯一权威 GameState。
 
+## 6. 账号级会话仲裁
+
+同一账号可能同时从"同一个 tab 刷新""同一浏览器另一个 tab""不同浏览器/设备"这三种关系发起新连接，server 靠握手时客户端带的 `tabId`（`sessionStorage`）/`browserId`（`localStorage`）身份信号确定性区分，不再靠"大概率是自己刷新前的旧连接"这类猜测：同 tab 静默接管；同浏览器另一个活跃 tab 硬拒绝，客户端跳独立死路页（不清共享凭证，避免把还在用的那个 tab 一起挤下线）；不同浏览器才弹确认框、用户可选择接管或换号登录。完整分支逻辑与错误码见 `contracts/session-mechanics.md`"账号级并发连接约束"；决策记录见 `decisions.md` D27。
+
 字段与消息契约见 `contracts/engine-contract.md`、`contracts/protocol-shared.md`；具体玩法规则见 `variants/*.md`；设计模式叙事见 `key-designs.md`；取舍理由见 `decisions.md`。

@@ -50,7 +50,7 @@ describe("debug:replayOmniscientView (e2e, socket.io-client — phase 4.5 step 5
   const connectAs = (userId: string): Promise<ClientSocket> => {
     const client = io(baseUrl, {
       transports: ["websocket"],
-      auth: { token: makeToken(userId), protocolVersion },
+      auth: { token: makeToken(userId), protocolVersion, tabId: crypto.randomUUID(), browserId: crypto.randomUUID() },
     });
     clients.push(client);
     return new Promise((resolve, reject) => {

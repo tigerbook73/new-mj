@@ -42,3 +42,64 @@ test("signing out clears the session and returns to login", async ({ page }) => 
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("button", { name: "Enter game" })).toBeVisible();
 });
+
+// D27 (session-mechanics.md "账号级并发连接约束") — three-way arbitration by
+// tabId/browserId, no more client-side "probably my own stale connection" guess.
+
+test("refreshing the same tab reconnects silently, no session-blocked / no prompt", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Refresh Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  await page.reload();
+
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+});
+
+test("a second tab in the same browser is hard-blocked into /session-blocked on load alone, no confirm prompt, no form needed", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Same Browser Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  // A fresh tab in the same browser context shares localStorage (the
+  // dev-session token), so App.tsx's own session-restore effect picks it up
+  // and hits the same-browser conflict on page load — no explicit re-login
+  // needed to reproduce it.
+  const second = await context.newPage();
+  await second.goto("/login");
+
+  await expect(second).toHaveURL(/\/session-blocked$/, { timeout: 10_000 });
+  await expect(second.getByText(/already signed in on another tab/i)).toBeVisible();
+  // The first tab's session is untouched — same-browser conflicts never kick it.
+  await expect(page).toHaveURL(/\/games$/);
+  await second.close();
+});
+
+test("a different browser is prompted; declining keeps the form usable with a cross-account hint", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Cross Browser Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  const otherContext = await browser.newContext();
+  const other = await otherContext.newPage();
+  other.on("dialog", (dialog) => void dialog.dismiss());
+  await other.goto("/login");
+  await other.getByPlaceholder("Enter nickname").fill("Cross Browser Player");
+  await other.getByRole("button", { name: "Enter game" }).click();
+
+  await expect(other).toHaveURL(/\/login$/);
+  await expect(other.getByText(/signed in on a different browser/i)).toBeVisible();
+  await expect(other.getByRole("button", { name: "Enter game" })).toBeVisible();
+  await otherContext.close();
+});

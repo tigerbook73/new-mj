@@ -21,6 +21,26 @@ const makeSocket = (result: { ok: true } | { ok: false; code: string }): Socket 
   return socket;
 };
 
+/** In-memory Storage stand-in — vitest's default (node) environment has no real localStorage/sessionStorage. */
+const makeStorage = (): Storage => {
+  const data = new Map<string, string>();
+  return {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => void data.set(key, value),
+    removeItem: (key: string) => void data.delete(key),
+    clear: () => data.clear(),
+    key: () => null,
+    get length() {
+      return data.size;
+    },
+  } as Storage;
+};
+
+beforeEach(() => {
+  vi.stubGlobal("localStorage", makeStorage());
+  vi.stubGlobal("sessionStorage", makeStorage());
+});
+
 describe("connectWithTakeoverPrompt", () => {
   beforeEach(() => {
     ioMock.mockReset();
@@ -38,7 +58,10 @@ describe("connectWithTakeoverPrompt", () => {
     expect(window.confirm).not.toHaveBeenCalled();
     expect(ioMock).toHaveBeenCalledWith(
       "http://localhost:3000",
-      expect.objectContaining({ reconnection: false }),
+      expect.objectContaining({
+        reconnection: false,
+        auth: expect.objectContaining({ tabId: expect.any(String), browserId: expect.any(String) }),
+      }),
     );
   });
 
@@ -69,5 +92,36 @@ describe("connectWithTakeoverPrompt", () => {
 
     expect(result).toEqual({ ok: false, code: "SESSION_EXISTS" });
     expect(ioMock).toHaveBeenCalledOnce();
+  });
+
+  it("never prompts for SESSION_EXISTS_SAME_BROWSER — returns it straight through", async () => {
+    const first = makeSocket({ ok: false, code: "SESSION_EXISTS_SAME_BROWSER" });
+    ioMock.mockReturnValue(first);
+    const { connectWithTakeoverPrompt } = await import("./socket");
+
+    const result = await connectWithTakeoverPrompt("token");
+
+    expect(result).toEqual({ ok: false, code: "SESSION_EXISTS_SAME_BROWSER" });
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(ioMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe("connect", () => {
+  beforeEach(() => {
+    ioMock.mockReset();
+  });
+
+  it("sends the same tabId across calls (sessionStorage) but a stable browserId (localStorage)", async () => {
+    ioMock.mockReturnValue(makeSocket({ ok: true }));
+    const { connect } = await import("./socket");
+
+    await connect("token");
+    await connect("token");
+
+    const [, firstOpts] = ioMock.mock.calls[0] as [string, { auth: Record<string, unknown> }];
+    const [, secondOpts] = ioMock.mock.calls[1] as [string, { auth: Record<string, unknown> }];
+    expect(firstOpts.auth["tabId"]).toBe(secondOpts.auth["tabId"]);
+    expect(firstOpts.auth["browserId"]).toBe(secondOpts.auth["browserId"]);
   });
 });
