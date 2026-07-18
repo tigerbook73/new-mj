@@ -448,10 +448,8 @@ export class RoomService {
   }
 
   /**
-   * Dev/test-only escape hatch (decisions.md D19) — caller (RoomsGateway) is
-   * responsible for the `ALLOW_DEBUG_OMNISCIENT` gate and for validating the
-   * requester is a seated player in this room; this method only checks the
-   * room itself is in a state where a gameState exists.
+   * Dev/test-only escape hatch (decisions.md D19) — gate/membership check is
+   * the caller's (RoomsGateway) responsibility.
    */
   getOmniscientView(roomId: string): OmniscientView {
     const room = this.mustGet(roomId);
@@ -462,14 +460,9 @@ export class RoomService {
   }
 
   /**
-   * phase 5.3 — Room objects are never evicted from memory while the
-   * process is up (a `finished` room just sits there, see
-   * contracts/session-mechanics.md §10), so an in-memory miss here only
-   * ever means "server restarted since this game finished" — falls back to
-   * the PG archive (phase 5.2) rather than the room existing-but-game-
-   * missing case, which is a genuine bad gameNumber and stays a lookup
-   * inside the in-memory room (no DB round-trip needed when the room is
-   * right there).
+   * In-memory miss only ever means "server restarted since" (rooms are
+   * never evicted while the process is up) — falls back to the PG archive.
+   * See contracts/session-mechanics.md §11.
    */
   private async findArchivedGame(
     roomId: string,
@@ -487,11 +480,8 @@ export class RoomService {
   }
 
   /**
-   * phase 4.5 step 3 — real product feature (unlike
-   * getOmniscientView): any userId who was seated in that specific
-   * archived game may fetch its replay, regardless of whether they're
-   * still in this room right now (seatUserIds is that game's own
-   * snapshot, not current room.players occupancy).
+   * Real product feature (unlike getOmniscientView): any userId seated in
+   * that archived game may fetch it, regardless of current room membership.
    */
   async getReplay(
     roomId: string,
@@ -509,18 +499,9 @@ export class RoomService {
   }
 
   /**
-   * phase 4.5 step 5 — 明牌 replay, gated the same way as D19's
-   * live getOmniscientView (dev/test-only, caller checks
-   * ALLOW_DEBUG_OMNISCIENT + current room membership), unlike getReplay
-   * above which is a real product feature open to anyone who played that
-   * game. End-of-game only: feeds the archived finalState straight into
-   * getOmniscientView instead of reconstructing state from events (that
-   * would need a new core capability — out of scope, see
-   * phase 4.5 "衔接问题"). DB fallback (phase 5.3) is structurally
-   * unreachable here in practice — the gateway's ALLOW_DEBUG_OMNISCIENT +
-   * current-room-membership gate already requires a live connection/seat,
-   * which can't exist for a room that isn't in memory — but shares
-   * findArchivedGame rather than duplicating the in-memory-only lookup.
+   * Dev/test-only escape hatch (D19), gated like getOmniscientView — unlike
+   * getReplay above. End-of-game only: feeds the archived finalState
+   * straight into getOmniscientView instead of reconstructing from events.
    */
   async getReplayOmniscientView(roomId: string, gameNumber: number): Promise<OmniscientView> {
     const found = await this.findArchivedGame(roomId, gameNumber);

@@ -1,12 +1,8 @@
 import { SignJWT } from "jose";
 
 /**
- * Temporary: dev-only fake login (decisions.md D16). Signs a JWT client-side
- * with the same shared secret apps/server's ConfigService.jwtSecret falls
- * back to when JWT_SECRET is unset — mirrors the pattern apps/server's own
- * e2e tests already use (jwtService.sign({sub}, {secret})). Replace with
- * real Supabase OAuth once D16's trigger condition is met; nothing else in
- * this module should be treated as a template for real auth.
+ * Dev-only fake login (D16) — signs with the same fallback secret
+ * apps/server's ConfigService.jwtSecret uses when JWT_SECRET is unset.
  */
 const DEV_JWT_SECRET = import.meta.env["VITE_DEV_JWT_SECRET"] ?? "dev-only-insecure-secret";
 

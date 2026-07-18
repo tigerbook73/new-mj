@@ -28,21 +28,10 @@ const deriveAvatar = (user: User): string | undefined => {
 };
 
 /**
- * docs/protocol.md §0 — rejects the connection outright (Socket.IO handshake
- * middleware, before `connection` fires) rather than gating individual
- * messages, so an unauthenticated/stale client never gets a live socket.
- * D10/architecture rule 3: socket.data.userId is the only source of
- * identity from here on; later messages must never trust a payload userId.
- *
- * Phase 5: two verification paths, chosen by whether real Supabase config
- * is present — not a separate test-mode flag. An environment without
- * SUPABASE_URL/SUPABASE_SERVICE_KEY set (every e2e test, this sandbox by
- * default) keeps using the D16 dev JWT path unchanged, zero test changes
- * needed. Uses supabase.auth.getUser(token) — delegates verification to
- * Supabase's own servers rather than checking the JWT signature locally —
- * so this works the same whether the project signs with the legacy shared
- * HS256 secret or newer asymmetric per-project keys, without this code
- * needing to know which.
+ * Handshake middleware, not a per-message guard (architecture rule 3):
+ * rejects the connection outright before `connection` fires.
+ * Two verification paths chosen by whether Supabase config is present —
+ * see docs/contracts/session-mechanics.md §11.
  */
 export const createAuthMiddleware = (
   jwtService: JwtService,

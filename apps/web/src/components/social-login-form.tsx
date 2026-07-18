@@ -2,12 +2,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-/**
- * Phase 5: the real login surface, replacing login-form.tsx's role as the
- * primary entry point — login-form.tsx (shadcn login-03's original social
- * buttons dropped for D16's dev-only nickname flow, see its own comment)
- * still exists but is now the secondary/dev-only section (see LoginView).
- */
+/** Primary login surface (phase 5) — see apps/web/AGENTS.md. */
 export function SocialLoginForm({
   className,
   onGoogle,

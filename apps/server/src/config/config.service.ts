@@ -6,11 +6,9 @@ export class ConfigService {
   readonly protocolVersion = PROTOCOL_VERSION;
 
   /**
-   * MVP: a shared HS256 secret, not Supabase's actual JWKS/verification
-   * mechanism (D16 — real Supabase wiring is phase 5, see supabaseUrl/
-   * supabaseServiceKey below). PORT/JWT_SECRET read from env with dev-only
-   * fallbacks so `nest start` works out of the box; production deployments
-   * must set real values.
+   * Dev-only fallback secret (D16) — real Supabase verification uses
+   * supabaseUrl/supabaseServiceKey below. Production deployments must set
+   * a real JWT_SECRET.
    */
   get jwtSecret(): string {
     // `||` not `??`: an empty-value `JWT_SECRET=` line in an env file must
