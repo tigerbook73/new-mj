@@ -634,6 +634,22 @@ describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", ()
     expect(room.result?.gamesPlayed).toBe(4);
   });
 
+  it("restores a disconnected seat during the grace period and cancels permanent takeover", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    service.handleDisconnect(room.id, "p2");
+    const resumed = service.reconnect(room.id, "p2");
+
+    expect(resumed).toMatchObject({ seat: 1, seq: expect.any(Number), view: { seat: 1 } });
+    expect(room.players[1]).toMatchObject({ isDisconnected: false, isAutoPiloted: false });
+    jest.advanceTimersByTime(60_000);
+    expect(room.players[1]).toMatchObject({ isDisconnected: false, isAutoPiloted: false });
+  });
+
   it("closes the room once the last human seat disconnects (nobody left to play for)", () => {
     const service = newRoomService();
     const room = service.create("host", "Host", "junk", { rulesetId: "junk" });

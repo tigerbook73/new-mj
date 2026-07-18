@@ -52,7 +52,7 @@
 
 阶段 5 唯一未闭环的是 OAuth 端到端验证：本沙盒用本地 `supabase start` 验证了 schema/持久化读写/GoTrue 真实 token 校验逻辑，但没能验证经 Kong 代理的完整 `/auth/v1/*` 请求（该沙盒 Kong 层的环境问题，非代码问题），以及 Google/GitHub 按钮点击后的真实 OAuth 跳转（需要用户提供的真实 OAuth Client secret）。本次 `auth-session-profile-fix-plan.md` 已开始实施：协议契约、profile/avatar、dev 伪账号持久化、sign out 顺序、账号级会话去重、断线 60 秒宽限期与 web 恢复骨架已落地；真实 OAuth 与完整多标签页/刷新手工验收仍未闭环。
 
-**下一步第一个动作**：补齐 auth-session 修复的 server/web 集成测试（宽限期内 `room:enter` ack 恢复、到期托管、`SessionRegistry` takeover 与旧连接清理），再用真实 Supabase 项目和 OAuth secrets 做 Google/GitHub 登录→大厅→牌桌手工验收；确认无误后阶段 5 正式收尾（按 `../doc-map.md` §6）。
+**下一步第一个动作**：用真实 Supabase 项目和 OAuth secrets 做 Google/GitHub 登录→大厅→牌桌手工验收；web bootstrap/sign-out/takeover UI 测试仍可在没有 OAuth secrets 时继续补齐。确认无误后阶段 5 正式收尾（按 `../doc-map.md` §6）。
 
 ## 待办
 

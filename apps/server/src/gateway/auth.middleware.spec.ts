@@ -2,7 +2,7 @@ import { JwtService } from "@nestjs/jwt";
 import type { Socket } from "socket.io";
 import { ConfigService } from "../config/config.service";
 import type { PersistenceService } from "../persistence/persistence.service";
-import { createAuthMiddleware, WsAuthError } from "./auth.middleware";
+import { createAuthMiddleware, deriveAvatar, deriveNickname, WsAuthError } from "./auth.middleware";
 
 const jwtService = new JwtService();
 const configService = new ConfigService();
@@ -61,5 +61,27 @@ describe("WsAuthError", () => {
     const error = new WsAuthError("VERSION_MISMATCH");
     expect(error.code).toBe("VERSION_MISMATCH");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("verified profile fallback", () => {
+  const user = (metadata: Record<string, unknown>, email = "fallback@example.com") =>
+    ({ user_metadata: metadata, email }) as never;
+
+  it("prefers the GitHub user_name and falls back through name/full_name/email", () => {
+    expect(deriveNickname(user({ user_name: "octocat", name: "Octo" }))).toBe("octocat");
+    expect(deriveNickname(user({ name: "Google Name", full_name: "Full Name" }))).toBe(
+      "Google Name",
+    );
+    expect(deriveNickname(user({ full_name: "Full Name" }))).toBe("Full Name");
+    expect(deriveNickname(user({}))).toBe("fallback");
+  });
+
+  it("uses avatar_url first and Google picture as fallback", () => {
+    expect(deriveAvatar(user({ avatar_url: "github-avatar", picture: "google-avatar" }))).toBe(
+      "github-avatar",
+    );
+    expect(deriveAvatar(user({ picture: "google-avatar" }))).toBe("google-avatar");
+    expect(deriveAvatar(user({}))).toBeUndefined();
   });
 });
