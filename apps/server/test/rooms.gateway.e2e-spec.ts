@@ -40,7 +40,12 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
   const connectAs = (userId: string): Promise<ClientSocket> => {
     const client = io(baseUrl, {
       transports: ["websocket"],
-      auth: { token: makeToken(userId), protocolVersion, tabId: crypto.randomUUID(), browserId: crypto.randomUUID() },
+      auth: {
+        token: makeToken(userId),
+        protocolVersion,
+        tabId: crypto.randomUUID(),
+        browserId: crypto.randomUUID(),
+      },
     });
     clients.push(client);
     return new Promise((resolve, reject) => {

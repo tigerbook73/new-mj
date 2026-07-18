@@ -3,7 +3,12 @@ import { AuthHandshakeSchema } from "./auth.ts";
 
 describe("AuthHandshakeSchema", () => {
   it("accepts token, protocolVersion, tabId and browserId without resume", () => {
-    const payload = { token: "jwt", protocolVersion: "1.0", tabId: "tab-1", browserId: "browser-1" };
+    const payload = {
+      token: "jwt",
+      protocolVersion: "1.0",
+      tabId: "tab-1",
+      browserId: "browser-1",
+    };
     expect(AuthHandshakeSchema.parse(payload)).toEqual(payload);
   });
 

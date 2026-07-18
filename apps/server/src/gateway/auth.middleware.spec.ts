@@ -92,9 +92,17 @@ describe("session arbitration (SessionRegistry wired in)", () => {
 
   it("rejects with UNAUTHORIZED when tabId/browserId are missing", async () => {
     const registry = new SessionRegistry();
-    const withRegistry = createAuthMiddleware(jwtService, configService, persistenceService, registry);
+    const withRegistry = createAuthMiddleware(
+      jwtService,
+      configService,
+      persistenceService,
+      registry,
+    );
     const token = jwtService.sign({ sub: "user-1" }, { secret: configService.jwtSecret });
-    const socket = fakeSessionSocket("s1", { token, protocolVersion: configService.protocolVersion });
+    const socket = fakeSessionSocket("s1", {
+      token,
+      protocolVersion: configService.protocolVersion,
+    });
     const next = jest.fn();
 
     await withRegistry(socket, next);
@@ -104,7 +112,12 @@ describe("session arbitration (SessionRegistry wired in)", () => {
 
   it("same tabId (refresh): silently replaces the old socket, no takeover flag needed", async () => {
     const registry = new SessionRegistry();
-    const withRegistry = createAuthMiddleware(jwtService, configService, persistenceService, registry);
+    const withRegistry = createAuthMiddleware(
+      jwtService,
+      configService,
+      persistenceService,
+      registry,
+    );
     const token = jwtService.sign({ sub: "user-1" }, { secret: configService.jwtSecret });
 
     const first = fakeSessionSocket("s1", auth(token, "tab-a", "browser-a"));
@@ -122,7 +135,12 @@ describe("session arbitration (SessionRegistry wired in)", () => {
 
   it("same browserId, different tabId: hard rejects with SESSION_EXISTS_SAME_BROWSER, never kicks", async () => {
     const registry = new SessionRegistry();
-    const withRegistry = createAuthMiddleware(jwtService, configService, persistenceService, registry);
+    const withRegistry = createAuthMiddleware(
+      jwtService,
+      configService,
+      persistenceService,
+      registry,
+    );
     const token = jwtService.sign({ sub: "user-1" }, { secret: configService.jwtSecret });
 
     const first = fakeSessionSocket("s1", auth(token, "tab-a", "browser-a"));
@@ -132,7 +150,9 @@ describe("session arbitration (SessionRegistry wired in)", () => {
     const next = jest.fn();
     await withRegistry(second, next);
 
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: "SESSION_EXISTS_SAME_BROWSER" }));
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "SESSION_EXISTS_SAME_BROWSER" }),
+    );
     expect(first.emit).not.toHaveBeenCalled();
     expect(first.disconnect).not.toHaveBeenCalled();
     expect(registry.get("user-1")?.socket).toBe(first);
@@ -141,12 +161,19 @@ describe("session arbitration (SessionRegistry wired in)", () => {
     const third = fakeSessionSocket("s3", auth(token, "tab-c", "browser-a", true));
     const next3 = jest.fn();
     await withRegistry(third, next3);
-    expect(next3).toHaveBeenCalledWith(expect.objectContaining({ code: "SESSION_EXISTS_SAME_BROWSER" }));
+    expect(next3).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "SESSION_EXISTS_SAME_BROWSER" }),
+    );
   });
 
   it("different browserId: soft SESSION_EXISTS, rejected unless takeover:true is sent", async () => {
     const registry = new SessionRegistry();
-    const withRegistry = createAuthMiddleware(jwtService, configService, persistenceService, registry);
+    const withRegistry = createAuthMiddleware(
+      jwtService,
+      configService,
+      persistenceService,
+      registry,
+    );
     const token = jwtService.sign({ sub: "user-1" }, { secret: configService.jwtSecret });
 
     const first = fakeSessionSocket("s1", auth(token, "tab-a", "browser-a"));
@@ -171,7 +198,12 @@ describe("session arbitration (SessionRegistry wired in)", () => {
 
   it("no conflict: connects normally and registers the session", async () => {
     const registry = new SessionRegistry();
-    const withRegistry = createAuthMiddleware(jwtService, configService, persistenceService, registry);
+    const withRegistry = createAuthMiddleware(
+      jwtService,
+      configService,
+      persistenceService,
+      registry,
+    );
     const token = jwtService.sign({ sub: "user-1" }, { secret: configService.jwtSecret });
     const socket = fakeSessionSocket("s1", auth(token, "tab-a", "browser-a"));
     const next = jest.fn();

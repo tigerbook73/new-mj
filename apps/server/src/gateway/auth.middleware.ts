@@ -16,10 +16,7 @@ interface HandshakeAuth {
 export class WsAuthError extends Error {
   constructor(
     public readonly code:
-      | "UNAUTHORIZED"
-      | "VERSION_MISMATCH"
-      | "SESSION_EXISTS"
-      | "SESSION_EXISTS_SAME_BROWSER",
+      "UNAUTHORIZED" | "VERSION_MISMATCH" | "SESSION_EXISTS" | "SESSION_EXISTS_SAME_BROWSER",
   ) {
     super(code);
     this.name = "WsAuthError";
@@ -91,7 +88,8 @@ export const createAuthMiddleware = (
         next(new WsAuthError("UNAUTHORIZED"));
         return;
       }
-      if (!registerSession(socket, userId, tabId, browserId, takeover, sessionRegistry, next)) return;
+      if (!registerSession(socket, userId, tabId, browserId, takeover, sessionRegistry, next))
+        return;
     }
     next();
   };
