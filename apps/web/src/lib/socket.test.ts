@@ -36,6 +36,10 @@ describe("connectWithTakeoverPrompt", () => {
 
     expect(result).toEqual({ ok: true, socket });
     expect(window.confirm).not.toHaveBeenCalled();
+    expect(ioMock).toHaveBeenCalledWith(
+      "http://localhost:3000",
+      expect.objectContaining({ reconnection: false }),
+    );
   });
 
   it("confirms SESSION_EXISTS and retries with takeover", async () => {

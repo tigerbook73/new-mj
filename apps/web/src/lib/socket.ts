@@ -14,6 +14,10 @@ export type ConnectResult = { ok: true; socket: Socket } | { ok: false; code: st
 export function connect(token: string, takeover = false): Promise<ConnectResult> {
   const socket = io(SERVER_URL, {
     transports: ["websocket"],
+    // Auth bootstrap owns reconnection. Automatic reconnect from an old page
+    // after a server restart can register first and cause a false takeover
+    // prompt on the freshly loaded page.
+    reconnection: false,
     auth: { token, protocolVersion: PROTOCOL_VERSION, ...(takeover ? { takeover: true } : {}) },
   });
 
