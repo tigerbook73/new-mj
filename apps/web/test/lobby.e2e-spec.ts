@@ -23,10 +23,10 @@ async function createRoom(page: Page, name: string) {
 
 test("four players find a room, choose seats, ready up, and start", async ({ browser }) => {
   const [host, p2, p3, p4] = await Promise.all([
-    loginAs(browser, "host"),
-    loginAs(browser, "p2"),
-    loginAs(browser, "p3"),
-    loginAs(browser, "p4"),
+    loginAs(browser, "start-host"),
+    loginAs(browser, "start-p2"),
+    loginAs(browser, "start-p3"),
+    loginAs(browser, "start-p4"),
   ]);
 
   await openVariant(host, "Junk Hu");
@@ -57,7 +57,7 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
 });
 
 test("host can name a room and fill specifically selected seats with bots", async ({ browser }) => {
-  const page = await loginAs(browser, "host");
+  const page = await loginAs(browser, "solo-host");
   await openVariant(page, "Junk Hu");
   await createRoom(page, "Solo table");
   await expect(page).toHaveURL(/\/lobby\//);
@@ -74,7 +74,7 @@ test("host can name a room and fill specifically selected seats with bots", asyn
 });
 
 test("switching tabs changes the active game lobby", async ({ browser }) => {
-  const page = await loginAs(browser, "host");
+  const page = await loginAs(browser, "tabs-host");
   await openVariant(page, "Bloodbattle");
   await expect(page.getByText("No open rooms found.")).toBeVisible();
   await openVariant(page, "Junk Hu");

@@ -11,11 +11,14 @@ async function loginAs(browser: Browser, nickname: string): Promise<Page> {
 }
 
 async function createAndStartRoom(browser: Browser, rulesetId: "junk" | "bloodbattle") {
+  // Prefixed by rulesetId so the two callers below (junk/bloodbattle tests)
+  // never collide on the same dev userId when Playwright runs them in
+  // parallel workers (deriveUserId(nickname) is deterministic).
   const [host, p2, p3, p4]: [Page, Page, Page, Page] = await Promise.all([
-    loginAs(browser, "host"),
-    loginAs(browser, "p2"),
-    loginAs(browser, "p3"),
-    loginAs(browser, "p4"),
+    loginAs(browser, `${rulesetId}-host`),
+    loginAs(browser, `${rulesetId}-p2`),
+    loginAs(browser, `${rulesetId}-p3`),
+    loginAs(browser, `${rulesetId}-p4`),
   ]);
   const players: [Page, Page, Page, Page] = [host, p2, p3, p4];
 
