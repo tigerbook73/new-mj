@@ -16,7 +16,11 @@
     "verify": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test && pnpm test:e2e",
     "check:deps": "node tools/check-deps.ts",
     "cli:play": "node packages/core/src/cli.ts play",
-    "fuzz": "node packages/core/src/cli.ts fuzz"
+    "fuzz": "node packages/core/src/cli.ts fuzz",
+    "sb:start": "supabase start",
+    "sb:stop": "supabase stop",
+    "sb:restart": "supabase stop && supabase start",
+    "sb:status": "supabase status"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
