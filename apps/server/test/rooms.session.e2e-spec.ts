@@ -35,6 +35,10 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
   const clients: ClientSocket[] = [];
 
   beforeAll(async () => {
+    // Override the production 60s disconnect grace period (session-
+    // mechanics.md 评审点 H) so the second test below doesn't have to burn
+    // real wall-clock time waiting it out.
+    process.env["DISCONNECT_GRACE_MS"] = "5000";
     app = await NestFactory.create(AppModule, { logger: false });
     await app.listen(0);
     const address = app.getHttpServer().address();
@@ -47,6 +51,7 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
   afterAll(async () => {
     for (const client of clients) client.disconnect();
     await app.close();
+    delete process.env["DISCONNECT_GRACE_MS"];
   });
 
   const connectAs = (userId: string): Promise<ClientSocket> => {
@@ -164,9 +169,10 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
     // order). Disconnecting it should reach RoomsGateway.handleDisconnect →
     // RoomService.handleDisconnect and mark that seat auto-piloted.
     b!.disconnect();
-    // Disconnect enters the 60-second grace period; advance past it before
-    // asserting the irreversible handoff to AI.
-    await new Promise((resolve) => setTimeout(resolve, 60_100));
+    // Disconnect enters the grace period (overridden to 5s for this test via
+    // DISCONNECT_GRACE_MS, see beforeAll — production default is 60s);
+    // advance past it before asserting the irreversible handoff to AI.
+    await new Promise((resolve) => setTimeout(resolve, 5_100));
     expect(roomService.get(roomId)?.players[1]).toMatchObject({ isAutoPiloted: true });
 
     // Drive only the 3 still-connected seats interactively (fresh
@@ -195,5 +201,5 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
     const room = roomService.get(roomId);
     expect(room?.phase).toBe("finished");
     expect(room?.status).toBe("closed");
-  }, 90_000);
+  }, 30_000);
 });

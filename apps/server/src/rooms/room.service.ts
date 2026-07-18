@@ -11,6 +11,7 @@ import {
   type SeatId,
 } from "@new-mj/core";
 import type { RankingEntry, RoomInfo, RoomSummary, SessionFormat } from "@new-mj/protocol";
+import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
 import { PersistenceService } from "../persistence/persistence.service";
 import { EventBus } from "./event-bus";
@@ -20,7 +21,6 @@ import { RoomServiceError } from "./room-service.error";
 const ROOM_SIZE = 4;
 const DEFAULT_TOTAL_GAMES = 4;
 const MAX_SEED = 2 ** 31;
-export const DISCONNECT_GRACE_MS = 60_000;
 
 interface SettledPayload {
   type: "Settled";
@@ -45,6 +45,7 @@ export class RoomService {
     private readonly gameService: GameService,
     private readonly eventBus: EventBus,
     private readonly persistenceService: PersistenceService,
+    private readonly configService: ConfigService,
   ) {}
 
   create(
@@ -375,7 +376,7 @@ export class RoomService {
       const current = this.rooms.get(roomId);
       const currentPlayer = current?.players.find((candidate) => candidate?.userId === userId);
       if (current && currentPlayer?.isDisconnected) this.markAutoPiloted(current, userId);
-    }, DISCONNECT_GRACE_MS);
+    }, this.configService.disconnectGraceMs);
     timer.unref();
     this.disconnectTimers.set(key, timer);
   }

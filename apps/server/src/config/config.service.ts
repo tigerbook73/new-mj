@@ -56,4 +56,16 @@ export class ConfigService {
   get isProduction(): boolean {
     return process.env["NODE_ENV"] === "production";
   }
+
+  /**
+   * Mid-game disconnect grace period (session-mechanics.md 评审点 H) before a
+   * seat is permanently handed to autoPlayBots. Overridable so e2e tests
+   * don't have to burn real wall-clock time waiting out the production
+   * 60-second default.
+   */
+  get disconnectGraceMs(): number {
+    const raw = process.env["DISCONNECT_GRACE_MS"];
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 60_000;
+  }
 }

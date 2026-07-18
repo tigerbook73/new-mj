@@ -1,4 +1,5 @@
 import { playJunkGame } from "@new-mj/core";
+import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
 // GameService is used directly (not via RoomService) so the acceptance test
 // below can inspect legal actions without exposing gameService as public API.
@@ -47,7 +48,12 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
 });
 
 const newRoomService = () =>
-  new RoomService(new GameService(), new EventBus(), fakePersistenceService());
+  new RoomService(
+    new GameService(),
+    new EventBus(),
+    fakePersistenceService(),
+    new ConfigService(),
+  );
 
 describe("RoomService — pure helpers", () => {
   it("accumulateScores adds deltas seat-wise across multiple calls", () => {
