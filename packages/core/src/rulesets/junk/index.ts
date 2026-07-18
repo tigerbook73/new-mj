@@ -1,7 +1,7 @@
-import { assertTileConservation } from "@/lib/invariants";
-import { STANDARD_TILE_SET } from "@/lib/tiles";
-import type { GameEvent } from "@/events";
-import type { RulesetModule } from "@/engine";
+import { assertTileConservation } from "../../lib/invariants.ts";
+import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import type { GameEvent } from "../../events.ts";
+import type { RulesetModule } from "../../engine.ts";
 import { parseJunkConfig } from "./config.ts";
 import {
   applyAnGang,

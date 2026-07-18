@@ -27,6 +27,7 @@
 - **D21**：阶段 4.1 AI 直连完整 `state`（`nextBotAction` 不经过 `getPlayerView`），不做"PlayerView-only 合法性引擎"公共契约——AI 是自己人代码非玩家可控对手，MVP 阶段这层防作弊契约不是真实需求。技术债：触发条件是日后做 AI 强度分级，或 AI 跑到独立进程/服务不再共享内存态 `state` 时。
 - **D22**（已并入 `contracts/session-mechanics.md` §11，原文见 git 历史）
 - **D23**：根目录单一 `.env` + `dotenv-flow` 级联加载（`.env` → `.env.[NODE_ENV]` → `.env.local` → `.env.[NODE_ENV].local`），不做 symlink；`.env` 提交进 git 只放 Supabase CLI 固定 demo 值，真实本地值放 `.env.development.local`（gitignored）；`.env.test` 只服务 Playwright，Jest/Vitest 不加载任何 `.env`。
+- **D24 shared package 开发态直接消费 `src`（`development` export 条件），生产态不变仍消费 `dist`**：只监听 `dist/*.d.ts` 曾实测在"改实现不改签名"时不触发 `tsc --watch` 重新编译，改成让真实源码进入监听范围更可靠。前提是 `packages/core` 去掉了内部 `@/*` 别名（Node/Vite 不认识 tsconfig `paths`）。
 
 ## 规格级决策（评审点，详情见规格文档定稿）
 

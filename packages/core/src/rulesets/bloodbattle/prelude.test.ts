@@ -8,7 +8,7 @@ import {
   type BloodbattleState,
   type GameEvent,
   type SeatId,
-} from "@/index";
+} from "../../index.ts";
 
 // Hand-rolled state for the pre-play phases only (no wall/turn machinery
 // needed — see docs/plan.md 阶段 1.5). Four disjoint 13-tile concealed hands.

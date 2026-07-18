@@ -8,6 +8,7 @@
     // 才支持 @/* 别名与省略扩展名的导入，是 Vite+React 项目的标准做法。
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "customConditions": ["development"],
     "paths": {
       "@/*": ["./src/*"]
     }

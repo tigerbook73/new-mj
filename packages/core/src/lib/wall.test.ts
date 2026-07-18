@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { createPrng, createWall, drawFromHead, drawFromTail } from "@/index";
+import { createPrng, createWall, drawFromHead, drawFromTail } from "../index.ts";
 
 test("PRNG is deterministic and serializable", () => {
   const first = createWall(createPrng(42));

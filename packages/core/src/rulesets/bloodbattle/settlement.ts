@@ -1,6 +1,6 @@
-import type { GameEvent } from "@/events";
-import { createEvent, EVENT_TYPES, nextEventSeq } from "@/events";
-import type { SeatId, TileKind } from "@/lib/ids";
+import type { GameEvent } from "../../events.ts";
+import { createEvent, EVENT_TYPES, nextEventSeq } from "../../events.ts";
+import type { SeatId, TileKind } from "../../lib/ids.ts";
 import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 import { ronCandidates } from "./tingpai.ts";
 import type { BloodbattleState } from "./types.ts";

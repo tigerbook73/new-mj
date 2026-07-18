@@ -1,7 +1,7 @@
-import type { SeatId, TileId, TileKind } from "@/lib/ids";
-import type { Meld, SeatState } from "@/lib/seat";
-import type { PrngState } from "@/lib/prng";
-import type { ApplyResult, GameConfig, PlayerViewBase } from "@/types";
+import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
+import type { Meld, SeatState } from "../../lib/seat.ts";
+import type { PrngState } from "../../lib/prng.ts";
+import type { ApplyResult, GameConfig, PlayerViewBase } from "../../types.ts";
 import {
   BLOODBATTLE_DRAW_BONUSES,
   BLOODBATTLE_END_REASONS,

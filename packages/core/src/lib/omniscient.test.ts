@@ -5,7 +5,7 @@ import {
   createJunkGame,
   getOmniscientView,
   type SeatState,
-} from "@/index";
+} from "../index.ts";
 
 const emptySeats = (hands: number[][]): SeatState[] =>
   hands.map((hand) => ({ hand, melds: [], discards: [] }));

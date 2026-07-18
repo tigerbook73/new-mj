@@ -1,9 +1,9 @@
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "@/events";
-import { createPrng, nextInt } from "@/lib/prng";
-import { createWall } from "@/lib/wall";
+import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createPrng, nextInt } from "../../lib/prng.ts";
+import { createWall } from "../../lib/wall.ts";
 import { parseBloodbattleConfig } from "./config.ts";
-import type { SeatId, TileId } from "@/lib/ids";
-import type { SeatState } from "@/lib/seat";
+import type { SeatId, TileId } from "../../lib/ids.ts";
+import type { SeatState } from "../../lib/seat.ts";
 import type { BloodbattleApplyResult, BloodbattleConfig, BloodbattleState } from "./types.ts";
 import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 

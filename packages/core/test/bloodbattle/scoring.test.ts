@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { scoreBloodbattleHand } from "@/index";
-import type { BloodbattleScoringInput, BloodbattleScoringResult } from "@/index";
+import { scoreBloodbattleHand } from "../../src/index.ts";
+import type { BloodbattleScoringInput, BloodbattleScoringResult } from "../../src/index.ts";
 
 type BloodbattleScoringCase = {
   id: string;

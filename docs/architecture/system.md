@@ -40,7 +40,7 @@ core ← server → protocol
 ## 4. 工程结构
 
 - Monorepo（pnpm workspace + Turbo）。
-- 模块系统：`apps/server` 是仓库里唯一的 CommonJS 包（其余 ESM），跟随 NestJS 官方默认构建方式；`core`/`protocol` 用 tsup 双发 CJS+ESM 兼容两边。
+- 模块系统：`apps/server` 是仓库里唯一的 CommonJS 包（其余 ESM），跟随 NestJS 官方默认构建方式；`core`/`protocol`/`ai` 用 tsup 双发 CJS+ESM 兼容两边。生产构建消费 `dist`；本地开发态 `apps/server`/`apps/web` 直接消费 shared package 的 `src`（`development` export 条件，见 `decisions.md` D24），不经过 `dist`。
 - 依赖方向由 dependency-cruiser 在 CI 强制检查，不是靠约定。
 - 测试运行时按包生态选择（Vitest for core/protocol/ai，Jest for server），不强求全仓统一 runner；细则见 `testing-strategy.md`。
 

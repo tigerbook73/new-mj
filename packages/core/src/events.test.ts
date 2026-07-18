@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { createEvent, nextEventSeq } from "@/index";
+import { createEvent, nextEventSeq } from "./index.ts";
 
 test("event sequence is explicit and monotonic", () => {
   assert.equal(nextEventSeq(0), 1);

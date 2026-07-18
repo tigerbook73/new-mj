@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { STANDARD_TILE_SET, allTileIds, tileIdOf } from "@/index";
+import { STANDARD_TILE_SET, allTileIds, tileIdOf } from "../index.ts";
 
 test("standard tile set has 136 stable ids", () => {
   assert.equal(STANDARD_TILE_SET.size, 136);

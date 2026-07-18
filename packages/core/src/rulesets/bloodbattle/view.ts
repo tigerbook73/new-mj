@@ -1,5 +1,5 @@
-import { eventsVisibleTo, type GameEvent } from "@/events";
-import type { SeatId } from "@/lib/ids";
+import { eventsVisibleTo, type GameEvent } from "../../events.ts";
+import type { SeatId } from "../../lib/ids.ts";
 import type { BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 

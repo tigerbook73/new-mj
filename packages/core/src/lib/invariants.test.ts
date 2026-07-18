@@ -6,7 +6,7 @@ import {
   assertContainerUniqueness,
   assertTileConservation,
   type SeatState,
-} from "@/index";
+} from "../index.ts";
 
 // assertContainerUniqueness/assertTileConservation only ever read
 // { wall, seats } (see lib/invariants.ts) — no need for a full ruleset state.

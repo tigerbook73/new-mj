@@ -1,4 +1,4 @@
-import type { RulesetModule } from "@/engine";
+import type { RulesetModule } from "../../engine.ts";
 import { applyAction, createBloodbattleGame, getLegalActions } from "./state-machine.ts";
 import { computeNextBloodbattleDealer } from "./prelude.ts";
 import { getPlayerView, rebuildPlayerView } from "./view.ts";

@@ -1,4 +1,4 @@
-import type { TileKind } from "@/lib/ids";
+import type { TileKind } from "../../lib/ids.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 import { BLOODBATTLE_SUITS } from "./constants.ts";
 

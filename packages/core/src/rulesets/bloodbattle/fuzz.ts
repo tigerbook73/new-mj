@@ -1,7 +1,7 @@
-import type { GameEvent } from "@/events";
-import { assertTileConservation } from "@/lib/invariants";
-import { createPrng, nextInt, type PrngState } from "@/lib/prng";
-import type { SeatId, TileId } from "@/lib/ids";
+import type { GameEvent } from "../../events.ts";
+import { assertTileConservation } from "../../lib/invariants.ts";
+import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
+import type { SeatId, TileId } from "../../lib/ids.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 import { applyAction, createBloodbattleGame, getLegalActions } from "./state-machine.ts";
 import type {

@@ -1,8 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": { "@/*": ["src/*.ts"] },
     "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]

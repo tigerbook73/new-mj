@@ -1,8 +1,8 @@
-import { bloodbattleRuleSet } from "@/rulesets/bloodbattle/index";
-import { junkRuleSet } from "@/rulesets/junk/index";
-import type { GameEvent } from "@/events";
-import type { SeatId } from "@/lib/ids";
-import type { ApplyResult } from "@/types";
+import { bloodbattleRuleSet } from "../rulesets/bloodbattle/index.ts";
+import { junkRuleSet } from "../rulesets/junk/index.ts";
+import type { GameEvent } from "../events.ts";
+import type { SeatId } from "../lib/ids.ts";
+import type { ApplyResult } from "../types.ts";
 
 type RegisteredRuleset = {
   id: string;

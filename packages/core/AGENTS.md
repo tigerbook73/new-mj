@@ -13,7 +13,7 @@
 
 - `src/lib/` 只放不带玩法立场的纯函数积木；`rulesets/*` 不 import 其他 ruleset 的流程代码。
 - 公共、玩法、计分、事件常量按模块归拢；Action/State 类型保留可读字面量联合。
-- `src` 与 `test` 内跨层引用使用 package-local `@/*` alias，禁止直接 import 父级目录。
+- `src` 与 `test` 内跨层引用一律用相对路径 + `.ts` 后缀（不用 `@/*` alias——Node 原生 `require()`/Vite 都不认识 tsconfig `paths`，`development` export 条件下 server/web 直接消费本包源码，见 `decisions.md` D24）。
 - 测试文件位置/命名遵循根 AGENTS.md 全局约定（`docs/testing-strategy.md` §1.1）；无 core 专属偏离。
 - 已导出的领域状态、事件和跨模块结果优先定义专门的 `type`/`interface`；这样可复用、可被契约引用，并减少后续接口调整时的漂移。
 - 仅在模块内部使用、语义一次性且不会成为跨包契约的简单结果，允许使用内联返回类型；不为形式统一而制造无意义类型名。
