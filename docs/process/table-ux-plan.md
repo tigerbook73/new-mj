@@ -1,6 +1,6 @@
 # Junk Table UX 分阶段实施计划
 
-> 状态：Phase 1 已本地 squash merge；Phase 2 已在阶段分支完成并通过验收，等待用户确认后合并。
+> 状态：Phase 2 已本地 squash merge；Phase 3 尚未开始。
 >
 > 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
 
@@ -123,11 +123,11 @@ Merge commit：`18416f9`
 - Web Vitest：13 条通过，覆盖 snapshot 初始/相同/更高/旧 seq、切局/切房 epoch、离房清理及重连 seq 保留。
 - 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
-### [x] Phase 2 — 可配置声明窗口超时（待确认合并）
+### [x] Phase 2 — 可配置声明窗口超时
 
 Branch：`feat/table-claim-timeout`
 
-Merge commit：待合并
+Merge commit：`39f93b2`
 
 目标：
 
