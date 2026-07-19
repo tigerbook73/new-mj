@@ -22,6 +22,7 @@
 - 所有 WS ack 失败码必须来自 `docs/contracts/protocol-shared.md` §5 的 `ErrCode` 枚举，不得发明新码；core 返回的 `RuleViolation` code 透传在 `message` 字段。
 - 可见性过滤一律用 `@new-mj/core` 导出的 `eventsVisibleTo()`，server 不自行判断规则可见性。
 - 声明超时只通过 `getLegalActions` 中是否存在 `{type:"pass"}` 跨玩法识别；timer/deadline 留在 RoomService，不写进 core state、Room 或 PlayerView。同一窗口不得因部分响应而续期。
+- `game:advice` 是只读查询：座位只取 ConnectionRegistry，RoomService 只把该 seat 的 PlayerView + legalActions 交给 `recommendAction`；不得把 gameState 传进 AI、推进状态、更新 timer 或广播事件。
 
 ## 代码地图
 

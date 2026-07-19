@@ -576,6 +576,56 @@ describe("RoomService — authoritative action snapshots", () => {
   });
 });
 
+describe("RoomService — game advice", () => {
+  it("returns a legal recommendation without mutating game state or emitting events", () => {
+    const eventBus = new EventBus();
+    const service = new RoomService(
+      new GameService(),
+      eventBus,
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+    const seat = ([0, 1, 2, 3] as const).find(
+      (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+    )!;
+    const stateBefore = room.gameState;
+    const seqBefore = room.lastEventSeq;
+    const emitted: unknown[] = [];
+    eventBus.on("game:event", (event) => emitted.push(event));
+    eventBus.on("game:snapshot", (event) => emitted.push(event));
+
+    const advice = service.getAdvice(room.id, seat);
+
+    expect(advice.seq).toBe(seqBefore);
+    expect(advice.actions).toEqual(gameService.getLegalActions(room.gameState, seat));
+    expect(advice.recommendedActionIndex).toBeGreaterThanOrEqual(0);
+    expect(advice.recommendedActionIndex).toBeLessThan(advice.actions.length);
+    expect(room.gameState).toBe(stateBefore);
+    expect(room.lastEventSeq).toBe(seqBefore);
+    expect(emitted).toEqual([]);
+  });
+
+  it("returns no recommendation for a seat with no legal action", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+    const idleSeat = ([0, 1, 2, 3] as const).find(
+      (candidate) => gameService.getLegalActions(room.gameState, candidate).length === 0,
+    )!;
+
+    expect(service.getAdvice(room.id, idleSeat)).toMatchObject({ actions: [] });
+    expect(service.getAdvice(room.id, idleSeat).recommendedActionIndex).toBeUndefined();
+  });
+});
+
 describe("RoomService — claim timeout", () => {
   beforeEach(() => {
     jest.useFakeTimers();

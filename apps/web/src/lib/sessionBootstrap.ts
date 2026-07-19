@@ -32,6 +32,8 @@ export async function establishSession(socket: Socket, nicknameOverride?: string
       view: null,
       gameSeq: null,
       gameDeadline: null,
+      snapshotRevision: useSessionStore.getState().snapshotRevision + 1,
+      advice: null,
       kicked: true,
     });
   });
@@ -43,6 +45,8 @@ export async function establishSession(socket: Socket, nicknameOverride?: string
         view: null,
         gameSeq: null,
         gameDeadline: null,
+        snapshotRevision: useSessionStore.getState().snapshotRevision + 1,
+        advice: null,
       });
     }
   });

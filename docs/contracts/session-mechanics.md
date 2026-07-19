@@ -76,6 +76,8 @@ finished: 计算排名，对外公开 result
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `decisions.md` D21。
 
+**AI Advice 查询**：`game:advice {}` 不接受 seat/userId，gateway 只从握手连接定位座位。RoomService 对同一时刻的 `getPlayerView(state, seat)` 与 `getLegalActions(state, seat)` 调用 `packages/ai.recommendAction`，返回 `{seq, deadline?, actions, recommendedActionIndex?}`；查询不运行 `applyAction`、不创建或续期 timer、不发事件。recommendation 必须是 actions 的原对象，server 只返回其下标。Web 每次接受 snapshot 都清旧建议并增加本地 revision，只接受 seq/deadline/revision 全匹配的异步响应。
+
 **声明窗口超时**：`ConfigService.claimTimeoutMs` 读取 `CLAIM_TIMEOUT_MS`，合法正整数原样采用（默认 `5000`，调试可设 `3600000` 等长值），缺失、空值、非有限数、小数、零或负数回退默认值。RoomService 不读取玩法私有 state，而是逐座位检查 `getLegalActions` 是否包含 `{type:"pass"}`；只有真人且未永久托管的合法 pass 座位才建立 timer。timer/deadline 属于 server 编排层，不进入 `Room`、core state 或 PlayerView。
 
 同一声明窗口中已存在的座位 deadline 不因其他人响应而续期；每次动作后仅为新响应者建 timer，并清理已响应或已失去 pass 的座位。到期回调用 room+seat+deadline 校验自己仍是当前 timer，再通过同一 `runAction({type:"pass"})` 路径发布 events→snapshots 并触发 bot 后续。切局、终局、房间关闭和永久托管均清 timer；重连只返回既有 deadline，不重置时间。

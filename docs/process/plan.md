@@ -24,16 +24,16 @@
 - [x] Phase 0：计划文档重置
 - [x] Phase 1：权威逐动作快照
 - [x] Phase 2：可配置声明窗口超时
-- [ ] Phase 3：AI Advice 数据链路
+- [x] Phase 3：AI Advice 数据链路（阶段分支已完成，待确认合并）
 - [ ] Phase 4：视觉基础与全屏 Table 骨架
 - [ ] Phase 5：完整操作 Dock 与 AI 推荐
 - [ ] Phase 6：事件驱动牌桌动画
 - [ ] Phase 7：全站视觉与体验统一
 - [ ] Phase 8：综合验收与计划收尾
 
-**当前状态**：Phase 2 已本地 squash merge 为 `39f93b2`；下一阶段尚未开始。
+**当前状态**：Phase 2 已本地 squash merge 为 `39f93b2`，merge tracker 提交为 `ce7145e`；Phase 3 已在分支 `feat/table-ai-advice` 完成实现与验收，等待用户确认后再本地 squash merge。
 
-**下一步第一个动作**：从最新 `main` 创建 Phase 3 分支，只细化 AI Advice 数据链路的接口、失效语义与测试计划，形成规划检查点后暂停。
+**下一步第一个动作**：等待用户检查 Phase 3 结果；仅在用户明确要求 merge 后，本地 squash merge 到 `main`，回填 Phase 3 的 `Merge commit`，再从最新 `main` 创建 Phase 4 分支并只细化其详细计划。
 
 ## 待办
 

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
-import type { PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
+import type { GameAdviceResponse, PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
 import { clearDevSession } from "@/lib/devAuth";
 import { ack } from "@/lib/socket";
 import { supabase } from "@/lib/supabase";
@@ -20,6 +20,8 @@ export type SessionState = {
   /** Core event seq is scoped to one game and resets when the next game starts. */
   gameSeq: number | null;
   gameDeadline: number | null;
+  snapshotRevision: number;
+  advice: GameAdviceResponse | null;
   /** Set by the session:kicked handler (sessionBootstrap.ts) so the login
    * screen can show a "taken over" message without a URL query param —
    * cleared on the next connect attempt. */
@@ -45,6 +47,8 @@ export type SessionState = {
     deadline?: number | undefined;
   }) => void;
   resetGameSeq: () => void;
+  applyGameAdvice: (advice: GameAdviceResponse, requestedRevision: number) => void;
+  clearGameAdvice: (requestedRevision?: number) => void;
   /**
    * room:playerJoined 事件只带 {seat,nickname,isBot}，没有 userId——client 不
    * 需要知道别人的 userId（自己的座位号靠自己的 userId 在初始快照里就能定位，
@@ -62,6 +66,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   view: null,
   gameSeq: null,
   gameDeadline: null,
+  snapshotRevision: 0,
+  advice: null,
   kicked: false,
   activeRoomHint: null,
   setSocket: (socket) => set({ socket }),
@@ -86,6 +92,8 @@ export const useSessionStore = create<SessionState>((set) => ({
       view: null,
       gameSeq: null,
       gameDeadline: null,
+      snapshotRevision: useSessionStore.getState().snapshotRevision + 1,
+      advice: null,
       kicked: false,
       activeRoomHint: null,
     });
@@ -98,6 +106,8 @@ export const useSessionStore = create<SessionState>((set) => ({
           view: null,
           gameSeq: null,
           gameDeadline: null,
+          snapshotRevision: state.snapshotRevision + 1,
+          advice: null,
           activeRoomHint: null,
         };
       const changedRoom = state.room?.id !== room.id;
@@ -106,16 +116,53 @@ export const useSessionStore = create<SessionState>((set) => ({
         room,
         activeRoomHint: null,
         ...(changedRoom ? { view: null } : {}),
-        ...(changedGame ? { gameSeq: null, gameDeadline: null } : {}),
+        ...(changedGame
+          ? {
+              gameSeq: null,
+              gameDeadline: null,
+              snapshotRevision: state.snapshotRevision + 1,
+              advice: null,
+            }
+          : {}),
       };
     }),
   applyGameSnapshot: ({ view, seq, deadline }) =>
     set((state) =>
       state.gameSeq === null || seq >= state.gameSeq
-        ? { view, gameSeq: seq, gameDeadline: deadline ?? null }
+        ? {
+            view,
+            gameSeq: seq,
+            gameDeadline: deadline ?? null,
+            snapshotRevision: state.snapshotRevision + 1,
+            advice: null,
+          }
         : state,
     ),
-  resetGameSeq: () => set({ gameSeq: null, gameDeadline: null }),
+  resetGameSeq: () =>
+    set((state) => ({
+      gameSeq: null,
+      gameDeadline: null,
+      snapshotRevision: state.snapshotRevision + 1,
+      advice: null,
+    })),
+  applyGameAdvice: (advice, requestedRevision) =>
+    set((state) => {
+      const currentDeadline = state.gameDeadline ?? undefined;
+      if (
+        state.snapshotRevision !== requestedRevision ||
+        state.gameSeq !== advice.seq ||
+        currentDeadline !== advice.deadline
+      ) {
+        return state;
+      }
+      return { advice };
+    }),
+  clearGameAdvice: (requestedRevision) =>
+    set((state) =>
+      requestedRevision === undefined || requestedRevision === state.snapshotRevision
+        ? { advice: null }
+        : state,
+    ),
   applyPlayerJoined: (seat, nickname, isBot, avatar) =>
     set((state) => {
       if (!state.room) return state;

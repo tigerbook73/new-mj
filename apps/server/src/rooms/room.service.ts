@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { chooseAction } from "@new-mj/ai";
+import { chooseAction, recommendAction } from "@new-mj/ai";
 import {
   eventsVisibleTo,
   type ApplyResult,
@@ -10,7 +10,13 @@ import {
   type PlayerViewBase,
   type SeatId,
 } from "@new-mj/core";
-import type { RankingEntry, RoomInfo, RoomSummary, SessionFormat } from "@new-mj/protocol";
+import type {
+  GameAdviceResponse,
+  RankingEntry,
+  RoomInfo,
+  RoomSummary,
+  SessionFormat,
+} from "@new-mj/protocol";
 import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
 import { PersistenceService } from "../persistence/persistence.service";
@@ -313,6 +319,28 @@ export class RoomService {
     const result = this.runAction(room, seat, action);
     this.autoPlayBots(room);
     return result;
+  }
+
+  getAdvice(roomId: string, seat: SeatId): GameAdviceResponse {
+    const room = this.mustGet(roomId);
+    if (room.phase !== "in-game") {
+      throw new RoomServiceError("GAME_NOT_STARTED", "no game in progress");
+    }
+    const view = this.gameService.getPlayerView(room.gameState, seat);
+    if (!view) throw new RoomServiceError("NOT_IN_ROOM");
+    const actions = [...this.gameService.getLegalActions(room.gameState, seat)];
+    const recommended = recommendAction(view, actions);
+    const recommendedActionIndex =
+      recommended === undefined ? undefined : actions.indexOf(recommended);
+    const deadline = this.claimDeadline(roomId, seat);
+    return {
+      seq: room.lastEventSeq,
+      actions,
+      ...(deadline !== undefined ? { deadline } : {}),
+      ...(recommendedActionIndex !== undefined && recommendedActionIndex >= 0
+        ? { recommendedActionIndex }
+        : {}),
+    };
   }
 
   /**

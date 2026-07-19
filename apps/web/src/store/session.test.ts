@@ -1,4 +1,4 @@
-import type { PlayerViewBase, RoomInfo } from "@new-mj/protocol";
+import type { GameAdviceResponse, PlayerViewBase, RoomInfo } from "@new-mj/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore } from "./session";
 
@@ -14,7 +14,38 @@ const room = (id: string, gameNumber: number): RoomInfo => ({ id, gameNumber }) 
 
 describe("session authoritative snapshots", () => {
   beforeEach(() => {
-    useSessionStore.setState({ room: null, view: null, gameSeq: null, gameDeadline: null });
+    useSessionStore.setState({
+      room: null,
+      view: null,
+      gameSeq: null,
+      gameDeadline: null,
+      snapshotRevision: 0,
+      advice: null,
+    });
+  });
+
+  it("accepts advice only for the exact seq, deadline, and snapshot revision", () => {
+    const store = useSessionStore.getState();
+    store.applyGameSnapshot({ view: view(0), seq: 10, deadline: 1_000 });
+    const revision = useSessionStore.getState().snapshotRevision;
+    const current: GameAdviceResponse = {
+      seq: 10,
+      deadline: 1_000,
+      actions: [{ type: "discard", tile: 1 }],
+      recommendedActionIndex: 0,
+    };
+    store.applyGameAdvice(current, revision);
+    expect(useSessionStore.getState().advice).toEqual(current);
+
+    store.applyGameSnapshot({ view: view(1), seq: 10, deadline: 1_000 });
+    expect(useSessionStore.getState().advice).toBeNull();
+    store.applyGameAdvice(current, revision);
+    expect(useSessionStore.getState().advice).toBeNull();
+
+    const nextRevision = useSessionStore.getState().snapshotRevision;
+    store.applyGameAdvice({ ...current, seq: 9 }, nextRevision);
+    store.applyGameAdvice({ ...current, deadline: 2_000 }, nextRevision);
+    expect(useSessionStore.getState().advice).toBeNull();
   });
 
   it("accepts initial, equal, and newer seq while rejecting an older snapshot", () => {

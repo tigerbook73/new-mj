@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Dialog } from "@base-ui/react/dialog";
 import type {
   DebugOmniscientView,
+  GameAdviceResponse,
   GameEventEnvelope,
   GameSnapshot,
   SeatId,
@@ -40,6 +41,9 @@ export function TableView() {
   const userId = useSessionStore((state) => state.userId);
   const room = useSessionStore((state) => state.room);
   const view = useSessionStore((state) => state.view);
+  const gameSeq = useSessionStore((state) => state.gameSeq);
+  const gameDeadline = useSessionStore((state) => state.gameDeadline);
+  const snapshotRevision = useSessionStore((state) => state.snapshotRevision);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
   const setTileUnit = useTableLayoutStore((state) => state.setTileUnit);
@@ -121,6 +125,21 @@ export function TableView() {
       activeSocket.off("room:closed", onClosed);
     };
   }, [activeSocket, navigate, setRoom]);
+
+  useEffect(() => {
+    if (!view || gameSeq === null) return;
+    const requestedRevision = snapshotRevision;
+    let cancelled = false;
+    void ack<GameAdviceResponse>(activeSocket, "game:advice", {}).then((result) => {
+      if (cancelled) return;
+      const store = useSessionStore.getState();
+      if (result.ok) store.applyGameAdvice(result.data, requestedRevision);
+      else store.clearGameAdvice(requestedRevision);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSocket, gameDeadline, gameSeq, snapshotRevision, view]);
 
   const sendAction = async (action: unknown) => {
     setError(null);

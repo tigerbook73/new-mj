@@ -14,6 +14,20 @@ export const chooseAction = <TAction>(legalActions: readonly TAction[]): TAction
   return legalActions[Math.floor(Math.random() * legalActions.length)] as TAction;
 };
 
+/**
+ * Deterministic, visibility-safe recommendation for a human-facing hint.
+ * The view parameter makes the information boundary explicit even though
+ * this intentionally weak first version only needs the legal action list.
+ */
+export const recommendAction = <TView, TAction>(
+  playerView: TView,
+  legalActions: readonly TAction[],
+): TAction | undefined => {
+  void playerView;
+  const winning = legalActions.find(isWinningAction);
+  return winning ?? legalActions[0];
+};
+
 const isWinningAction = (action: unknown): boolean =>
   typeof action === "object" &&
   action !== null &&

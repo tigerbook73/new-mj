@@ -3,6 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import { NestFactory } from "@nestjs/core";
 import type {
   GameEventEnvelope,
+  GameAdviceResponse,
   GameSnapshot,
   Reply,
   RoomInfo,
@@ -133,6 +134,22 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     expect(views.map((v) => v.view.seat).sort()).toEqual([0, 1, 2, 3]);
 
     const room = roomService.get(roomId)!;
+    for (const [seat, client] of [a, b, c, d].entries()) {
+      const advice = await ack<GameAdviceResponse>(client, "game:advice", {});
+      expect(advice.ok).toBe(true);
+      if (!advice.ok) continue;
+      expect(advice.data.actions).toEqual(
+        gameService.getLegalActions(room.gameState, seat as 0 | 1 | 2 | 3),
+      );
+      if (advice.data.recommendedActionIndex !== undefined) {
+        expect(advice.data.actions[advice.data.recommendedActionIndex]).toBeDefined();
+      }
+    }
+    expect(await ack<GameAdviceResponse>(a, "game:advice", { seat: 1 })).toMatchObject({
+      ok: false,
+      code: "INVALID_CONFIG",
+    });
+
     const actingSeat = ([0, 1, 2, 3] as const).find(
       (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
     );

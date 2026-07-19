@@ -8,3 +8,4 @@ export * from "./game.ts";
 export * from "./auth.ts";
 export * from "./debug.ts";
 export * from "./replay.ts";
+export * from "./advice.ts";

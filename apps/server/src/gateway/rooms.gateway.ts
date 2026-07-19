@@ -13,6 +13,7 @@ import type { SeatId } from "@new-mj/core";
 import { eventsVisibleTo } from "@new-mj/core";
 import {
   DebugReplayOmniscientViewRequestSchema,
+  GameAdviceRequestSchema,
   GameActionRequestSchema,
   LobbyListRequestSchema,
   ReplayGetRequestSchema,
@@ -25,6 +26,7 @@ import {
   RoomRemoveBotRequestSchema,
   RoomRemovePlayerRequestSchema,
   type DebugOmniscientView,
+  type GameAdviceResponse,
   type Reply,
   type ReplayGetResponse,
   type RoomInfo,
@@ -389,6 +391,19 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       const seat = this.seatOf(info);
       this.roomService.applyPlayerAction(info.roomId, seat, parsed.action);
       return {};
+    });
+  }
+
+  @SubscribeMessage("game:advice")
+  handleGameAdvice(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: unknown,
+  ): Reply<GameAdviceResponse> {
+    return this.reply(() => {
+      GameAdviceRequestSchema.parse(payload);
+      const info = this.requireConnection(client);
+      const seat = this.seatOf(info);
+      return this.roomService.getAdvice(info.roomId, seat);
     });
   }
 

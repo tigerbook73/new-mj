@@ -1,6 +1,6 @@
 # Junk Table UX 分阶段实施计划
 
-> 状态：Phase 2 已本地 squash merge；Phase 3 尚未开始。
+> 状态：Phase 2 已本地 squash merge；Phase 3 已在阶段分支完成并通过验收，等待用户确认后合并。
 >
 > 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
 
@@ -13,7 +13,7 @@
 - 只完整验收垃圾胡；bloodbattle 只保证公共骨架不回归，换三张/定缺等进入总待办。
 - UI 延续现有英文，本专题不做国际化。
 - AI 第一版只推荐一个合法动作，不承诺向听、牌效分数或解释。
-- 声明倒计时只用于可以合法 `pass` 的窗口；普通摸打回合不自动弃牌。
+- 声明窗口与普通摸打回合使用独立 server timer；普通回合的 10 秒自动出牌在 Phase 5 落地。
 - 本轮不加入音效。
 
 ## 2. 阶段工作流
@@ -169,9 +169,11 @@ Merge commit：`39f93b2`
 - Web Vitest：14 条通过，覆盖 deadline 接受、同 seq 清除、旧 seq 丢弃和状态 reset。
 - 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
-### [ ] Phase 3 — AI Advice 数据链路
+### [x] Phase 3 — AI Advice 数据链路（待确认合并）
 
 Branch：`feat/table-ai-advice`
+
+Merge commit：待合并
 
 目标：
 
@@ -179,15 +181,49 @@ Branch：`feat/table-ai-advice`
 - web 完成 advice 获取、缓存和按 seq/deadline 失效；本阶段不重做操作 UI。
 - 覆盖空动作、推荐合法性、胡/自摸优先、身份隔离、隐藏信息与 stale response。
 
+本阶段实施清单（2026-07-19 已细化）：
+
+1. **协议形状**：protocol 新增严格空对象请求 `GameAdviceRequestSchema` 和响应 `{seq, deadline?, actions: unknown[], recommendedActionIndex?}` schema/type；`recommendedActionIndex` 必须是 actions 的有效下标或省略，查询错误继续使用现有通用错误码。
+2. **AI API**：`packages/ai` 新增泛型 `recommendAction(playerView, legalActions)`，空数组返回 `undefined`，有胡/自摸时优先返回该动作，否则确定性返回第一项。函数返回的对象必须直接来自输入 legalActions，不生成或改写动作；第一版可不使用 view 的具体字段，但保留只消费可见视图的接口边界。现有 bot `chooseAction` 及随机策略不改变。
+3. **server 查询**：RoomService 新增只读 `getAdvice(roomId, seat)`：从当前 `gameState` 分别取得该 seat 的 PlayerView、legalActions、单局 seq 和既有 deadline，再调用 `recommendAction` 并用引用位置生成 index；不得推进状态、创建/续期 timer 或发布事件。
+4. **身份与可见性**：gateway 的 `game:advice {}` 只用握手后的 ConnectionRegistry 得到 room/seat，不接受 userId/seat；未入座、未开局沿用 `NOT_IN_ROOM`/`GAME_NOT_STARTED`。响应只含该 seat 的 PlayerView 可推导输入与合法动作，不暴露 gameState、牌墙或他人手牌。
+5. **Web 缓存**：session store 新增 advice 状态及 snapshot revision。Table 每次接受新 snapshot 后发起 advice 查询；只在响应的 `seq`、规范化 deadline 和发起时 revision 仍与当前 snapshot 完全一致时写入，否则静默丢弃。新 snapshot、切局/切房、离房、断线和 sign out 先清旧 advice。
+6. **本阶段 UI 边界**：Table 不渲染推荐高亮或新按钮；Phase 5 的操作 Dock 才消费缓存。查询失败只清当前 advice，不覆盖牌桌错误区，也不因自动重试形成请求循环。
+
+阶段验证：
+
+- AI 单测覆盖空数组、胡/自摸优先、无胡时确定性第一项、返回值属于原 legalActions，且输入 view/action 不被修改。
+- protocol 单测覆盖严格空请求、完整/空响应和非法推荐下标；若 schema 无法表达“下标小于数组长度”，由 server/consumer 单测补该关联约束。
+- RoomService 单测覆盖只读性、seq/deadline 透传、推荐 index 合法、只传 PlayerView 给 AI；gateway 真实 Socket.IO e2e 覆盖 ack 查询、握手座位隔离、伪造 payload 被拒和命令/事件状态不受影响。
+- Web store/Vitest 覆盖 exact seq+deadline+revision 接受，以及 stale seq、deadline 改变、同 seq 新 revision、离房/断线清理；现有 Table e2e 不要求出现推荐 UI。
+- 定向检查通过后执行根目录 `pnpm verify`，回填结果并提交，停在 Phase 3 branch 等待用户 merge 指令。
+
+完成内容：
+
+- protocol 新增严格空请求与带关联下标校验的 `GameAdviceResponse`；gateway 的 `game:advice` 只从握手连接定位 room/seat，伪造 seat payload 被拒。
+- `packages/ai.recommendAction` 空动作不推荐，优先 hu/zimo，否则确定性推荐第一项；普通回合因此会推荐一个合法 discard，且返回值始终引用原 legalActions。
+- RoomService advice 查询只读取该座位 PlayerView、legalActions、seq 和既有 deadline，不推进状态、不更新 timer、不广播事件。
+- Web 每次接受 snapshot 都增加 revision、清旧 advice 并重新查询；只有 seq、deadline、revision 全匹配才缓存，session/room reset 同步失效。本阶段没有新增推荐 UI。
+- protocol/session 契约与 server/web package 约束已同步更新。
+
+阶段验收（2026-07-19）：
+
+- AI Vitest：9 条通过；protocol Vitest：36 条通过；RoomService 定向 Jest：59 条通过；Web Vitest：15 条通过。
+- RoomsGateway 真实 Socket.IO 定向 e2e：8 条通过，覆盖各握手座位自己的 legalActions、合法推荐下标和伪造 payload 拒绝。
+- 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
+
 ### [ ] Phase 4 — 视觉基础与全屏 Table 骨架
 
 Branch：`feat/table-fullscreen-layout`
+
+Merge commit：待合并
 
 目标：
 
 - 建立翡翠绿、暖金和深色中性 chrome 的现代麻将桌 token。
 - Table 使用 `100dvh`、safe-area 与 `overflow-hidden`；牌桌尺寸同时受可用宽高约束。
 - 核心区域完整展示四家玩家、手牌/数量、牌墙、副露、弃牌、局数/庄家、当前行动者、剩余牌和连接/AI 状态。
+- 手牌按麻将牌面顺序稳定排序后展示（万→筒→条→字牌，各组内从小到大）；只排序渲染副本，不修改 PlayerView.hand，点击/提交继续使用原 TileId。
 - 离桌、设置、事件日志、dev debug 放入浮层/抽屉；结算改为正式结果面板。
 - 覆盖 1440×900、1366×768、390×844 与手机横屏，无页面滚动和核心内容裁切。
 
@@ -195,17 +231,23 @@ Branch：`feat/table-fullscreen-layout`
 
 Branch：`feat/table-action-dock`
 
+Merge commit：待合并
+
 目标：
 
 - 展示全部 junk 合法动作，补齐 `zimo/anGang/buGang`；按出牌、吃、碰、杠、胡、过分组并支持组合子选项。
 - AI 推荐动作、组合和弃牌默认选中；用户可以改选。
 - 所有动作统一采用“选择后确认”；请求期间防重复输入，snapshot 后清空，失败时恢复。
 - 展示 server deadline 倒计时；本地归零只进入等待状态。
+- 新增普通出牌回合 timer：`DISCARD_TIMEOUT_MS` 默认 10000ms，配置校验与调试长值规则对齐 `CLAIM_TIMEOUT_MS`；只在当前真人具有合法 discard 时由 server 计时，超时从 `getLegalActions` 过滤 discard 后提交最后一项（通常对应刚摸入、位于 core 手牌末尾的牌），仍走正常 `runAction`。声明窗口继续使用独立 claim deadline。
+- 普通出牌 deadline 同样由 server 下发并在 Dock 展示；本地归零只锁定操作并等待权威 snapshot，不自行 discard。主动出牌、回合切换、托管、局终、切局和房间关闭必须清理 timer，旧回调不得跨上下文出牌。
 - 支持键盘、触屏命中区、焦点、禁用与错误反馈。
 
 ### [ ] Phase 6 — 事件驱动牌桌动画
 
 Branch：`feat/table-event-animations`
+
+Merge commit：待合并
 
 目标：
 
@@ -216,6 +258,8 @@ Branch：`feat/table-event-animations`
 ### [ ] Phase 7 — 全站视觉与体验统一
 
 Branch：`feat/web-visual-refresh`
+
+Merge commit：待合并
 
 目标：
 
@@ -228,6 +272,8 @@ Branch：`feat/web-visual-refresh`
 ### [ ] Phase 8 — 综合验收与计划收尾
 
 Branch：`test/table-ux-acceptance`
+
+Merge commit：待合并
 
 目标：
 
