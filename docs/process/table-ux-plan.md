@@ -1,6 +1,6 @@
 # Junk Table UX 分阶段实施计划
 
-> 状态：Phase 2 已本地 squash merge；Phase 3 已在阶段分支完成并通过验收，等待用户确认后合并。
+> 状态：Phase 3 已本地 squash merge；Phase 4 尚未开始。
 >
 > 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
 
@@ -169,11 +169,11 @@ Merge commit：`39f93b2`
 - Web Vitest：14 条通过，覆盖 deadline 接受、同 seq 清除、旧 seq 丢弃和状态 reset。
 - 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
-### [x] Phase 3 — AI Advice 数据链路（待确认合并）
+### [x] Phase 3 — AI Advice 数据链路
 
 Branch：`feat/table-ai-advice`
 
-Merge commit：待合并
+Merge commit：`9a5d254`
 
 目标：
 
