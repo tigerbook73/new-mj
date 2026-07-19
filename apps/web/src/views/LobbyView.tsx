@@ -39,11 +39,11 @@ export function LobbyView() {
       RoomInfo | { room: RoomInfo; view?: import("@new-mj/protocol").PlayerViewBase; seq?: number }
     >(socket, "room:enter", { roomId }).then((result) => {
       if (result.ok) {
-        const { room: enteredRoom, view, seq } = unwrapRoomEnterAck(result.data);
+        const { room: enteredRoom, view, seq, deadline } = unwrapRoomEnterAck(result.data);
         setPreview(enteredRoom);
         if (view && seq !== undefined) {
           useSessionStore.getState().setRoom(enteredRoom);
-          useSessionStore.getState().applyGameSnapshot({ view, seq });
+          useSessionStore.getState().applyGameSnapshot({ view, seq, deadline });
           void navigate(`/room/${roomId}`);
         }
       } else setError(result.code);

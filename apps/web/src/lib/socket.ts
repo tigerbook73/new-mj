@@ -78,12 +78,14 @@ export function unwrapRoomEnterAck(data: RoomEnterResponse | RoomInfo): {
   room: RoomInfo;
   view?: PlayerViewBase;
   seq?: number;
+  deadline?: number;
 } {
   if (!("room" in data)) return { room: data };
   return {
     room: data.room,
     ...(data.view ? { view: data.view } : {}),
     ...(data.seq !== undefined ? { seq: data.seq } : {}),
+    ...(data.deadline !== undefined ? { deadline: data.deadline } : {}),
   };
 }
 

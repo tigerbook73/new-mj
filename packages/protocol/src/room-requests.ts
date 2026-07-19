@@ -45,7 +45,12 @@ export type RoomPeekRequest = z.infer<typeof RoomPeekRequestSchema>;
 
 export const RoomEnterRequestSchema = z.object({ roomId: z.string() });
 export type RoomEnterRequest = z.infer<typeof RoomEnterRequestSchema>;
-export type RoomEnterResponse = { room: RoomInfo; view?: PlayerViewBase; seq?: number };
+export type RoomEnterResponse = {
+  room: RoomInfo;
+  view?: PlayerViewBase;
+  seq?: number;
+  deadline?: number;
+};
 
 /** Each ruleset owns its Action union; core is the sole authority on legality. */
 export const GameActionRequestSchema = z.object({ action: z.unknown() });

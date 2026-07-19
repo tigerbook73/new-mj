@@ -76,6 +76,10 @@ finished: 计算排名，对外公开 result
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `decisions.md` D21。
 
+**声明窗口超时**：`ConfigService.claimTimeoutMs` 读取 `CLAIM_TIMEOUT_MS`，合法正整数原样采用（默认 `5000`，调试可设 `3600000` 等长值），缺失、空值、非有限数、小数、零或负数回退默认值。RoomService 不读取玩法私有 state，而是逐座位检查 `getLegalActions` 是否包含 `{type:"pass"}`；只有真人且未永久托管的合法 pass 座位才建立 timer。timer/deadline 属于 server 编排层，不进入 `Room`、core state 或 PlayerView。
+
+同一声明窗口中已存在的座位 deadline 不因其他人响应而续期；每次动作后仅为新响应者建 timer，并清理已响应或已失去 pass 的座位。到期回调用 room+seat+deadline 校验自己仍是当前 timer，再通过同一 `runAction({type:"pass"})` 路径发布 events→snapshots 并触发 bot 后续。切局、终局、房间关闭和永久托管均清 timer；重连只返回既有 deadline，不重置时间。
+
 **断线宽限期与永久托管（评审点 H 修订）**：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`。若房间对局中，座位只标记 `isDisconnected = true` 并启动 server 独有的 60 秒定时器；宽限期内不设置 `isAutoPiloted`、不跑 bot，对局轮到该座位时保持等待。原 userId 在宽限期内通过 `room:enter` 重连时清除定时器、恢复真人控制，并在 ack 中携带该座位的 `{ view, seq }`。定时器到期后才置 `isAutoPiloted = true`、广播托管事件并补跑 bot。主动 `room:leave`/sign out 不经过宽限期，立即走永久托管路径。
 
 **全部真人退出即关房**：`handleDisconnect` 和 `room:leave` 的 `in-game` 分支共享同一个私有方法（`RoomService.markAutoPiloted`）——标记完 `isAutoPiloted` 之后，如果房间里已经没有任何真人座位（每个座位要么本来就是 `isBot`，要么都被标了 `isAutoPiloted`），就不再调用 `autoPlayBots` 继续跑，直接把房间标 `phase: "finished"`/`status: "closed"`，广播 `room:closed { reason: "allPlayersLeft" }`——避免没有任何人观战的房间里 bot 互相打到底白白占用 server 资源。

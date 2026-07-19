@@ -55,6 +55,7 @@ export interface GameSnapshotEvent {
   seat: SeatId;
   view: PlayerViewBase;
   seq: number;
+  deadline?: number;
 }
 
 /**
@@ -65,6 +66,7 @@ export interface GameSnapshotEvent {
 export interface GameEventBroadcast {
   roomId: string;
   event: GameEvent;
+  deadlines?: Partial<Record<SeatId, number>>;
 }
 
 export interface RoomEventMap {

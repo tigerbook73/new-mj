@@ -1,6 +1,6 @@
 # Junk Table UX 分阶段实施计划
 
-> 状态：Phase 0 已本地 squash merge；Phase 1 已在阶段分支完成并通过验收，等待用户确认后合并。
+> 状态：Phase 1 已本地 squash merge；Phase 2 已在阶段分支完成并通过验收，等待用户确认后合并。
 >
 > 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
 
@@ -26,7 +26,7 @@
 4. 获得计划确认后，实现与测试同阶段完成；先跑定向检查，阶段门统一执行根目录 `pnpm verify`。
 5. 收工时更新本文件与 `plan.md`，记录验证结果和下一步首个动作，然后允许自动提交。
 6. 实现提交后必须停止并报告 branch、commit、验证结果和风险；**不得自动 merge、不得创建 PR、不得自动推送**。
-7. 只有用户明确要求 merge 后，才在本地把该 branch squash merge 到 `main`；成功后可删除本地阶段分支。下一 Phase 再从新的 `main` 开始，并重新经过“详细计划→用户确认”门。
+7. 只有用户明确要求 merge 后，才在本地把该 branch squash merge 到 `main`；成功后把最终 `Merge commit` 写入该 Phase 的固定字段并形成 tracker 提交，随后可删除本地阶段分支。下一 Phase 再从新的 `main` 开始，并重新经过“详细计划→用户确认”门。
 
 状态约定：`[ ] pending`、`[~] in progress`、`[x] completed`、`[!] blocked`。
 
@@ -62,6 +62,8 @@
 
 Branch：`docs/table-ux-plan-reset`
 
+Merge commit：`a1500a1`
+
 完成内容：
 
 - 新建本专题计划，固定阶段、公共接口、验收门和本地 squash 工作流。
@@ -75,9 +77,11 @@ Branch：`docs/table-ux-plan-reset`
 - D28 吸纳审计：断线宽限、账号仲裁与 server-truth 恢复均已由 `contracts/session-mechanics.md` 和 `decisions.md` D25–D28 承载，无残留旧计划引用。
 - `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
-### [x] Phase 1 — 权威逐动作快照（待确认合并）
+### [x] Phase 1 — 权威逐动作快照
 
 Branch：`feat/table-authoritative-snapshots`
+
+Merge commit：`18416f9`
 
 目标：
 
@@ -119,15 +123,51 @@ Branch：`feat/table-authoritative-snapshots`
 - Web Vitest：13 条通过，覆盖 snapshot 初始/相同/更高/旧 seq、切局/切房 epoch、离房清理及重连 seq 保留。
 - 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
-### [ ] Phase 2 — 可配置声明窗口超时
+### [x] Phase 2 — 可配置声明窗口超时（待确认合并）
 
 Branch：`feat/table-claim-timeout`
+
+Merge commit：待合并
 
 目标：
 
 - 实现 `CLAIM_TIMEOUT_MS` 解析、声明窗口 deadline、每座位响应 timer 与可靠清理。
 - deadline 随对应座位的 event/snapshot 发送；超时 pass 走与主动 pass 相同的 RoomService 路径。
 - 使用 fake timers 覆盖主动响应、部分响应、多玩家同时到期、窗口提前解决、房间关闭与重复 timer 防护。
+
+本阶段实施清单（2026-07-19 已细化）：
+
+1. **配置契约**：`ConfigService.claimTimeoutMs` 读取 `CLAIM_TIMEOUT_MS`，未设置、空字符串、非有限数字、非整数、零或负数统一回退 `5000`；合法正整数不设人为上限，因此调试可用 `3600000`。`.env.example` 增加说明，真实 `.env` 不由本阶段改写。
+2. **跨玩法识别**：RoomService 不读取玩法私有 state 或事件 payload 来判断窗口，只逐座位调用 `getLegalActions`；某座位当前合法动作中存在结构为 `{type:"pass"}` 的动作才创建声明 timer。因而 bloodbattle 的强制胡等不存在合法 pass 的窗口不会被错误超时。
+3. **timer 所有权**：timer 只存在于 RoomService 的 `Map<roomId:seat, {deadline,timer}>`，不进入 `Room`、core state 或 PlayerView，且对 bot/永久托管座位不创建（它们继续立即走 autoPlayBots）。timer 调用 `unref()`，不阻止进程退出。
+4. **同窗不续期**：每次动作后重新核对所有座位；仍有合法 pass 且已有 timer 的座位保留原 deadline，只为新出现的响应者建 timer；已响应或窗口解决的座位立即清理。这样一人先响应不会延长其他人的思考时间。
+5. **超时动作路径**：回调携带预期 deadline，执行前确认 map 条目仍相同、room 仍在进行且该座位仍可合法 pass；随后删除自身 timer，通过与真人/bot 相同的 `runAction({type:"pass"})` 路径产生 events/snapshots，再运行 autoPlayBots。已清理但排队中的旧回调必须无操作返回。
+6. **发送语义**：动作应用成功后先协调 timers/deadlines，再发送 Phase 1 的 events→snapshots。同一 seat 当前 deadline 同时附在其可见 `game:event` 和 `game:snapshot` envelope；无 deadline 时省略字段。EventBus 可携带 server-internal 的逐座位 deadline 映射，gateway 只投影本连接座位的值，不理解规则。
+7. **重连与 Web 状态**：`room:enter` 的中局 `{room,view,seq}` 响应扩为可选 `deadline`，取该座位既有绝对截止时间，不重置 timer。Web `applyGameSnapshot` 同步保存 `gameDeadline`，旧 seq snapshot 连同 deadline 一起丢弃；相同/更新 seq 可覆盖或清除 deadline，切局、切房、离房、断线和 sign out 清空。Phase 2 不显示倒计时，Phase 5 只消费这里保存的绝对时间。
+8. **生命周期清理**：新局初始化、窗口解决、局终、session 结束、房间关闭/删除以及座位转为永久托管时清理对应 timer；统一 helper 必须可重复调用，避免重复 clear 或跨局旧 callback 提交 pass。
+
+阶段验证：
+
+- ConfigService 单测覆盖默认 `5000`、合法短值、`3600000` 长调试值，以及空/NaN/Infinity/小数/零/负数回退，并在每例后恢复环境变量。
+- RoomService fake-timer 单测覆盖：只给可 pass 的真人建 timer；主动 pass 清自身但不延长他人 deadline；部分响应后剩余玩家到期；同一时刻多人到期串行走正常动作；窗口提前解决、新局、永久托管和房间关闭均清理；陈旧 callback 不产生重复事件。
+- gateway 真实 Socket.IO e2e 覆盖逐座位 deadline 隔离、event→snapshot 顺序、`game:action` ack 仍为空回执，以及重连取得同一绝对 deadline。
+- Web store 单测覆盖 deadline 的接受、同 seq 更新/清除、旧 seq 丢弃和各类 reset。
+- 定向检查通过后执行根目录 `pnpm verify`，回填结果并提交，停在 Phase 2 branch 等待用户 merge 指令。
+
+完成内容：
+
+- 新增 `CLAIM_TIMEOUT_MS` 配置，默认 5000ms，接受任意正整数长调试值；示例环境文件与配置测试同步完成。
+- RoomService 仅从 `getLegalActions` 的合法 pass 识别声明窗口，为真人座位维护不续期的绝对 deadline；超时通过正常 `runAction({type:"pass"})` 路径处理，bot/永久托管继续即时行动。
+- deadline 按座位附加到可见 event、权威 snapshot 和重连响应；gateway 只做座位投影，不读取规则。新局、终局、房间关闭和永久托管路径统一清理 timer。
+- Web store 保存 `gameDeadline`，与 snapshot seq 一起接受或丢弃，并在切局、切房、离房、断线和 sign out 时清空；本阶段不展示倒计时。
+- 阶段工作流新增固定 `Merge commit` 字段；Phase 0/1 已回填，Phase 2 在实际合并后回填。
+
+阶段验收（2026-07-19）：
+
+- ConfigService/RoomService 定向 Jest：66 条通过，覆盖默认/短值/长调试值/非法配置、逐座位 deadline、超时 pass、部分响应不续期及重连沿用 deadline。
+- RoomsGateway 真实 Socket.IO 定向 e2e：8 条通过，覆盖 deadline 座位隔离及 event→snapshot 一致性。
+- Web Vitest：14 条通过，覆盖 deadline 接受、同 seq 清除、旧 seq 丢弃和状态 reset。
+- 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
 ### [ ] Phase 3 — AI Advice 数据链路
 

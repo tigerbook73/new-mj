@@ -27,6 +27,11 @@ interface SettledPayload {
   scoreDeltas: [number, number, number, number];
 }
 
+interface ClaimTimer {
+  deadline: number;
+  timer: NodeJS.Timeout;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
@@ -40,6 +45,7 @@ const isGameEndedPayload = (payload: unknown): boolean =>
 export class RoomService {
   private readonly rooms = new Map<string, Room>();
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+  private readonly claimTimers = new Map<string, ClaimTimer>();
   /**
    * userId → roomId, server-truth source for client restore (session:identity's
    * activeRoom, see docs/contracts/session-mechanics.md §12). Only tracks real
@@ -329,8 +335,9 @@ export class RoomService {
     this.trackEventSeq(room, result.events);
     room.currentGameEvents.push(...result.events);
     this.accumulateScores(room, this.extractScoreDeltas(result.events));
+    const deadlines = this.reconcileClaimTimers(room);
     for (const event of result.events) {
-      this.eventBus.emit("game:event", { roomId: room.id, event });
+      this.eventBus.emit("game:event", { roomId: room.id, event, deadlines });
     }
     this.emitSnapshots(room);
 
@@ -400,7 +407,7 @@ export class RoomService {
   reconnect(
     roomId: string,
     userId: string,
-  ): { seat: SeatId; view: PlayerViewBase; seq: number } | undefined {
+  ): { seat: SeatId; view: PlayerViewBase; seq: number; deadline?: number } | undefined {
     const room = this.rooms.get(roomId);
     if (!room || room.phase !== "in-game") return undefined;
     const player = room.players.find((candidate) => candidate?.userId === userId);
@@ -411,7 +418,13 @@ export class RoomService {
     this.eventBus.emit("room:playerReconnected", { roomId, seat: player.seatId });
     const view = this.gameService.getPlayerView(room.gameState, player.seatId);
     if (!view) return undefined;
-    return { seat: player.seatId, view, seq: room.lastEventSeq };
+    const deadline = this.claimDeadline(roomId, player.seatId);
+    return {
+      seat: player.seatId,
+      view,
+      seq: room.lastEventSeq,
+      ...(deadline !== undefined ? { deadline } : {}),
+    };
   }
 
   /**
@@ -431,6 +444,7 @@ export class RoomService {
     delete player.disconnectedAt;
     if (player.isAutoPiloted) return;
     player.isAutoPiloted = true;
+    this.clearClaimTimer(room.id, player.seatId);
     this.eventBus.emit("room:playerAutoPiloted", { roomId: room.id, seat: player.seatId });
     if (this.hasNoHumanLeft(room)) {
       this.closeAbandonedRoom(room);
@@ -454,6 +468,7 @@ export class RoomService {
   }
 
   private closeAbandonedRoom(room: Room): void {
+    this.clearRoomClaimTimers(room.id);
     room.phase = "finished";
     room.status = "closed";
     room.finishedAt = Date.now();
@@ -597,6 +612,7 @@ export class RoomService {
   }
 
   private beginGame(room: Room, emitInitialSnapshots = true): void {
+    this.clearRoomClaimTimers(room.id);
     room.gameNumber += 1;
     room.seed = randomInt(MAX_SEED);
     const result = this.gameService.createGame(room.config, room.seed, room.dealer);
@@ -626,16 +642,19 @@ export class RoomService {
     for (let seat = 0; seat < ROOM_SIZE; seat++) {
       const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
       if (!view) continue;
+      const deadline = this.claimDeadline(room.id, seat as SeatId);
       this.eventBus.emit("game:snapshot", {
         roomId: room.id,
         seat: seat as SeatId,
         view,
         seq: room.lastEventSeq,
+        ...(deadline !== undefined ? { deadline } : {}),
       });
     }
   }
 
   private handleGameEnd(room: Room): void {
+    this.clearRoomClaimTimers(room.id);
     const gameLog: FinishedGameLog = {
       gameNumber: room.gameNumber,
       seatUserIds: room.currentGameSeatUserIds,
@@ -688,6 +707,78 @@ export class RoomService {
   private trackEventSeq(room: Room, events: readonly GameEvent[]): void {
     for (const event of events) {
       if (event.seq > room.lastEventSeq) room.lastEventSeq = event.seq;
+    }
+  }
+
+  private reconcileClaimTimers(room: Room): Partial<Record<SeatId, number>> {
+    const deadlines: Partial<Record<SeatId, number>> = {};
+    for (let seat = 0; seat < ROOM_SIZE; seat += 1) {
+      const seatId = seat as SeatId;
+      const player = room.players[seatId];
+      const canTimedPass =
+        room.phase === "in-game" &&
+        !!player &&
+        !player.isBot &&
+        !player.isAutoPiloted &&
+        this.gameService
+          .getLegalActions(room.gameState, seatId)
+          .some((action) => isRecord(action) && action.type === "pass");
+      if (!canTimedPass) {
+        this.clearClaimTimer(room.id, seatId);
+        continue;
+      }
+
+      const key = this.claimKey(room.id, seatId);
+      let entry = this.claimTimers.get(key);
+      if (!entry) {
+        const timeoutMs = this.configService.claimTimeoutMs;
+        const deadline = Date.now() + timeoutMs;
+        const timer = setTimeout(
+          () => this.handleClaimTimeout(room.id, seatId, deadline),
+          timeoutMs,
+        );
+        timer.unref();
+        entry = { deadline, timer };
+        this.claimTimers.set(key, entry);
+      }
+      deadlines[seatId] = entry.deadline;
+    }
+    return deadlines;
+  }
+
+  private handleClaimTimeout(roomId: string, seat: SeatId, deadline: number): void {
+    const key = this.claimKey(roomId, seat);
+    const entry = this.claimTimers.get(key);
+    if (!entry || entry.deadline !== deadline) return;
+    this.claimTimers.delete(key);
+    const room = this.rooms.get(roomId);
+    if (!room || room.phase !== "in-game") return;
+    const canPass = this.gameService
+      .getLegalActions(room.gameState, seat)
+      .some((action) => isRecord(action) && action.type === "pass");
+    if (!canPass) return;
+    this.runAction(room, seat, { type: "pass" });
+    this.autoPlayBots(room);
+  }
+
+  private claimKey(roomId: string, seat: SeatId): string {
+    return `${roomId}:${seat}`;
+  }
+
+  private claimDeadline(roomId: string, seat: SeatId): number | undefined {
+    return this.claimTimers.get(this.claimKey(roomId, seat))?.deadline;
+  }
+
+  private clearClaimTimer(roomId: string, seat: SeatId): void {
+    const key = this.claimKey(roomId, seat);
+    const entry = this.claimTimers.get(key);
+    if (entry) clearTimeout(entry.timer);
+    this.claimTimers.delete(key);
+  }
+
+  private clearRoomClaimTimers(roomId: string): void {
+    for (let seat = 0; seat < ROOM_SIZE; seat += 1) {
+      this.clearClaimTimer(roomId, seat as SeatId);
     }
   }
 

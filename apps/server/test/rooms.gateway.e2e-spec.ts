@@ -1,7 +1,14 @@
 import type { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { NestFactory } from "@nestjs/core";
-import type { Reply, RoomInfo, RoomSummary, SessionIdentity } from "@new-mj/protocol";
+import type {
+  GameEventEnvelope,
+  GameSnapshot,
+  Reply,
+  RoomInfo,
+  RoomSummary,
+  SessionIdentity,
+} from "@new-mj/protocol";
 import { io, type Socket as ClientSocket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { ConfigService } from "../src/config/config.service";
@@ -133,19 +140,24 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     const action = gameService.getLegalActions(room.gameState, actingSeat!)[0];
     expect(action).toBeDefined();
     const deliveryOrder = [a, b, c, d].map(() => [] as string[]);
-    const actionSnapshots = [a, b, c, d].map(
-      (client, index) =>
-        new Promise<{ view: { seat: number }; seq: number }>((resolve) => {
-          client.once("game:event", () => deliveryOrder[index]!.push("event"));
-          client.once("game:snapshot", (snapshot) => {
-            deliveryOrder[index]!.push("snapshot");
-            resolve(snapshot);
-          });
-        }),
+    const firstEvents = [a, b, c, d].map((client, index) =>
+      once<GameEventEnvelope>(client, "game:event").then((event) => {
+        deliveryOrder[index]!.push("event");
+        return event;
+      }),
+    );
+    const actionSnapshots = [a, b, c, d].map((client, index) =>
+      once<GameSnapshot>(client, "game:snapshot").then((snapshot) => {
+        deliveryOrder[index]!.push("snapshot");
+        return snapshot;
+      }),
     );
     const accepted = await ack<object>([a, b, c, d][actingSeat!]!, "game:action", { action });
     expect(accepted).toEqual({ ok: true, data: {} });
-    const updatedViews = await Promise.all(actionSnapshots);
+    let [lastEvents, updatedViews] = await Promise.all([
+      Promise.all(firstEvents),
+      Promise.all(actionSnapshots),
+    ]);
     expect(updatedViews.map(({ view }) => view.seat)).toEqual([0, 1, 2, 3]);
     expect(new Set(updatedViews.map(({ seq }) => seq))).toEqual(new Set([room.lastEventSeq]));
     expect(deliveryOrder).toEqual([
@@ -154,6 +166,54 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
       ["event", "snapshot"],
       ["event", "snapshot"],
     ]);
+
+    let responders = ([0, 1, 2, 3] as const).filter((seat) =>
+      gameService
+        .getLegalActions(room.gameState, seat)
+        .some(
+          (legal) =>
+            typeof legal === "object" && legal !== null && "type" in legal && legal.type === "pass",
+        ),
+    );
+    for (let step = 0; responders.length === 0 && step < 100; step += 1) {
+      const nextSeat = ([0, 1, 2, 3] as const).find(
+        (seat) => gameService.getLegalActions(room.gameState, seat).length > 0,
+      );
+      expect(nextSeat).toBeDefined();
+      const nextAction = gameService.getLegalActions(room.gameState, nextSeat!)[0];
+      const events = [a, b, c, d].map((client) => once<GameEventEnvelope>(client, "game:event"));
+      const nextSnapshots = [a, b, c, d].map((client) =>
+        once<GameSnapshot>(client, "game:snapshot"),
+      );
+      expect(
+        await ack<object>([a, b, c, d][nextSeat!]!, "game:action", { action: nextAction }),
+      ).toEqual({ ok: true, data: {} });
+      [lastEvents, updatedViews] = await Promise.all([
+        Promise.all(events),
+        Promise.all(nextSnapshots),
+      ]);
+      responders = ([0, 1, 2, 3] as const).filter((seat) =>
+        gameService
+          .getLegalActions(room.gameState, seat)
+          .some(
+            (legal) =>
+              typeof legal === "object" &&
+              legal !== null &&
+              "type" in legal &&
+              legal.type === "pass",
+          ),
+      );
+    }
+    expect(responders.length).toBeGreaterThan(0);
+    for (const seat of [0, 1, 2, 3] as const) {
+      if (responders.includes(seat)) {
+        expect(updatedViews[seat]!.deadline).toBeGreaterThan(Date.now());
+        expect(lastEvents[seat]!.deadline).toBe(updatedViews[seat]!.deadline);
+      } else {
+        expect(updatedViews[seat]!.deadline).toBeUndefined();
+        expect(lastEvents[seat]!.deadline).toBeUndefined();
+      }
+    }
 
     // action from a seat that is not their turn must be rejected with ILLEGAL_ACTION
     // (game:action still requires a legal action; sending garbage is the simplest

@@ -69,4 +69,11 @@ export class ConfigService {
     const parsed = raw ? Number(raw) : NaN;
     return Number.isInteger(parsed) && parsed > 0 ? parsed : 60_000;
   }
+
+  /** Server-owned claim-window timeout; intentionally accepts very large debug values. */
+  get claimTimeoutMs(): number {
+    const raw = process.env["CLAIM_TIMEOUT_MS"];
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0 ? parsed : 5_000;
+  }
 }

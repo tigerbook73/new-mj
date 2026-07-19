@@ -138,6 +138,11 @@ describe("unwrapRoomEnterAck", () => {
       currentSeat: 0,
     } as import("@new-mj/protocol").PlayerViewBase;
 
-    expect(unwrapRoomEnterAck({ room, view, seq: 42 })).toEqual({ room, view, seq: 42 });
+    expect(unwrapRoomEnterAck({ room, view, seq: 42, deadline: 1234 })).toEqual({
+      room,
+      view,
+      seq: 42,
+      deadline: 1234,
+    });
   });
 });

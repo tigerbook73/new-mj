@@ -22,8 +22,8 @@
 详细方案与阶段验收记录见 [`table-ux-plan.md`](./table-ux-plan.md)。本专题只完整验收垃圾胡；bloodbattle 保持公共骨架可用，专属玩法 UI 留在待办。
 
 - [x] Phase 0：计划文档重置
-- [x] Phase 1：权威逐动作快照（阶段分支已完成，待确认合并）
-- [ ] Phase 2：可配置声明窗口超时
+- [x] Phase 1：权威逐动作快照
+- [x] Phase 2：可配置声明窗口超时（阶段分支已完成，待确认合并）
 - [ ] Phase 3：AI Advice 数据链路
 - [ ] Phase 4：视觉基础与全屏 Table 骨架
 - [ ] Phase 5：完整操作 Dock 与 AI 推荐
@@ -31,9 +31,9 @@
 - [ ] Phase 7：全站视觉与体验统一
 - [ ] Phase 8：综合验收与计划收尾
 
-**当前状态**：Phase 0 已本地 squash merge 为 `a1500a1`；Phase 1 已在分支 `feat/table-authoritative-snapshots` 完成实现与验收，等待用户确认后再本地 squash merge，不得自动 merge。
+**当前状态**：Phase 1 已本地 squash merge 为 `18416f9`；Phase 2 已在分支 `feat/table-claim-timeout` 完成实现与验收，等待用户确认后再本地 squash merge，不得自动 merge。
 
-**下一步第一个动作**：等待用户检查 Phase 1 结果；仅在用户明确要求 merge 后，本地 squash merge 到 `main`，随后从最新 `main` 创建 Phase 2 分支并只细化其详细计划。
+**下一步第一个动作**：等待用户检查 Phase 2 结果；仅在用户明确要求 merge 后，本地 squash merge 到 `main`，回填 Phase 2 的 `Merge commit`，再从最新 `main` 创建 Phase 3 分支并只细化其详细计划。
 
 ## 待办
 

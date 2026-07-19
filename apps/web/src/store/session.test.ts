@@ -14,7 +14,7 @@ const room = (id: string, gameNumber: number): RoomInfo => ({ id, gameNumber }) 
 
 describe("session authoritative snapshots", () => {
   beforeEach(() => {
-    useSessionStore.setState({ room: null, view: null, gameSeq: null });
+    useSessionStore.setState({ room: null, view: null, gameSeq: null, gameDeadline: null });
   });
 
   it("accepts initial, equal, and newer seq while rejecting an older snapshot", () => {
@@ -26,6 +26,18 @@ describe("session authoritative snapshots", () => {
 
     store.applyGameSnapshot({ view: view(3), seq: 11 });
     expect(useSessionStore.getState()).toMatchObject({ view: view(3), gameSeq: 11 });
+  });
+
+  it("updates or clears deadline with accepted snapshots and ignores stale deadline", () => {
+    const store = useSessionStore.getState();
+    store.applyGameSnapshot({ view: view(0), seq: 10, deadline: 1_000 });
+    expect(useSessionStore.getState().gameDeadline).toBe(1_000);
+
+    store.applyGameSnapshot({ view: view(1), seq: 9, deadline: 2_000 });
+    expect(useSessionStore.getState().gameDeadline).toBe(1_000);
+
+    store.applyGameSnapshot({ view: view(2), seq: 10 });
+    expect(useSessionStore.getState().gameDeadline).toBeNull();
   });
 
   it("resets the seq epoch for a new game or room and clears game state on leave", () => {
@@ -41,6 +53,11 @@ describe("session authoritative snapshots", () => {
     store.setRoom(room("room-b", 1));
     expect(useSessionStore.getState().gameSeq).toBeNull();
     store.setRoom(null);
-    expect(useSessionStore.getState()).toMatchObject({ room: null, view: null, gameSeq: null });
+    expect(useSessionStore.getState()).toMatchObject({
+      room: null,
+      view: null,
+      gameSeq: null,
+      gameDeadline: null,
+    });
   });
 });

@@ -19,6 +19,7 @@ export type SessionState = {
   view: PlayerViewBase | null;
   /** Core event seq is scoped to one game and resets when the next game starts. */
   gameSeq: number | null;
+  gameDeadline: number | null;
   /** Set by the session:kicked handler (sessionBootstrap.ts) so the login
    * screen can show a "taken over" message without a URL query param —
    * cleared on the next connect attempt. */
@@ -38,7 +39,11 @@ export type SessionState = {
   setActiveRoomHint: (hint: ActiveRoomHint | null) => void;
   signOut: () => Promise<void>;
   setRoom: (room: RoomInfo | null) => void;
-  applyGameSnapshot: (snapshot: { view: PlayerViewBase; seq: number }) => void;
+  applyGameSnapshot: (snapshot: {
+    view: PlayerViewBase;
+    seq: number;
+    deadline?: number | undefined;
+  }) => void;
   resetGameSeq: () => void;
   /**
    * room:playerJoined 事件只带 {seat,nickname,isBot}，没有 userId——client 不
@@ -56,6 +61,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   room: null,
   view: null,
   gameSeq: null,
+  gameDeadline: null,
   kicked: false,
   activeRoomHint: null,
   setSocket: (socket) => set({ socket }),
@@ -79,27 +85,37 @@ export const useSessionStore = create<SessionState>((set) => ({
       room: null,
       view: null,
       gameSeq: null,
+      gameDeadline: null,
       kicked: false,
       activeRoomHint: null,
     });
   },
   setRoom: (room) =>
     set((state) => {
-      if (!room) return { room: null, view: null, gameSeq: null, activeRoomHint: null };
+      if (!room)
+        return {
+          room: null,
+          view: null,
+          gameSeq: null,
+          gameDeadline: null,
+          activeRoomHint: null,
+        };
       const changedRoom = state.room?.id !== room.id;
       const changedGame = changedRoom || state.room?.gameNumber !== room.gameNumber;
       return {
         room,
         activeRoomHint: null,
         ...(changedRoom ? { view: null } : {}),
-        ...(changedGame ? { gameSeq: null } : {}),
+        ...(changedGame ? { gameSeq: null, gameDeadline: null } : {}),
       };
     }),
-  applyGameSnapshot: ({ view, seq }) =>
+  applyGameSnapshot: ({ view, seq, deadline }) =>
     set((state) =>
-      state.gameSeq === null || seq >= state.gameSeq ? { view, gameSeq: seq } : state,
+      state.gameSeq === null || seq >= state.gameSeq
+        ? { view, gameSeq: seq, gameDeadline: deadline ?? null }
+        : state,
     ),
-  resetGameSeq: () => set({ gameSeq: null }),
+  resetGameSeq: () => set({ gameSeq: null, gameDeadline: null }),
   applyPlayerJoined: (seat, nickname, isBot, avatar) =>
     set((state) => {
       if (!state.room) return state;

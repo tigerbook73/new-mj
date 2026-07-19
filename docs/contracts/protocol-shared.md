@@ -29,13 +29,15 @@
 
 ## 3. 对局内通用消息（game:\*，跨玩法共用信封）
 
-| 消息            | payload                                                                                                                   | 说明                                                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                       |
-| `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` **尚未实现**（超时代提交 pass 是 MVP 已知限制） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 开局以及每个已接受动作的可见 events 之后逐座位下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }`    |
+| 消息            | payload                                                                                                                   | 说明                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                    |
+| `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤）；若该连接当前可合法 pass，则附 server 计算的绝对 deadline                  |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 开局以及每个已接受动作的可见 events 之后逐座位下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }` |
 
 身份一律取 `socket.data.userId`，payload 不含也不信任 userId（`decisions.md` D10 铁律）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
+
+`deadline` 是 Unix epoch 毫秒值，只由 server 生成。它只出现在当前具有合法 `{type:"pass"}` 的座位信封中；同一声明窗口内其他玩家先响应不会延长它。客户端本地归零不提交动作，server 到期后通过正常 `game:action` 内部路径代交 pass。中局 `room:enter` 的 `{room,view,seq,deadline?}` 会返回该座位尚未到期的同一个绝对 deadline。
 
 ## 4. 未实现/占位（跨房间的通用能力）
 

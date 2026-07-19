@@ -50,6 +50,9 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
 const newRoomService = () =>
   new RoomService(new GameService(), new EventBus(), fakePersistenceService(), new ConfigService());
 
+const isPassAction = (action: unknown): boolean =>
+  typeof action === "object" && action !== null && "type" in action && action.type === "pass";
+
 describe("RoomService — pure helpers", () => {
   it("accumulateScores adds deltas seat-wise across multiple calls", () => {
     const service = newRoomService();
@@ -570,6 +573,120 @@ describe("RoomService — authoritative action snapshots", () => {
     expect(snapshots).toHaveLength(4);
     expect(snapshots.map(({ seat: snapshotSeat }) => snapshotSeat)).toEqual([0, 1, 2, 3]);
     expect(new Set(snapshots.map(({ seq }) => seq))).toEqual(new Set([room.lastEventSeq]));
+  });
+});
+
+describe("RoomService — claim timeout", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    process.env["CLAIM_TIMEOUT_MS"] = "100";
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    delete process.env["CLAIM_TIMEOUT_MS"];
+  });
+
+  it("attaches one absolute deadline per eligible seat and submits pass through runAction", () => {
+    const eventBus = new EventBus();
+    const service = new RoomService(
+      new GameService(),
+      eventBus,
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    const snapshots: Array<{ seat: number; deadline?: number }> = [];
+    eventBus.on("game:snapshot", ({ seat, deadline }) =>
+      snapshots.push({ seat, ...(deadline !== undefined ? { deadline } : {}) }),
+    );
+    const played = playJunkGame(room.seed, {}, [], room.dealer);
+    if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
+
+    let responders: readonly number[] = [];
+    for (const { seat, action } of played.actions) {
+      service.applyPlayerAction(room.id, seat, action);
+      responders = ([0, 1, 2, 3] as const).filter((candidate) =>
+        gameService.getLegalActions(room.gameState, candidate).some((legal) => isPassAction(legal)),
+      );
+      if (responders.length > 0) break;
+    }
+
+    expect(responders.length).toBeGreaterThan(0);
+    const deadlines = snapshots
+      .slice(-4)
+      .filter(({ seat }) => responders.includes(seat))
+      .map(({ deadline }) => deadline);
+    expect(deadlines.every((deadline) => deadline === Date.now() + 100)).toBe(true);
+
+    const reconnectingSeat = responders[0]! as 0 | 1 | 2 | 3;
+    const reconnectingUser = room.players[reconnectingSeat]!.userId;
+    service.handleDisconnect(room.id, reconnectingUser);
+    expect(service.reconnect(room.id, reconnectingUser)?.deadline).toBe(Date.now() + 100);
+
+    jest.advanceTimersByTime(100);
+    for (const seat of responders) {
+      expect(
+        gameService.getLegalActions(room.gameState, seat as 0 | 1 | 2 | 3).some(isPassAction),
+      ).toBe(false);
+    }
+  });
+
+  it("does not extend another responder's deadline after a partial response", () => {
+    type FakeState = { responders: number[]; seq: number };
+    const fakeGameService = {
+      createGame: () => ({ state: { responders: [], seq: 0 }, events: [] }),
+      applyAction: (state: FakeState, seat: number, action: { type: string }) => {
+        const responders =
+          action.type === "open"
+            ? [1, 2]
+            : state.responders.filter((candidate) => candidate !== seat);
+        const seq = state.seq + 1;
+        return {
+          state: { responders, seq },
+          events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+        };
+      },
+      getLegalActions: (state: FakeState, seat: number) =>
+        state.responders.includes(seat) ? [{ type: "pass" }] : seat === 0 ? [{ type: "open" }] : [],
+      getPlayerView: (_state: FakeState, seat: 0 | 1 | 2 | 3) => ({
+        seat,
+        hand: [],
+        seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+        wallCount: 0,
+        currentSeat: 0,
+      }),
+      computeNextDealer: () => 0,
+    } as unknown as GameService;
+    const service = new RoomService(
+      fakeGameService,
+      new EventBus(),
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    service.applyPlayerAction(room.id, 0, { type: "open" });
+    const originalDeadline = Date.now() + 100;
+    jest.advanceTimersByTime(40);
+    service.applyPlayerAction(room.id, 1, { type: "pass" });
+    expect(service.reconnect(room.id, "p3")).toBeUndefined();
+
+    jest.advanceTimersByTime(59);
+    expect(fakeGameService.getLegalActions(room.gameState as FakeState, 2)).toEqual([
+      { type: "pass" },
+    ]);
+    jest.advanceTimersByTime(1);
+    expect(fakeGameService.getLegalActions(room.gameState as FakeState, 2)).toEqual([]);
+    expect(originalDeadline).toBe(Date.now());
   });
 });
 

@@ -21,6 +21,7 @@
 - 端口只有一个来源：`main.ts` 从 `ConfigService.port` 读（该 getter 读 `process.env.PORT`），不要在别处再读一次 `process.env.PORT`。`RoomsGateway` 的 `@WebSocketGateway` 配了 `cors: { origin: true }`（web/mobile 跑在不同端口，天然跨 origin；非商用项目不涉及 cookie/凭据，反射请求来源即可，不需要更复杂的白名单）。
 - 所有 WS ack 失败码必须来自 `docs/contracts/protocol-shared.md` §5 的 `ErrCode` 枚举，不得发明新码；core 返回的 `RuleViolation` code 透传在 `message` 字段。
 - 可见性过滤一律用 `@new-mj/core` 导出的 `eventsVisibleTo()`，server 不自行判断规则可见性。
+- 声明超时只通过 `getLegalActions` 中是否存在 `{type:"pass"}` 跨玩法识别；timer/deadline 留在 RoomService，不写进 core state、Room 或 PlayerView。同一窗口不得因部分响应而续期。
 
 ## 代码地图
 

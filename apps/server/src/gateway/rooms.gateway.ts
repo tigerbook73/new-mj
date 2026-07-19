@@ -143,12 +143,20 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
     this.eventBus.on("game:snapshot", (event) => {
       const socket = this.connections.socketForSeat(event.roomId, event.seat);
-      socket?.emit("game:snapshot", { view: event.view, seq: event.seq });
+      socket?.emit("game:snapshot", {
+        view: event.view,
+        seq: event.seq,
+        ...(event.deadline !== undefined ? { deadline: event.deadline } : {}),
+      });
     });
     this.eventBus.on("game:event", (event) => {
       for (const [seat, socket] of this.connections.socketsByRoom(event.roomId)) {
         if (eventsVisibleTo([event.event], seat).length > 0) {
-          socket.emit("game:event", { event: event.event });
+          const deadline = event.deadlines?.[seat];
+          socket.emit("game:event", {
+            event: event.event,
+            ...(deadline !== undefined ? { deadline } : {}),
+          });
         }
       }
     });
@@ -276,7 +284,14 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       }
       this.emitParticipantJoined(parsed.roomId, userId, identity.nickname, seatIndex >= 0, false);
       const roomInfo = this.snapshotWithParticipants(parsed.roomId);
-      return resumed ? { room: roomInfo, view: resumed.view, seq: resumed.seq } : roomInfo;
+      return resumed
+        ? {
+            room: roomInfo,
+            view: resumed.view,
+            seq: resumed.seq,
+            ...(resumed.deadline !== undefined ? { deadline: resumed.deadline } : {}),
+          }
+        : roomInfo;
     });
   }
 
