@@ -4,6 +4,6 @@ import { PrismaService } from "./prisma.service";
 
 @Module({
   providers: [PrismaService, PersistenceService],
-  exports: [PersistenceService],
+  exports: [PersistenceService, PrismaService],
 })
 export class PersistenceModule {}
