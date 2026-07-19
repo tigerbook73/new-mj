@@ -1,7 +1,7 @@
 # AGENTS.md
 
 在线麻将（非商用）。TS monorepo：packages/{core,protocol,ai} + apps/{server,web,mobile}。
-**当前阶段：阶段 4（垃圾胡完整人机对战 + UI 重做 + Replay）已完成；阶段 5（持久化：PG + 真正的 Supabase OAuth）代码已完成，等用户提供真实 Supabase 项目/Google/GitHub OAuth Client secret 才能端到端验证。**
+**当前工作：垃圾胡 Table UX 分阶段重做。持久化与真正的 Supabase OAuth 已完成，并已通过本地 Supabase 容器使用真实 Google/GitHub 账号做端到端验证；尚未部署到云端。进度见 `docs/process/plan.md`。**
 
 ## 会话仪式
 

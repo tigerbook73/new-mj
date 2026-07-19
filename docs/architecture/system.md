@@ -18,13 +18,13 @@
    core（纯函数引擎，零依赖）
    applyAction(state, seat, action) → { state', events } | { error }
                  |
-   PG(Supabase)：profiles/game_logs/room_sessions（阶段 5 已交付，见 contracts/session-mechanics.md §11；待接真实 Supabase 项目，见下）
+   PG(Supabase)：profiles/game_logs/room_sessions（已交付并通过本地 Supabase 容器验证，见 contracts/session-mechanics.md §11）
 ```
 
 ## 2. 部署视图
 
 - **server**：Render（付费档）。原因是 WebSocket 长连接需要长驻进程，排除了 Vercel 一类 serverless 平台；回合制麻将对延迟不敏感，不需要 Fly.io 式多区域部署。
-- **鉴权 + 数据库**：Supabase，开箱提供 OAuth（Google/GitHub）与 PG——代码侧阶段 5 已接入（`auth.middleware.ts` 的 Supabase 校验分支、web 的 OAuth 登录按钮、Prisma schema/持久化），但仓库里还没有绑定一个真实 Supabase 项目/OAuth Client secret，本地开发默认走 `supabase start` + D16 的开发态假登录，见 `decisions.md` D22。
+- **鉴权 + 数据库**：Supabase，开箱提供 OAuth（Google/GitHub）与 PG——`auth.middleware.ts` 的 Supabase 校验分支、web OAuth 登录、Prisma schema/持久化均已接入；已通过本地 Supabase 容器使用真实 Google/GitHub 账号完成端到端验证。正式云端项目、生产环境变量与回调地址尚未部署；本地仍保留 D16 开发态假登录供开发/e2e 使用，见 `decisions.md` D22。
 - **web**：静态托管（SPA），阶段 3 已交付（Vite + React + React Router + Tailwind + shadcn/ui + Zustand，见 D17 与 `apps/web/AGENTS.md`）。
 - **mobile**：Expo，阶段 7 交付，路线未定（是否 react-native-web 统一见 `process/plan.md` 待办）。
 - **除 OAuth 外全走 Socket.IO**：没有独立的 REST/tRPC 层，查询用 ack 模式实现；服务端仅暴露 `/health`。
