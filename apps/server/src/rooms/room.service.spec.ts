@@ -536,6 +536,43 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
   });
 });
 
+describe("RoomService — authoritative action snapshots", () => {
+  it("emits action events before one authoritative snapshot for every seat", () => {
+    const eventBus = new EventBus();
+    const service = new RoomService(
+      new GameService(),
+      eventBus,
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    const emitted: Array<{ type: "event" | "snapshot"; seat?: number; seq: number }> = [];
+    eventBus.on("game:event", ({ event }) => emitted.push({ type: "event", seq: event.seq }));
+    eventBus.on("game:snapshot", ({ seat, seq }) => emitted.push({ type: "snapshot", seat, seq }));
+
+    const seat = ([0, 1, 2, 3] as const).find(
+      (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+    );
+    expect(seat).toBeDefined();
+    const action = gameService.getLegalActions(room.gameState, seat!)[0];
+    expect(action).toBeDefined();
+    service.applyPlayerAction(room.id, seat!, action);
+
+    const firstSnapshot = emitted.findIndex(({ type }) => type === "snapshot");
+    expect(firstSnapshot).toBeGreaterThan(0);
+    expect(emitted.slice(0, firstSnapshot).every(({ type }) => type === "event")).toBe(true);
+    const snapshots = emitted.slice(firstSnapshot);
+    expect(snapshots).toHaveLength(4);
+    expect(snapshots.map(({ seat: snapshotSeat }) => snapshotSeat)).toEqual([0, 1, 2, 3]);
+    expect(new Set(snapshots.map(({ seq }) => seq))).toEqual(new Set([room.lastEventSeq]));
+  });
+});
+
 describe("RoomService — replay log archiving (phase 4.5 step 1)", () => {
   it("archives one FinishedGameLog per game, seeded with createGame's own events", () => {
     const service = newRoomService();

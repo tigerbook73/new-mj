@@ -33,7 +33,7 @@
 | --------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                       |
 | `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` **尚未实现**（超时代提交 pass 是 MVP 已知限制） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 入座开局/切局时下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }`                                   |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 开局以及每个已接受动作的可见 events 之后逐座位下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }`    |
 
 身份一律取 `socket.data.userId`，payload 不含也不信任 userId（`decisions.md` D10 铁律）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
 
@@ -59,13 +59,15 @@ A: game:action {discard 5m}  ──ack ok──
    ↓ server 跑 applyAction
 所有人 ← game:event TileDiscarded(5m)
 B、C ← game:event ClaimWindowOpened(各自选项, deadline=+5s)
+每个座位 ← game:snapshot（该次 discard 后的权威 PlayerView，同一 seq）
 B: game:action {peng}  ──ack ok──
 C: （超时）server 代提交 pass
 所有人 ← game:event ClaimWindowResolved / PengMade
 B ← game:event TurnStarted(B)（B 碰后出牌）
+每个座位 ← game:snapshot（该次声明动作后的权威 PlayerView，同一 seq）
 ```
 
-**顺序保证**：同连接消息有序（Socket.IO 单连接按发送序送达）；每房间操作串行处理，快照之后无漏事件的缝隙——这是重连"快照优先"策略（`contracts/session-mechanics.md` §8）成立的前提。
+**顺序保证**：同连接消息有序（Socket.IO 单连接按发送序送达）；每个已接受动作固定先发送该连接可见的全部 events，再发送覆盖这些 events 的 snapshot。命令 ack 仍只给回执，客户端只以 snapshot 更新规则状态；event 留给日志与非权威动画。每房间操作串行处理，快照之后无漏事件的缝隙——这是重连"快照优先"策略（`contracts/session-mechanics.md` §8）成立的前提。
 
 具体某个玩法的声明优先级顺序、Action 种类，见对应 `variants/*.md`。
 

@@ -125,3 +125,19 @@ describe("connect", () => {
     expect(firstOpts.auth["browserId"]).toBe(secondOpts.auth["browserId"]);
   });
 });
+
+describe("unwrapRoomEnterAck", () => {
+  it("preserves reconnect view and seq", async () => {
+    const { unwrapRoomEnterAck } = await import("./socket");
+    const room = { id: "room-1" } as import("@new-mj/protocol").RoomInfo;
+    const view = {
+      seat: 0,
+      hand: [],
+      seats: [],
+      wallCount: 0,
+      currentSeat: 0,
+    } as import("@new-mj/protocol").PlayerViewBase;
+
+    expect(unwrapRoomEnterAck({ room, view, seq: 42 })).toEqual({ room, view, seq: 42 });
+  });
+});

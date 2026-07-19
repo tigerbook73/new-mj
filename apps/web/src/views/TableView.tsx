@@ -65,41 +65,37 @@ export function TableView() {
 
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
-      useSessionStore.getState().setView(event.view);
+      useSessionStore.getState().applyGameSnapshot(event);
     };
-    // 只对"事实型"事件（谁的回合、谁打了什么牌、我能声明什么）做增量更新；
-    // "规则型"事件（吃/碰/杠成立、胡牌、结算）只记日志不解释——那部分逻辑只
-    // 存在于 core 里，按玩法分开实现，web 不能重新实现一遍（架构铁律 6）。画面
-    // 会在下一次 game:snapshot（下一局开始）时整体对齐，见 AGENTS.md。
     const onEvent = (message: GameEventEnvelope) => {
-      const payload = message.event.payload as {
-        type: string;
-        seat?: number;
-        tile?: number;
-        options?: unknown[];
-      };
+      const payload = message.event.payload as { type: string };
       setLog((prev) => [...prev.slice(-9), `#${message.event.seq} ${payload.type}`]);
-      const store = useSessionStore.getState();
-      switch (payload.type) {
-        case "TurnStarted":
-          if (typeof payload.seat === "number") {
-            store.applyTurnStarted(payload.seat as SeatId);
-          }
-          break;
-        case "TileDiscarded":
-          if (typeof payload.seat === "number" && typeof payload.tile === "number") {
-            store.applyTileDiscarded(payload.seat as SeatId, payload.tile);
-          }
-          break;
-        case "ClaimWindowOpened":
-          store.applyClaimWindowOpened(payload.options ?? []);
-          break;
-        case "ClaimWindowResolved":
-          store.applyClaimWindowResolved();
-          break;
-        default:
-          break;
-      }
+    };
+    const onScoreUpdated = (message: {
+      scores: [number, number, number, number];
+      gameNumber: number;
+      totalGames?: number;
+    }) => {
+      useSessionStore.setState((state) =>
+        state.room
+          ? {
+              room: {
+                ...state.room,
+                scores: message.scores,
+                gameNumber: message.gameNumber,
+                ...(message.totalGames !== undefined ? { totalGames: message.totalGames } : {}),
+              },
+            }
+          : state,
+      );
+    };
+    const onDealerChanged = (message: { dealer: 0 | 1 | 2 | 3; gameNumber: number }) => {
+      useSessionStore.setState((state) =>
+        state.room
+          ? { room: { ...state.room, dealer: message.dealer, gameNumber: message.gameNumber } }
+          : state,
+      );
+      useSessionStore.getState().resetGameSeq();
     };
     const onSessionFinished = (message: { result: SessionResult }) =>
       setSessionResult(message.result);
@@ -112,11 +108,15 @@ export function TableView() {
 
     activeSocket.on("game:snapshot", onSnapshot);
     activeSocket.on("game:event", onEvent);
+    activeSocket.on("room:scoreUpdated", onScoreUpdated);
+    activeSocket.on("room:dealerChanged", onDealerChanged);
     activeSocket.on("room:sessionFinished", onSessionFinished);
     activeSocket.on("room:closed", onClosed);
     return () => {
       activeSocket.off("game:snapshot", onSnapshot);
       activeSocket.off("game:event", onEvent);
+      activeSocket.off("room:scoreUpdated", onScoreUpdated);
+      activeSocket.off("room:dealerChanged", onDealerChanged);
       activeSocket.off("room:sessionFinished", onSessionFinished);
       activeSocket.off("room:closed", onClosed);
     };

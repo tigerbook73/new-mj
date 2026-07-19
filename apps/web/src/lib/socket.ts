@@ -77,9 +77,14 @@ export function ack<T>(socket: Socket, event: string, payload: unknown): Promise
 export function unwrapRoomEnterAck(data: RoomEnterResponse | RoomInfo): {
   room: RoomInfo;
   view?: PlayerViewBase;
+  seq?: number;
 } {
   if (!("room" in data)) return { room: data };
-  return { room: data.room, ...(data.view ? { view: data.view } : {}) };
+  return {
+    room: data.room,
+    ...(data.view ? { view: data.view } : {}),
+    ...(data.seq !== undefined ? { seq: data.seq } : {}),
+  };
 }
 
 /** Formats a connect() failure code for display; SESSION_EXISTS gets a friendlier message. */

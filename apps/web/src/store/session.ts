@@ -17,6 +17,8 @@ export type SessionState = {
   nickname: string | null;
   room: RoomInfo | null;
   view: PlayerViewBase | null;
+  /** Core event seq is scoped to one game and resets when the next game starts. */
+  gameSeq: number | null;
   /** Set by the session:kicked handler (sessionBootstrap.ts) so the login
    * screen can show a "taken over" message without a URL query param —
    * cleared on the next connect attempt. */
@@ -36,7 +38,8 @@ export type SessionState = {
   setActiveRoomHint: (hint: ActiveRoomHint | null) => void;
   signOut: () => Promise<void>;
   setRoom: (room: RoomInfo | null) => void;
-  setView: (view: PlayerViewBase | null) => void;
+  applyGameSnapshot: (snapshot: { view: PlayerViewBase; seq: number }) => void;
+  resetGameSeq: () => void;
   /**
    * room:playerJoined 事件只带 {seat,nickname,isBot}，没有 userId——client 不
    * 需要知道别人的 userId（自己的座位号靠自己的 userId 在初始快照里就能定位，
@@ -44,17 +47,6 @@ export type SessionState = {
    */
   applyPlayerJoined: (seat: SeatId, nickname: string, isBot: boolean, avatar?: string) => void;
   applyReadyChanged: (seat: SeatId, ready: boolean) => void;
-  /**
-   * 只对"事实型" game:event 做增量更新（谁的回合、谁打出了什么牌、我能声明
-   * 什么），"规则型"事件（吃碰杠成立/胡牌/结算）不在这里解释——那部分逻辑
-   * 只存在于 core 里，按玩法分开实现，web 不能碰（架构铁律 6）。规则型事件
-   * 发生后画面会暂时不同步，等下一次 game:snapshot（下一局开始）整体对齐，
-   * 见 apps/web/AGENTS.md。
-   */
-  applyTurnStarted: (seat: SeatId) => void;
-  applyTileDiscarded: (seat: SeatId, tile: number) => void;
-  applyClaimWindowOpened: (options: unknown[]) => void;
-  applyClaimWindowResolved: () => void;
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -63,6 +55,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   nickname: null,
   room: null,
   view: null,
+  gameSeq: null,
   kicked: false,
   activeRoomHint: null,
   setSocket: (socket) => set({ socket }),
@@ -85,12 +78,28 @@ export const useSessionStore = create<SessionState>((set) => ({
       nickname: null,
       room: null,
       view: null,
+      gameSeq: null,
       kicked: false,
       activeRoomHint: null,
     });
   },
-  setRoom: (room) => set({ room, activeRoomHint: null }),
-  setView: (view) => set({ view }),
+  setRoom: (room) =>
+    set((state) => {
+      if (!room) return { room: null, view: null, gameSeq: null, activeRoomHint: null };
+      const changedRoom = state.room?.id !== room.id;
+      const changedGame = changedRoom || state.room?.gameNumber !== room.gameNumber;
+      return {
+        room,
+        activeRoomHint: null,
+        ...(changedRoom ? { view: null } : {}),
+        ...(changedGame ? { gameSeq: null } : {}),
+      };
+    }),
+  applyGameSnapshot: ({ view, seq }) =>
+    set((state) =>
+      state.gameSeq === null || seq >= state.gameSeq ? { view, gameSeq: seq } : state,
+    ),
+  resetGameSeq: () => set({ gameSeq: null }),
   applyPlayerJoined: (seat, nickname, isBot, avatar) =>
     set((state) => {
       if (!state.room) return state;
@@ -114,34 +123,5 @@ export const useSessionStore = create<SessionState>((set) => ({
       const players = [...state.room.players] as RoomInfo["players"];
       players[seat] = { ...player, isReady: ready };
       return { room: { ...state.room, players } };
-    }),
-  applyTurnStarted: (seat) =>
-    set((state) => {
-      if (!state.view) return state;
-      const { myClaimOptions: _drop, ...rest } = state.view;
-      return { view: { ...rest, currentSeat: seat } };
-    }),
-  applyTileDiscarded: (seat, tile) =>
-    set((state) => {
-      if (!state.view) return state;
-      const seats = state.view.seats.map((entry, index) => {
-        if (index !== seat) return entry;
-        // junk-private field (discards), see TableView's ViewExtras comment —
-        // not on every ruleset's seats shape, so only append when present.
-        const extra = entry as { discards?: { tile: number; claimedBy?: SeatId }[] };
-        const discards = extra.discards ? [...extra.discards, { tile }] : extra.discards;
-        return { ...entry, handCount: entry.handCount - 1, ...(discards && { discards }) };
-      });
-      const hand =
-        seat === state.view.seat ? state.view.hand.filter((t) => t !== tile) : state.view.hand;
-      return { view: { ...state.view, seats, hand } };
-    }),
-  applyClaimWindowOpened: (options) =>
-    set((state) => (state.view ? { view: { ...state.view, myClaimOptions: options } } : state)),
-  applyClaimWindowResolved: () =>
-    set((state) => {
-      if (!state.view) return state;
-      const { myClaimOptions: _drop, ...rest } = state.view;
-      return { view: rest };
     }),
 }));

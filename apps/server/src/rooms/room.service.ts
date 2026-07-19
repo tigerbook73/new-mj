@@ -238,12 +238,13 @@ export class RoomService {
   nextRound(roomId: string): Room {
     const room = this.mustGet(roomId);
     room.dealer = this.gameService.computeNextDealer(room.gameState, room.dealer);
-    this.beginGame(room);
+    this.beginGame(room, false);
     this.eventBus.emit("room:dealerChanged", {
       roomId,
       dealer: room.dealer,
       gameNumber: room.gameNumber,
     });
+    this.emitSnapshots(room);
     this.autoPlayBots(room);
     return room;
   }
@@ -331,6 +332,7 @@ export class RoomService {
     for (const event of result.events) {
       this.eventBus.emit("game:event", { roomId: room.id, event });
     }
+    this.emitSnapshots(room);
 
     if (result.events.some((event) => isGameEndedPayload(event.payload))) {
       this.handleGameEnd(room);
@@ -594,7 +596,7 @@ export class RoomService {
     return this.gameService.getOmniscientView(found.log.finalState);
   }
 
-  private beginGame(room: Room): void {
+  private beginGame(room: Room, emitInitialSnapshots = true): void {
     room.gameNumber += 1;
     room.seed = randomInt(MAX_SEED);
     const result = this.gameService.createGame(room.config, room.seed, room.dealer);
@@ -617,6 +619,10 @@ export class RoomService {
       string | null,
     ];
 
+    if (emitInitialSnapshots) this.emitSnapshots(room);
+  }
+
+  private emitSnapshots(room: Room): void {
     for (let seat = 0; seat < ROOM_SIZE; seat++) {
       const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
       if (!view) continue;

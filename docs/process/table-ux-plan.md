@@ -1,6 +1,6 @@
 # Junk Table UX 分阶段实施计划
 
-> 状态：Phase 0 已完成，等待用户授权本地 squash merge。
+> 状态：Phase 0 已本地 squash merge；Phase 1 已在阶段分支完成并通过验收，等待用户确认后合并。
 >
 > 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
 
@@ -21,11 +21,12 @@
 本专题经用户明确确认，临时覆盖 `workflow.md` 的 trunk-based 默认方式：
 
 1. 每个 Phase 必须从最新本地 `main` 创建下表指定的独立 branch；前一 Phase 未合并不得开始后一 Phase。
-2. 开工先读 `plan.md` 状态区，再只细化当前 Phase 的实现清单、接口、风险和验收。若细化时出现新的架构级选择，暂停并提请用户决定。
-3. 实现与测试同阶段完成；先跑定向检查，阶段门统一执行根目录 `pnpm verify`。
-4. 收工时更新本文件与 `plan.md`，记录验证结果和下一步首个动作，然后允许自动提交。
-5. 提交后必须停止并报告 branch、commit、验证结果和风险；**不得自动 merge、不得创建 PR、不得自动推送**。
-6. 只有用户明确要求 merge 后，才在本地把该 branch squash merge 到 `main`；成功后可删除本地阶段分支。下一 Phase 再从新的 `main` 开始。
+2. 开工先读 `plan.md` 状态区，再只细化当前 Phase 的实现清单、接口、风险和验收。详细计划完成后更新两份 tracker、形成规划检查点提交并强制暂停；**只有用户明确确认该 Phase 计划后才能开始测试和实现**。
+3. 若细化时出现新的架构级选择，同样暂停并提请用户决定，不能用规划检查点绕过架构护栏。
+4. 获得计划确认后，实现与测试同阶段完成；先跑定向检查，阶段门统一执行根目录 `pnpm verify`。
+5. 收工时更新本文件与 `plan.md`，记录验证结果和下一步首个动作，然后允许自动提交。
+6. 实现提交后必须停止并报告 branch、commit、验证结果和风险；**不得自动 merge、不得创建 PR、不得自动推送**。
+7. 只有用户明确要求 merge 后，才在本地把该 branch squash merge 到 `main`；成功后可删除本地阶段分支。下一 Phase 再从新的 `main` 开始，并重新经过“详细计划→用户确认”门。
 
 状态约定：`[ ] pending`、`[~] in progress`、`[x] completed`、`[!] blocked`。
 
@@ -44,6 +45,8 @@
 - `game:snapshot` 保持 `{ view, seq, deadline? }` 形状，扩展语义为每个真人、bot 或超时代提交动作后的逐座位权威状态。
 - 同一连接按“可见 game events → 覆盖这些 events 的 snapshot”发送。
 - event 只驱动动画；snapshot 始终是最终状态权威。重连直接采用最新 snapshot，不重播历史动画。
+- Phase 6 使用双状态与动画屏障：新 snapshot 立即进入 `authoritativeSnapshot`，但只有对应 event 动画完成后才提交为 Table 渲染和可操作性所读的 `presentedView`；可选动作、AI 建议和按钮不得直接读取尚未呈现的权威状态。
+- 动画期间锁定操作并按 seq 排队；重连、页面恢复、队列过长或 reduced-motion 时允许跳过动画，直接把最新权威 snapshot 提交到 `presentedView`。
 
 ### 3.3 可配置声明超时
 
@@ -72,7 +75,7 @@ Branch：`docs/table-ux-plan-reset`
 - D28 吸纳审计：断线宽限、账号仲裁与 server-truth 恢复均已由 `contracts/session-mechanics.md` 和 `decisions.md` D25–D28 承载，无残留旧计划引用。
 - `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
-### [ ] Phase 1 — 权威逐动作快照
+### [x] Phase 1 — 权威逐动作快照（待确认合并）
 
 Branch：`feat/table-authoritative-snapshots`
 
@@ -84,6 +87,37 @@ Branch：`feat/table-authoritative-snapshots`
 - 覆盖多事件动作、bot 连续动作、重连和旧 snapshot 丢弃。
 
 开工前细化重点：snapshot 生成时点、bot 链的逐步发送顺序、局终/切局的重复快照边界，以及 store 中 event/snapshot 暂存形状。
+
+本阶段实施清单（2026-07-19 已细化）：
+
+1. **发送时点**：`runAction` 先按现有 visibility 顺序发布该动作全部 `game:event`，再基于动作后的同一 `gameState` 给四个座位生成 snapshot；每次 bot 动作也走同一个 `runAction`，所以 bot 链天然逐步发送，不能在整条链结束后只发最后状态。
+2. **局终顺序**：结束一局的动作固定为“终局 events → 终局 snapshot → `room:scoreUpdated`/`room:sessionFinished`”；若会话继续，则再发 `room:dealerChanged`，最后发下一局初始 snapshot。这样 Phase 6 能动画化终局事件，同时下一局仍从独立权威快照开始。
+3. **单局 seq**：core seq 每局从头开始，不把它误当会话全局序号。web store 保存 `gameSeq`；同局只接受 `seq >= gameSeq`（相等也接受，因为一次声明响应可能改变本人视角而不要求全局 seq 增长）。`room:dealerChanged` 或切换 room/gameNumber 时清空 seq epoch，再接收下一局 snapshot。
+4. **统一入口**：web 新增 `applyGameSnapshot({view, seq})`，Lobby 初始开局、Table 实时 snapshot、`room:enter` 重连 ack 全部走这一入口；`unwrapRoomEnterAck` 不再丢弃 seq。
+5. **事件职责**：Table 本阶段只保留事件日志，不再用 `TurnStarted`/`TileDiscarded`/`ClaimWindowOpened`/`ClaimWindowResolved` 局部修改 view；Phase 6 再把原始事件接入非权威动画队列。
+6. **房间同步**：Table 接收 `room:scoreUpdated`/`room:dealerChanged` 更新 room 元数据；离房、被踢、sign out 时同时清空 view 与 gameSeq，避免下一房间继承旧牌桌。
+
+阶段验证：
+
+- RoomService 单测验证每个动作 events 在前、四座 snapshot 在后，四份 view 各自对应 seat 且 seq 一致。
+- gateway e2e 验证真实 socket 的动作 ack 不带状态、所有连接收到 snapshot，并保持 event→snapshot 顺序。
+- web store 单测验证初始/同 seq/更高 seq 接受、旧 seq 丢弃、下一局 epoch 重置和离房清理。
+- 现有 Table e2e 继续证明点击出牌后依靠 snapshot 更新手牌与牌河。
+- 根目录 `pnpm verify` 全绿后回填结果并提交，停在 Phase 1 branch 等待用户 merge 指令。
+
+完成内容：
+
+- RoomService 的每个真人、bot 动作固定先发布可见 events，再基于同一动作后状态逐座位发布权威 snapshot；终局 snapshot 先于比分/会话事件，续局顺序修正为 dealerChanged 后发布下一局初始 snapshot。
+- Web 新增单局 `gameSeq` 和统一 `applyGameSnapshot` 入口，Lobby、Table、重连 ack 都保留并使用 seq；旧 snapshot 被丢弃，相同 seq 可覆盖，切局重置 epoch，离房/断线/sign out 清空状态。
+- Table 不再解释 game events 来修改 PlayerView，只保留日志；同步接收 score/dealer 房间元数据。动画与可选动作的双状态屏障已明确写入 Phase 6。
+- 协议、会话契约和 Web package 约束已同步更新。
+
+阶段验收（2026-07-19）：
+
+- RoomService 定向单测：55 条通过，覆盖 event→四座同 seq snapshot。
+- RoomsGateway 真实 Socket.IO 定向 e2e：8 条通过，覆盖 action ack 仅回执、四连接 event→snapshot 顺序。
+- Web Vitest：13 条通过，覆盖 snapshot 初始/相同/更高/旧 seq、切局/切房 epoch、离房清理及重连 seq 保留。
+- 根目录 `pnpm verify`：通过；format/typecheck/lint/build/unit/e2e 全绿，web Playwright 24 条、server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
 
 ### [ ] Phase 2 — 可配置声明窗口超时
 
@@ -135,8 +169,8 @@ Branch：`feat/table-event-animations`
 
 目标：
 
-- 建立非权威事件动画队列，覆盖摸牌、出牌、吃碰杠胡、回合、牌墙变化和结算。
-- 动画结束后提交对应 snapshot；积压、失焦恢复和重连时快速追平最新权威状态。
+- 建立 `authoritativeSnapshot`/`presentedView` 双状态与非权威事件动画队列，覆盖摸牌、出牌、吃碰杠胡、回合、牌墙变化和结算。
+- 动画期间锁定操作；动画结束后才提交对应 snapshot 并展示其中的可选动作，防止下一状态按钮早于动画出现；积压、失焦恢复和重连时快速追平最新权威状态。
 - `prefers-reduced-motion` 下跳过位移动画但保留状态反馈。
 
 ### [ ] Phase 7 — 全站视觉与体验统一
@@ -147,6 +181,8 @@ Branch：`feat/web-visual-refresh`
 
 - 将牌桌设计系统应用到登录、游戏选择、大厅、房间和 Replay。
 - 统一布局、间距、层级、按钮、加载/空/错状态和明暗主题，并接通现有 ThemeToggle。
+- 建立全局 Toast 与路由错误恢复：访问已不存在/无权进入的 lobby、table 或 replay URL 时，不直接渲染 `ROOM_NOT_FOUND` 等协议错误字样，而是显示用户可读 Toast 后按会话状态跳转到可用页面；访问未匹配路由时同样用 Toast 替代裸 `404 Not Found`，已登录回 `/games`，未登录回 `/login`。
+- 覆盖直接输入 URL、刷新失效 URL、客户端导航和冷启动恢复四条路径；跳转不能循环，Toast 在目标页面可见且只显示一次。
 - 不改变这些页面的业务流程、路由或协议。
 
 ### [ ] Phase 8 — 综合验收与计划收尾

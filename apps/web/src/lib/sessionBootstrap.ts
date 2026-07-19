@@ -26,11 +26,11 @@ export async function establishSession(socket: Socket, nicknameOverride?: string
   }
   socket.on("session:kicked", () => {
     socket.disconnect();
-    useSessionStore.setState({ socket: null, room: null, view: null, kicked: true });
+    useSessionStore.setState({ socket: null, room: null, view: null, gameSeq: null, kicked: true });
   });
   socket.on("disconnect", () => {
     if (useSessionStore.getState().socket === socket) {
-      useSessionStore.setState({ socket: null, room: null, view: null });
+      useSessionStore.setState({ socket: null, room: null, view: null, gameSeq: null });
     }
   });
   const nickname = nicknameOverride ?? identity.data.nickname;

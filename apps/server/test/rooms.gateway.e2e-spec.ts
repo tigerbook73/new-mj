@@ -20,6 +20,7 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
   let makeToken: (userId: string) => string;
   let protocolVersion: string;
   let roomService: RoomService;
+  let gameService: GameService;
   const clients: ClientSocket[] = [];
 
   beforeAll(async () => {
@@ -34,6 +35,7 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     makeToken = (userId: string) =>
       jwtService.sign({ sub: userId }, { secret: configService.jwtSecret });
     roomService = app.get(RoomService);
+    gameService = app.get(GameService);
   });
 
   afterAll(async () => {
@@ -122,6 +124,36 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
 
     const views = (await snapshots) as Array<{ view: { seat: number }; seq: number }>;
     expect(views.map((v) => v.view.seat).sort()).toEqual([0, 1, 2, 3]);
+
+    const room = roomService.get(roomId)!;
+    const actingSeat = ([0, 1, 2, 3] as const).find(
+      (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+    );
+    expect(actingSeat).toBeDefined();
+    const action = gameService.getLegalActions(room.gameState, actingSeat!)[0];
+    expect(action).toBeDefined();
+    const deliveryOrder = [a, b, c, d].map(() => [] as string[]);
+    const actionSnapshots = [a, b, c, d].map(
+      (client, index) =>
+        new Promise<{ view: { seat: number }; seq: number }>((resolve) => {
+          client.once("game:event", () => deliveryOrder[index]!.push("event"));
+          client.once("game:snapshot", (snapshot) => {
+            deliveryOrder[index]!.push("snapshot");
+            resolve(snapshot);
+          });
+        }),
+    );
+    const accepted = await ack<object>([a, b, c, d][actingSeat!]!, "game:action", { action });
+    expect(accepted).toEqual({ ok: true, data: {} });
+    const updatedViews = await Promise.all(actionSnapshots);
+    expect(updatedViews.map(({ view }) => view.seat)).toEqual([0, 1, 2, 3]);
+    expect(new Set(updatedViews.map(({ seq }) => seq))).toEqual(new Set([room.lastEventSeq]));
+    expect(deliveryOrder).toEqual([
+      ["event", "snapshot"],
+      ["event", "snapshot"],
+      ["event", "snapshot"],
+      ["event", "snapshot"],
+    ]);
 
     // action from a seat that is not their turn must be rejected with ILLEGAL_ACTION
     // (game:action still requires a legal action; sending garbage is the simplest
