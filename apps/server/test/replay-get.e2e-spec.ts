@@ -40,10 +40,21 @@ describe("replay:get (e2e, socket.io-client — phase 4.5 step 3)", () => {
     await app.close();
   });
 
-  const connectAs = (userId: string): Promise<ClientSocket> => {
+  afterEach(() => {
+    for (const client of clients) client.disconnect();
+    clients.length = 0;
+  });
+
+  const connectAs = (userId: string, takeover = false): Promise<ClientSocket> => {
     const client = io(baseUrl, {
       transports: ["websocket"],
-      auth: { token: makeToken(userId), protocolVersion },
+      auth: {
+        token: makeToken(userId),
+        protocolVersion,
+        tabId: crypto.randomUUID(),
+        browserId: crypto.randomUUID(),
+        ...(takeover ? { takeover: true } : {}),
+      },
     });
     clients.push(client);
     return new Promise((resolve, reject) => {
@@ -127,7 +138,7 @@ describe("replay:get (e2e, socket.io-client — phase 4.5 step 3)", () => {
     // A second socket for the same userId — proves replay:get doesn't rely
     // on the gateway's ConnectionRegistry (requireConnection/seatOf), only
     // on handshake identity + RoomService's own seatUserIds check.
-    const sameUserSecondSocket = await connectAs("replay-registry-a");
+    const sameUserSecondSocket = await connectAs("replay-registry-a", true);
     void host;
 
     const result = await ack<ReplayGetResponse>(sameUserSecondSocket, "replay:get", {

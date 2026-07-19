@@ -8,6 +8,8 @@ export const PlayerSchema = z.object({
   avatar: z.string().optional(),
   isBot: z.boolean(),
   isReady: z.boolean(),
+  isAutoPiloted: z.boolean(),
+  isDisconnected: z.boolean(),
 });
 export type Player = z.infer<typeof PlayerSchema>;
 

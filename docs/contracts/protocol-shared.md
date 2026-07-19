@@ -8,11 +8,14 @@
 
 ```ts
 // 连接时 auth 载荷
-{ token: string, protocolVersion: string, resume?: { roomId: string } }
+{ token: string, protocolVersion: string, tabId: string, browserId: string, takeover?: boolean }
 ```
 
 - server 验证 JWT → 绑定 `socket.data.userId`；版本不匹配 → 拒绝连接并附 `VERSION_MISMATCH`（客户端提示刷新）；已实现见 `apps/server/src/gateway/auth.middleware.ts`
-- `resume` 存在时：server 校验该用户确在该房间，成功则自动重新加入 socket room 并推送 `game:snapshot`——**尚未实现**，MVP 阶段排除重连（见 `session-mechanics.md` "MVP 不实现"）
+- 重连不使用握手 `resume` 字段；客户端恢复登录后调用 `room:enter`，由该消息 ack 携带必要的 `RoomInfo` 与（命中 60 秒宽限期时）`{ view, seq }` 快照。该 `roomId` 从何而来见下方 `session:identity`。
+- **`session:identity`**（查询，握手成功后即可发）：`{}` → `{ userId, nickname, avatar?, activeRoom?: { roomId, phase } }`。`activeRoom` 是 server-truth 恢复依据（`RoomService.findActiveRoomForUser`，见 `session-mechanics.md` §12）——客户端不再靠自己记住的 `localStorage` roomId 猜测该恢复到哪，而是先查这个字段，非空时再对 `activeRoom.roomId` 发 `room:enter` 拿真正的快照；为空表示当前不在任何房间。
+- `tabId`（客户端 `sessionStorage` 持久化，同 tab 刷新不变、新开 tab 换新值）/`browserId`（客户端 `localStorage` 持久化，同源全部 tab 共享）是账号级并发连接仲裁用的身份信号，握手**必带**，缺失/非字符串直接 `UNAUTHORIZED`；生成逻辑见 `apps/web/src/lib/clientIdentity.ts`。
+- `takeover?: true` 仅用于"不同浏览器"这一种冲突（`browserId` 不匹配）下确认接管；`tabId` 相同（同一 tab 刷新）无条件静默接管，不看这个字段；`browserId` 相同但 `tabId` 不同（同浏览器另一个活跃 tab）无条件拒绝，这个字段也不起作用。完整仲裁逻辑与新增错误码 `SESSION_EXISTS_SAME_BROWSER` 见 `session-mechanics.md` "账号级并发连接约束"。
 
 ## 2. 统一信封与 ack/事件关系
 
@@ -30,7 +33,7 @@
 | --------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                       |
 | `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤到本连接应见的版本）；`deadline` **尚未实现**（超时代提交 pass 是 MVP 已知限制） |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 入座开局/切局时下发的权威快照；断线重连、`deadline` 同上未实现                                                          |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 入座开局/切局时下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }`                                   |
 
 身份一律取 `socket.data.userId`，payload 不含也不信任 userId（`decisions.md` D10 铁律）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
 

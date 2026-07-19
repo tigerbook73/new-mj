@@ -8,8 +8,8 @@ export function SignOutButton() {
   const navigate = useNavigate();
   const signOut = useSessionStore((state) => state.signOut);
 
-  const handleSignOut = () => {
-    signOut();
+  const handleSignOut = async () => {
+    await signOut();
     void navigate("/login", { replace: true });
   };
 

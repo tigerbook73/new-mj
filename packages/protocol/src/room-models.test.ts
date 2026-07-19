@@ -13,6 +13,8 @@ const validPlayer = {
   nickname: "Alice",
   isBot: false,
   isReady: true,
+  isAutoPiloted: false,
+  isDisconnected: false,
 };
 
 const validRoomInfo = {

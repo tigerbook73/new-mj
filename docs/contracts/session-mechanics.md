@@ -61,36 +61,39 @@ finished: 计算排名，对外公开 result
 
 **ack 请求**（已实现，详细 payload 见 `contracts/protocol-shared.md` 的通用信封约定）：
 
-| 消息          | 备注                                                                                                                                                                                                                                    |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播                                                                                                                                                  |
-| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）、房间名称（不填给默认值）；"进入新上下文"类消息，ack 给快照                                                                                                                                  |
-| `room:join`   | 可选 `seat`：给了必须是当前空座位（否则 `SEAT_TAKEN`），不给沿用"自动找第一个空位"；ack 给 `RoomInfo` 快照                                                                                                                              |
-| `room:ready`  | ack `{}`                                                                                                                                                                                                                                |
-| `room:addBot` | 仅房主（座位 0）、仅 `waiting` 阶段可调用；可选 `seat`（语义同 `room:join`），不给补入下一个空位；bot 立即视为已 ready；ack `{}`                                                                                                        |
-| `lobby:list`  | 查询，无副作用；`{ rulesetId, search? }` → `RoomSummary[]`，只返回 `phase==="waiting" && status==="open"` 的房间（MVP 不做观战/大厅列表实时推送，是一次性查询快照，search 按房间名称大小写不敏感子串匹配）                              |
-| `room:peek`   | 查询，无副作用，不占座；`{ roomId }` → `RoomInfo` 快照——房间页在玩家真正选座位前用它展示当前座位占用情况                                                                                                                                |
-| `room:leave`  | 无 payload，身份取自连接；`waiting` 阶段房主离开删整个房间（广播 `room:closed`），非房主离开只清空自己的座位（广播 `room:playerLeft`）；`in-game` 阶段等同断线（转托管，见评审点 H），不删房、不清座位；`finished` 阶段 no-op；ack `{}` |
+| 消息          | 备注                                                                                                                                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `room:start`  | 房主发起，4 人到达后可调用；触发 game 1；ack 只给回执，视图走 `game:snapshot` 事件单播                                                                                                                                  |
+| `room:create` | 可指定 sessionFormat（MVP 默认 "4-round"）、房间名称（不填给默认值）；"进入新上下文"类消息，ack 给快照                                                                                                                  |
+| `room:join`   | 可选 `seat`：给了必须是当前空座位（否则 `SEAT_TAKEN`），不给沿用"自动找第一个空位"；ack 给 `RoomInfo` 快照                                                                                                              |
+| `room:ready`  | ack `{}`                                                                                                                                                                                                                |
+| `room:addBot` | 仅房主（座位 0）、仅 `waiting` 阶段可调用；可选 `seat`（语义同 `room:join`），不给补入下一个空位；bot 立即视为已 ready；ack `{}`                                                                                        |
+| `lobby:list`  | 查询，无副作用；`{ rulesetId, search? }` → `RoomSummary[]`，只返回 `phase==="waiting" && status==="open"` 的房间（MVP 不做观战/大厅列表实时推送，是一次性查询快照，search 按房间名称大小写不敏感子串匹配）              |
+| `room:peek`   | 查询，无副作用，不占座；`{ roomId }` → `RoomInfo` 快照——房间页在玩家真正选座位前用它展示当前座位占用情况                                                                                                                |
+| `room:leave`  | 无 payload，身份取自连接；`waiting` 阶段房主离开删整个房间（广播 `room:closed`），非房主离开只清空自己的座位（广播 `room:playerLeft`）；`in-game` 阶段立即转永久托管，不删房、不清座位；`finished` 阶段 no-op；ack `{}` |
 
 `nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `decisions.md` D21。
 
-**断线托管**（评审点 H 的掉线路径）：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`——若房间对局中，把该座位标记 `isAutoPiloted = true` 并立刻跑一次 `autoPlayBots`（复用 bot 自动出牌的同一条扫描循环，`nextBotAction` 对 `isBot` 和 `isAutoPiloted` 一视同仁）。这个标记一旦置位永不清除，MVP 没有"断线重连恢复真人操控"的路径：`room.players` 里那个座位的记录还在（只是 `isAutoPiloted=true`），同一 `userId` 想重新 `room:join` 这个房间会直接被 `ALREADY_IN_ROOM` 拒绝——断线等同于这局及本会话剩余局数都由 bot 代打到底，没有回退方案。房间还在等待阶段（尚未 `room:start`）时断线不触发任何处理，座位原样留空，不在评审点 H 范围内。`room:leave`（主动离座，见下）在 `in-game` 阶段复用同一条内部标记逻辑，跟断线是同一个效果。
+**断线宽限期与永久托管（评审点 H 修订）**：`RoomsGateway.handleDisconnect` 在 socket 断开时查出该连接的 `{roomId, userId}`，交给 `RoomService.handleDisconnect`。若房间对局中，座位只标记 `isDisconnected = true` 并启动 server 独有的 60 秒定时器；宽限期内不设置 `isAutoPiloted`、不跑 bot，对局轮到该座位时保持等待。原 userId 在宽限期内通过 `room:enter` 重连时清除定时器、恢复真人控制，并在 ack 中携带该座位的 `{ view, seq }`。定时器到期后才置 `isAutoPiloted = true`、广播托管事件并补跑 bot。主动 `room:leave`/sign out 不经过宽限期，立即走永久托管路径。
 
 **全部真人退出即关房**：`handleDisconnect` 和 `room:leave` 的 `in-game` 分支共享同一个私有方法（`RoomService.markAutoPiloted`）——标记完 `isAutoPiloted` 之后，如果房间里已经没有任何真人座位（每个座位要么本来就是 `isBot`，要么都被标了 `isAutoPiloted`），就不再调用 `autoPlayBots` 继续跑，直接把房间标 `phase: "finished"`/`status: "closed"`，广播 `room:closed { reason: "allPlayersLeft" }`——避免没有任何人观战的房间里 bot 互相打到底白白占用 server 资源。
 
 **事件推送**（已实现）：
 
-| 消息                   | payload                                  | 说明                                                 |
-| ---------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `room:playerJoined`    | seat、nickname、isBot                    |                                                      |
-| `room:readyChanged`    | seat、ready                              |                                                      |
-| `room:scoreUpdated`    | scores、gameNumber、totalGames?          | 每局结束后 broadcast                                 |
-| `room:dealerChanged`   | dealer、gameNumber                       | 进下一局时                                           |
-| `room:sessionFinished` | result                                   | 会话结束，公开排名                                   |
-| `room:playerLeft`      | seat                                     | `waiting` 阶段非房主主动离开                         |
-| `room:closed`          | reason（`hostLeft` \| `allPlayersLeft`） | 房间不再存在：房主等待阶段离开，或对局中全部真人退出 |
+| 消息                      | payload                                  | 说明                                                 |
+| ------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `room:playerJoined`       | seat、nickname、isBot                    |                                                      |
+| `room:playerDisconnected` | seat                                     | 断线宽限期开始                                       |
+| `room:playerReconnected`  | seat                                     | 宽限期内恢复真人控制                                 |
+| `room:playerAutoPiloted`  | seat                                     | 到期或主动离开，永久转 AI 代打                       |
+| `room:readyChanged`       | seat、ready                              |                                                      |
+| `room:scoreUpdated`       | scores、gameNumber、totalGames?          | 每局结束后 broadcast                                 |
+| `room:dealerChanged`      | dealer、gameNumber                       | 进下一局时                                           |
+| `room:sessionFinished`    | result                                   | 会话结束，公开排名                                   |
+| `room:playerLeft`         | seat                                     | `waiting` 阶段非房主主动离开                         |
+| `room:closed`             | reason（`hostLeft` \| `allPlayersLeft`） | 房间不再存在：房主等待阶段离开，或对局中全部真人退出 |
 
 **未实现**：`room:starting`。
 
@@ -126,7 +129,16 @@ finished: 计算排名，对外公开 result
 - ❌ 战绩聚合查询接口（`stats:get`/`profile:get`，`contracts/protocol-shared.md` §4 仍是占位）：阶段 5 落地的是持久化层本身（schema + 写入 + `replay:get` 的 DB 兜底读取），不是一个新的聚合查询 API/UI，见 §11
 - ❌ `lobby:list` 实时推送（仍是查询快照，不随他人建房/离开自动刷新）
 
-**评审点 H【已定：采纳，已实现】**：对局中退出 = 转托管代打到局终，掉线与主动离座同路径，不允许中途散局。掉线路径（`RoomsGateway.handleDisconnect` → `RoomService.handleDisconnect`）和主动离座路径（`room:leave` → 同一条内部标记逻辑）都已实现，共享同一套托管机制，只是触发入口不同；`waiting` 阶段不适用这条规则（还没开局，谈不上"中途"），离座直接清空座位或删房，见 §6。
+**评审点 H【已定：采纳，2026-07 修订】**：对局中 socket 断开先进入 60 秒可逆宽限期，期间纯等待、不代打；同一 userId 通过 `room:enter` ack 恢复座位与快照。宽限期到期才永久转 AI 并补跑当前动作。主动 `room:leave`/sign out 立即永久托管。两态分别由 `isDisconnected` 与 `isAutoPiloted` 表示，`waiting` 阶段断线不处理。
+
+**账号级并发连接约束（三态仲裁，2026-07 修订）**：server 维护 `SessionRegistry(userId -> { socket, tabId, browserId })`（`apps/server/src/gateway/session-registry.ts`）。`tabId`/`browserId` 是客户端握手时**必带**的身份信号（见 `protocol-shared.md` §1），server 按下述优先级确定性判断新连接跟已有连接的关系，不再靠"猜大概率是自己刷新前的旧连接"这类概率性推断：
+
+1. **同一个 tab**（`tabId` 相同，典型是刷新）→ 无条件静默踢旧连接、接受新连接，第一次握手就成功，不看 `takeover` 字段——这吃掉了旧版"刷新时 race 到旧连接还没清理完"的问题，因为判断不再依赖"registry 里有没有残留项"这种时序敏感的信号，而是直接比对身份。
+2. **同一个浏览器、不同 tab**（`browserId` 相同、`tabId` 不同）、且旧连接仍在 registry 里（即仍活跃）→ 无条件拒绝，握手以新错误码 `SESSION_EXISTS_SAME_BROWSER` 失败，`takeover:true` 在这条分支不起作用（没有接管入口）。客户端（无论是走 `ensureConnected()` 被动恢复还是 `LoginView`/`AuthCallbackView` 显式登录撞上这个码，见 §12）一律跳转独立的 `/session-blocked` 死路页（`apps/web/src/views/SessionBlockedView.tsx`）：只尝试 `window.close()`（对非脚本打开的普通 tab 是 best-effort，大概率静默失败），**不清任何本地凭证**——`localStorage` 里的 dev-session token / Supabase session 是同浏览器全部 tab 共享的，旧连接那个 tab 还在用同一份凭证，清掉会把它一起挤下线；即使这个死路页所在的 tab 被刷新，`tabId` 仍是同一个值（`sessionStorage` 语义），会再次确定性地撞回同一个错误码，不存在"死页面里刷新反而抢到会话"的风险。
+3. **不同浏览器**（`browserId` 不同）→ 沿用旧版 `SESSION_EXISTS` 语义：默认拒绝；客户端确认接管后带 `takeover:true`，server 发送尽力而为的 `session:kicked` 并断开旧 socket，新连接再通过 `room:enter` 命中宽限期。**"确认接管"仅限有用户手势的显式登录路径**（`LoginView` 提交、OAuth 回调，`connectWithTakeoverPrompt`）——`App.tsx` 的整页加载会话恢复没有用户手势，理论上不会合法地撞上这条分支（本地能读到 token 就意味着这就是当年登录过的那个浏览器），万一出现就按"没有可用 token"处理，直接掉回未登录态，不弹确认、不静默接管。用户在 `confirm()` 里拒绝接管时，停留在原登录页面，内联提示改用其他账号登录（表单/OAuth 按钮继续可用），不跳转、不锁死。
+4. **无冲突** → 现有流程，直接放行。
+
+旧 socket 被踢后走普通断线路径，不触发主动离座托管；`registry.deleteIfSame` 摘除必须比较 socket 引用，避免旧连接延迟清理误删新登记。
 
 **评审点 I【已定：采纳快照优先】**：重连一律下发 `game:snapshot`，客户端弃旧状态整体替换；`lastSeq` 增量补发是未来可能的优化项，当前不实现。
 
@@ -214,5 +226,16 @@ Player C: room:leave {}
 - **三张表，Prisma 管理，无跨表外键**（`apps/server/prisma/schema.prisma`）：`profiles`（`id` = 真实 Supabase `auth.users.id`，`nickname`/`avatar`，只在真实 Supabase 登录成功后由 `auth.middleware.ts` upsert，dev 假登录不写这张表）、`room_sessions`（`id` = roomId，`rulesetId`/`sessionFormat`/`result: SessionResult`/`finishedAt`，会话结束时归档一行）、`game_logs`（`roomId`+`gameNumber` 复合唯一，`rulesetId`/`seatUserIds`/`events`/`finalState`，每局结束归档一行，跟 §10 的内存 `FinishedGameLog` 同形状 + 多一个 `rulesetId` 字段，让归档记录不依赖 `room_sessions` 行是否存在就能自解释）。三表互相之间、和 `auth.users` 之间都不建外键——`game_logs` 行必然先于对应 `room_sessions` 行写入（局结束 vs 会话结束不是同一时刻），硬 FK 会拒绝这些插入；`decisions.md` D7"单向引用 userId"的精神延伸到这里，一致性由应用层保证，不靠数据库约束。
 - **写入路径 fire-and-forget**：`RoomService.handleGameEnd`（每局结束）和会话结束时分别调 `PersistenceService.archiveGame`/`archiveSession`，都不 `await`——失败只记日志，绝不能让"存历史记录"这件事有能力打断正在进行的对局逻辑（对局本身的正确性不依赖持久化是否成功）。`PersistenceService` 在 `DATABASE_URL` 未配置时每个方法直接短路成 no-op/`null`，不会让 Prisma 真的尝试连接。
 - **读取路径**：`replay:get`/`debug:replayOmniscientView` 在内存里的 `room.finishedGames` 找不到对应局时（即该房间对象不在 `RoomService` 的内存 `Map` 里——按上面的说明，这只可能是"进程重启过"），退回查 `game_logs` 表；查到则照常走 `rebuildPlayerView`/`getOmniscientView` 重建返回值。`RoomService.getReplay`/`getReplayOmniscientView` 因此是 `async`，`RoomsGateway` 用只服务这两个 handler 的 `replyAsync`（其余 handler 保持同步 `reply()`，不受影响）。
-- **鉴权**：`auth.middleware.ts` 按 `ConfigService.supabaseUrl`/`supabaseServiceKey` 是否配置分支——配置了就用 `@supabase/supabase-js` 的 `auth.getUser(token)` 委托 Supabase 自己的服务器验证真实 token（`socket.data.userId` = Supabase 返回的 `user.id`，同时 fire-and-forget upsert 一行 `profiles`）；未配置就回退 D16 的开发态共享 HS256 校验——两条路径共用同一个中间件函数，靠配置存在与否分支，不是新增一个"测试模式"开关，现有全部 e2e（不设 `SUPABASE_URL`）零改动继续用旧路径。
+- **鉴权**：`auth.middleware.ts` 按 `ConfigService.supabaseUrl`/`supabaseServiceKey` 是否配置分支——未配置就走 D16 的开发态共享 HS256 校验。配置了且 `ConfigService.isProduction` 为 false（`NODE_ENV !== "production"`）时，**先同步尝试同一份 D16 HS256 校验**（不等一次可能连不上本地 GoTrue 的网络往返）；不是有效 dev token 才用 `@supabase/supabase-js` 的 `auth.getUser(token)` 委托 Supabase 自己的服务器验证真实 token（`socket.data.userId` = Supabase 返回的 `user.id`，同时 fire-and-forget upsert 一行 `profiles`）；两者都失败才 `UNAUTHORIZED`。生产环境（`NODE_ENV=production`）完全跳过 D16 分支，只走真实 Supabase 校验（`decisions.md` D16/D28）——这是为了让 D23 提交进 git 的 Supabase CLI demo 配置不会挡住本地 `pnpm dev` 的假昵称登录，同时保证泄露的 dev secret 在生产环境完全没有可乘之机。两条主路径仍共用同一个中间件函数，靠配置存在与否分支，不是新增一个"测试模式"开关，现有全部 e2e（不设 `SUPABASE_URL`）零改动继续用旧路径。
 - 完整取舍记录见 `decisions.md` D22。
+
+## 12. 客户端会话恢复：server-truth 优先（`decisions.md` D28）
+
+- **`playerRooms: Map<userId, roomId>`**（`RoomService`）：唯一的 userId→roomId 反查索引，只追踪真实玩家（bot 用合成 `bot:${uuid}` id，从不写入）。`findActiveRoomForUser(userId)` 是它唯一的读接口，供 `session:identity` 的 ack 消费（见 `protocol-shared.md` §1）。
+  - 写入：座位真正入座时（`create`/`join` 内部的 `seatPlayer`）。
+  - 清除：座位真正清空时——`leave()`/`removePlayer()` 的非托管分支、`closeAbandonedRoom()`（对局中最后一个真人离场）、一个 session（多局）整体结束（`handleGameEnd` 的 `!shouldContinue` 分支）。
+  - **故意不清除**：座位被永久 auto-pilot 接管时（`markAutoPiloted`）。设计决策：用户仍应该能被带回这个房间围观，而不是断线/被 AI 接管之后就在 server 眼里"查无此房"——`TableView` 对这种"有座位、没有可恢复视角"的情况渲染只读的"已被 AI 接管"提示，见下。
+- **client 端不再有单独的"恢复"状态机**：`apps/web/src/lib/sessionBootstrap.ts` 的 `ensureConnected()`/`doConnect()`/`establishSession()` 只负责"连上 socket + 拿身份 + 挂 `session:kicked`/`disconnect` 监听"，不做任何路由判断；`session:kicked`/`disconnect` 触发时只重置 store 状态（`socket:null` 等），不 `navigate()`、不整页刷新。
+- **"该渲染什么/该在哪个 URL"统一收口到 react-router 的 `loader`**（`apps/web/src/router.tsx` 的 `protectedLoader`）：每个受保护路由（`/games`、`/lobby/:roomId`、`/room/:roomId`、`/replay/:roomId/:gameNumber`）的 loader 在组件挂载前跑，读 `session:identity` 给的 `activeRoomHint`（或已经 fetch 过的 `store.room`），跟当前路由的 `:roomId` 比对，不一致就 `redirect()`，从不出现"先渲染错的、再纠正"的一帧。`useRevalidator()`（`components/RevalidateOnSessionLoss.tsx`）把"没有发生导航但状态变了"（被踢/断线）接到同一套 loader 判断上——全应用只有 loader 这一处会为"状态不匹配"发起路由变化。
+- **`room:enter` 的座位重绑定**：`RoomsGateway.handleRoomEnter` 现在会判断调用者是否能在 `room.players` 里定位到自己的座位——能定位到就调 `ConnectionRegistry.track()`（重新绑定该座位的 socket，修复重连后 `game:snapshot`/`game:event` 单播仍打到旧 socket 的问题），定位不到（纯预览/未入座）才退回 `enter()`。
+- 服务器重启后，内存态房间本身就不存在了（架构未变，见 §11 开头），`playerRooms` 和"client 记住的 last-room"两种机制在这种情况下都救不回来——这是 server-truth 相对 client-only 机制严格更优、而非"各有取舍"的原因，见 `decisions.md` D28。

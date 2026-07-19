@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { GameConfigSchema, SeatIdSchema, SessionFormatSchema } from "./common.ts";
+import type { PlayerViewBase } from "./game.ts";
+import type { RoomInfo } from "./room-models.ts";
 
 export const RoomCreateRequestSchema = z.object({
   rulesetId: z.string(),
@@ -43,6 +45,7 @@ export type RoomPeekRequest = z.infer<typeof RoomPeekRequestSchema>;
 
 export const RoomEnterRequestSchema = z.object({ roomId: z.string() });
 export type RoomEnterRequest = z.infer<typeof RoomEnterRequestSchema>;
+export type RoomEnterResponse = { room: RoomInfo; view?: PlayerViewBase; seq?: number };
 
 /** Each ruleset owns its Action union; core is the sole authority on legality. */
 export const GameActionRequestSchema = z.object({ action: z.unknown() });

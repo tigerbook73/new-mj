@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
 import type { PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
+import { clearDevSession } from "@/lib/devAuth";
+import { ack } from "@/lib/socket";
 import { supabase } from "@/lib/supabase";
+
+export interface ActiveRoomHint {
+  roomId: string;
+  phase: string;
+}
 
 // 骨架先行：字段形状由 3c（socket/user）、3d（room）、3e（view）逐步填充实现。
 export type SessionState = {
@@ -10,9 +17,24 @@ export type SessionState = {
   nickname: string | null;
   room: RoomInfo | null;
   view: PlayerViewBase | null;
+  /** Set by the session:kicked handler (sessionBootstrap.ts) so the login
+   * screen can show a "taken over" message without a URL query param —
+   * cleared on the next connect attempt. */
+  kicked: boolean;
+  /**
+   * session:identity's cheap activeRoom hint (roomId+phase, no full RoomInfo)
+   * — lets the /games loader (router.tsx) redirect to the right place right
+   * after a fresh connect, before any room-specific loader has fetched the
+   * real `room`. Superseded by `room` the moment it's set (setRoom clears
+   * this) so a stale hint can never re-route someone back into a room they
+   * already left.
+   */
+  activeRoomHint: ActiveRoomHint | null;
   setSocket: (socket: Socket | null) => void;
   setUser: (userId: string, nickname: string) => void;
-  signOut: () => void;
+  setKicked: (kicked: boolean) => void;
+  setActiveRoomHint: (hint: ActiveRoomHint | null) => void;
+  signOut: () => Promise<void>;
   setRoom: (room: RoomInfo | null) => void;
   setView: (view: PlayerViewBase | null) => void;
   /**
@@ -41,24 +63,48 @@ export const useSessionStore = create<SessionState>((set) => ({
   nickname: null,
   room: null,
   view: null,
+  kicked: false,
+  activeRoomHint: null,
   setSocket: (socket) => set({ socket }),
   setUser: (userId, nickname) => set({ userId, nickname }),
-  signOut: () =>
-    set((state) => {
-      state.socket?.disconnect();
-      // Best-effort, and a no-op when supabase is undefined (unconfigured,
-      // or the dev nickname login path which never establishes a Supabase
-      // session) — local state below is cleared either way.
-      void supabase?.auth.signOut();
-      return { socket: null, userId: null, nickname: null, room: null, view: null };
-    }),
-  setRoom: (room) => set({ room }),
+  setKicked: (kicked) => set({ kicked }),
+  setActiveRoomHint: (activeRoomHint) => set({ activeRoomHint }),
+  signOut: async () => {
+    const { socket, room } = useSessionStore.getState();
+    if (socket && room)
+      await Promise.race([
+        ack(socket, "room:leave", {}),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]);
+    await supabase?.auth.signOut();
+    clearDevSession();
+    socket?.disconnect();
+    set({
+      socket: null,
+      userId: null,
+      nickname: null,
+      room: null,
+      view: null,
+      kicked: false,
+      activeRoomHint: null,
+    });
+  },
+  setRoom: (room) => set({ room, activeRoomHint: null }),
   setView: (view) => set({ view }),
   applyPlayerJoined: (seat, nickname, isBot, avatar) =>
     set((state) => {
       if (!state.room) return state;
       const players = [...state.room.players] as RoomInfo["players"];
-      players[seat] = { userId: "", seatId: seat, nickname, isBot, isReady: false, avatar };
+      players[seat] = {
+        userId: "",
+        seatId: seat,
+        nickname,
+        isBot,
+        isReady: false,
+        isAutoPiloted: false,
+        isDisconnected: false,
+        ...(avatar ? { avatar } : {}),
+      };
       return { room: { ...state.room, players } };
     }),
   applyReadyChanged: (seat, ready) =>

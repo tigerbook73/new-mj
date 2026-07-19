@@ -46,4 +46,27 @@ export class ConfigService {
   get supabaseServiceKey(): string | undefined {
     return process.env["SUPABASE_SERVICE_KEY"];
   }
+
+  /**
+   * D16 dev-JWT gate: when Supabase is configured, auth.middleware.ts tries
+   * the D16 dev JWT first (before Supabase) only when this is false, and
+   * skips the D16 path entirely when true — so a leaked/default dev secret
+   * can never bypass a real deployment's auth, regardless of what
+   * SUPABASE_URL happens to be set to.
+   */
+  get isProduction(): boolean {
+    return process.env["NODE_ENV"] === "production";
+  }
+
+  /**
+   * Mid-game disconnect grace period (session-mechanics.md 评审点 H) before a
+   * seat is permanently handed to autoPlayBots. Overridable so e2e tests
+   * don't have to burn real wall-clock time waiting out the production
+   * 60-second default.
+   */
+  get disconnectGraceMs(): number {
+    const raw = process.env["DISCONNECT_GRACE_MS"];
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 60_000;
+  }
 }

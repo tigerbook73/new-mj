@@ -46,7 +46,12 @@ describeIfDb("replay:get DB fallback for a room not in memory (phase 5.3)", () =
   const connectAs = (userId: string): Promise<ClientSocket> => {
     const client = io(baseUrl, {
       transports: ["websocket"],
-      auth: { token: makeToken(userId), protocolVersion },
+      auth: {
+        token: makeToken(userId),
+        protocolVersion,
+        tabId: crypto.randomUUID(),
+        browserId: crypto.randomUUID(),
+      },
     });
     clients.push(client);
     return new Promise((resolve, reject) => {

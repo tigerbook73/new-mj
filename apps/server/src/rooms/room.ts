@@ -37,13 +37,9 @@ export interface RoomPlayer {
   avatar?: string;
   isBot: boolean;
   isReady: boolean;
-  /**
-   * Set once this seat's socket disconnects mid-game (session-mechanics.md
-   * §8 评审点 H): auto-played for the rest of the session just like a bot
-   * seat, never cleared — this MVP has no reconnect-to-resume-control path.
-   * Never true for isBot seats (bots have no socket to disconnect).
-   */
   isAutoPiloted: boolean;
+  isDisconnected: boolean;
+  disconnectedAt?: number;
 }
 
 /**

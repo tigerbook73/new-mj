@@ -3,18 +3,18 @@ import { jwtVerify } from "jose";
 import { deriveUserId, signDevToken } from "@/lib/devAuth";
 
 describe("deriveUserId", () => {
-  it("slugifies the nickname and appends a random suffix", () => {
+  it("slugifies the nickname into a deterministic pseudo-account id", () => {
     const id = deriveUserId("测试玩家 Alice!");
-    expect(id).toMatch(/^alice-[a-z0-9]{6}$/);
+    expect(id).toBe("dev:alice");
   });
 
   it("falls back to 'player' when the nickname has no ascii-alnum characters", () => {
     const id = deriveUserId("测试玩家");
-    expect(id).toMatch(/^player-[a-z0-9]{6}$/);
+    expect(id).toBe("dev:player");
   });
 
-  it("produces a different suffix on each call", () => {
-    expect(deriveUserId("Alice")).not.toBe(deriveUserId("Alice"));
+  it("returns the same account id for the same nickname", () => {
+    expect(deriveUserId("Alice")).toBe(deriveUserId("Alice"));
   });
 });
 

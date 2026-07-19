@@ -15,18 +15,18 @@
 
 ## 阶段路线
 
-| 阶段 | 内容                                                                                                                                              | 验收                                           | 状态 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- |
-| 0    | 规则与契约定义                                                                                                                                    | 四份规格文档定稿                               | ✅   |
-| 1    | core 基建 + junk RuleSet + CLI fuzz                                                                                                               | CLI 整局 + 1 万局 fuzz 绿                      | ✅   |
-| 1.5  | bloodbattle RuleSet（允许一次接口调整）                                                                                                           | 番型用例全绿 + fuzz                            | ✅   |
-| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk）                                                                              | 4 模拟客户端整局                               | ✅   |
-| 2→3  | 文档结构重构                                                                                                                                      | 新结构落地，详见 `../doc-map.md`               | ✅   |
-| 3    | web：登录/大厅/牌桌（先竖切）                                                                                                                     | 浏览器真人对局                                 | ✅   |
-| 4    | 垃圾胡打磨到完整可玩：AI 补位 + 断线托管 + 黑暗模式 + 大厅/房间 UI 重做 + Replay + 牌桌 UI 重做（原 4.1-4.5、4.7，无 4.6，见下方说明）            | 见下方"已完成阶段"小节                         | ✅   |
-| 5    | 持久化落地：事件日志/replay/战绩搬进 PG（重启后仍在）+ 真正的 Supabase OAuth（D16 触发条件）——原编号 4.6，从阶段 4 系列拉出单独立项（见下方说明） | 重启 server 后历史对局的 replay/战绩仍可查     | ✅\* |
-| 6    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI 框架（应是增量工作，见下方说明）                                                                  | 单人能对着 AI 完整打完一局血战                 |      |
-| 7    | mobile（Expo，血战完成后再考虑）                                                                                                                  |                                                |      |
+| 阶段 | 内容                                                                                                                                              | 验收                                       | 状态 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ---- |
+| 0    | 规则与契约定义                                                                                                                                    | 四份规格文档定稿                           | ✅   |
+| 1    | core 基建 + junk RuleSet + CLI fuzz                                                                                                               | CLI 整局 + 1 万局 fuzz 绿                  | ✅   |
+| 1.5  | bloodbattle RuleSet（允许一次接口调整）                                                                                                           | 番型用例全绿 + fuzz                        | ✅   |
+| 2    | server：gateway/RoomManager/托管/AI 补位（可与 1.5 并行，基于 junk）                                                                              | 4 模拟客户端整局                           | ✅   |
+| 2→3  | 文档结构重构                                                                                                                                      | 新结构落地，详见 `../doc-map.md`           | ✅   |
+| 3    | web：登录/大厅/牌桌（先竖切）                                                                                                                     | 浏览器真人对局                             | ✅   |
+| 4    | 垃圾胡打磨到完整可玩：AI 补位 + 断线托管 + 黑暗模式 + 大厅/房间 UI 重做 + Replay + 牌桌 UI 重做（原 4.1-4.5、4.7，无 4.6，见下方说明）            | 见下方"已完成阶段"小节                     | ✅   |
+| 5    | 持久化落地：事件日志/replay/战绩搬进 PG（重启后仍在）+ 真正的 Supabase OAuth（D16 触发条件）——原编号 4.6，从阶段 4 系列拉出单独立项（见下方说明） | 重启 server 后历史对局的 replay/战绩仍可查 | ✅\* |
+| 6    | 血战到底打磨到完整可玩，复用阶段 4 沉淀的 AI/UI 框架（应是增量工作，见下方说明）                                                                  | 单人能对着 AI 完整打完一局血战             |      |
+| 7    | mobile（Expo，血战完成后再考虑）                                                                                                                  |                                            |      |
 
 > \* 阶段 5 代码已完成（见下方"已完成阶段"），但 Google/GitHub 按钮点击后的完整 OAuth 跳转需要用户提供真实 OAuth Client secret 才能端到端验证，尚未验证，见下方"下一步"。
 >
@@ -50,13 +50,17 @@
 
 阶段 4（6 个子步骤）与阶段 5（持久化 + Supabase OAuth）代码均已完成并按 `../doc-map.md` §6 收尾吸纳，见上方"已完成阶段"的索引。
 
-阶段 5 唯一未闭环的是 OAuth 端到端验证：本沙盒用本地 `supabase start` 验证了 schema/持久化读写/GoTrue 真实 token 校验逻辑，但没能验证经 Kong 代理的完整 `/auth/v1/*` 请求（该沙盒 Kong 层的环境问题，非代码问题），以及 Google/GitHub 按钮点击后的真实 OAuth 跳转（需要用户提供的真实 OAuth Client secret）。
+阶段 5 唯一未闭环的是 OAuth 端到端验证：本沙盒用本地 `supabase start` 验证了 schema/持久化读写/GoTrue 真实 token 校验逻辑，但没能验证经 Kong 代理的完整 `/auth/v1/*` 请求（该沙盒 Kong 层的环境问题，非代码问题），以及 Google/GitHub 按钮点击后的真实 OAuth 跳转（需要用户提供的真实 OAuth Client secret）。本次 `auth-session-profile-fix-plan.md` 已开始实施：协议契约、profile/avatar、dev 伪账号持久化、sign out 顺序、账号级会话去重、断线 60 秒宽限期与 web 恢复骨架已落地；真实 OAuth 与完整多标签页/刷新手工验收仍未闭环。
 
-**下一步第一个动作**：等用户提供真实 Supabase 项目 URL/anon key/service role key，以及 Google/GitHub OAuth Client ID/Secret（填进 `.env`，参考 `.env.example`），端到端验证一遍登录→大厅→牌桌的真实 OAuth 流程，确认无误后阶段 5 正式收尾（按 `../doc-map.md` §6）；OAuth secret 到位前，可以先开始阶段 6 血战到底的打磨（两者互不阻塞）。
+**本次修复（D28）**：一次 code review 发现 7 处问题（`App.tsx`/`AuthCallbackView` 各自独立 connect 产生的竞态、dev token 优先级调整吞掉合法 Supabase session 的回归、`session:kicked`/`disconnect` 监听只挂在被动恢复路径漏了主动登录、`apps/server/AGENTS.md` 与代码顺序不一致、`auth.middleware.ts` 里一段确定性失败的死代码、`"new-mj:dev-session"` 散落 4 处硬编码、`LoginView` 潜在的重复 `navigate()`），修复过程中把恢复机制一并重构为 server-truth 驱动：`RoomService` 新增 `userId→roomId` 反查索引（`playerRooms`），`session:identity` 的 ack 带上 `activeRoom`；client 端删除了整个手写的 bootstrap 状态机（`App.tsx` 的 `useEffect`、`RequireAuth`、store 里的 `restoring`），改用 react-router 的 `loader`+`redirect()` 统一判断"当前状态是否匹配这个路由"，`useRevalidator()` 把被顶号/断线这类没有发生导航的状态变化接到同一套判断上——不再有任何地方"先渲染错的再纠正"。顺带修了 review 过程中发现的两个相邻 bug：`room:enter` 重连时没有重绑定 `ConnectionRegistry` 的座位 socket（导致重连后收不到下一次 `game:snapshot`/`game:event`）、`TableView` 一直没实现 `session-mechanics.md` §6 早就写了的"永久 auto-pilot → 只读围观提示"。完整设计见 `contracts/session-mechanics.md` §12，决策记录见 `decisions.md` D28。server 单测/e2e、web typecheck/lint/单测与 app e2e（含新增的两个"刷新后回到房间/大厅"场景）已全绿。
+
+根目录 `pnpm verify` 已于 2026-07-19 全绿：format/typecheck/lint/build/unit/e2e 全部通过；web Playwright 24 条通过，server e2e 21 条通过，core 包含 1000 局 junk 与 10000 局 bloodbattle fuzz。
+
+**下一步第一个动作**：重启本地 `pnpm dev`，先手工验证 dev 登录→建房开局→刷新→直接回到牌桌；再验证不开局刷新→回到大厅，以及两个标签页模拟顶号后旧标签不会自动重连。确认无误后再用真实 Supabase 项目和 OAuth secrets 做 Google/GitHub 登录→大厅→牌桌手工验收，阶段 5 正式收尾（按 `../doc-map.md` §6）。
 
 ## 待办
 
-- [ ] 阶段 4：协议补 nickname 字段（`room:create`/`room:join` payload 目前没有，`apps/server` 用 userId 派生占位昵称）——界面优化免不了要用真实昵称
+- [x] auth-session-profile-fix：nickname/avatar 已改为握手验证后的 server identity；dev 昵称为确定性伪账号；断线宽限期与账号级会话去重已开始实施，详见 `auth-session-profile-fix-plan.md`
 - [ ] 阶段 7 前：mobile 具体路线（是否 react-native-web 统一）
 - [ ] 真人协作触发时：repo 权限、是否上分支保护
 - [ ] 日麻立项时：按 `../architecture/variant-boundary.md` §2 走一次边界复审，重点是庄家轮换公式与会话排名策略两条"待验证"条目

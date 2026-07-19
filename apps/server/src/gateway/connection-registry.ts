@@ -6,6 +6,7 @@ export interface ConnectionInfo {
   roomId: string;
   userId: string;
   nickname: string;
+  avatar?: string;
 }
 
 /**
@@ -22,15 +23,22 @@ export class ConnectionRegistry {
   private readonly seatSockets = new Map<string, Map<SeatId, Socket>>();
   private readonly roomSockets = new Map<string, Set<Socket>>();
 
-  enter(client: Socket, roomId: string, userId: string, nickname: string): void {
+  enter(client: Socket, roomId: string, userId: string, nickname: string, avatar?: string): void {
     client.join(roomId);
-    this.bySocketId.set(client.id, { roomId, userId, nickname });
+    this.bySocketId.set(client.id, { roomId, userId, nickname, ...(avatar ? { avatar } : {}) });
     if (!this.roomSockets.has(roomId)) this.roomSockets.set(roomId, new Set());
     this.roomSockets.get(roomId)!.add(client);
   }
 
-  track(client: Socket, roomId: string, userId: string, nickname: string, seat: SeatId): void {
-    this.enter(client, roomId, userId, nickname);
+  track(
+    client: Socket,
+    roomId: string,
+    userId: string,
+    nickname: string,
+    seat: SeatId,
+    avatar?: string,
+  ): void {
+    this.enter(client, roomId, userId, nickname, avatar);
     if (!this.seatSockets.has(roomId)) this.seatSockets.set(roomId, new Map());
     // !: the map was just created above if missing, so it is always present here.
     this.seatSockets.get(roomId)!.set(seat, client);

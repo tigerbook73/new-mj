@@ -1,10 +1,12 @@
 import type { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { NestFactory } from "@nestjs/core";
-import type { Reply, RoomInfo, RoomSummary } from "@new-mj/protocol";
+import type { Reply, RoomInfo, RoomSummary, SessionIdentity } from "@new-mj/protocol";
 import { io, type Socket as ClientSocket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { ConfigService } from "../src/config/config.service";
+import { GameService } from "../src/core/game.service";
+import { RoomService } from "../src/rooms/room.service";
 
 const once = <T>(socket: ClientSocket, event: string): Promise<T> =>
   new Promise((resolve) => socket.once(event, resolve));
@@ -17,6 +19,7 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
   let baseUrl: string;
   let makeToken: (userId: string) => string;
   let protocolVersion: string;
+  let roomService: RoomService;
   const clients: ClientSocket[] = [];
 
   beforeAll(async () => {
@@ -30,6 +33,7 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     protocolVersion = configService.protocolVersion;
     makeToken = (userId: string) =>
       jwtService.sign({ sub: userId }, { secret: configService.jwtSecret });
+    roomService = app.get(RoomService);
   });
 
   afterAll(async () => {
@@ -40,7 +44,12 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
   const connectAs = (userId: string): Promise<ClientSocket> => {
     const client = io(baseUrl, {
       transports: ["websocket"],
-      auth: { token: makeToken(userId), protocolVersion },
+      auth: {
+        token: makeToken(userId),
+        protocolVersion,
+        tabId: crypto.randomUUID(),
+        browserId: crypto.randomUUID(),
+      },
     });
     clients.push(client);
     return new Promise((resolve, reject) => {
@@ -217,4 +226,88 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     expect(await ack<object>(observer, "room:leave", {})).toEqual({ ok: true, data: {} });
     await expect(left).resolves.toEqual({ userId: "participant-observer" });
   });
+
+  it("session:identity reports activeRoom only while the caller currently holds a seat", async () => {
+    const client = await connectAs("identity-user");
+
+    const before = await ack<SessionIdentity>(client, "session:identity", {});
+    expect(before).toMatchObject({ ok: true, data: { userId: "identity-user" } });
+    if (before.ok) expect(before.data.activeRoom).toBeUndefined();
+
+    const created = await ack<RoomInfo>(client, "room:create", { rulesetId: "junk" });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const after = await ack<SessionIdentity>(client, "session:identity", {});
+    expect(after).toMatchObject({
+      ok: true,
+      data: { activeRoom: { roomId: created.data.id, phase: "waiting" } },
+    });
+  });
+
+  it("room:enter rebinds a reconnecting seated player's per-seat socket (regression: a stale ConnectionRegistry entry silently swallows the next game:event unicast)", async () => {
+    process.env["DISCONNECT_GRACE_MS"] = "2000";
+    try {
+      const seatSockets = await Promise.all([
+        connectAs("rebind-a"),
+        connectAs("rebind-b"),
+        connectAs("rebind-c"),
+        connectAs("rebind-d"),
+      ]);
+      const [a, b, c, d] = seatSockets;
+
+      const created = await ack<RoomInfo>(a, "room:create", { rulesetId: "junk" });
+      if (!created.ok) throw new Error(`room:create failed: ${created.code}`);
+      const roomId = created.data.id;
+      for (const client of [b, c, d]) {
+        const joined = await ack<RoomInfo>(client, "room:join", { roomId });
+        if (!joined.ok) throw new Error(`room:join failed: ${joined.code}`);
+      }
+      for (const client of seatSockets) {
+        const ready = await ack<object>(client, "room:ready", { ready: true });
+        if (!ready.ok) throw new Error(`room:ready failed: ${ready.code}`);
+      }
+      const started = await ack<object>(a, "room:start", {});
+      if (!started.ok) throw new Error(`room:start failed: ${started.code}`);
+
+      // b (seat 1) disconnects without room:leave — enters the grace period
+      // (RoomService.handleDisconnect), same as a real network drop.
+      b.disconnect();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // A fresh connection, same identity, reconnects within the grace
+      // window — the exact client restore path (connect() + room:enter).
+      const bReconnected = await connectAs("rebind-b");
+      const entered = await ack<RoomInfo | { room: RoomInfo; view?: unknown; seq?: number }>(
+        bReconnected,
+        "room:enter",
+        { roomId },
+      );
+      expect(entered.ok).toBe(true);
+      if (entered.ok) expect("view" in entered.data).toBe(true);
+
+      // Drive a legal action from a still-connected seat (never seat 1 — a
+      // merely-disconnected-but-not-yet-auto-piloted seat isn't bot-driven,
+      // see RoomService.nextBotAction). The resulting game:event must reach
+      // bReconnected: before the fix, room:enter only called
+      // ConnectionRegistry.enter(), never track(), so seatSockets kept
+      // pointing at the original (now fully disconnected) `b` and this
+      // unicast/broadcast would silently go nowhere.
+      const gameService = new GameService();
+      const room = roomService.get(roomId)!;
+      const otherSeat = ([0, 2, 3] as const).find(
+        (seat) => gameService.getLegalActions(room.gameState, seat).length > 0,
+      );
+      if (otherSeat === undefined) throw new Error("no connected seat has a legal action");
+      const legalActions = gameService.getLegalActions(room.gameState, otherSeat);
+      const receivedByNewSocket = once(bReconnected, "game:event");
+      const acted = await ack<object>(seatSockets[otherSeat], "game:action", {
+        action: legalActions[0],
+      });
+      expect(acted.ok).toBe(true);
+      await expect(receivedByNewSocket).resolves.toBeDefined();
+    } finally {
+      delete process.env["DISCONNECT_GRACE_MS"];
+    }
+  }, 15000);
 });
