@@ -41,11 +41,15 @@ export const deriveAvatar = (user: User): string | undefined => {
  * Handshake middleware, not a per-message guard (architecture rule 3):
  * rejects the connection outright before `connection` fires.
  * Two verification paths chosen by whether Supabase config is present —
- * see docs/contracts/session-mechanics.md §11. When Supabase is configured
- * but a token fails its verification, falls back to the D16 dev JWT path,
- * but only outside production (`configService.isProduction`) — otherwise a
- * committed/default dev secret would let a forged token bypass real auth in
- * a shipped deployment.
+ * see docs/contracts/session-mechanics.md §11. Outside production
+ * (`configService.isProduction`), a Supabase-configured deployment tries the
+ * D16 dev JWT first — it's a synchronous check against the server's own
+ * secret, so it never pays for a network round-trip (or waits on a dead
+ * local GoTrue instance) for tokens that were never going to be Supabase
+ * tokens in the first place; only a token that fails the dev-JWT check falls
+ * through to real Supabase verification. In production the dev-JWT path is
+ * skipped entirely — otherwise a committed/default dev secret would let a
+ * forged token bypass real auth in a shipped deployment.
  */
 export const createAuthMiddleware = (
   jwtService: JwtService,
@@ -109,6 +113,18 @@ export const createAuthMiddleware = (
     const tabId = typeof auth.tabId === "string" ? auth.tabId : undefined;
     const browserId = typeof auth.browserId === "string" ? auth.browserId : undefined;
 
+    // The local dev login is already a JWT signed with the server's dev
+    // secret. When a local Supabase project is also configured, checking that
+    // token against Supabase first adds a network round-trip (and can wait for
+    // a dead local GoTrue instance) before reaching the D16 fallback.
+    if (supabase && !configService.isProduction) {
+      const sub = verifyDevJwt(token);
+      if (sub) {
+        finish(socket, sub, defaultNickname(sub), undefined, takeover, tabId, browserId, next);
+        return;
+      }
+    }
+
     if (supabase) {
       const { data, error } = await supabase.auth.getUser(token);
       if (!error && data.user) {
@@ -131,14 +147,6 @@ export const createAuthMiddleware = (
           next,
         );
         return;
-      }
-
-      if (!configService.isProduction) {
-        const sub = verifyDevJwt(token);
-        if (sub) {
-          finish(socket, sub, defaultNickname(sub), undefined, takeover, tabId, browserId, next);
-          return;
-        }
       }
 
       next(new WsAuthError("UNAUTHORIZED"));
@@ -185,7 +193,8 @@ const registerSession = (
 ): boolean => {
   const existing = registry.get(userId);
   if (existing && existing.socket !== socket) {
-    if (existing.tabId !== tabId) {
+    const sameTab = existing.tabId === tabId;
+    if (!sameTab) {
       if (existing.browserId === browserId) {
         next(new WsAuthError("SESSION_EXISTS_SAME_BROWSER"));
         return false;
@@ -195,7 +204,10 @@ const registerSession = (
         return false;
       }
     }
-    existing.socket.emit("session:kicked", { reason: "takeover" });
+    // A same-tab reconnect is the normal refresh/server-restart path. Close
+    // the stale transport without telling the old page it was taken over;
+    // that message is reserved for an explicit cross-browser takeover.
+    if (!sameTab) existing.socket.emit("session:kicked", { reason: "takeover" });
     existing.socket.disconnect(true);
   }
   registry.set(userId, { socket, tabId, browserId });

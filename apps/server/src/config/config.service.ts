@@ -48,10 +48,11 @@ export class ConfigService {
   }
 
   /**
-   * D16 fallback gate: when Supabase is configured but a token fails its
-   * verification, auth.middleware.ts retries the D16 dev JWT path only when
-   * this is false — so a leaked/default dev secret can never bypass a real
-   * deployment's auth, regardless of what SUPABASE_URL happens to be set to.
+   * D16 dev-JWT gate: when Supabase is configured, auth.middleware.ts tries
+   * the D16 dev JWT first (before Supabase) only when this is false, and
+   * skips the D16 path entirely when true — so a leaked/default dev secret
+   * can never bypass a real deployment's auth, regardless of what
+   * SUPABASE_URL happens to be set to.
    */
   get isProduction(): boolean {
     return process.env["NODE_ENV"] === "production";

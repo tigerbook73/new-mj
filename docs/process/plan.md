@@ -52,7 +52,9 @@
 
 阶段 5 唯一未闭环的是 OAuth 端到端验证：本沙盒用本地 `supabase start` 验证了 schema/持久化读写/GoTrue 真实 token 校验逻辑，但没能验证经 Kong 代理的完整 `/auth/v1/*` 请求（该沙盒 Kong 层的环境问题，非代码问题），以及 Google/GitHub 按钮点击后的真实 OAuth 跳转（需要用户提供的真实 OAuth Client secret）。本次 `auth-session-profile-fix-plan.md` 已开始实施：协议契约、profile/avatar、dev 伪账号持久化、sign out 顺序、账号级会话去重、断线 60 秒宽限期与 web 恢复骨架已落地；真实 OAuth 与完整多标签页/刷新手工验收仍未闭环。
 
-**下一步第一个动作**：用真实 Supabase 项目和 OAuth secrets 做 Google/GitHub 登录→大厅→牌桌手工验收；web bootstrap/sign-out/takeover UI 测试仍可在没有 OAuth secrets 时继续补齐。确认无误后阶段 5 正式收尾（按 `../doc-map.md` §6）。
+**本次修复（D28）**：一次 code review 发现 7 处问题（`App.tsx`/`AuthCallbackView` 各自独立 connect 产生的竞态、dev token 优先级调整吞掉合法 Supabase session 的回归、`session:kicked`/`disconnect` 监听只挂在被动恢复路径漏了主动登录、`apps/server/AGENTS.md` 与代码顺序不一致、`auth.middleware.ts` 里一段确定性失败的死代码、`"new-mj:dev-session"` 散落 4 处硬编码、`LoginView` 潜在的重复 `navigate()`），修复过程中把恢复机制一并重构为 server-truth 驱动：`RoomService` 新增 `userId→roomId` 反查索引（`playerRooms`），`session:identity` 的 ack 带上 `activeRoom`；client 端删除了整个手写的 bootstrap 状态机（`App.tsx` 的 `useEffect`、`RequireAuth`、store 里的 `restoring`），改用 react-router 的 `loader`+`redirect()` 统一判断"当前状态是否匹配这个路由"，`useRevalidator()` 把被顶号/断线这类没有发生导航的状态变化接到同一套判断上——不再有任何地方"先渲染错的再纠正"。顺带修了 review 过程中发现的两个相邻 bug：`room:enter` 重连时没有重绑定 `ConnectionRegistry` 的座位 socket（导致重连后收不到下一次 `game:snapshot`/`game:event`）、`TableView` 一直没实现 `session-mechanics.md` §6 早就写了的"永久 auto-pilot → 只读围观提示"。完整设计见 `contracts/session-mechanics.md` §12，决策记录见 `decisions.md` D28。server 单测/e2e、web typecheck/lint/单测与 app e2e（含新增的两个"刷新后回到房间/大厅"场景）已全绿。
+
+**下一步第一个动作**：跑一遍根目录 `pnpm verify` 确认全绿后，重启本地 `pnpm dev` 手工验证：dev 登录→建房开局→刷新→直接回到牌桌；不开局刷新→回到大厅；两个标签页模拟顶号确认不会自动重连。确认无误后再用真实 Supabase 项目和 OAuth secrets 做 Google/GitHub 登录→大厅→牌桌手工验收，阶段 5 正式收尾（按 `../doc-map.md` §6）。
 
 ## 待办
 

@@ -128,7 +128,7 @@ describe("session arbitration (SessionRegistry wired in)", () => {
     await withRegistry(second, next);
 
     expect(next).toHaveBeenCalledWith();
-    expect(first.emit).toHaveBeenCalledWith("session:kicked", { reason: "takeover" });
+    expect(first.emit).not.toHaveBeenCalled();
     expect(first.disconnect).toHaveBeenCalledWith(true);
     expect(registry.get("user-1")?.socket).toBe(second);
   });
@@ -269,7 +269,7 @@ describe("D16 dev JWT fallback when Supabase is configured", () => {
     expect(persistence.fireAndForget).toHaveBeenCalled();
   });
 
-  it("falls back to the D16 dev JWT outside production when Supabase verification fails", async () => {
+  it("uses the D16 dev JWT immediately outside production without a Supabase round-trip", async () => {
     getUser.mockResolvedValue({ data: { user: null }, error: new Error("invalid token") });
     const { middleware, config } = buildMiddleware();
     const token = jwtService.sign({ sub: "dev-user" }, { secret: config.jwtSecret });
@@ -280,6 +280,7 @@ describe("D16 dev JWT fallback when Supabase is configured", () => {
 
     expect(next).toHaveBeenCalledWith();
     expect(socket.data.userId).toBe("dev-user");
+    expect(getUser).not.toHaveBeenCalled();
   });
 
   it("never falls back in production, even if Supabase verification fails", async () => {

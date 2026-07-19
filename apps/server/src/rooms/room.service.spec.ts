@@ -48,12 +48,7 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
 });
 
 const newRoomService = () =>
-  new RoomService(
-    new GameService(),
-    new EventBus(),
-    fakePersistenceService(),
-    new ConfigService(),
-  );
+  new RoomService(new GameService(), new EventBus(), fakePersistenceService(), new ConfigService());
 
 describe("RoomService — pure helpers", () => {
   it("accumulateScores adds deltas seat-wise across multiple calls", () => {
@@ -389,6 +384,125 @@ describe("RoomService — leave (phase 4.4.4)", () => {
 
     expect(() => service.leave(room.id, "host")).not.toThrow();
     expect(room.players[0]).not.toBeNull();
+  });
+});
+
+describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)", () => {
+  it("maps the host after create, and a joined player after join", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    expect(service.findActiveRoomForUser("host")).toBe(room.id);
+
+    service.join(room.id, "p2", "P2");
+    expect(service.findActiveRoomForUser("p2")).toBe(room.id);
+  });
+
+  it("never maps a bot's synthetic userId", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    const bot = service.addBot(room.id, "host");
+
+    expect(service.findActiveRoomForUser(bot.userId)).toBeUndefined();
+  });
+
+  it("waiting phase: a non-host leaving clears just their mapping", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.join(room.id, "p2", "P2");
+
+    service.leave(room.id, "p2");
+
+    expect(service.findActiveRoomForUser("p2")).toBeUndefined();
+    expect(service.findActiveRoomForUser("host")).toBe(room.id);
+  });
+
+  it("waiting phase: the host leaving (room deleted) clears every seated userId's mapping", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.join(room.id, "p2", "P2");
+
+    service.leave(room.id, "host");
+
+    expect(service.findActiveRoomForUser("host")).toBeUndefined();
+    expect(service.findActiveRoomForUser("p2")).toBeUndefined();
+  });
+
+  it("removePlayer clears the removed userId's mapping", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.join(room.id, "p2", "P2");
+
+    service.removePlayer(room.id, "host", 1);
+
+    expect(service.findActiveRoomForUser("p2")).toBeUndefined();
+  });
+
+  it("in-game leave (auto-pilot) does NOT clear the mapping — explicit design decision", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    service.leave(room.id, "p2");
+
+    expect(room.players[1]).toMatchObject({ isAutoPiloted: true });
+    expect(service.findActiveRoomForUser("p2")).toBe(room.id);
+  });
+
+  it("closeAbandonedRoom (last human seat disconnects mid-game) clears every seated userId's mapping", () => {
+    jest.useFakeTimers();
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+
+    service.handleDisconnect(room.id, "host");
+    jest.advanceTimersByTime(60_000);
+
+    expect(room.phase).toBe("finished");
+    expect(service.findActiveRoomForUser("host")).toBeUndefined();
+    jest.useRealTimers();
+  });
+
+  it("a session finishing (4 rounds played) clears every seated userId's mapping", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    for (let round = 0; round < 4; round++) {
+      const played = playJunkGame(room.seed, {}, [], room.dealer);
+      if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
+      for (const { seat, action } of played.actions) {
+        if (room.phase !== "in-game") break;
+        service.applyPlayerAction(room.id, seat, action);
+      }
+    }
+
+    expect(room.phase).toBe("finished");
+    for (const userId of ["host", "p2", "p3", "p4"]) {
+      expect(service.findActiveRoomForUser(userId)).toBeUndefined();
+    }
+  });
+
+  it("creating a second room while still mapped to an unfinished first room overwrites the mapping (last write wins)", () => {
+    const service = newRoomService();
+    service.create("host", "Host", "junk", { rulesetId: "junk" });
+    const second = service.create(
+      "host",
+      "Host",
+      "junk",
+      { rulesetId: "junk" },
+      "4-round",
+      "Room 2",
+    );
+
+    expect(service.findActiveRoomForUser("host")).toBe(second.id);
   });
 });
 

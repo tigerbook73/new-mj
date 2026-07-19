@@ -10,7 +10,7 @@ import type {
   RoomReadyChangedEvent,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
-import { ack } from "@/lib/socket";
+import { ack, unwrapRoomEnterAck } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
 
 const initials = (nickname: string): string =>
@@ -39,12 +39,11 @@ export function LobbyView() {
       RoomInfo | { room: RoomInfo; view?: import("@new-mj/protocol").PlayerViewBase; seq?: number }
     >(socket, "room:enter", { roomId }).then((result) => {
       if (result.ok) {
-        const data = result.data;
-        const enteredRoom = "room" in data ? data.room : data;
+        const { room: enteredRoom, view } = unwrapRoomEnterAck(result.data);
         setPreview(enteredRoom);
-        if ("room" in data && data.view) {
+        if (view) {
           useSessionStore.getState().setRoom(enteredRoom);
-          useSessionStore.getState().setView(data.view);
+          useSessionStore.getState().setView(view);
           void navigate(`/room/${roomId}`);
         }
       } else setError(result.code);

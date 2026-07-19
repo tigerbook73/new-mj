@@ -40,6 +40,17 @@ const isGameEndedPayload = (payload: unknown): boolean =>
 export class RoomService {
   private readonly rooms = new Map<string, Room>();
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+  /**
+   * userId → roomId, server-truth source for client restore (session:identity's
+   * activeRoom, see docs/contracts/session-mechanics.md §12). Only tracks real
+   * players — bots use synthetic `bot:${uuid}` ids and are never seated via a
+   * client restore path. Deliberately *not* cleared when a seat transitions to
+   * isAutoPiloted — the user should still be able to be routed back to that
+   * room to spectate. Cleared only when the seat is actually freed (leave/
+   * removePlayer) or the room stops being a valid destination (abandoned/
+   * session finished).
+   */
+  private readonly playerRooms = new Map<string, string>();
 
   constructor(
     private readonly gameService: GameService,
@@ -185,11 +196,13 @@ export class RoomService {
     }
 
     if (userId === room.ownerUserId) {
+      this.untrackRoomPlayers(room);
       this.rooms.delete(roomId);
       this.eventBus.emit("room:closed", { roomId, reason: "hostLeft" });
       return;
     }
     room.players[seat] = null;
+    this.playerRooms.delete(userId);
     this.eventBus.emit("room:playerLeft", { roomId, seat: seat as SeatId });
   }
 
@@ -283,6 +296,7 @@ export class RoomService {
       throw new RoomServiceError("UNAUTHORIZED", "the host cannot be removed");
     }
     room.players[seat] = null;
+    if (!player.isBot) this.playerRooms.delete(player.userId);
     this.eventBus.emit("room:playerLeft", { roomId, seat });
     return { userId: player.userId, isBot: player.isBot };
   }
@@ -441,6 +455,7 @@ export class RoomService {
     room.phase = "finished";
     room.status = "closed";
     room.finishedAt = Date.now();
+    this.untrackRoomPlayers(room);
     this.eventBus.emit("room:closed", { roomId: room.id, reason: "allPlayersLeft" });
   }
 
@@ -505,6 +520,16 @@ export class RoomService {
 
   get(roomId: string): Room | undefined {
     return this.rooms.get(roomId);
+  }
+
+  findActiveRoomForUser(userId: string): string | undefined {
+    return this.playerRooms.get(userId);
+  }
+
+  private untrackRoomPlayers(room: Room): void {
+    for (const player of room.players) {
+      if (player && !player.isBot) this.playerRooms.delete(player.userId);
+    }
   }
 
   /**
@@ -631,6 +656,7 @@ export class RoomService {
       room.phase = "finished";
       room.status = "closed";
       room.finishedAt = Date.now();
+      this.untrackRoomPlayers(room);
       room.result = {
         winner: ranking[0]!.seatId,
         ranking,
@@ -697,6 +723,7 @@ export class RoomService {
       isDisconnected: false,
     };
     room.players[seatIndex] = player;
+    if (!isBot) this.playerRooms.set(userId, room.id);
     this.eventBus.emit("room:playerJoined", {
       roomId: room.id,
       seat: player.seatId,

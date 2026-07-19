@@ -24,3 +24,28 @@ export async function signDevToken(userId: string): Promise<string> {
   const key = new TextEncoder().encode(DEV_JWT_SECRET);
   return new SignJWT({ sub: userId }).setProtectedHeader({ alg: "HS256" }).sign(key);
 }
+
+const DEV_SESSION_KEY = "new-mj:dev-session";
+
+export interface DevSession {
+  token: string;
+  nickname: string;
+}
+
+/** Single home for the dev-session localStorage key/shape — every reader/writer goes through these three. */
+export function readDevSession(): DevSession | undefined {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DEV_SESSION_KEY) ?? "null") as DevSession | null;
+    return saved?.token ? saved : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeDevSession(session: DevSession): void {
+  localStorage.setItem(DEV_SESSION_KEY, JSON.stringify(session));
+}
+
+export function clearDevSession(): void {
+  localStorage.removeItem(DEV_SESSION_KEY);
+}

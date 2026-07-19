@@ -31,6 +31,7 @@ import {
   type RoomParticipant,
   type RoomSummary,
   type RoomEnterResponse,
+  type SessionIdentity,
 } from "@new-mj/protocol";
 import type { Server, Socket } from "socket.io";
 import { ZodError } from "zod";
@@ -229,12 +230,15 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   @SubscribeMessage("session:identity")
-  handleSessionIdentity(
-    @ConnectedSocket() client: Socket,
-  ): Reply<{ userId: string; nickname: string; avatar?: string }> {
+  handleSessionIdentity(@ConnectedSocket() client: Socket): Reply<SessionIdentity> {
     const userId = this.requireUserId(client);
     const identity = this.identity(client);
-    return { ok: true, data: { userId, ...identity } };
+    const roomId = this.roomService.findActiveRoomForUser(userId);
+    const phase = roomId ? this.roomService.get(roomId)?.phase : undefined;
+    return {
+      ok: true,
+      data: { userId, ...identity, ...(roomId && phase ? { activeRoom: { roomId, phase } } : {}) },
+    };
   }
 
   @SubscribeMessage("room:peek")
@@ -257,8 +261,20 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       if (!room) throw new RoomServiceError("ROOM_NOT_FOUND");
       const identity = this.identity(client);
       const resumed = this.roomService.reconnect(parsed.roomId, userId);
-      this.connections.enter(client, parsed.roomId, userId, identity.nickname, identity.avatar);
-      this.emitParticipantJoined(parsed.roomId, userId, identity.nickname, false, false);
+      const seatIndex = room.players.findIndex((player) => player?.userId === userId);
+      if (seatIndex >= 0) {
+        this.connections.track(
+          client,
+          parsed.roomId,
+          userId,
+          identity.nickname,
+          seatIndex as SeatId,
+          identity.avatar,
+        );
+      } else {
+        this.connections.enter(client, parsed.roomId, userId, identity.nickname, identity.avatar);
+      }
+      this.emitParticipantJoined(parsed.roomId, userId, identity.nickname, seatIndex >= 0, false);
       const roomInfo = this.snapshotWithParticipants(parsed.roomId);
       return resumed ? { room: roomInfo, view: resumed.view, seq: resumed.seq } : roomInfo;
     });

@@ -1,5 +1,11 @@
 import { io, type Socket } from "socket.io-client";
-import { PROTOCOL_VERSION, type Reply } from "@new-mj/protocol";
+import {
+  PROTOCOL_VERSION,
+  type PlayerViewBase,
+  type Reply,
+  type RoomEnterResponse,
+  type RoomInfo,
+} from "@new-mj/protocol";
 import { getBrowserId, getTabId } from "./clientIdentity";
 
 const SERVER_URL = import.meta.env["VITE_SERVER_URL"] ?? "http://localhost:3000";
@@ -61,4 +67,25 @@ export async function connectWithTakeoverPrompt(token: string): Promise<ConnectR
 /** ack<T>: emits a command/query and resolves with the server's Reply<T> envelope. */
 export function ack<T>(socket: Socket, event: string, payload: unknown): Promise<Reply<T>> {
   return new Promise((resolve) => socket.emit(event, payload, resolve));
+}
+
+/**
+ * room:enter's ack is a bare RoomInfo (waiting/browsing) or {room, view, seq}
+ * (mid-game reconnect) — this normalizes the two shapes for every caller
+ * (loaders, LobbyView) instead of each repeating `"room" in data ? ... : ...`.
+ */
+export function unwrapRoomEnterAck(data: RoomEnterResponse | RoomInfo): {
+  room: RoomInfo;
+  view?: PlayerViewBase;
+} {
+  if (!("room" in data)) return { room: data };
+  return { room: data.room, ...(data.view ? { view: data.view } : {}) };
+}
+
+/** Formats a connect() failure code for display; SESSION_EXISTS gets a friendlier message. */
+export function describeConnectError(code: string): string {
+  if (code === "SESSION_EXISTS") {
+    return "This account is signed in on a different browser. Sign in with a different account, or try again and confirm the takeover.";
+  }
+  return code;
 }

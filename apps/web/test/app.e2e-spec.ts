@@ -59,6 +59,72 @@ test("refreshing the same tab reconnects silently, no session-blocked / no promp
   await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
 });
 
+test("opening /login with a saved dev session restores directly to /games", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Saved Session Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  // A full navigation recreates the app while preserving this tab's
+  // localStorage identity. Once bootstrap restores the socket, LoginView
+  // must not leave a live authenticated session sitting on the login form.
+  await page.goto("/login");
+
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+});
+
+// server-truth restore (session:identity's activeRoom + the /games loader,
+// router.tsx): a cold reload must land back on the actual room/table, not
+// strand on /games or hang on TableView's "Waiting for game data…".
+
+test("refreshing while in an in-game room lands back on the table with data already populated", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Restore Table Host");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Create room" }).last().click();
+  await page.getByLabel("Room name").fill("Restore table room");
+  await page.getByRole("button", { name: "Create room" }).click();
+  await expect(page).toHaveURL(/\/lobby\/[0-9a-f-]{36}$/);
+
+  await page.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
+  await page.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
+  await page.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
+  await page.getByRole("checkbox", { name: "Ready" }).check();
+  await page.getByRole("button", { name: "Start game" }).click();
+  await expect(page).toHaveURL(/\/room\/[0-9a-f-]{36}$/, { timeout: 10_000 });
+  const roomUrl = page.url();
+
+  await page.reload();
+
+  await expect(page).toHaveURL(roomUrl, { timeout: 10_000 });
+  await expect(page.getByText(/^Table \(Seat/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Waiting for game data…")).not.toBeVisible();
+});
+
+test("refreshing while in a waiting-phase room lands back on that room's lobby", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Restore Lobby Host");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Create room" }).last().click();
+  await page.getByLabel("Room name").fill("Restore lobby room");
+  await page.getByRole("button", { name: "Create room" }).click();
+  await expect(page).toHaveURL(/\/lobby\/[0-9a-f-]{36}$/);
+  const lobbyUrl = page.url();
+
+  await page.reload();
+
+  await expect(page).toHaveURL(lobbyUrl, { timeout: 10_000 });
+  await expect(page.getByText("Restore lobby room")).toBeVisible({ timeout: 10_000 });
+});
+
 test("a second tab in the same browser is hard-blocked into /session-blocked on load alone, no confirm prompt, no form needed", async ({
   page,
   context,

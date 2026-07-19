@@ -1,17 +1,17 @@
 import { useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { LoginForm } from "@/components/login-form";
 import { SocialLoginForm } from "@/components/social-login-form";
-import { connectWithTakeoverPrompt } from "@/lib/socket";
-import { deriveUserId, signDevToken } from "@/lib/devAuth";
+import { connectWithTakeoverPrompt, describeConnectError } from "@/lib/socket";
+import { clearDevSession, deriveUserId, signDevToken, writeDevSession } from "@/lib/devAuth";
+import { establishSession } from "@/lib/sessionBootstrap";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 
 export function LoginView() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const setUser = useSessionStore((state) => state.setUser);
-  const setSocket = useSessionStore((state) => state.setSocket);
+  const kicked = useSessionStore((state) => state.kicked);
+  const setKicked = useSessionStore((state) => state.setKicked);
   const [nickname, setNickname] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -49,35 +49,45 @@ export function LoginView() {
 
     setPending(true);
     setError(null);
+    setKicked(false);
     const userId = deriveUserId(trimmed);
     const token = await signDevToken(userId);
-    localStorage.setItem("new-mj:dev-session", JSON.stringify({ token, nickname: trimmed }));
+    writeDevSession({ token, nickname: trimmed });
     const result = await connectWithTakeoverPrompt(token);
-    setPending(false);
 
     if (!result.ok) {
-      localStorage.removeItem("new-mj:dev-session");
+      setPending(false);
+      clearDevSession();
       if (result.code === "SESSION_EXISTS_SAME_BROWSER") {
         void navigate("/session-blocked");
         return;
       }
-      setError(
-        result.code === "SESSION_EXISTS"
-          ? "This account is signed in on a different browser. Sign in with a different account, or submit again and confirm the takeover."
-          : result.code,
-      );
+      setError(describeConnectError(result.code));
       return;
     }
 
-    setUser(userId, trimmed);
-    setSocket(result.socket);
-    void navigate("/games");
+    try {
+      await establishSession(result.socket, trimmed);
+    } catch (thrown) {
+      setPending(false);
+      setError(thrown instanceof Error ? thrown.message : "UNAUTHORIZED");
+      return;
+    }
+    // Not awaited — signOut() awaits GoTrueClient's initializePromise, which
+    // can be stuck retrying a dead Supabase instance; let it clean up the
+    // residual session in the background instead of blocking this login.
+    void supabase?.auth.signOut({ scope: "local" });
+    setPending(false);
+    // /games' own loader decides the actual destination (lobby/table/games)
+    // from server-truth room state — this only expresses "take me into the
+    // logged-in app".
+    void navigate("/games", { replace: true });
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
       <div className="flex w-full max-w-sm flex-col gap-6">
-        {new URLSearchParams(location.search).get("kicked") === "1" && (
+        {kicked && (
           <p className="rounded-md border border-destructive p-3 text-sm text-destructive">
             Your account was taken over by another connection.
           </p>

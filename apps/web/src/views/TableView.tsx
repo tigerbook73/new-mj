@@ -155,6 +155,22 @@ export function TableView() {
   };
 
   if (!view) {
+    // The table loader (router.tsx) only ever lets a `!view` room through
+    // when the caller's own seat is permanently auto-piloted (session-
+    // mechanics.md §6/§12) — every other "not resumable" case is redirected
+    // to /lobby/:id before this ever mounts. The generic fallback text below
+    // only covers a genuinely transient in-flight state, not a real dead end.
+    const mySeat = room?.players.find((player) => player?.userId === userId);
+    if (mySeat?.isAutoPiloted) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
+          <p>This seat has been taken over by AI — you're spectating, not playing.</p>
+          <Link to="/games" className="text-sm underline">
+            Back to games
+          </Link>
+        </div>
+      );
+    }
     return <div className="p-6">Waiting for game data…</div>;
   }
 
