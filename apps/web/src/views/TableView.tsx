@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Dialog } from "@base-ui/react/dialog";
 import type {
@@ -6,19 +6,20 @@ import type {
   GameAdviceResponse,
   GameEventEnvelope,
   GameSnapshot,
+  RoomReadyChangedEvent,
   SeatId,
   SessionResult,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
-import { DiscardPile, type DiscardEntry } from "@/components/mahjong/DiscardPile";
-import { HandRow } from "@/components/mahjong/HandRow";
-import { MeldGroup, type Meld } from "@/components/mahjong/MeldGroup";
-import { PlayerBadge } from "@/components/mahjong/PlayerBadge";
-import { WallStack } from "@/components/mahjong/WallStack";
+import { CenterStatus } from "@/components/mahjong/CenterStatus";
+import type { DiscardEntry } from "@/components/mahjong/DiscardPile";
+import type { Meld } from "@/components/mahjong/MeldGroup";
+import { RoundEndOverlay } from "@/components/mahjong/RoundEndOverlay";
+import { TableBoard, type SeatContent } from "@/components/mahjong/TableBoard";
+import { TableHud } from "@/components/mahjong/TableHud";
 import { ack } from "@/lib/socket";
-import { seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
+import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
 import { useSessionStore } from "@/store/session";
-import { useTableLayoutStore } from "@/store/tableLayout";
 
 /**
  * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myClaimOptions），
@@ -27,13 +28,36 @@ import { useTableLayoutStore } from "@/store/tableLayout";
  * 读取，不 import 任何 ruleset 专属类型（架构铁律 6）。
  */
 type ClaimOption = { action: Record<string, unknown> };
-type JunkSeatExtra = { handCount: number; melds: Meld[]; discards: DiscardEntry[] };
-type ViewExtras = { phase?: string; myClaimOptions?: ClaimOption[]; seats?: JunkSeatExtra[] };
+type JunkSeatExtra = {
+  handCount: number;
+  melds: Meld[];
+  discards: DiscardEntry[];
+  /** Public: this seat just drew and hasn't acted yet — see docs/variants/junk.md §7. */
+  justDrawn: boolean;
+};
+type GameResultLike =
+  | { type: "draw"; scoreDeltas: [number, number, number, number] }
+  | {
+      type: "win";
+      winner: number;
+      winners: number[];
+      winType: "zimo" | "ron";
+      from?: number;
+      scoreDeltas: [number, number, number, number];
+    };
+type ViewExtras = {
+  phase?: string;
+  myClaimOptions?: ClaimOption[];
+  seats?: JunkSeatExtra[];
+  /** Private: only present when it's my own seat's just-drawn tile. */
+  justDrawn?: number;
+  /** Public: the single most recent discard on the table — see docs/variants/junk.md §7. */
+  lastDiscard?: { seat: SeatId; tile: number };
+  /** Public: present once `phase==="finished"` — drives RoundEndOverlay below. */
+  result?: GameResultLike;
+};
 
-const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [] };
-
-/** Grid unit ~= container width / 20 (mj-next's convention: 4 hand rows + gutters per side). */
-const TILE_UNIT_DIVISOR = 20;
+const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [], justDrawn: false };
 
 export function TableView() {
   const navigate = useNavigate();
@@ -46,26 +70,12 @@ export function TableView() {
   const snapshotRevision = useSessionStore((state) => state.snapshotRevision);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
-  const setTileUnit = useTableLayoutStore((state) => state.setTileUnit);
-  const tileUnit = useTableLayoutStore((state) => state.tileUnit);
 
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
-
-  const tableRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = tableRef.current;
-    if (!el) return;
-    const updateUnit = () => setTileUnit(el.clientWidth / TILE_UNIT_DIVISOR);
-    const observer = new ResizeObserver(updateUnit);
-    observer.observe(el);
-    updateUnit();
-    return () => observer.disconnect();
-  }, [setTileUnit]);
 
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
@@ -103,6 +113,11 @@ export function TableView() {
     };
     const onSessionFinished = (message: { result: SessionResult }) =>
       setSessionResult(message.result);
+    // Reused for the between-rounds confirm gate too, not just pre-game ready-up
+    // — see docs/contracts/session-mechanics.md §6.
+    const onReadyChanged = (event: RoomReadyChangedEvent) => {
+      useSessionStore.getState().applyReadyChanged(event.seat, event.ready);
+    };
     const onClosed = ({ reason }: { reason: string }) => {
       const notice =
         reason === "hostLeft" ? "The owner closed this room." : "This room was closed.";
@@ -115,12 +130,14 @@ export function TableView() {
     activeSocket.on("room:scoreUpdated", onScoreUpdated);
     activeSocket.on("room:dealerChanged", onDealerChanged);
     activeSocket.on("room:sessionFinished", onSessionFinished);
+    activeSocket.on("room:readyChanged", onReadyChanged);
     activeSocket.on("room:closed", onClosed);
     return () => {
       activeSocket.off("game:snapshot", onSnapshot);
       activeSocket.off("game:event", onEvent);
       activeSocket.off("room:scoreUpdated", onScoreUpdated);
       activeSocket.off("room:dealerChanged", onDealerChanged);
+      activeSocket.off("room:readyChanged", onReadyChanged);
       activeSocket.off("room:sessionFinished", onSessionFinished);
       activeSocket.off("room:closed", onClosed);
     };
@@ -140,6 +157,12 @@ export function TableView() {
       cancelled = true;
     };
   }, [activeSocket, gameDeadline, gameSeq, snapshotRevision, view]);
+
+  const confirmNextRound = async () => {
+    setError(null);
+    const result = await ack(activeSocket, "room:ready", { ready: true });
+    if (!result.ok) setError(result.code);
+  };
 
   const sendAction = async (action: unknown) => {
     setError(null);
@@ -182,7 +205,7 @@ export function TableView() {
     const mySeat = room?.players.find((player) => player?.userId === userId);
     if (mySeat?.isAutoPiloted) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
+        <div className="flex h-[100dvh] w-full flex-col items-center justify-center gap-3 overflow-hidden p-6 text-center">
           <p>This seat has been taken over by AI — you're spectating, not playing.</p>
           <Link to="/games" className="text-sm underline">
             Back to games
@@ -190,7 +213,11 @@ export function TableView() {
         </div>
       );
     }
-    return <div className="p-6">Waiting for game data…</div>;
+    return (
+      <div className="flex h-[100dvh] w-full items-center justify-center overflow-hidden p-6">
+        Waiting for game data…
+      </div>
+    );
   }
 
   const extras = view as unknown as ViewExtras;
@@ -203,25 +230,131 @@ export function TableView() {
 
   const seatData = (seat: SeatId): JunkSeatExtra => extras.seats?.[seat] ?? EMPTY_SEAT;
   const playerInfo = (seat: SeatId) => room?.players[seat];
-  const wallPerSide = Math.floor(view.wallCount / 4);
+
+  const seats = Object.fromEntries(
+    SEAT_DIRECTIONS.map((direction) => {
+      const seat = seatAt(view.seat, direction);
+      const data = seatData(seat);
+      const player = playerInfo(seat);
+      const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
+      const content: SeatContent = {
+        melds: data.melds.map((meld) => ({
+          ...meld,
+          ...(meld.from !== undefined
+            ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
+            : {}),
+        })),
+        // The just-drawn tile is pinned separately below — drop it from the main row/count so
+        // it isn't shown (or counted) twice.
+        handCount: drawnVisible ? data.handCount - 1 : data.handCount,
+        info: player?.nickname ?? `Seat ${seat + 1}`,
+        justDrawn:
+          direction === "bottom"
+            ? {
+                visible: extras.justDrawn !== undefined,
+                ...(extras.justDrawn !== undefined ? { tileId: extras.justDrawn } : {}),
+                ...(extras.justDrawn !== undefined && isMyTurn
+                  ? {
+                      onClick: () => void sendAction({ type: "discard", tile: extras.justDrawn }),
+                    }
+                  : {}),
+              }
+            : { visible: data.justDrawn },
+        ...(direction === "bottom"
+          ? {
+              hand:
+                extras.justDrawn !== undefined
+                  ? view.hand.filter((tile) => tile !== extras.justDrawn)
+                  : view.hand,
+              interactive: isMyTurn,
+              onDiscard: (tile: number) => void sendAction({ type: "discard", tile }),
+            }
+          : {}),
+      };
+      return [direction, content];
+    }),
+  ) as Record<SeatDirection, SeatContent>;
+
+  const discards = Object.fromEntries(
+    SEAT_DIRECTIONS.map((direction) => {
+      const seat = seatAt(view.seat, direction);
+      const entries = seatData(seat).discards.map((entry) => ({
+        ...entry,
+        claimedByDirection:
+          entry.claimedBy !== undefined
+            ? directionOf(view.seat, entry.claimedBy as SeatId)
+            : undefined,
+        justDiscarded: extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile,
+      }));
+      return [direction, entries];
+    }),
+  ) as Record<SeatDirection, DiscardEntry[]>;
+
+  const currentDirection = SEAT_DIRECTIONS.find(
+    (direction) => seatAt(view.seat, direction) === view.currentSeat,
+  );
 
   return (
-    <div className="flex min-h-screen flex-col gap-4 p-6">
-      <div className="flex items-center justify-between gap-4 pr-20">
-        <h1 className="text-lg font-medium">Table (Seat {view.seat})</h1>
-        <Button
-          variant="outline"
-          onClick={() => {
-            if (isOwner && hasOtherPlayers) setLeaveConfirmOpen(true);
-            else void leave();
-          }}
-        >
-          Leave room
-        </Button>
-      </div>
+    <div
+      data-testid="table-page"
+      className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+    >
+      <TableHud
+        roomName={room?.name ?? "Mahjong table"}
+        seat={view.seat}
+        gameNumber={room?.gameNumber ?? 1}
+        totalGames={room?.totalGames ?? 1}
+        dealer={room?.dealer ?? 0}
+        scores={room?.scores ?? [0, 0, 0, 0]}
+        onLeave={() => {
+          if (isOwner && hasOtherPlayers) setLeaveConfirmOpen(true);
+          else void leave();
+        }}
+      />
+
+      <main
+        data-testid="table-stage"
+        className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
+        style={{ containerType: "size" }}
+      >
+        <TableBoard
+          seats={seats}
+          discards={discards}
+          currentDirection={currentDirection}
+          center={
+            <CenterStatus
+              phase={extras.phase ?? "unknown"}
+              currentSeat={view.currentSeat}
+              wallCount={view.wallCount}
+              actions={
+                claimOptions.length > 0 ? (
+                  <div className="flex flex-wrap justify-center gap-1">
+                    {claimOptions.map((option, index) => (
+                      <Button key={index} size="sm" onClick={() => void sendAction(option.action)}>
+                        {String(option.action["type"])}
+                      </Button>
+                    ))}
+                  </div>
+                ) : undefined
+              }
+              error={error}
+            />
+          }
+        />
+        {extras.result && sessionResult == null && room && (
+          <RoundEndOverlay
+            result={extras.result}
+            gameNumber={room.gameNumber}
+            totalGames={room.totalGames ?? 1}
+            players={room.players}
+            myConfirmed={room.players[view.seat]?.isReady === true}
+            onConfirm={() => void confirmNextRound()}
+          />
+        )}
+      </main>
 
       {sessionResult != null && (
-        <div className="text-sm">
+        <div className="absolute bottom-3 left-3 z-20 max-w-md rounded-lg border bg-background/95 p-3 text-sm shadow-lg">
           <p>Session finished: {JSON.stringify(sessionResult)}</p>
           <div className="mt-1 flex flex-wrap gap-2">
             {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
@@ -238,127 +371,6 @@ export function TableView() {
           </div>
         </div>
       )}
-
-      {/* Three nested grids (outer=hands, middle=wall stacks, inner=discards+melds),
-          mirroring the mj-next reference layout. tileUnit === 0 means the
-          ResizeObserver hasn't measured yet — skip rendering to avoid a frame of
-          zero-sized tiles. */}
-      <div
-        ref={tableRef}
-        className="mx-auto grid aspect-square w-full max-w-3xl min-w-[320px] grid-cols-[10%_1fr_10%] grid-rows-[10%_1fr_10%] overflow-hidden rounded-lg bg-green-800 ring-2 ring-border dark:bg-green-950"
-      >
-        {tileUnit > 0 &&
-          SEAT_DIRECTIONS.map((direction) => {
-            const seat = seatAt(view.seat, direction);
-            const data = seatData(seat);
-            const player = playerInfo(seat);
-            const isBottom = direction === "bottom";
-            const gridArea: Record<SeatDirection, string> = {
-              top: "col-start-2 row-start-1",
-              left: "col-start-1 row-start-2",
-              right: "col-start-3 row-start-2",
-              bottom: "col-start-2 row-start-3",
-            };
-            const badge = (
-              <PlayerBadge
-                nickname={player?.nickname ?? `Seat ${seat}`}
-                handCount={data.handCount}
-                isCurrentTurn={view.currentSeat === seat}
-                isBot={player?.isBot ?? false}
-                isSelf={seat === view.seat}
-                avatar={player?.avatar}
-                isDisconnected={player?.isDisconnected}
-                isAutoPiloted={player?.isAutoPiloted}
-              />
-            );
-            const hand = (
-              <HandRow
-                direction={direction}
-                hand={isBottom ? view.hand : undefined}
-                handCount={data.handCount}
-                interactive={isBottom && isMyTurn}
-                onDiscard={(tile) => void sendAction({ type: "discard", tile })}
-              />
-            );
-            // Badge sits on the outer edge, hand tiles sit closer to the wall.
-            return (
-              <div
-                key={direction}
-                className={`flex items-center justify-center gap-1 overflow-hidden ${gridArea[direction]} ${direction === "top" || direction === "bottom" ? "flex-col" : "flex-row"}`}
-              >
-                {direction === "top" || direction === "left" ? (
-                  <>
-                    {badge}
-                    {hand}
-                  </>
-                ) : (
-                  <>
-                    {hand}
-                    {badge}
-                  </>
-                )}
-              </div>
-            );
-          })}
-
-        <div className="col-start-2 row-start-2 grid grid-cols-[13%_1fr_13%] grid-rows-[13%_1fr_13%] overflow-hidden">
-          {SEAT_DIRECTIONS.map((direction) => {
-            const gridArea: Record<SeatDirection, string> = {
-              top: "col-start-2 row-start-1",
-              left: "col-start-1 row-start-2",
-              right: "col-start-3 row-start-2",
-              bottom: "col-start-2 row-start-3",
-            };
-            return (
-              <div
-                key={direction}
-                className={`flex items-center justify-center overflow-hidden ${gridArea[direction]}`}
-              >
-                <WallStack direction={direction} count={wallPerSide} />
-              </div>
-            );
-          })}
-
-          <div className="col-start-2 row-start-2 grid grid-cols-[15%_1fr_15%] grid-rows-[15%_1fr_15%] overflow-hidden">
-            {SEAT_DIRECTIONS.map((direction) => {
-              const seat = seatAt(view.seat, direction);
-              const data = seatData(seat);
-              const gridArea: Record<SeatDirection, string> = {
-                top: "col-start-2 row-start-1",
-                left: "col-start-1 row-start-2",
-                right: "col-start-3 row-start-2",
-                bottom: "col-start-2 row-start-3",
-              };
-              return (
-                <div
-                  key={direction}
-                  className={`flex items-center justify-center gap-1 overflow-hidden ${gridArea[direction]} ${direction === "top" || direction === "bottom" ? "flex-col" : "flex-row"}`}
-                >
-                  <MeldGroup direction={direction} melds={data.melds} />
-                  <DiscardPile direction={direction} discards={data.discards} />
-                </div>
-              );
-            })}
-
-            <div className="col-start-2 row-start-2 flex flex-col items-center justify-center gap-2 overflow-auto bg-background/90 p-2 text-center text-xs">
-              <p>
-                Phase: {extras.phase ?? "unknown"} | Turn: seat {view.currentSeat} | Wall:{" "}
-                {view.wallCount}
-              </p>
-              {claimOptions.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1">
-                  {claimOptions.map((option, index) => (
-                    <Button key={index} size="sm" onClick={() => void sendAction(option.action)}>
-                      {String(option.action["type"])}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              {error && <p className="text-destructive">{error}</p>}
-            </div>
-          </div>
-        </div>
-      </div>
 
       <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
         <Dialog.Portal>
@@ -384,28 +396,35 @@ export function TableView() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      {import.meta.env.DEV && (
-        <div>
-          <h2 className="text-sm font-medium">Debug: omniscient view (dev-only)</h2>
-          <Button variant="outline" size="sm" onClick={() => void fetchDebugOmniscientView()}>
-            Show all hands + wall
-          </Button>
-          {debugView && (
-            <pre className="mt-2 max-w-full overflow-x-auto text-xs text-muted-foreground">
-              {JSON.stringify(debugView, null, 2)}
-            </pre>
-          )}
+      <details className="absolute right-3 bottom-3 z-20 max-h-[60dvh] w-72 overflow-auto rounded-lg border bg-background/95 p-2 text-xs shadow-lg">
+        <summary className="cursor-pointer font-medium">Diagnostics</summary>
+        {import.meta.env.DEV && (
+          <div className="mt-3">
+            <h2 className="font-medium">Debug: omniscient view (dev-only)</h2>
+            <Button
+              className="mt-1"
+              variant="outline"
+              size="sm"
+              onClick={() => void fetchDebugOmniscientView()}
+            >
+              Show all hands + wall
+            </Button>
+            {debugView && (
+              <pre className="mt-2 max-w-full overflow-x-auto text-muted-foreground">
+                {JSON.stringify(debugView, null, 2)}
+              </pre>
+            )}
+          </div>
+        )}
+        <div className="mt-3">
+          <h2 className="font-medium">Recent events</h2>
+          <ul className="text-muted-foreground">
+            {log.map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ul>
         </div>
-      )}
-
-      <div>
-        <h2 className="text-sm font-medium">Recent events</h2>
-        <ul className="text-xs text-muted-foreground">
-          {log.map((line, index) => (
-            <li key={index}>{line}</li>
-          ))}
-        </ul>
-      </div>
+      </details>
     </div>
   );
 }

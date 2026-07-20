@@ -1,27 +1,41 @@
-import type { SeatDirection } from "@/lib/seatLayout";
+import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
+import { sortTilesForDisplay } from "@/lib/mahjongTiles";
 import { Tile } from "./Tile";
 
 interface HandRowProps {
-  direction: SeatDirection;
   /** Present only for the seat rendering as "bottom" (me) — everyone else only exposes handCount. */
   hand?: number[] | undefined;
   handCount: number;
-  interactive?: boolean;
+  interactive?: boolean | undefined;
   onDiscard?: ((tile: number) => void) | undefined;
+  /** Precomputed by the shared HandTrack shell (see components/mahjong/HandTrack.tsx) so the drawn-tile slot next to it always matches. */
+  tileWidthPx: number;
+  tileHeightPx: number;
+  config: TableLayoutConfig;
 }
 
-export function HandRow({ direction, hand, handCount, interactive, onDiscard }: HandRowProps) {
-  const flexClass = direction === "left" || direction === "right" ? "flex-col" : "flex-row";
-
+export function HandRow({
+  hand,
+  handCount,
+  interactive,
+  onDiscard,
+  tileWidthPx,
+  tileHeightPx,
+  config,
+}: HandRowProps) {
   if (hand) {
+    const displayHand = sortTilesForDisplay(hand);
     return (
-      <div className={`flex ${flexClass} flex-wrap items-center justify-center gap-0.5`}>
-        {hand.map((tile, index) => (
+      <div
+        className="flex h-full w-full flex-nowrap items-center justify-end"
+        style={{ gap: `${config.tiles.tileGapPx}px` }}
+      >
+        {displayHand.map((tile, index) => (
           <Tile
             key={`${tile}-${index}`}
             tileId={tile}
-            direction={direction}
-            size="md"
+            widthPx={tileWidthPx}
+            heightPx={tileHeightPx}
             clickable={interactive}
             onClick={interactive ? () => onDiscard?.(tile) : undefined}
             testId="hand-tile"
@@ -32,9 +46,12 @@ export function HandRow({ direction, hand, handCount, interactive, onDiscard }: 
   }
 
   return (
-    <div className={`flex ${flexClass} items-center justify-center gap-0.5`}>
+    <div
+      className="flex h-full w-full items-center justify-end"
+      style={{ gap: `${config.tiles.tileGapPx}px` }}
+    >
       {Array.from({ length: handCount }, (_, index) => (
-        <Tile key={index} back direction={direction} size="sm" />
+        <Tile key={index} back widthPx={tileWidthPx} heightPx={tileHeightPx} />
       ))}
     </div>
   );

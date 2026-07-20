@@ -19,6 +19,7 @@ import { GamePickerView } from "@/views/GamePickerView";
 import { LobbyView } from "@/views/LobbyView";
 import { TableView } from "@/views/TableView";
 import { ReplayView } from "@/views/ReplayView";
+import { TableLayoutLabView } from "@/views/TableLayoutLabView";
 
 /**
  * /login is outside ProtectedLayout, but still checks server-truth: a
@@ -154,6 +155,9 @@ export const router = createBrowserRouter([
       // Dead end for SESSION_EXISTS_SAME_BROWSER — reached before this tab
       // ever gets a socket, no loader of its own needed.
       { path: "/session-blocked", element: <SessionBlockedView /> },
+      ...(import.meta.env.DEV
+        ? [{ path: "/dev/table-layout", element: <TableLayoutLabView /> }]
+        : []),
       {
         element: <ProtectedLayout />,
         children: [

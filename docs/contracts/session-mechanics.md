@@ -72,7 +72,9 @@ finished: 计算排名，对外公开 result
 | `room:peek`   | 查询，无副作用，不占座；`{ roomId }` → `RoomInfo` 快照——房间页在玩家真正选座位前用它展示当前座位占用情况                                                                                                                |
 | `room:leave`  | 无 payload，身份取自连接；`waiting` 阶段房主离开删整个房间（广播 `room:closed`），非房主离开只清空自己的座位（广播 `room:playerLeft`）；`in-game` 阶段立即转永久托管，不删房、不清座位；`finished` 阶段 no-op；ack `{}` |
 
-`nextRound`（进下一局）是 `RoomService` 内部方法，由局结束后自动触发，**不是**对外暴露的 ack 消息。
+`nextRound`（进下一局）是 `RoomService` 内部方法，**不是**对外暴露的 ack 消息，触发时机见下。
+
+**局间确认（2026-07 新增）**：一局结束且 `shouldContinue(room)` 为真时，server 不再立刻自动开下一局——先把每个真人座位的 `isReady` 重置为 `false`（bot / 已永久托管座位立即自动置 `true`，不阻塞真人），广播对应的 `room:readyChanged`（复用既有消息，不新增协议面）。客户端此时从 `game:snapshot` 已经能看到 `view.phase==="finished"` 与 `view.result`（连同已经收到的 `room:scoreUpdated` 累计分数），据此渲染"上一局结果+下一局"确认界面；每个真人调用既有的 `room:ready { ready: true }` 确认继续。`RoomService.ready()` 每次调用后都会检查这个房间是否正处于"等下一局"状态且全部座位 `isReady` 均为 `true`，一旦满足就立刻触发 `nextRound`。若确认过程中某座位断线转永久托管，视同自动确认并重新检查。这套机制刻意不引入新的 room 级 `phase` 取值——"正在等下一局"是内部标志（`Room.awaitingNextRound`），从不上线；客户端完全靠 `view.phase`（本局是否已结束）+ `players[].isReady`（谁还没确认）自行判断展示状态。
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息——`RoomService` 在每次 `applyPlayerAction`（真人动作）之后、以及每局开局（`beginGame`）之后，都会扫描所有 `isBot` 座位，用 `@new-mj/ai` 的 `chooseAction(getLegalActions(state, seat))` 选一个动作并直接调用同一条内部执行路径，循环到没有 bot 座位还有合法动作为止（即轮到真人，或对局结束）。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——`decisions.md` D18 末尾提过的"AI 只吃 PlayerView"设想本轮不做，理由与技术债记录见 `decisions.md` D21。
 
@@ -124,6 +126,7 @@ finished: 计算排名，对外公开 result
 - ✅ 房间名称（阶段 4.4）：`room:create` 可选 `name`，`room:join`/`room:addBot` 可选 `seat` 指定座位
 - ✅ Replay（阶段 4.5）：每局归档事件日志 + 终局状态快照，参与过的玩家可回放；明牌 replay 走独立调试通道，见 §10
 - ✅ 持久化（阶段 5）：事件日志/战绩落 PG，重启后 `replay:get` 仍可查；真正的 Supabase OAuth，见 §11
+- ✅ 局间确认（2026-07 新增）：每局结束后不立刻自动开下一局，等所有真人座位复用 `room:ready` 确认后才 `nextRound`，见 §6
 
 **MVP 不实现**：
 
@@ -179,10 +182,19 @@ Player A (房主): room:start {}
 ```
 [applyPlayerAction 收到的 events 里出现 GameEnded]
   server: 从 Settled 事件提取 scoreDeltas，更新 room.scores
-每个座位: 先收到终局可见 game:event，再收到终局 game:snapshot
+每个座位: 先收到终局可见 game:event（view.result 已可读），再收到终局 game:snapshot
 
 房间内所有人: room:scoreUpdated { scores, gameNumber: 1, totalGames: 4 }
-server: 计算 nextDealer = 1（轮转）并创建 game 2
+server: 重置真人座位 isReady=false（bot/托管座位自动 true），设 room.awaitingNextRound=true
+房间内所有人（真人座位重置那几条）: room:readyChanged { seat, ready: false } ×N
+  [客户端展示"上一局结果 + 确认下一局"界面]
+
+Player A/B/C/D: room:ready { ready: true }（各自确认）
+  ← 各自 ack ok
+  ← 房间内所有人: room:readyChanged { seat, ready: true } ×4
+  [最后一个座位确认后，全部 isReady===true]
+
+server: 计算 nextDealer = 1（轮转）并创建 game 2，room.awaitingNextRound=false
 房间内所有人: room:dealerChanged { dealer: 1, gameNumber: 2 }
 每个座位单独收到: game:snapshot { view: PlayerView(seat, game 2), seq, deadline? }
 ```

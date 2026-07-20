@@ -98,6 +98,7 @@ export class RoomService {
       dealer: 0,
       seed: 0,
       lastEventSeq: 0,
+      awaitingNextRound: false,
       createdAt: Date.now(),
       currentGameEvents: [],
       currentGameSeatUserIds: [null, null, null, null],
@@ -218,11 +219,21 @@ export class RoomService {
     this.eventBus.emit("room:playerLeft", { roomId, seat: seat as SeatId });
   }
 
+  /**
+   * Dual-purpose by design (docs/contracts/session-mechanics.md §6 "局间确认"):
+   * pre-game this is the `waiting`-phase ready-up `canStart()` gates on; between
+   * rounds it's reused as the confirm-to-continue gate `handleGameEnd` sets up
+   * (`room.awaitingNextRound`) — same message, same field, no new protocol
+   * surface. Only the latter case can trigger `nextRound` from here.
+   */
   ready(roomId: string, userId: string, ready: boolean): void {
     const room = this.mustGet(roomId);
     this.mustFindPlayer(room, userId).isReady = ready;
     const seat = room.players.findIndex((player) => player?.userId === userId) as SeatId;
     this.eventBus.emit("room:readyChanged", { roomId, seat, ready });
+    if (ready && room.awaitingNextRound && this.allReadyForNextRound(room)) {
+      this.advanceToNextRound(room);
+    }
   }
 
   canStart(room: Room): boolean {
@@ -478,6 +489,20 @@ export class RoomService {
       this.closeAbandonedRoom(room);
       return;
     }
+    // Newly-autopiloted seats auto-confirm the pending "next round?" gate too
+    // (§6), same as a bot — it must never be the reason nobody can continue.
+    if (room.awaitingNextRound && !player.isReady) {
+      player.isReady = true;
+      this.eventBus.emit("room:readyChanged", {
+        roomId: room.id,
+        seat: player.seatId,
+        ready: true,
+      });
+      if (this.allReadyForNextRound(room)) {
+        this.advanceToNextRound(room);
+        return;
+      }
+    }
     this.autoPlayBots(room);
   }
 
@@ -729,6 +754,32 @@ export class RoomService {
       return;
     }
 
+    // docs/contracts/session-mechanics.md §6 "局间确认": wait for every real
+    // seat to confirm (reusing room:ready/isReady) instead of dealing the
+    // next round immediately. Bot/autopiloted seats auto-confirm so they
+    // never block; if that already covers every seat (e.g. no humans left,
+    // or everyone happened to already be ready), advance right away.
+    room.awaitingNextRound = true;
+    for (const player of room.players) {
+      if (!player) continue;
+      player.isReady = player.isBot || player.isAutoPiloted;
+      this.eventBus.emit("room:readyChanged", {
+        roomId: room.id,
+        seat: player.seatId,
+        ready: player.isReady,
+      });
+    }
+    if (this.allReadyForNextRound(room)) {
+      this.advanceToNextRound(room);
+    }
+  }
+
+  private allReadyForNextRound(room: Room): boolean {
+    return room.players.every((player) => player === null || player.isReady);
+  }
+
+  private advanceToNextRound(room: Room): void {
+    room.awaitingNextRound = false;
     this.nextRound(room.id);
   }
 

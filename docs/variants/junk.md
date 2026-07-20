@@ -73,7 +73,9 @@
 
 ## 7. PlayerView 私有字段
 
-`JunkPlayerView`（`packages/core/src/rulesets/junk/types.ts`）在 `PlayerViewBase` 之上扩展：`phase`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`result`，以及 `TileId` 形式的 `melds`/`discards`（垃圾胡选择用 TileId，不是 TileKind——不同玩法可以有不同选择，见 `contracts/engine-contract.md` §5）。
+`JunkPlayerView`（`packages/core/src/rulesets/junk/types.ts`）在 `PlayerViewBase` 之上扩展：`phase`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`justDrawn`/`result`，以及 `TileId` 形式的 `melds`/`discards`（垃圾胡选择用 TileId，不是 TileKind——不同玩法可以有不同选择，见 `contracts/engine-contract.md` §5）。
+
+`justDrawn` 是这份清单里唯一分两层可见性的字段：`seats[].justDrawn`（布尔）公开给所有座位，标记"这一家现在是不是刚摸牌、还没对它/本回合做出行动"——这件事本身从来不是秘密（配套的 public `TileDrawn`/`GangReplacementDrawn` 事件本就不带 `tile`，只是不告诉你摸到了什么）；顶层 `justDrawn?: TileId` 只在请求视角正好是刚摸牌的那一家时才附加，用来在自己视角显示真实牌面。两者都在该家 discard/anGang/buGang 提交时一起清空（robKong 待裁决窗口期间保持"仍在摸牌决策中"直到裁决落定，见 `packages/core/src/rulesets/junk/state-machine.ts` 的 `resolveUnclaimed`）。庄家开局多摸的第 14 张牌视同一次摸牌，`createJunkGame` 发牌后即设置 `justDrawn`，语义与后续每回合的摸牌完全一致。
 
 ## 8. Config 清单（均有默认值，已确认：全取默认）
 

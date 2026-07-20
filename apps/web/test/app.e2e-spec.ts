@@ -101,7 +101,7 @@ test("refreshing while in an in-game room lands back on the table with data alre
   await page.reload();
 
   await expect(page).toHaveURL(roomUrl, { timeout: 10_000 });
-  await expect(page.getByText(/^Table \(Seat/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("table-hud")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Waiting for game data…")).not.toBeVisible();
 });
 

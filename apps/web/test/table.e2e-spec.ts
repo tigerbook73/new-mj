@@ -54,28 +54,78 @@ async function createAndStartRoom(browser: Browser, rulesetId: "junk" | "bloodba
   return { players, roomId };
 }
 
+async function expectDesktopTableFits(page: Page, viewport: { width: number; height: number }) {
+  await page.setViewportSize(viewport);
+  const tablePage = page.getByTestId("table-page");
+  const tableCore = page.getByTestId("table-core");
+  await expect(tablePage).toBeVisible();
+  await expect(tableCore).toBeVisible();
+  await expect(page.getByTestId("table-center-status")).toBeVisible();
+  for (const direction of ["top", "left", "right", "bottom"]) {
+    await expect(page.getByTestId(`player-track-${direction}`)).toBeVisible();
+    await expect(page.getByTestId(`player-info-${direction}`)).toBeVisible();
+    await expect(page.getByTestId(`table-area-${direction}`)).toBeVisible();
+  }
+
+  const dimensions = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.clientHeight);
+
+  const coreBox = await tableCore.boundingBox();
+  expect(coreBox).not.toBeNull();
+  expect(coreBox!.x).toBeGreaterThanOrEqual(0);
+  expect(coreBox!.y).toBeGreaterThanOrEqual(0);
+  expect(coreBox!.x + coreBox!.width).toBeLessThanOrEqual(viewport.width);
+  expect(coreBox!.y + coreBox!.height).toBeLessThanOrEqual(viewport.height);
+}
+
 // 3e 的核心验证：TableView 渲染 PlayerView 通用骨架，且能真的把一个动作发给
 // server 并成功执行——不是只渲染静态数据。房主(座位0)在第 1 局天然是庄家
 // （session-mechanics.md §5），游戏一开局就轮到他，所以他的手牌按钮应该立刻
 // 可点。
-test("junk table renders hands and a discard action succeeds", async ({ browser }) => {
+test("junk desktop table fits both target viewports and a discard succeeds", async ({
+  browser,
+}) => {
   const { players } = await createAndStartRoom(browser, "junk");
   const [host] = players;
 
-  const myBadge = host.getByTestId("player-badge").filter({ hasText: "(you)" });
-  await expect(myBadge).toBeVisible({ timeout: 10_000 });
+  // From the host's own view, "bottom" is always their own seat (seatAt(view.seat, "bottom") === view.seat).
+  const myInfo = host.getByTestId("player-info-bottom");
+  await expect(myInfo).toBeVisible({ timeout: 10_000 });
   const handTiles = host.getByTestId("hand-tile");
   await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
+  await expectDesktopTableFits(host, { width: 1440, height: 900 });
+  await expectDesktopTableFits(host, { width: 1366, height: 768 });
   const tileCountBefore = await handTiles.count();
+  const displayedTileIds = (await handTiles.evaluateAll((tiles) =>
+    tiles.map((tile) => Number(tile.getAttribute("data-tile-id"))),
+  )) as number[];
+  expect(displayedTileIds.map((tileId) => Math.floor(tileId / 4))).toEqual(
+    [...displayedTileIds].map((tileId) => Math.floor(tileId / 4)).sort((a, b) => a - b),
+  );
+  const discardedTileId = displayedTileIds[0]!;
+  // The just-drawn tile is pinned outside the main "hand-tile" row (see HandTrack) — discarding
+  // any tile clears my own justDrawn regardless of which one, so if it was pinned before this
+  // discard, it rejoins the main row here and the row's own count doesn't shrink even though my
+  // hand did.
+  const drawnWasPinned =
+    (await host.getByTestId("hand-track-drawn-bottom").getAttribute("data-empty")) === null;
 
   await handTiles.first().click();
 
-  // 打出的这张牌从我手牌里消失、座位手牌数同步减少（TileDiscarded 事实型事件
-  // 驱动的增量更新，见 useSessionStore.applyTileDiscarded），不是等下一次快照
-  // 才刷新——这两个断言本身就证明了动作真的被 server 接受，不需要额外去检查
-  // 有没有报错文案。
-  await expect(handTiles).toHaveCount(tileCountBefore - 1, { timeout: 10_000 });
-  await expect(myBadge.getByTestId("player-hand-count")).toHaveText("13", { timeout: 10_000 });
+  // 打出的这张牌从我手牌里消失，这来自 server 接受动作后广播的权威
+  // snapshot，不依赖命令 ack 或事件推导。
+  await expect(handTiles).toHaveCount(drawnWasPinned ? tileCountBefore : tileCountBefore - 1, {
+    timeout: 10_000,
+  });
+  await expect(
+    host.getByTestId("table-area-bottom").locator(`[data-tile-id="${discardedTileId}"]`),
+  ).toBeVisible({ timeout: 10_000 });
 
   for (const page of players) {
     await page.context().close();
@@ -90,7 +140,7 @@ test("bloodbattle table renders the common skeleton", async ({ browser }) => {
   const { players } = await createAndStartRoom(browser, "bloodbattle");
   const [host] = players;
 
-  await expect(host.getByText(/^Table \(Seat/)).toBeVisible({ timeout: 10_000 });
+  await expect(host.getByTestId("table-hud")).toBeVisible({ timeout: 10_000 });
   await expect(host.getByTestId("hand-tile").first()).toBeVisible({ timeout: 10_000 });
 
   for (const page of players) {

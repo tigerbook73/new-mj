@@ -40,6 +40,7 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   dealer: 0,
   seed: 1,
   lastEventSeq: 0,
+  awaitingNextRound: false,
   createdAt: Date.now(),
   currentGameEvents: [],
   currentGameSeatUserIds: [null, null, null, null],
@@ -485,6 +486,11 @@ describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)"
         if (room.phase !== "in-game") break;
         service.applyPlayerAction(room.id, seat, action);
       }
+      // Round ended but the session continues — every real seat must confirm
+      // (§6 局间确认) before the next round's seed/actions exist.
+      if (room.phase === "in-game") {
+        for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+      }
     }
 
     expect(room.phase).toBe("finished");
@@ -525,12 +531,17 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
 
     // start()/applyPlayerAction() auto-play every bot seat, so once control
     // returns here it must be the human's (seat 0) turn — this loop only
-    // ever supplies seat-0 actions.
+    // ever supplies seat-0 actions. No legal action means a round just ended
+    // and the session continues (§6 局间确认) — confirm ready and move on;
+    // the bot seats already auto-confirmed.
     let steps = 0;
     while (room.phase === "in-game" && steps < 500) {
       steps += 1;
       const legalActions = gameService.getLegalActions(room.gameState, 0);
-      expect(legalActions.length).toBeGreaterThan(0);
+      if (legalActions.length === 0) {
+        service.ready(room.id, "host", true);
+        continue;
+      }
       service.applyPlayerAction(room.id, 0, legalActions[0]);
     }
 
@@ -757,6 +768,11 @@ describe("RoomService — replay log archiving (phase 4.5 step 1)", () => {
     while (room.phase === "in-game" && steps < 500) {
       steps += 1;
       const legalActions = gameService.getLegalActions(room.gameState, 0);
+      if (legalActions.length === 0) {
+        // Round ended, session continues (§6 局间确认) — confirm and move on.
+        service.ready(room.id, "host", true);
+        continue;
+      }
       service.applyPlayerAction(room.id, 0, legalActions[0]);
     }
 
@@ -948,7 +964,10 @@ describe("RoomService — handleDisconnect (phase 4.2 acceptance criterion)", ()
         (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
       );
       if (seat === undefined) {
-        throw new Error("no connected seat has a legal action — game got stuck");
+        // Round ended, session continues (§6 局间确认) — confirm every
+        // connected seat (p2/seat1 is autopiloted and already auto-confirmed).
+        for (const userId of ["host", "p3", "p4"]) service.ready(room.id, userId, true);
+        continue;
       }
       const legalActions = gameService.getLegalActions(room.gameState, seat);
       service.applyPlayerAction(room.id, seat, legalActions[0]);
@@ -1011,6 +1030,11 @@ describe("RoomService — full 4-round session (real junk engine)", () => {
       for (const { seat, action } of played.actions) {
         if (room.phase !== "in-game") break;
         service.applyPlayerAction(room.id, seat, action);
+      }
+      // Round ended but the session continues — every real seat must confirm
+      // (§6 局间确认) before the next round's seed/dealer exist.
+      if (room.phase === "in-game") {
+        for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
       }
     }
 

@@ -161,6 +161,7 @@ export const emitDraw = (
   }
   state.wall = drawn.wall;
   state.seats[seat]!.hand.push(drawn.tile);
+  state.justDrawn = { seat, tile: drawn.tile };
   appendEvent(state, events, publicVisibility, {
     type: replacement ? "GangReplacementDrawn" : "TileDrawn",
     seat,
@@ -274,6 +275,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void =>
     state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
     meld.type = "buGang";
     meld.tiles.push(tile);
+    delete state.justDrawn;
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
       result: "unclaimed",
@@ -309,6 +311,7 @@ export const applyDiscard = (
   state.seats[seat]!.hand = remaining;
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
+  delete state.justDrawn;
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
@@ -344,6 +347,7 @@ export const applyAnGang = (
   if (tiles.length !== 4) return fail("GANG_NOT_AVAILABLE");
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
+  delete state.justDrawn;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -399,6 +403,7 @@ export const applyBuGang = (
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
   meld.type = "buGang";
   meld.tiles.push(tile);
+  delete state.justDrawn;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -444,6 +449,8 @@ export const createJunkGame = (
       tiles: [...state.seats[seat]!.hand],
     });
   }
+  const dealerHand = state.seats[dealer]!.hand;
+  state.justDrawn = { seat: dealer, tile: dealerHand[dealerHand.length - 1]! };
   state.phase = "playing";
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.turnStarted, seat: dealer });
   assertTileConservation(state);

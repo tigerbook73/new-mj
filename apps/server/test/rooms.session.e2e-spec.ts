@@ -118,6 +118,15 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
         if (!result.ok)
           throw new Error(`game:action rejected: ${result.code} ${result.message ?? ""}`);
       }
+
+      // Round ended but the session continues — every real seat must confirm
+      // (§6 局间确认) before the next round's seed/dealer exist.
+      if (roomService.get(roomId)?.phase === "in-game") {
+        for (const client of seatSockets) {
+          const readyAgain = await ack<object>(client!, "room:ready", { ready: true });
+          if (!readyAgain.ok) throw new Error(`room:ready failed: ${readyAgain.code}`);
+        }
+      }
     }
 
     const { result } = await sessionFinished;
@@ -186,7 +195,17 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
       const seat = connectedSeats.find(
         (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
       );
-      if (seat === undefined) throw new Error("no connected seat has a legal action — stuck?");
+      if (seat === undefined) {
+        // Round ended, session continues (§6 局间确认) — confirm every
+        // connected seat (seat 1 is autopiloted and already auto-confirmed).
+        for (const connected of connectedSeats) {
+          const readyAgain = await ack<object>(seatSockets[connected]!, "room:ready", {
+            ready: true,
+          });
+          if (!readyAgain.ok) throw new Error(`room:ready failed: ${readyAgain.code}`);
+        }
+        continue;
+      }
       const legalActions = gameService.getLegalActions(room.gameState, seat);
       const result = await ack<object>(seatSockets[seat]!, "game:action", {
         action: legalActions[0],

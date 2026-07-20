@@ -14,6 +14,7 @@ import {
   parseJunkConfig,
   fuzzJunkGames,
   playJunkGame,
+  type JunkPlayerView,
   type JunkState,
 } from "../../src/index.ts";
 
@@ -121,6 +122,53 @@ test("views and event filtering do not expose another seat's concealed hand", ()
 
 // "Event reconstruction ≡ direct derivation" moved to
 // cross-ruleset-invariants.test.ts (parameterized over registered rulesets).
+
+test("justDrawn: own view sees the tile, other seats only see a boolean flag", () => {
+  const started = createJunkGame(11, 0);
+  if ("error" in started) throw new Error(started.error.code);
+  let state = started.state;
+  let guard = 0;
+  while (!state.justDrawn && guard < 80) {
+    guard += 1;
+    if (state.phase === "awaiting-claims") {
+      const responder = ([0, 1, 2, 3] as const).find(
+        (seat) => junkRuleSet.getLegalActions(state, seat).length > 0,
+      )!;
+      state = unwrap(
+        junkRuleSet.applyAction(
+          state,
+          responder,
+          junkRuleSet.getLegalActions(state, responder)[0]!,
+        ),
+      );
+    } else {
+      const actions = junkRuleSet.getLegalActions(state, state.currentSeat);
+      state = unwrap(junkRuleSet.applyAction(state, state.currentSeat, actions[0]!));
+    }
+  }
+  const drawn = state.justDrawn;
+  if (!drawn) throw new Error("no draw observed within guard steps");
+  for (const viewer of [0, 1, 2, 3] as const) {
+    const view = junkRuleSet.getPlayerView(state, viewer) as JunkPlayerView;
+    for (const candidate of [0, 1, 2, 3] as const) {
+      expect(view.seats[candidate]!.justDrawn).toBe(candidate === drawn.seat);
+    }
+    expect(view.justDrawn).toBe(viewer === drawn.seat ? drawn.tile : undefined);
+  }
+
+  // Acting on the drawn tile clears it — everyone stops seeing that seat as
+  // "just drew" (a subsequent draw, e.g. the next seat's turn starting in the
+  // same applyAction call, is a separate justDrawn and not asserted here).
+  const nextActions = junkRuleSet.getLegalActions(state, drawn.seat);
+  state = unwrap(junkRuleSet.applyAction(state, drawn.seat, nextActions[0]!));
+  for (const viewer of [0, 1, 2, 3] as const) {
+    const view = junkRuleSet.getPlayerView(state, viewer) as JunkPlayerView;
+    expect(view.seats[drawn.seat]!.justDrawn).toBe(false);
+  }
+  expect(
+    (junkRuleSet.getPlayerView(state, drawn.seat) as JunkPlayerView).justDrawn,
+  ).toBeUndefined();
+});
 
 test("public draw and concealed-gang events never contain a TileId", () => {
   const started = createJunkGame(29, 0);

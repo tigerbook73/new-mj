@@ -67,6 +67,14 @@ export interface Room {
   seed: number;
   lastEventSeq: number;
   gameState?: unknown;
+  /**
+   * True between a game ending (more rounds left in the session) and the
+   * next one actually dealing — `ready()` re-checks every seat's `isReady`
+   * while this is set and advances once they're all true (see
+   * `RoomService.handleGameEnd`/`ready`). Bots/autopiloted seats are
+   * auto-confirmed so they never block real players.
+   */
+  awaitingNextRound: boolean;
   createdAt: number;
   finishedAt?: number;
   result?: SessionResult;

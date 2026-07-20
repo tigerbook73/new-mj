@@ -45,6 +45,7 @@ const TILE_KINDS = [
 ] as const;
 
 type TileKind = (typeof TILE_KINDS)[number];
+export type TileTheme = "Regular" | "Black";
 
 const COPIES_PER_KIND = 4;
 
@@ -53,6 +54,17 @@ export const tileKindOf = (tileId: number): TileKind => {
   if (!kind) throw new Error(`INVALID_TILE_ID: ${tileId}`);
   return kind;
 };
+
+/** Sort a display copy by m → p → s → z while preserving physical TileIds. */
+export const sortTilesForDisplay = (tileIds: readonly number[]): number[] =>
+  tileIds
+    .map((tileId, index) => ({
+      tileId,
+      index,
+      kindIndex: TILE_KINDS.indexOf(tileKindOf(tileId)),
+    }))
+    .sort((left, right) => left.kindIndex - right.kindIndex || left.index - right.index)
+    .map(({ tileId }) => tileId);
 
 /** mj-next's public/tiles/Regular naming (Man/Pin/Sou + Ton/Nan/Shaa/Pei/Haku/Hatsu/Chun). */
 const TILE_KIND_TO_FILE: Record<TileKind, string> = {
@@ -92,9 +104,8 @@ const TILE_KIND_TO_FILE: Record<TileKind, string> = {
   "7z": "Chun",
 };
 
-const TILE_THEME = "Regular";
+export const tileImageSrc = (tileId: number, theme: TileTheme = "Regular"): string =>
+  `/tiles/${theme}/${TILE_KIND_TO_FILE[tileKindOf(tileId)]}.svg`;
 
-export const tileImageSrc = (tileId: number): string =>
-  `/tiles/${TILE_THEME}/${TILE_KIND_TO_FILE[tileKindOf(tileId)]}.svg`;
-
-export const tileBackImageSrc = (): string => `/tiles/${TILE_THEME}/Back.svg`;
+export const tileBackImageSrc = (theme: TileTheme = "Regular"): string =>
+  `/tiles/${theme}/Back.svg`;

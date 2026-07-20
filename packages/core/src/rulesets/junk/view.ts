@@ -15,12 +15,14 @@ export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView =>
       })),
       discards: entry.discards.map((discard) => ({ ...discard })),
       handCount: entry.hand.length,
+      justDrawn: state.justDrawn?.seat === index,
     })),
     wallCount: state.wall.length,
     currentSeat: state.currentSeat,
     phase: state.phase,
   };
   if (state.lastDiscard) view.lastDiscard = { ...state.lastDiscard };
+  if (state.justDrawn?.seat === seat) view.justDrawn = state.justDrawn.tile;
   if (state.result) view.result = state.result;
   if (pending?.options[seat]) view.myClaimOptions = [...pending.options[seat]];
   if (ownResponse) view.myClaimResponse = ownResponse;
@@ -36,6 +38,7 @@ const cloneView = (view: JunkPlayerView): JunkPlayerView => ({
     handCount: seat.handCount,
     melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
     discards: seat.discards.map((discard) => ({ ...discard })),
+    justDrawn: seat.justDrawn,
   })),
   ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
   ...(view.result ? { result: view.result } : {}),
@@ -60,16 +63,25 @@ const updateMeld = (
  */
 export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): JunkPlayerView => {
   let view: JunkPlayerView | undefined;
+  // The dealer's initial 14th tile is dealt, not drawn via TileDrawn, but it's
+  // the same "just drew, haven't acted yet" state — see docs/variants/junk.md §7.
+  let dealer: SeatId | undefined;
   for (const event of eventsVisibleTo(events, seat)) {
     const payload = expectPayload(event.payload);
     if (payload.type === "GameStarted") {
       const handCounts = payload.handCounts as number[];
+      dealer = payload.dealer as SeatId;
       view = {
         seat,
         hand: [],
-        seats: handCounts.map((handCount) => ({ handCount, melds: [], discards: [] })),
+        seats: handCounts.map((handCount, index) => ({
+          handCount,
+          melds: [],
+          discards: [],
+          justDrawn: index === dealer,
+        })),
         wallCount: payload.wallCount as number,
-        currentSeat: payload.dealer as SeatId,
+        currentSeat: dealer,
         phase: "dealing",
       };
       continue;
@@ -78,7 +90,11 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
     view = cloneView(view);
     switch (payload.type) {
       case "HandDealt": {
-        if ((payload.seat as SeatId) === seat) view.hand = [...(payload.tiles as number[])];
+        if ((payload.seat as SeatId) === seat) {
+          view.hand = [...(payload.tiles as number[])];
+          // Dealer's HandDealt always carries 14 tiles, so the last index exists.
+          if (seat === dealer) view.justDrawn = view.hand[view.hand.length - 1]!;
+        }
         break;
       }
       case "TurnStarted":
@@ -90,8 +106,12 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
       case "TileDrawn":
       case "GangReplacementDrawn": {
         const drawnSeat = payload.seat as SeatId;
+        view.seats[drawnSeat]!.justDrawn = true;
         if ("tile" in payload) {
-          if (drawnSeat === seat) view.hand.push(payload.tile as number);
+          if (drawnSeat === seat) {
+            view.hand.push(payload.tile as number);
+            view.justDrawn = payload.tile as number;
+          }
         } else {
           view.seats[drawnSeat]!.handCount += 1;
           view.wallCount -= 1;
@@ -103,7 +123,11 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
         const tile = payload.tile as number;
         view.seats[discardedSeat]!.handCount -= 1;
         view.seats[discardedSeat]!.discards.push({ tile });
-        if (discardedSeat === seat) view.hand = view.hand.filter((candidate) => candidate !== tile);
+        view.seats[discardedSeat]!.justDrawn = false;
+        if (discardedSeat === seat) {
+          view.hand = view.hand.filter((candidate) => candidate !== tile);
+          delete view.justDrawn;
+        }
         view.lastDiscard = { seat: discardedSeat, tile };
         view.phase = "awaiting-claims";
         break;
@@ -122,6 +146,8 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
       case "PengMade":
       case "GangMade": {
         const meldSeat = payload.seat as SeatId;
+        view.seats[meldSeat]!.justDrawn = false;
+        if (meldSeat === seat) delete view.justDrawn;
         const gangType = payload.gangType as "anGang" | "buGang" | undefined;
         const type =
           payload.type === "ChiMade"
