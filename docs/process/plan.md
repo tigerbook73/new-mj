@@ -25,15 +25,15 @@
 - [x] Phase 1：权威逐动作快照
 - [x] Phase 2：可配置声明窗口超时
 - [x] Phase 3：AI Advice 数据链路
-- [~] Phase 4：视觉基础与响应式 Table 骨架（P4.1 进入 Layout Lab 参数化布局验收）
+- [~] Phase 4：视觉基础与响应式 Table 骨架（P4.1 已验收合并，P4.2 手机横屏待制定详细计划）
 - [ ] Phase 5：完整操作 Dock 与 AI 推荐
 - [ ] Phase 6：事件驱动牌桌动画
 - [ ] Phase 7：全站视觉与体验统一
 - [ ] Phase 8：综合验收与计划收尾
 
-**当前状态**：Phase 3 已本地 squash merge 为 `9a5d254`，merge tracker 提交为 `d2a6bba`；Phase 4 使用五个独立 branch、逐一合并确认。P4.1 桌面横屏、手牌排序、Tile Storybook 验收、开发专用 Layout Lab（含内部尺寸计算从 CSS container query 换成 `fitTileGrid` 纯函数）均已在 `feat/table-layout-desktop` 完成。P4.1 收尾子步骤"接入正式 Table"已实现并在等待用户验收期间又补了一版：Layout Lab 的 bottom-region 新原型（手牌区独立一圈+摸牌钉住列、副露与玩家信息合并进原牌墙那一圈、牌墙不再可视化）已经接入正式 `TableBoard`，`HandTrack`/`MeldInfoTrack` 两个新共享壳组件让 Lab 与正式 Table 真正复用同一套布局代码；配套给 junk core+protocol 加了 `justDrawn`（公开的"刚摸牌"布尔 + 仅本人可见的真实牌面），所以摸牌钉住列在正式桌面上是真功能而不是占位；`PlayerBadge` 全量信息（头像/庄家/托管/比分）这次没有迁入新的信息列，留作后续任务。`pnpm --filter @new-mj/core verify` 与 `pnpm --filter @new-mj/web verify` 均通过（细节见 `table-ux-plan.md`）。
+**当前状态**：Phase 3 已本地 squash merge 为 `9a5d254`，merge tracker 提交为 `d2a6bba`；Phase 4 使用五个独立 branch、逐一合并确认。P4.1 桌面横屏（手牌排序、Tile Storybook、开发专用 Layout Lab、接入正式 Table、`justDrawn` 摸牌钉住列、round-end 确认门等全部子步骤）已在浏览器完成人工验收（真实四人开局，1440×900/1366×768 视口检查手牌区/副露+玩家信息区/摸牌钉住列），2026-07-20 本地 squash merge 到 `main` 为 `cda9286`，`feat/table-layout-desktop` 已合并完成。`PlayerBadge` 全量信息（头像/庄家/托管/比分）尚未迁入新信息列，留作后续任务。
 
-**下一步第一个动作**：用户在浏览器里实际验收正式 Table 的新布局（真实四人开局、桌面 1440×900/1366×768 视口，重点看手牌区/副露+玩家信息区/摸牌钉住列）；确认后结束并合并 P4.1。P4.1 整体验收并合并前不创建或细化 P4.2。
+**下一步第一个动作**：从最新本地 `main` 创建 `feat/table-layout-landscape` branch，制定 P4.2（手机横屏）详细计划——保留四家方位，按高度约束桌面核心，利用左右余量承载紧凑信息；计划提交后暂停，等待用户确认再开始实现。
 
 ## 待办
 
