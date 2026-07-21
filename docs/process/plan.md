@@ -32,9 +32,9 @@
 
 **当前状态**：本专题改为**先做完桌面端完整功能，手机横屏/竖屏移出阶段序列、转入下方待办**（原 Phase 2/3"手机横屏/竖屏"与 Phase 5 里覆盖 844×390/390×844 的部分已从 `table-ux-plan.md` 删除）。同时放弃原计划里"每个 layoutMode 各自摸索一套扁平 config、最后再回头统一"的做法——手机横屏 chrome 的详细设计（`feat/table-layout-landscape` 分支上的 draft lab 探索）投入产出比不划算，已删除；改为参考 `../architecture/frontend-layout.md`（吸纳自 `multi-screen-refactor.md` 讨论稿，原文已删除）提出的 Zone/LayoutPreset schema。分支上跟横屏无关但有价值的 `inlineInsetPct`（`HandTrack`/`MeldInfoTrack` 透传给 `DirectionalSurface` 的已有能力）已保留，分支改名为 `feat/table-layout-schema`。`decisions.md` 新增 D30（离散 layoutMode 判定标准）。`table-ux-plan.md` 已整体重写：已完成部分压缩为 §4 现状基线，阶段编号从 1 重新开始，Phase 7（综合验收）通过即视为 Junk Table UX 桌面端完整收尾。
 
-**当前状态**：Phase 1 已在 `feat/table-layout-schema` 完成并提交，等待用户明确 merge 指令；Step 0 与 Step 1a 均已完成，1b 按用户要求留待其自行规划。2026-07-21 已通过 `pnpm --filter @new-mj/web verify`（33 unit、28 Playwright、build、Storybook）与根目录 `pnpm verify`（format/typecheck/lint/build/unit/e2e 全绿）。
+**当前状态**：Phase 1 已 squash merge 到 `main`（`3beacb9`）；Step 0 与 Step 1a 均已完成，1b 按用户要求留待其自行规划。2026-07-21 已通过 `pnpm --filter @new-mj/web verify`（33 unit、28 Playwright、build、Storybook）与根目录 `pnpm verify`（format/typecheck/lint/build/unit/e2e 全绿）。
 
-**下一步第一个动作**：等待用户明确指令，将 `feat/table-layout-schema` squash merge 到 `main`；合并后回填 Merge commit，并为 Phase 2 做详细计划与确认检查点。
+**下一步第一个动作**：从最新 `main` 创建 Phase 2 独立分支，细化视觉与覆盖层的接口、风险与验收，形成规划检查点并等待用户确认。
 
 ## 待办
 

@@ -1,6 +1,6 @@
 # Junk Table UX 分阶段实施计划
 
-> 状态：现状基线（协议/快照/声明超时/AI advice/桌面视觉骨架）已完成并合入 main，见 §4。新计划**先做完桌面端完整功能**，手机横屏/竖屏移入 `plan.md` 待办，暂不纳入本文件的阶段序列。Phase 1 的 Step 0/1a 已在阶段分支完成并验证，等待用户 merge；1b 按用户要求留待其自行规划，不阻塞本阶段。
+> 状态：现状基线（协议/快照/声明超时/AI advice/桌面视觉骨架）已完成并合入 main，见 §4。新计划**先做完桌面端完整功能**，手机横屏/竖屏移入 `plan.md` 待办，暂不纳入本文件的阶段序列。Phase 1 的 Step 0/1a 已 squash merge 到 main（`3beacb9`）；1b 按用户要求留待其自行规划，不阻塞本阶段。
 >
 > 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
 
@@ -68,7 +68,7 @@
 
 Branch：`feat/table-layout-schema`
 
-Merge commit：待合并
+Merge commit：`3beacb9 feat(web): migrate desktop table to zone presets`
 
 目标：不新增可见 UI；按 `../architecture/frontend-layout.md` 提出的 Zone/LayoutPreset schema 重写现有桌面（1440×900/1366×768）渲染路径，验证"一个玩法+一个布局"能在新架构下端到端跑通且视觉零变化；同时产出/升级布局工具。放弃原计划里"每个 layoutMode 各自摸索一套扁平 config"的做法（`TableLayoutConfig` 与已废弃的横屏 draft `DraftLabConfig` 是这个问题的具体例证）。手机端 layoutMode 移出本轮范围（见 §1），本阶段的 schema/工具设计不因此走捷径——两个视口本身仍需要 schema 正确表达旋转与区域划分，只是不为手机横屏/竖屏另起 LayoutPreset。
 
@@ -83,7 +83,7 @@ Merge commit：待合并
 
 - [x] `pnpm --filter @new-mj/web verify`（typecheck/lint/unit/e2e/build/build-storybook）全绿；33 个 unit、28 个 Playwright 全部通过。
 - [x] 既有 Layout Lab/桌面布局 Playwright 回归通过；本次为纯重构，未引入可见 UI。
-- [x] 2026-07-21 根目录 `pnpm verify` 全绿（format/typecheck/lint/build/unit/e2e，包含 core junk 1000 局与 bloodbattle 10000 局 fuzz）。阶段提交后停在 `feat/table-layout-schema`，等待用户 merge 指令。
+- [x] 2026-07-21 根目录 `pnpm verify` 全绿（format/typecheck/lint/build/unit/e2e，包含 core junk 1000 局与 bloodbattle 10000 局 fuzz）。已 squash merge 到 `main`（`3beacb9`）。
 
 ## 6. Phase 2 — 视觉与覆盖层
 
