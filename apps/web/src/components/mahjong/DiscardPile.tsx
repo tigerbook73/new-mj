@@ -1,6 +1,6 @@
 import { fitTileGrid } from "@/lib/tableGeometry";
 import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
-import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
+import type { TableLayoutMetrics } from "@/lib/desktopTablePreset";
 import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
 import { Tile } from "./Tile";
 
@@ -20,7 +20,7 @@ interface DiscardPileProps {
   /** Real measured content-box pixels of the discard region (see fitTileGrid). */
   containerWidthPx: number;
   containerHeightPx: number;
-  config: TableLayoutConfig;
+  metrics: TableLayoutMetrics;
 }
 
 /**
@@ -38,15 +38,15 @@ export function DiscardPile({
   discards,
   containerWidthPx,
   containerHeightPx,
-  config,
+  metrics,
 }: DiscardPileProps) {
-  const { columns, rows } = config.discard;
+  const { columns, rows } = metrics.discard;
   const { tileWidthPx, tileHeightPx } = fitTileGrid(containerWidthPx, containerHeightPx, {
     columns,
     rows,
-    heightPct: config.tiles.discardShortPct,
-    aspectRatio: config.tiles.aspectRatio,
-    tileGapPx: config.tiles.tileGapPx,
+    heightPct: metrics.tiles.discardShortPct,
+    aspectRatio: metrics.tiles.aspectRatio,
+    tileGapPx: metrics.tiles.tileGapPx,
   });
   // Extra rows only ever append past the configured minimum — never fewer — so a pile that's
   // still within capacity always renders the same slot count.
@@ -58,7 +58,7 @@ export function DiscardPile({
       style={{
         gridTemplateColumns: `repeat(${columns}, ${tileWidthPx}px)`,
         gridAutoRows: `${tileHeightPx}px`,
-        gap: `${config.tiles.tileGapPx}px`,
+        gap: `${metrics.tiles.tileGapPx}px`,
       }}
     >
       {Array.from({ length: totalRows * columns }, (_, index) => {

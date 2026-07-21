@@ -1,75 +1,63 @@
+import type { TableLayoutMetrics } from "@/lib/desktopTablePreset";
+import { findZone, zoneStyle, type Zone } from "@/lib/layoutPreset";
 import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
-import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
 import { useMeasuredSize } from "@/lib/useMeasuredSize";
-import { DirectionalSurface } from "./TableGeometry";
 
-/**
- * Renders in the region that used to show the face-down wall stack: Meld
- * (left, bottom-aligned) + per-seat info (right, counter-rotated so it always
- * reads upright regardless of seat direction).
- *
- * Shared between the dev Layout Lab (components/layout-lab/LayoutLabPreview.tsx)
- * and the production Table board — see docs/process/table-ux-plan.md P4.1 收尾.
- * Sizes meld tiles once (from the meld column's own measured pixels) and
- * hands that size to `renderMeld` so callers never re-derive it.
- */
+/** Meld and information columns consume child Zones rather than independent percentage props. */
 export function MeldInfoTrack({
   direction,
-  config,
+  metrics,
+  zone,
   testId,
   contentTestId,
   renderMeld,
   infoContent,
 }: {
   direction: SeatDirection;
-  config: TableLayoutConfig;
+  metrics: TableLayoutMetrics;
+  zone: Zone;
   testId?: string;
   contentTestId?: string;
   renderMeld: (size: { tileWidthPx: number; tileHeightPx: number }) => React.ReactNode;
   infoContent: React.ReactNode;
 }) {
-  const { meldWidthPct, meldHeightPct, meldTileHeightPct } = config.meldInfo;
-  const infoWidthPct = 100 - meldWidthPct;
+  const meldZone = findZone(zone, `meld-${direction}`);
+  const infoZone = findZone(zone, `info-${direction}`);
+  if (!meldZone || !infoZone) throw new Error(`Missing meld/info child zones for ${direction}`);
   const [meldRef, meldSize] = useMeasuredSize<HTMLDivElement>();
   const [infoRef, infoSize] = useMeasuredSize<HTMLDivElement>();
   const infoFontSizePx = infoSize.height * 0.25;
-  const infoVertical = direction === "left" || direction === "right";
-  /** The counter-rotation below cancels the ambient rotation net, so this wrapper's own
-   * width/height render on screen exactly as authored — set them to the region's actual
-   * on-screen footprint (swapped for left/right, where the ambient rotation swaps axes). */
-  const infoTextBoxWidthPx = infoVertical ? infoSize.height : infoSize.width;
-  const infoTextBoxHeightPx = infoVertical ? infoSize.width : infoSize.height;
-  const tileHeightPx = (meldTileHeightPct / 100) * meldSize.height;
-  const tileWidthPx = tileHeightPx / config.tiles.aspectRatio;
+  const vertical = direction === "left" || direction === "right";
+  const infoTextBoxWidthPx = vertical ? infoSize.height : infoSize.width;
+  const infoTextBoxHeightPx = vertical ? infoSize.width : infoSize.height;
+  const tileHeightPx = (metrics.meldInfo.meldTileHeightPct / 100) * meldSize.height;
+  const tileWidthPx = tileHeightPx / metrics.tiles.aspectRatio;
 
   return (
-    <DirectionalSurface direction={direction} testId={testId ?? `meld-info-track-${direction}`}>
+    <div data-testid={testId ?? `meld-info-track-${direction}`} className="relative h-full w-full">
       <div
         data-testid={contentTestId ?? `meld-info-content-${direction}`}
-        className="flex h-full w-full"
+        className="relative h-full w-full"
         style={{ boxSizing: "border-box" }}
       >
         <div
-          className={`flex h-full flex-col justify-end border-2 border-dashed ${
-            config.debug.showRegions ? "border-orange-300 bg-orange-300/10" : "border-transparent"
-          }`}
-          style={{ width: `${meldWidthPct}%`, boxSizing: "border-box" }}
+          className={`absolute flex flex-col justify-end border-2 border-dashed ${metrics.debug.showRegions ? "border-orange-300 bg-orange-300/10" : "border-transparent"}`}
+          style={{ ...zoneStyle(meldZone), boxSizing: "border-box" }}
         >
-          <div ref={meldRef} style={{ height: `${meldHeightPct}%`, boxSizing: "border-box" }}>
+          <div
+            ref={meldRef}
+            className="flex items-center"
+            style={{ height: `${metrics.meldInfo.meldHeightPct}%`, boxSizing: "border-box" }}
+          >
             {renderMeld({ tileWidthPx, tileHeightPx })}
           </div>
         </div>
         <div
           ref={infoRef}
           data-testid={`player-info-${direction}`}
-          className={`relative h-full border-2 border-dashed ${
-            config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"
-          }`}
-          style={{ width: `${infoWidthPct}%`, boxSizing: "border-box" }}
+          className={`absolute border-2 border-dashed ${metrics.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
+          style={{ ...zoneStyle(infoZone), boxSizing: "border-box" }}
         >
-          {/* Counter-rotate against the ambient DirectionalSurface rotation so the label always
-           * renders upright, regardless of seat direction; clipped + ellipsized to this wrapper's
-           * own on-screen footprint so a long label never spills outside the region. */}
           <div
             className="absolute top-1/2 left-1/2 flex items-center justify-center overflow-hidden"
             style={{
@@ -87,6 +75,6 @@ export function MeldInfoTrack({
           </div>
         </div>
       </div>
-    </DirectionalSurface>
+    </div>
   );
 }

@@ -3,6 +3,8 @@ import { DirectionalSurface, Ring } from "@/components/mahjong/TableGeometry";
 import { HandTrack } from "@/components/mahjong/HandTrack";
 import { MeldInfoTrack } from "@/components/mahjong/MeldInfoTrack";
 import { fitTileGrid } from "@/lib/tableGeometry";
+import { createDesktopTablePreset } from "@/lib/desktopTablePreset";
+import { findZone } from "@/lib/layoutPreset";
 import type { SeatDirection } from "@/lib/seatLayout";
 import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
 import { useMeasuredSize } from "@/lib/useMeasuredSize";
@@ -152,7 +154,7 @@ function LabMeldTiles({
 }) {
   return (
     <div
-      className="flex h-full flex-wrap content-end items-end justify-start overflow-hidden"
+      className="flex h-full flex-nowrap content-end items-end justify-start overflow-hidden"
       style={{ gap: `${config.tiles.tileGapPx * 2}px`, boxSizing: "border-box" }}
     >
       {Array.from({ length: config.meldInfo.meldGroupCount }, (_, groupIndex) => (
@@ -229,6 +231,14 @@ export function LayoutLabPreview({
   drawn: boolean;
   realTiles?: boolean;
 }) {
+  const preset = createDesktopTablePreset(config);
+  // The Lab still provides the seat rotation through DirectionalSurface. Its
+  // child components only need the local child-zone geometry, so do not apply
+  // the production seat-root rotation a second time here.
+  const localSeatZone = (id: string) => ({
+    ...findZone(preset.root, id)!,
+    rotationDeg: 0 as const,
+  });
   return (
     <div
       className={`border-2 bg-green-800 font-mono text-white ${config.debug.showRegions ? "border-indigo-900" : "border-transparent"}`}
@@ -240,7 +250,8 @@ export function LayoutLabPreview({
           <HandTrack
             key={direction}
             direction={direction}
-            config={config}
+            metrics={config}
+            zone={localSeatZone(`hand-${direction}`)}
             drawn={{
               visible: drawn,
               ...(realTiles && direction === "bottom" ? { tileId: (13 * 7) % 136 } : {}),
@@ -269,7 +280,8 @@ export function LayoutLabPreview({
               <MeldInfoTrack
                 key={direction}
                 direction={direction}
-                config={config}
+                metrics={config}
+                zone={localSeatZone(`meld-info-${direction}`)}
                 testId={`lab-region-wall-${direction}`}
                 contentTestId={`lab-region-content-wall-${direction}`}
                 infoContent={`Player ${direction}`}

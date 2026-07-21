@@ -21,23 +21,25 @@
 
 详细方案与阶段验收记录见 [`table-ux-plan.md`](./table-ux-plan.md)。本专题只完整验收垃圾胡；bloodbattle 保持公共骨架可用，专属玩法 UI 留在待办。
 
-- [x] Phase 0：计划文档重置
-- [x] Phase 1：权威逐动作快照
-- [x] Phase 2：可配置声明窗口超时
-- [x] Phase 3：AI Advice 数据链路
-- [~] Phase 4：视觉基础与响应式 Table 骨架（P4.1 已验收合并，P4.2 手机横屏待制定详细计划）
-- [ ] Phase 5：完整操作 Dock 与 AI 推荐
-- [ ] Phase 6：事件驱动牌桌动画
-- [ ] Phase 7：全站视觉与体验统一
-- [ ] Phase 8：综合验收与计划收尾
+- [x] 现状基线：协议/快照/声明超时/AI advice 数据链路 + 桌面视觉骨架（详见 `table-ux-plan.md` §4，merge commits `18416f9`/`39f93b2`/`9a5d254`/`cda9286`）
+- [x] Phase 1：几何数据层 + 桌面迁移（1b 布局工具由用户后续自行规划，不阻塞本阶段）
+- [ ] Phase 2：视觉与覆盖层
+- [ ] Phase 3：桌面视口回归验收
+- [ ] Phase 4：完整操作 Dock 与 AI 推荐
+- [ ] Phase 5：事件驱动牌桌动画
+- [ ] Phase 6：全站视觉与体验统一
+- [ ] Phase 7：综合验收与计划收尾（Junk Table UX 桌面端收尾）
 
-**当前状态**：Phase 3 已本地 squash merge 为 `9a5d254`，merge tracker 提交为 `d2a6bba`；Phase 4 使用五个独立 branch、逐一合并确认。P4.1 桌面横屏（手牌排序、Tile Storybook、开发专用 Layout Lab、接入正式 Table、`justDrawn` 摸牌钉住列、round-end 确认门等全部子步骤）已在浏览器完成人工验收（真实四人开局，1440×900/1366×768 视口检查手牌区/副露+玩家信息区/摸牌钉住列），2026-07-20 本地 squash merge 到 `main` 为 `cda9286`，`feat/table-layout-desktop` 已合并完成。`PlayerBadge` 全量信息（头像/庄家/托管/比分）尚未迁入新信息列，留作后续任务。
+**当前状态**：本专题改为**先做完桌面端完整功能，手机横屏/竖屏移出阶段序列、转入下方待办**（原 Phase 2/3"手机横屏/竖屏"与 Phase 5 里覆盖 844×390/390×844 的部分已从 `table-ux-plan.md` 删除）。同时放弃原计划里"每个 layoutMode 各自摸索一套扁平 config、最后再回头统一"的做法——手机横屏 chrome 的详细设计（`feat/table-layout-landscape` 分支上的 draft lab 探索）投入产出比不划算，已删除；改为参考 `../architecture/frontend-layout.md`（吸纳自 `multi-screen-refactor.md` 讨论稿，原文已删除）提出的 Zone/LayoutPreset schema。分支上跟横屏无关但有价值的 `inlineInsetPct`（`HandTrack`/`MeldInfoTrack` 透传给 `DirectionalSurface` 的已有能力）已保留，分支改名为 `feat/table-layout-schema`。`decisions.md` 新增 D30（离散 layoutMode 判定标准）。`table-ux-plan.md` 已整体重写：已完成部分压缩为 §4 现状基线，阶段编号从 1 重新开始，Phase 7（综合验收）通过即视为 Junk Table UX 桌面端完整收尾。
 
-**下一步第一个动作**：从最新本地 `main` 创建 `feat/table-layout-landscape` branch，制定 P4.2（手机横屏）详细计划——保留四家方位，按高度约束桌面核心，利用左右余量承载紧凑信息；计划提交后暂停，等待用户确认再开始实现。
+**当前状态**：Phase 1 已在 `feat/table-layout-schema` 完成并提交，等待用户明确 merge 指令；Step 0 与 Step 1a 均已完成，1b 按用户要求留待其自行规划。2026-07-21 已通过 `pnpm --filter @new-mj/web verify`（33 unit、28 Playwright、build、Storybook）与根目录 `pnpm verify`（format/typecheck/lint/build/unit/e2e 全绿）。
+
+**下一步第一个动作**：等待用户明确指令，将 `feat/table-layout-schema` squash merge 到 `main`；合并后回填 Merge commit，并为 Phase 2 做详细计划与确认检查点。
 
 ## 待办
 
 - [ ] 正式云端部署 Supabase/应用，配置生产环境变量与 Google/GitHub OAuth 回调地址并做部署后验收。
+- [ ] Junk Table UX 手机横屏/竖屏适配：Table UX 计划桌面端（Phase 1-7）全部完成后再评估是否启动；届时基于 `../architecture/frontend-layout.md` 的 Zone/LayoutPreset schema 与 Phase 1 产出的布局工具重新写详细计划，预期步骤比原来手搓 chrome 精简。
 - [ ] 血战到底 Table 专属体验：换三张、定缺、血战状态与完整操作 UI。
 - [ ] mobile 路线与 Expo 实现（是否复用 react-native-web 另行决定）。
 - [ ] 日麻立项时按 `../architecture/variant-boundary.md` §2 复审庄家轮换公式与会话排名策略。
