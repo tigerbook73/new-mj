@@ -1,321 +1,261 @@
-import { useEffect, useMemo, useState } from "react";
-import { LayoutLabPreview } from "@/components/layout-lab/LayoutLabPreview";
-import {
-  DEFAULT_TABLE_LAYOUT_CONFIG,
-  normalizeTableLayoutConfig,
-  readTableLayoutConfig,
-  type TableLayoutConfig,
-  writeTableLayoutConfig,
-} from "@/lib/tableLayoutLab";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { findNode, findParentNode, exportSketchDraft, type SketchNode } from "@/lib/layoutSketch";
+import { SketchCanvas } from "@/components/layout-sketch/SketchCanvas";
+import { SketchHeader } from "@/components/layout-sketch/SketchHeader";
+import { VIEWPORT_PRESETS } from "@/components/layout-sketch/viewportPresets";
+import { SketchProperties } from "@/components/layout-sketch/SketchProperties";
+import { SketchTreePanel } from "@/components/layout-sketch/SketchTree";
+import { SketchVariables } from "@/components/layout-sketch/SketchVariables";
+import { useSketchEditor } from "@/hooks/useSketchEditor";
 
-type ViewportName = "fit" | "desktop" | "compact" | "portrait" | "landscape";
-type ConfigSection = Exclude<keyof TableLayoutConfig, "version">;
-const viewports: Record<ViewportName, { label: string; width?: number; height?: number }> = {
-  fit: { label: "Fit available space" },
-  desktop: { label: "1440 × 900", width: 1440, height: 900 },
-  compact: { label: "1366 × 768", width: 1366, height: 768 },
-  portrait: { label: "390 × 844", width: 390, height: 844 },
-  landscape: { label: "844 × 390", width: 844, height: 390 },
+const findSketchPath = (root: SketchNode, name: string): SketchNode[] | undefined => {
+  if (root.name === name) return [root];
+  for (const child of root.children) {
+    const path = findSketchPath(child, name);
+    if (path) return [root, ...path];
+  }
+  return undefined;
 };
 
-function NumberControl({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="grid grid-cols-[1fr_5rem] items-center text-sm">
-      <span>{label}</span>
-      <input
-        className="rounded border bg-background px-2 py-1"
-        aria-label={label}
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-function Section({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <fieldset className={`grid gap-2 rounded border border-amber-200 p-3 ${className}`}>
-      <legend className="px-1 text-sm font-semibold">{title}</legend>
-      {children}
-    </fieldset>
-  );
-}
-
 export function TableLayoutLabView() {
-  const [config, setConfig] = useState(readTableLayoutConfig);
-  const [drawn, setDrawn] = useState(true);
-  const [viewport, setViewport] = useState<ViewportName>("fit");
-  const [message, setMessage] = useState("Loaded local layout");
-  const [json, setJson] = useState("");
-  const [controlsOpen, setControlsOpen] = useState(false);
-
+  const editor = useSketchEditor();
+  const [hoveredName, setHoveredName] = useState<string>();
+  const [exportStatus, setExportStatus] = useState<"success" | "error">();
+  const [coordinateView, setCoordinateView] = useState<"world" | "parent" | "zone">("world");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const pageRef = useRef<HTMLElement>(null);
+  const treePanelRef = useRef<HTMLElement>(null);
+  const detectedMode =
+    VIEWPORT_PRESETS.find(
+      (preset) => preset.w === editor.draft.viewport.w && preset.h === editor.draft.viewport.h,
+    )?.id ?? "custom";
+  const activeMode =
+    editor.viewportMode?.draft === editor.draft.name ? editor.viewportMode.mode : detectedMode;
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      writeTableLayoutConfig(config);
-      setMessage("Saved locally");
-    }, 150);
+    treePanelRef.current
+      ?.querySelector<HTMLButtonElement>(`button[data-sketch-node="${editor.selected.name}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+    if (editor.selected.name !== "viewport") {
+      nameInputRef.current?.focus({ preventScroll: true });
+      nameInputRef.current?.select();
+    }
+  }, [editor.selected.name]);
+  useEffect(() => {
+    if (!exportStatus) return;
+    const timer = window.setTimeout(() => setExportStatus(undefined), 2400);
     return () => window.clearTimeout(timer);
-  }, [config]);
-
-  const selectedViewport = viewports[viewport];
-  const previewStyle = useMemo(() => {
-    if (!selectedViewport.width || !selectedViewport.height)
-      return { width: "100%", height: "100%" };
-    const ratio = selectedViewport.width / selectedViewport.height;
-    return {
-      aspectRatio: `${selectedViewport.width}/${selectedViewport.height}`,
-      width: `min(100cqw, calc(100cqh * ${ratio}))`,
-      height: `min(100cqh, calc(100cqw / ${ratio}))`,
-    };
-  }, [selectedViewport]);
-  const patch = <K extends ConfigSection>(section: K, next: Partial<TableLayoutConfig[K]>) =>
-    setConfig((current) =>
-      normalizeTableLayoutConfig({ ...current, [section]: { ...current[section], ...next } }),
+  }, [exportStatus]);
+  const selectedParentName = useMemo(
+    () => findParentNode(editor.draft.root, editor.selected.name)?.name,
+    [editor.draft.root, editor.selected.name],
+  );
+  const parentLocalUnrotatedNames = useMemo(
+    () =>
+      selectedParentName
+        ? (findSketchPath(editor.draft.root, selectedParentName)?.map((node) => node.name) ?? [])
+        : [],
+    [editor.draft.root, selectedParentName],
+  );
+  const focusNode =
+    coordinateView === "parent"
+      ? (findNode(editor.draft.root, selectedParentName ?? "") ?? editor.draft.root)
+      : coordinateView === "zone"
+        ? editor.selected
+        : undefined;
+  const focusAspectRatio = useMemo(() => {
+    if (!focusNode) return undefined;
+    const path = findSketchPath(editor.draft.root, focusNode.name) ?? [];
+    return (
+      (editor.draft.viewport.w / editor.draft.viewport.h) *
+      path.slice(1).reduce((ratio, node) => ratio * (node.w.resolved / node.h.resolved), 1)
     );
-  const exportJson = JSON.stringify(config, null, 2);
-
-  const copy = async (content: string, success: string) => {
-    await navigator.clipboard.writeText(content);
-    setMessage(success);
+  }, [editor.draft.root, editor.draft.viewport, focusNode]);
+  const canvasStyle =
+    focusAspectRatio === undefined
+      ? editor.canvasStyle
+      : {
+          aspectRatio: String(focusAspectRatio),
+          width: `min(90cqw, ${90 * focusAspectRatio}cqh)`,
+        };
+  const viewInfo =
+    coordinateView === "parent"
+      ? `Parent: ${selectedParentName ?? "viewport"} · unrotated local axes`
+      : coordinateView === "zone"
+        ? `Zone: ${editor.selected.name} · local axes`
+        : undefined;
+  const resizeTree = (clientY: number) => {
+    const page = pageRef.current;
+    if (!page) return;
+    const bounds = page.getBoundingClientRect();
+    const next = Math.min(
+      Math.max(clientY - bounds.top - 56, 120),
+      Math.max(120, bounds.height - 56 - 160),
+    );
+    editor.patchDocument({ leftTreeHeight: Math.round(next) });
   };
-
+  const resizeSidebar = (side: "left" | "right", clientX: number) => {
+    const page = pageRef.current;
+    if (!page) return;
+    const bounds = page.getBoundingClientRect();
+    const max =
+      side === "left"
+        ? Math.max(160, Math.min(480, bounds.width - editor.document.rightWidth - 360))
+        : Math.max(180, Math.min(520, bounds.width - editor.document.leftWidth - 360));
+    const proposed = side === "left" ? clientX - bounds.left : bounds.right - clientX;
+    editor.patchDocument({
+      [side === "left" ? "leftWidth" : "rightWidth"]: Math.round(
+        Math.min(Math.max(proposed, side === "left" ? 160 : 180), max),
+      ),
+    });
+  };
+  const modeChange = (mode: string) => {
+    editor.setViewportMode({ draft: editor.draft.name, mode });
+    const preset = VIEWPORT_PRESETS.find((item) => item.id === mode);
+    if (preset) {
+      editor.setViewportSize("w", preset.w);
+      editor.setViewportSize("h", preset.h);
+    }
+  };
+  const exportPreset = () => {
+    void navigator.clipboard
+      .writeText(
+        JSON.stringify(exportSketchDraft(editor.draft, editor.document.variables), null, 2),
+      )
+      .then(() => setExportStatus("success"))
+      .catch(() => setExportStatus("error"));
+  };
   return (
     <main
-      className="grid h-dvh grid-cols-1 overflow-hidden bg-slate-200 text-slate-950 md:grid-cols-[minmax(0,1fr)_22rem]"
+      ref={pageRef}
       data-testid="layout-lab-page"
+      className="relative grid h-dvh overflow-hidden bg-slate-950 pt-14 text-slate-100"
+      style={{
+        gridTemplateColumns: `${editor.document.leftWidth}px minmax(0,1fr) ${editor.document.rightWidth}px`,
+        gridTemplateRows: `${editor.document.leftTreeHeight}px minmax(160px,1fr)`,
+      }}
     >
-      <button
-        className="fixed top-3 right-3 z-30 rounded bg-slate-950 px-3 py-2 text-xs text-white md:hidden"
-        onClick={() => setControlsOpen((open) => !open)}
-      >
-        {controlsOpen ? "Close controls" : "Layout controls"}
-      </button>
-      <section
-        className="grid min-h-0 place-items-center overflow-hidden p-4"
-        aria-label="Layout preview"
-        style={{ containerType: "size" }}
-      >
+      <SketchHeader
+        drafts={editor.document.drafts}
+        draft={editor.draft}
+        mode={activeMode}
+        showBoundaries={editor.showBoundaries}
+        onSelectDraft={editor.selectDraft}
+        onRenameDraft={editor.renameDraft}
+        onNew={editor.newDraft}
+        onCopyDraft={editor.copyDraft}
+        onDeleteDraft={editor.deleteDraft}
+        onToggleBoundaries={editor.setShowBoundaries}
+        onViewportMode={modeChange}
+        onViewportSize={editor.setViewportSize}
+        onExport={exportPreset}
+        onImportDesktop={editor.importDesktop}
+        onImportJson={editor.importPresetJson}
+        coordinateView={coordinateView}
+        onCoordinateView={setCoordinateView}
+        viewInfo={viewInfo}
+      />
+      {exportStatus && (
         <div
-          className="grid h-full w-full place-items-center border border-slate-400 bg-slate-100"
-          data-testid="layout-lab-viewport"
-          style={{ ...previewStyle, containerType: "size" }}
+          role="status"
+          className={`absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded px-3 py-2 text-sm shadow-lg ${exportStatus === "success" ? "bg-emerald-700 text-white" : "bg-red-700 text-white"}`}
         >
-          <LayoutLabPreview config={config} drawn={drawn} realTiles />
+          {exportStatus === "success" ? "LayoutPreset copied" : "Could not copy LayoutPreset"}
         </div>
-      </section>
-
-      <aside
-        className={`min-h-0 overflow-y-auto border-l bg-background p-4 text-foreground transition-transform max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-20 max-md:w-[min(22rem,92vw)] ${controlsOpen ? "max-md:translate-x-0" : "max-md:translate-x-full"}`}
-        aria-label="Layout controls"
-      >
-        <h1 className="text-lg font-semibold">Table Layout Lab</h1>
-        <div className="grid gap-4">
-          <Section title="Preview">
-            <label className="grid gap-1 text-xs">
-              Viewport
-              <select
-                aria-label="Viewport"
-                className="rounded border bg-background px-2 py-1"
-                value={viewport}
-                onChange={(event) => setViewport(event.target.value as ViewportName)}
-              >
-                {Object.entries(viewports).map(([key, item]) => (
-                  <option key={key} value={key}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="flex justify-between">
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  aria-label="Drawn tile"
-                  type="checkbox"
-                  checked={drawn}
-                  onChange={(event) => setDrawn(event.target.checked)}
-                />
-                Show drawn tile
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={config.debug.showRegions}
-                  onChange={(event) => patch("debug", { showRegions: event.target.checked })}
-                />
-                showRegions
-              </label>
-            </div>
-
-            <NumberControl
-              label="Aspect ratio"
-              value={config.tiles.aspectRatio}
-              min={1.2}
-              max={1.8}
-              step={0.05}
-              onChange={(value) => patch("tiles", { aspectRatio: value })}
-            />
-            <NumberControl
-              label="Tile gap px"
-              value={config.tiles.tileGapPx}
-              min={0}
-              max={8}
-              step={0.1}
-              onChange={(value) => patch("tiles", { tileGapPx: value })}
-            />
-          </Section>
-          <Section title="Hand region">
-            <NumberControl
-              label="Player track %"
-              value={config.hand.trackPct}
-              min={5}
-              max={30}
-              onChange={(value) => patch("hand", { trackPct: value })}
-            />
-            <NumberControl
-              label="Hand tile count"
-              value={config.hand.tileCount}
-              min={0}
-              max={13}
-              onChange={(value) => patch("hand", { tileCount: value })}
-            />
-            <NumberControl
-              label="Hand tile height %"
-              value={config.hand.tileHeightPct}
-              min={5}
-              max={80}
-              onChange={(value) => patch("hand", { tileHeightPct: value })}
-            />
-            <NumberControl
-              label="Hand side column width %"
-              value={config.hand.sideWidthPct}
-              min={5}
-              max={30}
-              onChange={(value) => patch("hand", { sideWidthPct: value })}
-            />
-          </Section>
-          <Section title="Meld / Info region">
-            <NumberControl
-              label="Meld+Info track %"
-              value={config.meldInfo.trackPct}
-              min={5}
-              max={30}
-              onChange={(value) => patch("meldInfo", { trackPct: value })}
-            />
-            <NumberControl
-              label="Meld region width %"
-              value={config.meldInfo.meldWidthPct}
-              min={10}
-              max={90}
-              onChange={(value) => patch("meldInfo", { meldWidthPct: value })}
-            />
-            <NumberControl
-              label="Meld height % (bottom-aligned)"
-              value={config.meldInfo.meldHeightPct}
-              min={10}
-              max={100}
-              onChange={(value) => patch("meldInfo", { meldHeightPct: value })}
-            />
-            <NumberControl
-              label="Meld tile height %"
-              value={config.meldInfo.meldTileHeightPct}
-              min={5}
-              max={80}
-              onChange={(value) => patch("meldInfo", { meldTileHeightPct: value })}
-            />
-            <NumberControl
-              label="Meld group count"
-              value={config.meldInfo.meldGroupCount}
-              min={0}
-              max={4}
-              onChange={(value) => patch("meldInfo", { meldGroupCount: value })}
-            />
-          </Section>
-          <Section title="Discard region">
-            <div className="flex justify-between">
-              <label>Layout</label>
-              <div className="flex gap-2">
-                <button
-                  className="rounded border px-2 py-1 text-xs"
-                  onClick={() => patch("discard", { columns: 14, rows: 2 })}
-                >
-                  14×2
-                </button>
-                <button
-                  className="rounded border px-2 py-1 text-xs"
-                  onClick={() => patch("discard", { columns: 8, rows: 3 })}
-                >
-                  8×3
-                </button>
-                <button
-                  className="rounded border px-2 py-1 text-xs"
-                  onClick={() => patch("discard", { columns: 6, rows: 4 })}
-                >
-                  6×4
-                </button>
-              </div>{" "}
-            </div>
-            <NumberControl
-              label="Discard track %"
-              value={config.discard.trackPct}
-              min={5}
-              max={34}
-              onChange={(value) => patch("discard", { trackPct: value })}
-            />
-            <NumberControl
-              label="Discard tile height %"
-              value={config.tiles.discardShortPct}
-              min={5}
-              max={80}
-              onChange={(value) => patch("tiles", { discardShortPct: value })}
-            />
-          </Section>
-          <Section title="Save / transfer">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                className="rounded border px-2 py-1 text-xs"
-                onClick={() => {
-                  setConfig(structuredClone(DEFAULT_TABLE_LAYOUT_CONFIG));
-                  setMessage("Reset to defaults");
-                }}
-              >
-                Reset defaults
-              </button>
-              <button
-                className="rounded border px-2 py-1 text-xs"
-                onClick={() => void copy(exportJson, "Copied JSON")}
-              >
-                Copy JSON
-              </button>
-            </div>
-          </Section>
-        </div>
-      </aside>
+      )}
+      <SketchTreePanel
+        panelRef={treePanelRef}
+        root={editor.draft.root}
+        selected={editor.selected.name}
+        onSelect={editor.select}
+        onHover={setHoveredName}
+        onAddChild={editor.add}
+        onDelete={editor.remove}
+        onCopy={editor.copy}
+        onConvertToGrid={editor.convertToGrid}
+      />
+      <div
+        role="separator"
+        aria-label="Resize Tree and Properties"
+        aria-orientation="horizontal"
+        data-testid="tree-properties-resizer"
+        className="col-start-1 row-start-1 z-20 -mb-1 h-2 w-full self-end cursor-row-resize touch-none bg-transparent hover:bg-amber-400/40"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          resizeTree(event.clientY);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeTree(event.clientY);
+        }}
+      />
+      <div
+        role="separator"
+        aria-label="Resize left sidebar"
+        aria-orientation="vertical"
+        data-testid="left-sidebar-resizer"
+        className="col-start-1 row-start-1 row-span-2 z-20 -mr-1 h-full w-2 justify-self-end cursor-col-resize touch-none bg-transparent hover:bg-amber-400/40"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          resizeSidebar("left", event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            resizeSidebar("left", event.clientX);
+        }}
+      />
+      <SketchCanvas
+        root={coordinateView === "world" ? editor.draft.root : (focusNode ?? editor.draft.root)}
+        style={canvasStyle}
+        selected={editor.selected.name}
+        hovered={hoveredName}
+        showBoundaries={editor.showBoundaries}
+        onSelect={editor.select}
+        onHover={setHoveredName}
+        coordinateView={coordinateView}
+        referenceName={
+          coordinateView === "parent"
+            ? selectedParentName
+            : coordinateView === "zone"
+              ? editor.selected.name
+              : undefined
+        }
+        unrotatedNames={coordinateView === "parent" ? parentLocalUnrotatedNames : undefined}
+      />
+      <SketchProperties
+        selected={editor.selected}
+        nameInputRef={nameInputRef}
+        onRename={editor.rename}
+        onGeometryChange={editor.updateGeometry}
+        onCenterChange={editor.updateCenter}
+        onGridChange={editor.updateGrid}
+        pendingGridUpdate={editor.pendingGridUpdate}
+        onConfirmGridUpdate={editor.confirmGridUpdate}
+        onCancelGridUpdate={editor.cancelGridUpdate}
+        onRotationChange={editor.updateRotation}
+        onShadowChange={editor.setCellShadow}
+        resolveExpression={editor.resolveExpression}
+      />
+      <SketchVariables
+        variables={editor.document.variables}
+        onAdd={editor.addVariable}
+        onUpdate={editor.updateVariable}
+        onRemove={editor.removeVariable}
+        isUsed={editor.isVariableUsed}
+      />
+      <div
+        role="separator"
+        aria-label="Resize right sidebar"
+        aria-orientation="vertical"
+        data-testid="right-sidebar-resizer"
+        className="col-start-3 row-start-1 row-span-2 z-20 -ml-1 h-full w-2 justify-self-start cursor-col-resize touch-none bg-transparent hover:bg-amber-400/40"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          resizeSidebar("right", event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            resizeSidebar("right", event.clientX);
+        }}
+      />
     </main>
   );
 }

@@ -21,15 +21,14 @@ export type LayoutPreset = {
   name: string;
   referenceCanvas: { w: number; h: number };
   root: Zone;
+  editor?: { version: 1; root: unknown; variables: { name: string; value: string }[] } | undefined;
 };
 
 export type ZoneSize = { w: number; h: number };
 
 /** The on-screen footprint of a zone. Its local coordinate system is never rotated. */
 export function getRenderedZoneSize({ localSize, rotationDeg }: Zone): ZoneSize {
-  return Math.abs(rotationDeg) === 90
-    ? { w: localSize.h, h: localSize.w }
-    : { ...localSize };
+  return Math.abs(rotationDeg) === 90 ? { w: localSize.h, h: localSize.w } : { ...localSize };
 }
 
 export function findZone(zone: Zone, id: string): Zone | undefined {
@@ -57,25 +56,33 @@ export function zoneStyle(zone: Zone): CSSProperties {
 export function ZoneRenderer({
   zone,
   renderZone,
+  getPointerEvents,
   root = true,
 }: {
   zone: Zone;
   renderZone?: (zone: Zone) => ReactNode;
+  getPointerEvents?: (zone: Zone, hasContent: boolean) => CSSProperties["pointerEvents"];
   root?: boolean | undefined;
 }): ReactElement {
+  const content = renderZone?.(zone);
+  const hasContent = content !== null && content !== undefined;
   return createElement(
     "div",
     {
       "data-zone": zone.id,
       className: "min-h-0 min-w-0",
-      style: root ? { position: "relative", width: "100%", height: "100%" } : zoneStyle(zone),
+      style: {
+        ...(root ? { position: "relative", width: "100%", height: "100%" } : zoneStyle(zone)),
+        pointerEvents: getPointerEvents?.(zone, hasContent) ?? (hasContent ? "auto" : "none"),
+      },
     },
-    renderZone?.(zone),
+    content,
     zone.children?.map((child) =>
       createElement(ZoneRenderer, {
         key: child.id,
         zone: child,
         ...(renderZone ? { renderZone } : {}),
+        ...(getPointerEvents ? { getPointerEvents } : {}),
         root: false,
       }),
     ),

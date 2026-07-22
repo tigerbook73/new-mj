@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { DESKTOP_TABLE_METRICS, DESKTOP_TABLE_PRESET } from "@/lib/desktopTablePreset";
 import { type Zone, ZoneRenderer } from "@/lib/layoutPreset";
-import { SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
+import { type SeatDirection } from "@/lib/seatLayout";
 import { useMeasuredSize } from "@/lib/useMeasuredSize";
 import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
 import { DiscardPile, type DiscardEntry } from "./DiscardPile";
@@ -9,6 +9,7 @@ import { HandRow } from "./HandRow";
 import { HandTrack, type HandTrackDrawn } from "./HandTrack";
 import { MeldGroup, type Meld } from "./MeldGroup";
 import { MeldInfoTrack } from "./MeldInfoTrack";
+import { resolveTableZone, tableZonePointerEvents } from "./tableZoneRegistry";
 
 export interface SeatContent {
   melds: Meld[];
@@ -117,7 +118,10 @@ function DiscardTrack({
 }) {
   const [contentRef, contentSize] = useMeasuredSize<HTMLDivElement>();
   return (
-    <div data-testid={`table-area-${direction}`} className="grid h-full w-full place-items-center">
+    <div
+      data-testid={`table-area-${direction}`}
+      className="pointer-events-none grid h-full w-full place-items-center"
+    >
       <div ref={contentRef} className="grid h-full w-full place-items-center">
         <DiscardPile
           direction={direction}
@@ -146,29 +150,45 @@ export function TableBoard({ seats, discards, center, currentDirection }: TableB
     >
       <ZoneRenderer
         zone={DESKTOP_TABLE_PRESET.root}
+        getPointerEvents={(zone) => tableZonePointerEvents(zone.id)}
         renderZone={(zone) => {
-          const direction = SEAT_DIRECTIONS.find((candidate) => zone.id.endsWith(`-${candidate}`));
-          if (
-            zone.id.startsWith("hand-") &&
-            direction &&
-            !zone.id.startsWith("hand-content") &&
-            !zone.id.startsWith("hand-drawn")
-          )
-            return <HandSeatTrack direction={direction} seat={seats[direction]} zone={zone} />;
-          if (zone.id.startsWith("meld-info-") && direction)
-            return <MeldInfoSeatTrack direction={direction} seat={seats[direction]} zone={zone} />;
-          if (zone.id.startsWith("discard-") && direction)
-            return <DiscardTrack direction={direction} discards={discards[direction]} />;
-          if (zone.id === "center")
-            return (
-              <div className="relative grid h-full w-full place-items-center rounded-md bg-green-950/50 dark:bg-black/50">
-                <div className="grid h-full w-full place-items-center overflow-hidden">
-                  {center}
+          const binding = resolveTableZone(zone.id);
+          switch (binding?.role) {
+            case "hand":
+              return (
+                <HandSeatTrack
+                  direction={binding.direction}
+                  seat={seats[binding.direction]}
+                  zone={zone}
+                />
+              );
+            case "meldInfo":
+              return (
+                <MeldInfoSeatTrack
+                  direction={binding.direction}
+                  seat={seats[binding.direction]}
+                  zone={zone}
+                />
+              );
+            case "discard":
+              return (
+                <DiscardTrack
+                  direction={binding.direction}
+                  discards={discards[binding.direction]}
+                />
+              );
+            case "center":
+              return (
+                <div className="relative grid h-full w-full place-items-center rounded-md bg-green-950/50 dark:bg-black/50">
+                  <div className="grid h-full w-full place-items-center overflow-hidden">
+                    {center}
+                  </div>
+                  {currentDirection && <TurnIndicator direction={currentDirection} />}
                 </div>
-                {currentDirection && <TurnIndicator direction={currentDirection} />}
-              </div>
-            );
-          return null;
+              );
+            default:
+              return null;
+          }
         }}
       />
     </div>

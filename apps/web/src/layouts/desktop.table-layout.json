@@ -1,0 +1,232 @@
+{
+  "name": "desktop",
+  "referenceCanvas": { "w": 1440, "h": 900 },
+  "root": {
+    "id": "table",
+    "anchorCenter": { "x": 50, "y": 50 },
+    "localSize": { "w": 100, "h": 100 },
+    "rotationDeg": 0,
+    "arrangement": { "mode": "absolute", "points": [] },
+    "children": [
+      {
+        "id": "hand-bottom",
+        "anchorCenter": { "x": 50, "y": 94 },
+        "localSize": { "w": 76, "h": 12 },
+        "rotationDeg": 0,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "hand-content-bottom",
+            "anchorCenter": { "x": 50, "y": 50 },
+            "localSize": { "w": 76, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          },
+          {
+            "id": "hand-drawn-bottom",
+            "anchorCenter": { "x": 94, "y": 50 },
+            "localSize": { "w": 12, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "hand-right",
+        "anchorCenter": { "x": 94, "y": 50 },
+        "localSize": { "w": 76, "h": 12 },
+        "rotationDeg": -90,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "hand-content-right",
+            "anchorCenter": { "x": 50, "y": 50 },
+            "localSize": { "w": 76, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          },
+          {
+            "id": "hand-drawn-right",
+            "anchorCenter": { "x": 94, "y": 50 },
+            "localSize": { "w": 12, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "hand-top",
+        "anchorCenter": { "x": 50, "y": 6 },
+        "localSize": { "w": 76, "h": 12 },
+        "rotationDeg": 180,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "hand-content-top",
+            "anchorCenter": { "x": 50, "y": 50 },
+            "localSize": { "w": 76, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          },
+          {
+            "id": "hand-drawn-top",
+            "anchorCenter": { "x": 94, "y": 50 },
+            "localSize": { "w": 12, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "hand-left",
+        "anchorCenter": { "x": 6, "y": 50 },
+        "localSize": { "w": 76, "h": 12 },
+        "rotationDeg": 90,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "hand-content-left",
+            "anchorCenter": { "x": 50, "y": 50 },
+            "localSize": { "w": 76, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          },
+          {
+            "id": "hand-drawn-left",
+            "anchorCenter": { "x": 94, "y": 50 },
+            "localSize": { "w": 12, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "meld-info-bottom",
+        "anchorCenter": { "x": 50, "y": 84.2 },
+        "localSize": { "w": 60.8, "h": 7.6 },
+        "rotationDeg": 0,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "meld-bottom",
+            "anchorCenter": { "x": 40, "y": 50 },
+            "localSize": { "w": 80, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "flex", "direction": "row", "gap": 1.9, "align": "end" }
+          },
+          {
+            "id": "info-bottom",
+            "anchorCenter": { "x": 90, "y": 50 },
+            "localSize": { "w": 20, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "meld-info-right",
+        "anchorCenter": { "x": 84.2, "y": 50 },
+        "localSize": { "w": 60.8, "h": 7.6 },
+        "rotationDeg": -90,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "meld-right",
+            "anchorCenter": { "x": 40, "y": 50 },
+            "localSize": { "w": 80, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "flex", "direction": "row", "gap": 1.9, "align": "end" }
+          },
+          {
+            "id": "info-right",
+            "anchorCenter": { "x": 90, "y": 50 },
+            "localSize": { "w": 20, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "meld-info-top",
+        "anchorCenter": { "x": 50, "y": 15.8 },
+        "localSize": { "w": 60.8, "h": 7.6 },
+        "rotationDeg": 180,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "meld-top",
+            "anchorCenter": { "x": 40, "y": 50 },
+            "localSize": { "w": 80, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "flex", "direction": "row", "gap": 1.9, "align": "end" }
+          },
+          {
+            "id": "info-top",
+            "anchorCenter": { "x": 90, "y": 50 },
+            "localSize": { "w": 20, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "meld-info-left",
+        "anchorCenter": { "x": 15.8, "y": 50 },
+        "localSize": { "w": 60.8, "h": 7.6 },
+        "rotationDeg": 90,
+        "arrangement": { "mode": "absolute", "points": [] },
+        "children": [
+          {
+            "id": "meld-left",
+            "anchorCenter": { "x": 40, "y": 50 },
+            "localSize": { "w": 80, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "flex", "direction": "row", "gap": 1.9, "align": "end" }
+          },
+          {
+            "id": "info-left",
+            "anchorCenter": { "x": 90, "y": 50 },
+            "localSize": { "w": 20, "h": 100 },
+            "rotationDeg": 0,
+            "arrangement": { "mode": "absolute", "points": [] }
+          }
+        ]
+      },
+      {
+        "id": "discard-bottom",
+        "anchorCenter": { "x": 50, "y": 72.192 },
+        "localSize": { "w": 27.968, "h": 16.416 },
+        "rotationDeg": 0,
+        "arrangement": { "mode": "absolute", "points": [] }
+      },
+      {
+        "id": "discard-right",
+        "anchorCenter": { "x": 72.192, "y": 50 },
+        "localSize": { "w": 27.968, "h": 16.416 },
+        "rotationDeg": -90,
+        "arrangement": { "mode": "absolute", "points": [] }
+      },
+      {
+        "id": "discard-top",
+        "anchorCenter": { "x": 50, "y": 27.808 },
+        "localSize": { "w": 27.968, "h": 16.416 },
+        "rotationDeg": 180,
+        "arrangement": { "mode": "absolute", "points": [] }
+      },
+      {
+        "id": "discard-left",
+        "anchorCenter": { "x": 27.808, "y": 50 },
+        "localSize": { "w": 27.968, "h": 16.416 },
+        "rotationDeg": 90,
+        "arrangement": { "mode": "absolute", "points": [] }
+      },
+      {
+        "id": "center",
+        "anchorCenter": { "x": 50, "y": 50 },
+        "localSize": { "w": 27.968, "h": 27.968 },
+        "rotationDeg": 0,
+        "arrangement": { "mode": "grid", "cols": 1, "rows": 1, "gap": 0 }
+      }
+    ]
+  }
+}

@@ -61,6 +61,32 @@ type LayoutPreset = {
 
 区域内部（如一手牌）用 flex/grid 排布即可，不需要精确到每张牌的坐标，浏览器算行内位置比手写坐标表更稳；`absolute` 模式留给确实需要精确定位的场景。
 
+### 4.1 多级旋转与编辑参照系
+
+`rotationDeg` 不再只限于座位根 Zone；每一层 Zone 都可设 `0 | 90 | 180 | -90`。最终渲染按祖先到自身依次累积 CSS transform；导出数据不做拍平或补偿。所有位置都定义在**父 Zone 未旋转的局部坐标系**，所有 `arrangement` 都定义在**当前 Zone 未旋转的局部坐标系**。
+
+草图编辑器围绕当前选中 Zone 提供三种参照视图，三者只投影同一份 `LayoutPreset` 数据：
+
+- **World**：最终生产效果；所有祖先和自身旋转生效，选中 Zone 子树正常显示、其余对象淡化。
+- **Parent-local**：逆转选中 Zone 的全部祖先旋转，但保留它自身旋转；用于编辑其相对父级的中心点、本地宽高与 rotation。
+- **Zone-local**：同时逆转祖先与选中 Zone 自身旋转；当前 Zone 填满局部预览，用于编辑它的 `absolute`/`flex`/`grid` arrangement 及直接子对象。
+
+字段必须标明参照系：`center X/Y` 属于父局部坐标；`local W/H`、`rotation`、`arrangement` 属于当前 Zone。若父对象不是 `absolute`，子对象位置由父 arrangement 派生，位置字段只读。World 的最终视觉矩形先作为可见结果；在仅支持四分之一转的前提下，后续可精确反算为可编辑输入。
+
+为让 App 直接消费导出结果同时支持编辑器无损往返，`LayoutPreset.root` 保持 resolved Zone 数据；编辑器特有 raw expression、变量与辅助 Grid 另放可选 `editor` 元数据。旧 preset 不带该元数据时，以数值 raw 导入。当前草图辅助 Grid 与正式 `Zone.arrangement.grid` 是不同概念：前者导出时透明展开，后者是正式运行时布局语义。
+
+### 4.2 Zone 与业务 Element 的绑定（目标契约）
+
+`LayoutPreset` 只描述几何，不能携带 React 组件名或业务数据。运行时由一个集中 renderer registry 按稳定 `Zone.id`（必要时按 `id + direction` resolver）找到可选的业务 service；`ZoneRenderer` 对每个 Zone 只创建一次定位容器，并递归渲染其子 Zone。若该 Zone 有 service，service 作为定位容器的内容包裹子 Zone：`ZoneFrame → Service(children) → child ZoneFrame`；没有 service 时，定位容器直接包裹子 Zone。这样所有绝对定位只归 ZoneFrame，service 不得重新创建同一子 Zone 的定位层；需要给子 service 共享尺寸或交互状态的 service 用 Context 包裹 `children`。未注册的 Zone 是合法的结构 Zone：可用于坐标分组、旋转或编辑器 Grid 展开，不渲染业务内容。
+
+当前 production 已有集中 registry，但 Lab export 与 production render 的递归 service 结构留待 Table UX Phase 2 落地。届时 registry 的每个 service 都接收 `children`；父级 service 负责业务 Context/本区视觉壳，叶子 service 负责本区业务内容。测试校验必需业务 Zone 存在且唯一、每个绑定都能解析、未绑定 Zone 只产生结构容器，以及父 service 不与 renderer 重复生成子 Zone DOM。
+
+### 4.3 生产布局文件（下一切片）
+
+桌面生产布局应以静态 `desktop.table-layout.json` 保存，内容为可由 Layout Lab 导出的 `LayoutPreset`；Game Page 通过显式 `preset` prop 传入 `TableBoard`，而不是由 `TableBoard` 内部 import 某个预设。运行时先校验通用 Zone 合法性、id 全局唯一性与 registry 所需业务插槽完整性，再交给 `ZoneRenderer`。`editor` 元数据可保留以支持 Lab 无损导入，但运行时不得依赖它。
+
+`LayoutPreset` 保持纯几何：区域内牌尺寸、间距、弃牌行列等麻将展示参数仍由独立的 Table presentation 配置承担。若未来需要由 Lab 一并编辑，使用包裹 `LayoutPreset` 的麻将专用 document，而不将业务组件字段加入通用 schema。
+
 ## 5. 区域组合：原子 vs 组合（目标状态）
 
 拆成"展示原子"和"组合方式"两层：Tile、ActionButton 这类最小展示单元跨 `layoutMode` 复用，不感知自己被摆在哪；"多个展示原子怎么分组排布"（独立弃牌区 vs 合并牌河）是真正因布局而异的部分，值得写成不同的组合组件，但消费同一份底层数据，不出现两套平行的数据处理逻辑。空间受限的 `layoutMode`（尤其竖屏）可能需要把多个区域合并显示（如四家弃牌合并成一个带来源标记的公共牌河）；目前只有桌面+计划中的横竖屏几种，几个组合组件就够，不需要提前搭一个通用的动态拼装引擎。

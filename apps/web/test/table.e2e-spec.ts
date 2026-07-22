@@ -101,6 +101,12 @@ test("junk desktop table fits both target viewports and a discard succeeds", asy
   await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
   await expectDesktopTableFits(host, { width: 1440, height: 900 });
   await expectDesktopTableFits(host, { width: 1366, height: 768 });
+  // The structural child zones are transparent to input; the actual Tile must
+  // receive hover so its clickable affordance is visible before a discard.
+  await handTiles.first().hover();
+  await expect
+    .poll(() => handTiles.first().evaluate((tile) => getComputedStyle(tile).translate))
+    .not.toBe("none");
   const tileCountBefore = await handTiles.count();
   const displayedTileIds = (await handTiles.evaluateAll((tiles) =>
     tiles.map((tile) => Number(tile.getAttribute("data-tile-id"))),

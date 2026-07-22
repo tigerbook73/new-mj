@@ -7,21 +7,36 @@ export type TableLayoutMetrics = TableLayoutConfig;
 const absolute = { mode: "absolute" as const, points: [] };
 const seatDirections: readonly SeatDirection[] = ["bottom", "right", "top", "left"];
 
-function seatAnchor(direction: SeatDirection, edge: number) {
+/**
+ * The legacy board was three nested grids. A Zone therefore needs both its
+ * own edge width and the total width already consumed by outer grids.
+ */
+function seatAnchor(direction: SeatDirection, inset: number, edge: number) {
   switch (direction) {
-    case "bottom": return { x: 50, y: 100 - edge / 2 };
-    case "top": return { x: 50, y: edge / 2 };
-    case "left": return { x: edge / 2, y: 50 };
-    case "right": return { x: 100 - edge / 2, y: 50 };
+    case "bottom":
+      return { x: 50, y: 100 - inset - edge / 2 };
+    case "top":
+      return { x: 50, y: inset + edge / 2 };
+    case "left":
+      return { x: inset + edge / 2, y: 50 };
+    case "right":
+      return { x: 100 - inset - edge / 2, y: 50 };
   }
 }
 
-function seatZone(id: string, direction: SeatDirection, edge: number, children?: Zone[]): Zone {
+function seatZone(
+  id: string,
+  direction: SeatDirection,
+  inset: number,
+  span: number,
+  edge: number,
+  children?: Zone[],
+): Zone {
   return {
     id,
-    anchorCenter: seatAnchor(direction, edge),
+    anchorCenter: seatAnchor(direction, inset, edge),
     // Every seat is authored in its natural, bottom-facing local coordinates.
-    localSize: { w: 100 - edge * 2, h: edge },
+    localSize: { w: span, h: edge },
     rotationDeg: SEAT_ROTATION[direction] as RotationDeg,
     arrangement: absolute,
     children,
@@ -35,10 +50,11 @@ function seatZone(id: string, direction: SeatDirection, edge: number, children?:
  */
 export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPreset {
   const handEdge = config.hand.trackPct;
-  const meldEdge = (100 - handEdge * 2) * (config.meldInfo.trackPct / 100);
-  const discardCanvas = 100 - handEdge * 2 - meldEdge * 2;
-  const discardEdge = discardCanvas * (config.discard.trackPct / 100);
-  const innerCanvas = discardCanvas - discardEdge * 2;
+  const handSpan = 100 - handEdge * 2;
+  const meldEdge = handSpan * (config.meldInfo.trackPct / 100);
+  const meldSpan = handSpan - meldEdge * 2;
+  const discardEdge = meldSpan * (config.discard.trackPct / 100);
+  const innerCanvas = meldSpan - discardEdge * 2;
   const handContentWidth = 100 - config.hand.sideWidthPct * 2;
   const meldWidth = config.meldInfo.meldWidthPct;
 
@@ -53,19 +69,62 @@ export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPrese
       arrangement: absolute,
       children: [
         ...seatDirections.map((direction) =>
-          seatZone(`hand-${direction}`, direction, handEdge, [
-            { id: `hand-content-${direction}`, anchorCenter: { x: 50, y: 50 }, localSize: { w: handContentWidth, h: 100 }, rotationDeg: 0, arrangement: absolute },
-            { id: `hand-drawn-${direction}`, anchorCenter: { x: 100 - config.hand.sideWidthPct / 2, y: 50 }, localSize: { w: config.hand.sideWidthPct, h: 100 }, rotationDeg: 0, arrangement: absolute },
+          seatZone(`hand-${direction}`, direction, 0, handSpan, handEdge, [
+            {
+              id: `hand-content-${direction}`,
+              anchorCenter: { x: 50, y: 50 },
+              localSize: { w: handContentWidth, h: 100 },
+              rotationDeg: 0,
+              arrangement: absolute,
+            },
+            {
+              id: `hand-drawn-${direction}`,
+              anchorCenter: { x: 100 - config.hand.sideWidthPct / 2, y: 50 },
+              localSize: { w: config.hand.sideWidthPct, h: 100 },
+              rotationDeg: 0,
+              arrangement: absolute,
+            },
           ]),
         ),
         ...seatDirections.map((direction) =>
-          seatZone(`meld-info-${direction}`, direction, meldEdge, [
-            { id: `meld-${direction}`, anchorCenter: { x: meldWidth / 2, y: 50 }, localSize: { w: meldWidth, h: 100 }, rotationDeg: 0, arrangement: { mode: "flex", direction: "row", gap: config.tiles.tileGapPx, align: "end" } },
-            { id: `info-${direction}`, anchorCenter: { x: meldWidth + (100 - meldWidth) / 2, y: 50 }, localSize: { w: 100 - meldWidth, h: 100 }, rotationDeg: 0, arrangement: absolute },
+          seatZone(`meld-info-${direction}`, direction, handEdge, meldSpan, meldEdge, [
+            {
+              id: `meld-${direction}`,
+              anchorCenter: { x: meldWidth / 2, y: 50 },
+              localSize: { w: meldWidth, h: 100 },
+              rotationDeg: 0,
+              arrangement: {
+                mode: "flex",
+                direction: "row",
+                gap: config.tiles.tileGapPx,
+                align: "end",
+              },
+            },
+            {
+              id: `info-${direction}`,
+              anchorCenter: { x: meldWidth + (100 - meldWidth) / 2, y: 50 },
+              localSize: { w: 100 - meldWidth, h: 100 },
+              rotationDeg: 0,
+              arrangement: absolute,
+            },
           ]),
         ),
-        ...seatDirections.map((direction) => seatZone(`discard-${direction}`, direction, discardEdge)),
-        { id: "center", anchorCenter: { x: 50, y: 50 }, localSize: { w: innerCanvas, h: innerCanvas }, rotationDeg: 0, arrangement: { mode: "grid", cols: 1, rows: 1, gap: 0 } },
+        ...seatDirections.map((direction) =>
+          seatZone(
+            `discard-${direction}`,
+            direction,
+            handEdge + meldEdge,
+            innerCanvas,
+            discardEdge,
+          ),
+        ),
+        {
+          id: "center",
+          anchorCenter: { x: 50, y: 50 },
+          localSize: { w: innerCanvas, h: innerCanvas },
+          rotationDeg: 0,
+          arrangement: { mode: "grid", cols: 1, rows: 1, gap: 0 },
+        },
       ],
     },
   };

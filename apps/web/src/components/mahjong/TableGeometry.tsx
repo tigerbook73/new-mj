@@ -1,11 +1,7 @@
 import type { ReactNode } from "react";
 import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
 
-/**
- * Shared board geometry primitives used by both the dev Layout Lab
- * (src/components/layout-lab/LayoutLabPreview.tsx) and the production Table
- * board, so the two never drift into two separate layout implementations.
- */
+/** Shared board geometry primitives used by the production Table board. */
 
 const AREA: Record<SeatDirection, string> = {
   top: "col-start-2 row-start-1",

@@ -1,165 +1,56 @@
-# Junk Table UX 分阶段实施计划
+# Junk Table UX 计划
 
-> 状态：现状基线（协议/快照/声明超时/AI advice/桌面视觉骨架）已完成并合入 main，见 §4。新计划**先做完桌面端完整功能**，手机横屏/竖屏移入 `plan.md` 待办，暂不纳入本文件的阶段序列。Phase 1 的 Step 0/1a 已 squash merge 到 main（`3beacb9`）；1b 按用户要求留待其自行规划，不阻塞本阶段。
->
-> 本文件保存专题设计、阶段依赖、阶段细化内容与验收记录；`plan.md` 只保留总进度、当前阶段和下一步第一个动作。
+> 范围：只完成 junk 的桌面 Web 体验（1440×900、1366×768）。手机横屏/竖屏、bloodbattle 专属 UI 与音效不在本专题内。项目总状态见 [`plan.md`](./plan.md)。
 
-## 1. 目标与边界
+## 目标与既定边界
 
-本专题把垃圾胡 Table 打磨成完整产品体验：桌面 Web 全屏无页面滚动、核心对局内容不裁切、合法动作完整可操作、AI 给出一个合法推荐、server 提供可配置声明超时、客户端按权威快照同步并播放事件动画，同时把现代麻将桌视觉系统推广到其他 Web 页面。**手机横屏/竖屏适配移出本轮范围**，见 `plan.md` 待办——先在桌面端把功能做完整、跑通 `../architecture/frontend-layout.md` 的 Zone/LayoutPreset schema，再决定何时启动手机端。
+牌桌必须以 server 权威快照为最终状态；事件只驱动动画。合法动作和 AI 推荐均来自 server/core，客户端不重算规则；时间只由 server 处理。完整契约见 `../contracts/`、`../variants/junk.md` 和根 `AGENTS.md`。
 
-边界：
+## 已完成（归档）
 
-- 只完整验收垃圾胡；bloodbattle 只保证公共骨架不回归，换三张/定缺等进入总待办。
-- UI 延续现有英文，本专题不做国际化。
-- AI 第一版只推荐一个合法动作，不承诺向听、牌效分数或解释。
-- 声明窗口与普通摸打回合使用独立 server timer；普通回合的 10 秒自动出牌在 Phase 4 落地。
-- 本轮不加入音效。
-- 本轮只覆盖桌面视口（1440×900、1366×768）；手机视口（844×390、390×844）不在验收范围内。
+- 基线：权威逐动作快照、可配置声明超时、AI advice 数据链路、桌面牌桌骨架、Tile Storybook 与布局 Lab 均已完成并验证。
+- Phase 1：Zone/LayoutPreset schema、桌面 preset、Grid 等效几何、集中 registry 与桌面迁移已完成；1a 已以 `3beacb9` 合入 main。
+- Phase 1b：层级布局 Lab 已完成多 draft、变量、Grid、持久化、导入、JSON export 和浏览器回归，并已 squash merge 到 main。这是完成项，不再保留控件和实施步骤清单。
 
-## 2. 阶段工作流
+## 后续阶段
 
-本专题经用户明确确认，临时覆盖 `workflow.md` 的 trunk-based 默认方式：
+### Phase 2 — Lab export → production renderer
 
-1. 每个 Phase 必须从最新本地 `main` 创建独立 branch；前一 Phase 未合并不得开始后一 Phase。
-2. 开工先读 `plan.md` 状态区，再只细化当前 Phase 的实现清单、接口、风险和验收。详细计划完成后更新两份 tracker、形成规划检查点提交并强制暂停；**只有用户明确确认该 Phase 计划后才能开始测试和实现**。
-3. 若细化时出现新的架构级选择，同样暂停并提请用户决定，不能用规划检查点绕过架构护栏。
-4. 获得计划确认后，实现与测试同阶段完成；先跑定向检查，阶段门统一执行根目录 `pnpm verify`。
-5. 收工时更新本文件与 `plan.md`，记录验证结果和下一步首个动作，然后允许自动提交。
-6. 实现提交后必须停止并报告 branch、commit、验证结果和风险；**不得自动 merge、不得创建 PR、不得自动推送**。
-7. 只有用户明确要求 merge 后，才在本地把该 branch squash merge 到 `main`；成功后把最终 `Merge commit` 写入该 Phase 的固定字段并形成 tracker 提交，随后可删除本地阶段分支。下一 Phase 再从新的 `main` 开始，并重新经过"详细计划→用户确认"门。
+目标：让正式 Table 直接消费可由 Lab 导出的 `LayoutPreset`，并消除当前 Zone DOM 与业务组件重复定位的问题。
 
-状态约定：`[ ] pending`、`[~] in progress`、`[x] completed`、`[!] blocked`。
+- `ZoneRenderer` 统一递归：每个 Zone 只生成一个 `ZoneFrame`；registry 命中时使用 `ZoneFrame → Service(children) → child ZoneFrame`，未命中时直接递归子 Zone。
+- service 统一接收 `children`；父 service 用 Context 提供尺寸/交互状态，不得按子 Zone id 再创建定位 DOM；叶子 Zone 绑定对应业务内容。
+- Game Page 显式把 desktop preset 传给 `TableBoard`；JSON 保持纯几何，运行时校验 Zone 与 registry 插槽。
 
-## 3. 公共接口决策
+验收：无空透明覆盖层；手牌 hover/click、中心操作和 DevTools 命中正常；两种桌面视口与既有 junk/bloodbattle 回归通过。
 
-### 3.1 AI advice
+### Phase 3 — 桌面交互与视觉覆盖层
 
-- 查询 `game:advice {}`。
-- ack data：`{ seq: number, deadline?: number, actions: unknown[], recommendedActionIndex?: number }`。
-- server 只根据握手绑定座位取得 `PlayerView + getLegalActions`，再调用 `packages/ai`；payload 不包含也不信任 userId/seat。
-- `packages/ai` 的 `recommendAction(playerView, legalActions)`：推荐必须来自 legalActions，只消费该座位可见信息。
-- web 只接受与当前 seq 匹配的 advice；动作数组由 core 决定合法性，web 只分组、展示和提交。
+目标：完成一局 junk 所需的可见信息、操作与反馈。
 
-### 3.2 权威快照与动画
+- 完整操作 Dock：所有合法动作、组合选项、确认/禁用/错误反馈、键盘与触屏可达性。
+- 接入一个合法 AI 推荐；展示 server deadline，普通出牌超时仍只由 server 代提交。
+- 完成桌面视觉层级：玩家信息、中心状态、结算、离桌/设置/日志等覆盖层，并把关键视口回归纳入 e2e。
 
-- `game:snapshot` 保持 `{ view, seq, deadline? }` 形状，语义为每个真人、bot 或超时代提交动作后的逐座位权威状态。
-- 同一连接按"可见 game events → 覆盖这些 events 的 snapshot"发送。
-- event 只驱动动画；snapshot 始终是最终状态权威。重连直接采用最新 snapshot，不重播历史动画。
-- Phase 5（事件驱动牌桌动画）使用双状态与动画屏障：新 snapshot 立即进入 `authoritativeSnapshot`，但只有对应 event 动画完成后才提交为 Table 渲染和可操作性所读的 `presentedView`；可选动作、AI 建议和按钮不得直接读取尚未呈现的权威状态。
-- 动画期间锁定操作并按 seq 排队；重连、页面恢复、队列过长或 reduced-motion 时允许跳过动画，直接把最新权威 snapshot 提交到 `presentedView`。
+验收：真人与 AI 混桌可完成一局 junk，所有合法动作可操作，两个目标桌面视口无页面滚动或关键内容裁切。
 
-### 3.3 可配置声明超时
+### Phase 4 — 动画与全站体验统一
 
-- `ConfigService.claimTimeoutMs` 读取 `CLAIM_TIMEOUT_MS`，默认 `5000` 毫秒。
-- 只接受正整数；缺失、空值、非数字、零或负数回退默认值。
-- server 计算绝对 deadline，客户端只展示，不在本地计时结束时自行提交动作。
-- 玩家响应、窗口解决、牌局结束、房间关闭或新窗口替换旧窗口时必须清理定时器；到期通过正常动作路径提交 `{ type: "pass" }`。
+目标：在不改变权威状态语义的前提下提升反馈与一致性。
 
-## 4. 现状基线
+- 事件动画采用 authoritative/presented 双状态；支持 reduced-motion、重连和积压时直接追平。
+- 将成熟的视觉 token、加载/空/错状态、Toast 与路由恢复推广到登录、游戏选择、大厅、房间和 Replay。
 
-以下能力已完成、测试覆盖、并合入 `main`，不再是本计划的执行项，只作为后续阶段的既定基础：
+验收：动画不提前暴露下一权威状态；跨页错误恢复不显示裸协议错误；明暗主题与键盘路径可用。
 
-- **协议与会话**：权威逐动作快照（`game:snapshot` 每个动作后逐座位下发，web 用统一入口 `applyGameSnapshot`，merge commit `18416f9`）；可配置声明窗口超时（`CLAIM_TIMEOUT_MS`，server 计时代提交 pass，merge commit `39f93b2`）；AI Advice 数据链路（`game:advice` 查询，AI 只消费 PlayerView+legalActions，merge commit `9a5d254`）。三者的协议形状仍是当前公共契约，见 §3。
-- **桌面视觉骨架**（merge commit `cda9286`）：1440×900/1366×768 视口下的现代麻将桌视觉——`TableHud`/`TableBoard`/`CenterStatus` 组件切分、手牌显示排序（万→筒→条→字牌，各组内从小到大，只排序渲染副本不改 `PlayerView.hand`）、Tile Storybook、开发态 Layout Lab（`/dev/table-layout`）、正式 Table 接入。`justDrawn` 摸牌钉住列见 `../variants/junk.md` §7；round-end 确认门见 `../contracts/session-mechanics.md` §6；tile 尺寸计算取舍见 `../decisions.md` D29。完整组件/代码地图见 `apps/web/AGENTS.md`。
-- **已知技术债**：`PlayerBadge` 全量信息（头像/庄家/托管/比分）尚未迁入 `MeldInfoTrack` 的信息列，目前信息列只是占位昵称文字（见 `plan.md` 待办）。
+### Phase 5 — 综合验收与收尾
 
-## 5. Phase 1 — 几何数据层 + 桌面迁移 + 布局工具
+目标：完成 junk 桌面端收尾。
 
-Branch：`feat/table-layout-schema`
+- 覆盖真人 + AI、刷新/断线恢复、声明超时、结算、Replay、慢网络和 reduced-motion。
+- 执行根目录 `pnpm verify`，按 `../doc-map.md` §6 吸纳耐久结论，清理本文件的阶段过程内容。
+- 评估是否启动手机适配，并在 `plan.md` 写明下一专题的首个动作。
 
-Merge commit：`3beacb9 feat(web): migrate desktop table to zone presets`
+## 阶段门
 
-目标：不新增可见 UI；按 `../architecture/frontend-layout.md` 提出的 Zone/LayoutPreset schema 重写现有桌面（1440×900/1366×768）渲染路径，验证"一个玩法+一个布局"能在新架构下端到端跑通且视觉零变化；同时产出/升级布局工具。放弃原计划里"每个 layoutMode 各自摸索一套扁平 config"的做法（`TableLayoutConfig` 与已废弃的横屏 draft `DraftLabConfig` 是这个问题的具体例证）。手机端 layoutMode 移出本轮范围（见 §1），本阶段的 schema/工具设计不因此走捷径——两个视口本身仍需要 schema 正确表达旋转与区域划分，只是不为手机横屏/竖屏另起 LayoutPreset。
-
-实施步骤：
-
-1. **Step 0（已完成）**：定义 `Zone`/`LayoutPreset` TS 类型（中心锚点、本地坐标、`rotationDeg` 语义——只有座位根 Zone 设非零值、`arrangement` 的 flex/grid/absolute 三态、嵌套 children）+ 一个纯函数渲染翻译组件（消费 Zone 树产出 CSS/DOM，只认坐标不认业务）。单测覆盖：90 度整数倍时宽高互换、子级坐标不受父级旋转角度影响（只随 CSS 层叠继承，不重复相加）、`localSize`+`rotationDeg` → 最终尺寸的推导规则。
-2. **Step 1a / 1b（契约定下后互不阻塞，可穿插进行）**：
-   - 1a（已完成）：把现有 `TableLayoutConfig`（`apps/web/src/lib/tableLayoutLab.ts`）的数值手工翻译成一份桌面 `LayoutPreset` 数据（不依赖工具存在），改造 `TableBoard`/`HandTrack`/`MeldInfoTrack`/`DiscardPile` 消费 Zone 树而不是各自的 `%` prop；用既有桌面 Playwright 回归验证零可感知变化（纯重构，不是视觉改版）。
-   - 1b（延后，不阻塞）：把 `/dev/table-layout` 升级/替换为能编辑并导出 `LayoutPreset` JSON 的工具；按用户要求由用户后续自行规划，本阶段不实现也不作为验收条件。
-
-验证：
-
-- [x] `pnpm --filter @new-mj/web verify`（typecheck/lint/unit/e2e/build/build-storybook）全绿；33 个 unit、28 个 Playwright 全部通过。
-- [x] 既有 Layout Lab/桌面布局 Playwright 回归通过；本次为纯重构，未引入可见 UI。
-- [x] 2026-07-21 根目录 `pnpm verify` 全绿（format/typecheck/lint/build/unit/e2e，包含 core junk 1000 局与 bloodbattle 10000 局 fuzz）。已 squash merge 到 `main`（`3beacb9`）。
-
-## 6. Phase 2 — 视觉与覆盖层
-
-Branch：待定
-
-目标（占位，Phase 1 完成后细化）：建立翡翠绿、暖金和深色中性 chrome 的统一 table token（桌面视口）；离桌、设置、事件日志、dev debug 放入浮层/抽屉；结算改为正式结果面板。
-
-## 7. Phase 3 — 桌面视口回归验收
-
-Branch：待定
-
-目标（占位，Phase 2 完成后细化）：扩展 Table Playwright，同一真实 Junk 对局验收 1440×900、1366×768 两个桌面视口，断言无滚动、board 完整位于 viewport、核心元素无裁切；覆盖菜单抽屉、Leave 确认、dev debug、结算面板与 replay 链接；light/dark 各检查一次 table token 生效。
-
-## 8. Phase 4 — 完整操作 Dock 与 AI 推荐
-
-Branch：`feat/table-action-dock`
-
-Merge commit：待合并
-
-目标：
-
-- 展示全部 junk 合法动作，补齐 `zimo/anGang/buGang`；按出牌、吃、碰、杠、胡、过分组并支持组合子选项。
-- AI 推荐动作、组合和弃牌默认选中；用户可以改选。
-- 所有动作统一采用"选择后确认"；请求期间防重复输入，snapshot 后清空，失败时恢复。
-- 展示 server deadline 倒计时；本地归零只进入等待状态。
-- 新增普通出牌回合 timer：`DISCARD_TIMEOUT_MS` 默认 10000ms，配置校验与调试长值规则对齐 `CLAIM_TIMEOUT_MS`；只在当前真人具有合法 discard 时由 server 计时，超时从 `getLegalActions` 过滤 discard 后提交最后一项，仍走正常 `runAction`。声明窗口继续使用独立 claim deadline。
-- 普通出牌 deadline 同样由 server 下发并在 Dock 展示；本地归零只锁定操作并等待权威 snapshot，不自行 discard。主动出牌、回合切换、托管、局终、切局和房间关闭必须清理 timer，旧回调不得跨上下文出牌。
-- 支持键盘、触屏命中区、焦点、禁用与错误反馈。
-- 把 `TableView.tsx` 现在内联的 socket 订阅/派生/派发逻辑抽成集中的会话控制器，展示组件不直接碰 socket/协议（`../architecture/frontend-layout.md` §8 动作/逻辑层）。
-
-## 9. Phase 5 — 事件驱动牌桌动画
-
-Branch：`feat/table-event-animations`
-
-Merge commit：待合并
-
-目标：
-
-- 建立 `authoritativeSnapshot`/`presentedView` 双状态与非权威事件动画队列，覆盖摸牌、出牌、吃碰杠胡、回合、牌墙变化和结算。
-- 动画期间锁定操作；动画结束后才提交对应 snapshot 并展示其中的可选动作，防止下一状态按钮早于动画出现；积压、失焦恢复和重连时快速追平最新权威状态。
-- `prefers-reduced-motion` 下跳过位移动画但保留状态反馈。
-- 跨区域动画复用 `TileId` 作为 Motion `layoutId`；引入动画调度/降级层（`../architecture/frontend-layout.md` §6/§7）。
-
-## 10. Phase 6 — 全站视觉与体验统一
-
-Branch：`feat/web-visual-refresh`
-
-Merge commit：待合并
-
-目标：
-
-- 将牌桌设计系统应用到登录、游戏选择、大厅、房间和 Replay。
-- 统一布局、间距、层级、按钮、加载/空/错状态和明暗主题，并接通现有 ThemeToggle。
-- 建立全局 Toast 与路由错误恢复：访问已不存在/无权进入的 lobby、table 或 replay URL 时，不直接渲染 `ROOM_NOT_FOUND` 等协议错误字样，而是显示用户可读 Toast 后按会话状态跳转到可用页面；访问未匹配路由时同样用 Toast 替代裸 `404 Not Found`，已登录回 `/games`，未登录回 `/login`。
-- 覆盖直接输入 URL、刷新失效 URL、客户端导航和冷启动恢复四条路径；跳转不能循环，Toast 在目标页面可见且只显示一次。
-- 不改变这些页面的业务流程、路由或协议。
-
-## 11. Phase 7 — 综合验收与计划收尾
-
-Branch：`test/table-ux-acceptance`
-
-Merge commit：待合并
-
-目标：
-
-- 验收真人 + AI 垃圾胡完整流程：刷新/断线恢复、声明超时、全部动作、结算与 Replay。
-- 完成桌面视口（1440×900、1366×768）、键盘、触屏、明暗主题、reduced-motion 和慢网络验收。
-- 执行根 `pnpm verify`，记录结果并按 `../doc-map.md` §6 将耐久内容吸纳进 contracts/architecture/decisions/AGENTS。
-- 总 plan 更新为完成状态；评估是否启动手机横屏/竖屏（`plan.md` 待办），写下下一个待办的首个动作；清理本文件中不再有价值的推演细节。
-
-## 12. 全局验收门
-
-每个 Phase 都必须满足：
-
-- 实现与测试在同一阶段 branch。
-- 定向测试通过，根目录 `pnpm verify` 全绿。
-- `plan.md` 与本文件准确记录阶段状态、验证结果和下一步第一个动作。
-- 工作树除该阶段预期内容外干净，形成提交后停止。
-- 未收到用户明确 merge 指令时，main、其他 branch 和远端状态均不得改变。
+每个阶段从最新 main 建分支；先形成并由用户确认当前阶段的简要实现计划，再实现与测试。阶段完成后运行定向检查和根 `pnpm verify`，更新本文件与 `plan.md`、提交并停止；未经用户明确指令不得 merge、推送或创建 PR。

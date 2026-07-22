@@ -128,3 +128,27 @@
     @apply font-sans;
   }
 }
+
+/* The Layout Lab chrome is intentionally dark even when the application uses light theme. */
+.layout-lab-scrollbar {
+  scrollbar-color: #475569 #0f172a;
+}
+
+.layout-lab-scrollbar::-webkit-scrollbar {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.layout-lab-scrollbar::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.layout-lab-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+  border: 2px solid #0f172a;
+  border-radius: 9999px;
+}
+
+.layout-lab-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
