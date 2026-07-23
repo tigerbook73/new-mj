@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DESKTOP_TABLE_PRESET } from "@/lib/desktopTablePreset";
-import {
-  REQUIRED_TABLE_ZONE_IDS,
-  resolveTableZone,
-  tableZonePointerEvents,
-} from "./tableZoneRegistry";
+import { REQUIRED_TABLE_ZONE_IDS, resolveTableZone } from "./tableZoneRegistry";
 
 const zoneIds = (zone: typeof DESKTOP_TABLE_PRESET.root): string[] => [
   zone.id,
@@ -20,12 +16,8 @@ describe("table zone registry", () => {
     }
   });
 
-  it("keeps structural Zones unbound and hand children pointer-transparent to their content", () => {
-    expect(resolveTableZone("hand-content-bottom")).toBeUndefined();
+  it("keeps only unknown structural Zones unbound", () => {
+    expect(resolveTableZone("hand-content-bottom")).toBeDefined();
     expect(resolveTableZone("unknown")).toBeUndefined();
-    expect(tableZonePointerEvents("hand-bottom")).toBe("auto");
-    expect(tableZonePointerEvents("hand-content-bottom")).toBe("none");
-    expect(tableZonePointerEvents("hand-drawn-bottom")).toBe("none");
-    expect(tableZonePointerEvents("discard-bottom")).toBe("none");
   });
 });

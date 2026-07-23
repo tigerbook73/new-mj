@@ -1,6 +1,7 @@
 import type { LayoutPreset, RotationDeg, Zone } from "./layoutPreset";
 import { DEFAULT_TABLE_LAYOUT_CONFIG, type TableLayoutConfig } from "./tableLayoutLab";
 import { SEAT_ROTATION, type SeatDirection } from "./seatLayout";
+import desktopTableLayout from "../layouts/desktop.table-layout.json";
 
 export type TableLayoutMetrics = TableLayoutConfig;
 
@@ -117,6 +118,7 @@ export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPrese
   };
 }
 
-export const DESKTOP_TABLE_PRESET = createDesktopTablePreset(DEFAULT_TABLE_LAYOUT_CONFIG);
+/** The checked-in Lab export is the production desktop layout source of truth. */
+export const DESKTOP_TABLE_PRESET = desktopTableLayout as LayoutPreset;
 
 export const DESKTOP_TABLE_METRICS: TableLayoutMetrics = DEFAULT_TABLE_LAYOUT_CONFIG;

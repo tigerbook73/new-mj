@@ -16,6 +16,7 @@ import type { DiscardEntry } from "@/components/mahjong/DiscardPile";
 import type { Meld } from "@/components/mahjong/MeldGroup";
 import { RoundEndOverlay } from "@/components/mahjong/RoundEndOverlay";
 import { TableBoard, type SeatContent } from "@/components/mahjong/TableBoard";
+import { DESKTOP_TABLE_PRESET } from "@/lib/desktopTablePreset";
 import { TableHud } from "@/components/mahjong/TableHud";
 import { ack } from "@/lib/socket";
 import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
@@ -318,6 +319,7 @@ export function TableView() {
         style={{ containerType: "size" }}
       >
         <TableBoard
+          preset={DESKTOP_TABLE_PRESET}
           seats={seats}
           discards={discards}
           currentDirection={currentDirection}

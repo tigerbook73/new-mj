@@ -11,18 +11,9 @@
 - 基线：权威逐动作快照、可配置声明超时、AI advice 数据链路、桌面牌桌骨架、Tile Storybook 与布局 Lab 均已完成并验证。
 - Phase 1：Zone/LayoutPreset schema、桌面 preset、Grid 等效几何、集中 registry 与桌面迁移已完成；1a 已以 `3beacb9` 合入 main。
 - Phase 1b：层级布局 Lab 已完成多 draft、变量、Grid、持久化、导入、JSON export 和浏览器回归，并已 squash merge 到 main。这是完成项，不再保留控件和实施步骤清单。
+- Phase 2：正式 Table 已直接消费 Lab 导出的 desktop preset；递归 `ZoneFrame → Service(children)` renderer 使每个 Zone 仅有一个定位 DOM，并在运行时校验 registry 所需插槽。手牌、副露/信息 service 不再重建子 Zone 定位，桌面交互与两种目标视口回归已通过。
 
 ## 后续阶段
-
-### Phase 2 — Lab export → production renderer
-
-目标：让正式 Table 直接消费可由 Lab 导出的 `LayoutPreset`，并消除当前 Zone DOM 与业务组件重复定位的问题。
-
-- `ZoneRenderer` 统一递归：每个 Zone 只生成一个 `ZoneFrame`；registry 命中时使用 `ZoneFrame → Service(children) → child ZoneFrame`，未命中时直接递归子 Zone。
-- service 统一接收 `children`；父 service 用 Context 提供尺寸/交互状态，不得按子 Zone id 再创建定位 DOM；叶子 Zone 绑定对应业务内容。
-- Game Page 显式把 desktop preset 传给 `TableBoard`；JSON 保持纯几何，运行时校验 Zone 与 registry 插槽。
-
-验收：无空透明覆盖层；手牌 hover/click、中心操作和 DevTools 命中正常；两种桌面视口与既有 junk/bloodbattle 回归通过。
 
 ### Phase 3 — 桌面交互与视觉覆盖层
 

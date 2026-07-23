@@ -19,6 +19,7 @@ export type LayoutPreset = {
 };
 
 export type ZoneSize = { w: number; h: number };
+export type ZoneService = (zone: Zone, children: ReactNode) => ReactNode;
 
 /** The on-screen footprint of a zone. Its local coordinate system is never rotated. */
 export function getRenderedZoneSize({ localSize, rotationDeg }: Zone): ZoneSize {
@@ -47,19 +48,43 @@ export function zoneStyle(zone: Zone): CSSProperties {
  * Pure geometry-to-DOM translation. It owns only positioning and local rotation;
  * callers supply business content by stable zone id.
  */
+export function assertLayoutPreset(
+  preset: LayoutPreset,
+  requiredZoneIds: readonly string[] = [],
+): void {
+  const ids = new Set<string>();
+  const visit = (zone: Zone) => {
+    if (ids.has(zone.id)) throw new Error(`Zone id "${zone.id}" is duplicated`);
+    ids.add(zone.id);
+    zone.children?.forEach(visit);
+  };
+  visit(preset.root);
+  for (const id of requiredZoneIds) {
+    if (!ids.has(id)) throw new Error(`Required Zone "${id}" is missing`);
+  }
+}
+
+/** A single positioned ZoneFrame optionally wraps its recursively-rendered children in a service. */
 export function ZoneRenderer({
   zone,
-  renderZone,
-  getPointerEvents,
+  renderService,
   root = true,
 }: {
   zone: Zone;
-  renderZone?: (zone: Zone) => ReactNode;
-  getPointerEvents?: (zone: Zone, hasContent: boolean) => CSSProperties["pointerEvents"];
+  renderService?: ZoneService | undefined;
   root?: boolean | undefined;
 }): ReactElement {
-  const content = renderZone?.(zone);
-  const hasContent = content !== null && content !== undefined;
+  const children = zone.children?.map((child) =>
+    createElement(ZoneRenderer, {
+      key: child.id,
+      zone: child,
+      ...(renderService ? { renderService } : {}),
+      root: false,
+    }),
+  );
+  const service = renderService?.(zone, children);
+  const content = service ?? children;
+  const hasService = service !== null && service !== undefined;
   return createElement(
     "div",
     {
@@ -67,18 +92,9 @@ export function ZoneRenderer({
       className: "min-h-0 min-w-0",
       style: {
         ...(root ? { position: "relative", width: "100%", height: "100%" } : zoneStyle(zone)),
-        pointerEvents: getPointerEvents?.(zone, hasContent) ?? (hasContent ? "auto" : "none"),
+        pointerEvents: hasService ? "auto" : "none",
       },
     },
     content,
-    zone.children?.map((child) =>
-      createElement(ZoneRenderer, {
-        key: child.id,
-        zone: child,
-        ...(renderZone ? { renderZone } : {}),
-        ...(getPointerEvents ? { getPointerEvents } : {}),
-        root: false,
-      }),
-    ),
   );
 }
