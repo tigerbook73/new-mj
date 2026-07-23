@@ -23,6 +23,8 @@
     "sb:status": "supabase status"
   },
   "devDependencies": {
+    "@swc/cli": "^0.7.10",
+    "@swc/core": "^1.15.46",
     "@types/node": "^26.1.1",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
