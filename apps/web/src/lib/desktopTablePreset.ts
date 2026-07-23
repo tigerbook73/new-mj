@@ -4,7 +4,6 @@ import { SEAT_ROTATION, type SeatDirection } from "./seatLayout";
 
 export type TableLayoutMetrics = TableLayoutConfig;
 
-const absolute = { mode: "absolute" as const, points: [] };
 const seatDirections: readonly SeatDirection[] = ["bottom", "right", "top", "left"];
 
 /**
@@ -38,7 +37,6 @@ function seatZone(
     // Every seat is authored in its natural, bottom-facing local coordinates.
     localSize: { w: span, h: edge },
     rotationDeg: SEAT_ROTATION[direction] as RotationDeg,
-    arrangement: absolute,
     children,
   };
 }
@@ -66,7 +64,6 @@ export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPrese
       anchorCenter: { x: 50, y: 50 },
       localSize: { w: 100, h: 100 },
       rotationDeg: 0,
-      arrangement: absolute,
       children: [
         ...seatDirections.map((direction) =>
           seatZone(`hand-${direction}`, direction, 0, handSpan, handEdge, [
@@ -75,14 +72,12 @@ export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPrese
               anchorCenter: { x: 50, y: 50 },
               localSize: { w: handContentWidth, h: 100 },
               rotationDeg: 0,
-              arrangement: absolute,
             },
             {
               id: `hand-drawn-${direction}`,
               anchorCenter: { x: 100 - config.hand.sideWidthPct / 2, y: 50 },
               localSize: { w: config.hand.sideWidthPct, h: 100 },
               rotationDeg: 0,
-              arrangement: absolute,
             },
           ]),
         ),
@@ -93,19 +88,12 @@ export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPrese
               anchorCenter: { x: meldWidth / 2, y: 50 },
               localSize: { w: meldWidth, h: 100 },
               rotationDeg: 0,
-              arrangement: {
-                mode: "flex",
-                direction: "row",
-                gap: config.tiles.tileGapPx,
-                align: "end",
-              },
             },
             {
               id: `info-${direction}`,
               anchorCenter: { x: meldWidth + (100 - meldWidth) / 2, y: 50 },
               localSize: { w: 100 - meldWidth, h: 100 },
               rotationDeg: 0,
-              arrangement: absolute,
             },
           ]),
         ),
@@ -123,7 +111,6 @@ export function createDesktopTablePreset(config: TableLayoutConfig): LayoutPrese
           anchorCenter: { x: 50, y: 50 },
           localSize: { w: innerCanvas, h: innerCanvas },
           rotationDeg: 0,
-          arrangement: { mode: "grid", cols: 1, rows: 1, gap: 0 },
         },
       ],
     },

@@ -2,18 +2,12 @@ import { createElement, type CSSProperties, type ReactElement, type ReactNode } 
 
 export type RotationDeg = 0 | 90 | 180 | -90;
 
-export type ZoneArrangement =
-  | { mode: "flex"; direction: "row" | "column"; gap: number; align: string }
-  | { mode: "grid"; cols: number; rows: number; gap: number }
-  | { mode: "absolute"; points: { x: number; y: number }[] };
-
 /** A local coordinate system. Child coordinates and sizes are percentages of this Zone. */
 export type Zone = {
   id: string;
   anchorCenter: { x: number; y: number };
   localSize: { w: number; h: number };
   rotationDeg: RotationDeg;
-  arrangement: ZoneArrangement;
   children?: Zone[] | undefined;
 };
 

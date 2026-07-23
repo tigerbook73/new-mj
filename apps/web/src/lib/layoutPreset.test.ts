@@ -8,7 +8,6 @@ const zone = (rotationDeg: Zone["rotationDeg"]): Zone => ({
   anchorCenter: { x: 50, y: 50 },
   localSize: { w: 80, h: 12 },
   rotationDeg,
-  arrangement: { mode: "absolute", points: [] },
 });
 
 describe("desktop table preset", () => {

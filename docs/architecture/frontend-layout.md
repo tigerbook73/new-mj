@@ -37,10 +37,6 @@ type Zone = {
   anchorCenter: { x: number; y: number }; // 中心点锚点，旋转前后不变
   localSize: { w: number; h: number }; // 旋转前（本地朝向）的宽高
   rotationDeg: 0 | 90 | 180 | -90;
-  arrangement:
-    | { mode: "flex"; direction: "row" | "column"; gap: number; align: string }
-    | { mode: "grid"; cols: number; rows: number; gap: number }
-    | { mode: "absolute"; points: { x: number; y: number }[] };
   children?: Zone[]; // 坐标相对父级本地坐标系（旋转前），随父级一起旋转
 };
 
@@ -54,26 +50,26 @@ type LayoutPreset = {
 关键设计点：
 
 - **锚点用中心点，不用左上角**：与 §3 已实现的旋转技巧同一套心智——CSS `transform: rotate()` 默认绕元素中心旋转，`anchorCenter` 在旋转前后是同一个值，省掉一次换算。
-- **`localSize` 存旋转前尺寸**，内部排布逻辑（flex/grid/absolute）永远按本地朝向写，不关心自己会被转多少度。旋转后的最终尺寸按"90 度整数倍时宽高互换，0°/180° 不互换"从 `localSize`+`rotationDeg` 推导，这条规则只对 90 的整数倍角度成立（麻将四座位场景恰好都是这几个角度）。
+- **`localSize` 存旋转前尺寸**。旋转后的最终尺寸按"90 度整数倍时宽高互换，0°/180° 不互换"从 `localSize`+`rotationDeg` 推导，这条规则只对 90 的整数倍角度成立（麻将四座位场景恰好都是这几个角度）。
 - **`rotationDeg` 的语义**：类型上每个 Zone 都能设，但实践中绝大多数 Zone 的 `rotationDeg` 应该是 `0`——只有代表"某个座位的整个区域"的根 Zone 才设非零值（对应 §3 `DirectionalSurface` 的用法），子孙 Zone 不需要、也不应该在渲染时把自己的角度和父级角度相加。渲染翻译组件实现时应该只在这一类"座位根"节点上应用 CSS 旋转，其余节点旋转恒为 0，避免被理解成"每层都要算旋转叠加"。
 - **保留父子层级，不拍平**：子区域坐标相对父级本地坐标系书写，父级一转，子级自动跟着转。拍平会导致两个问题：一是旋转要在每个子元素上单独计算，重新引入"每张牌自己算三角函数"的问题；二是层叠顺序失去 DOM 树天然的父子级作用域，需要维护一份全局 `z-index` 表，还会撞上"带 `transform` 的元素各自创建新层叠上下文"这个 CSS 坑。保留层级则两个问题都不存在，`z-index` 只需要在同一父容器内局部唯一。
 - **不引入 Yoga 或 canvas 类库**（react-konva/pixi）：D2 已定 UI 用 DOM + Motion，浏览器自带的 CSS 排版就是这层要用的引擎。
 
-区域内部（如一手牌）用 flex/grid 排布即可，不需要精确到每张牌的坐标，浏览器算行内位置比手写坐标表更稳；`absolute` 模式留给确实需要精确定位的场景。
+Zone 只表达区域几何；区域内部（如一手牌）的 flex/grid 排布由对应业务组件管理，不进入通用 preset。
 
 ### 4.1 多级旋转与编辑参照系
 
-`rotationDeg` 不再只限于座位根 Zone；每一层 Zone 都可设 `0 | 90 | 180 | -90`。最终渲染按祖先到自身依次累积 CSS transform；导出数据不做拍平或补偿。所有位置都定义在**父 Zone 未旋转的局部坐标系**，所有 `arrangement` 都定义在**当前 Zone 未旋转的局部坐标系**。
+`rotationDeg` 不再只限于座位根 Zone；每一层 Zone 都可设 `0 | 90 | 180 | -90`。最终渲染按祖先到自身依次累积 CSS transform；导出数据不做拍平或补偿。所有位置都定义在**父 Zone 未旋转的局部坐标系**。
 
 草图编辑器围绕当前选中 Zone 提供三种参照视图，三者只投影同一份 `LayoutPreset` 数据：
 
 - **World**：最终生产效果；所有祖先和自身旋转生效，选中 Zone 子树正常显示、其余对象淡化。
 - **Parent-local**：逆转选中 Zone 的全部祖先旋转，但保留它自身旋转；用于编辑其相对父级的中心点、本地宽高与 rotation。
-- **Zone-local**：同时逆转祖先与选中 Zone 自身旋转；当前 Zone 填满局部预览，用于编辑它的 `absolute`/`flex`/`grid` arrangement 及直接子对象。
+- **Zone-local**：同时逆转祖先与选中 Zone 自身旋转；当前 Zone 填满局部预览，用于编辑直接子对象。
 
-字段必须标明参照系：`center X/Y` 属于父局部坐标；`local W/H`、`rotation`、`arrangement` 属于当前 Zone。若父对象不是 `absolute`，子对象位置由父 arrangement 派生，位置字段只读。World 的最终视觉矩形先作为可见结果；在仅支持四分之一转的前提下，后续可精确反算为可编辑输入。
+字段必须标明参照系：`center X/Y` 属于父局部坐标；`local W/H`、`rotation` 属于当前 Zone。World 的最终视觉矩形先作为可见结果；在仅支持四分之一转的前提下，后续可精确反算为可编辑输入。
 
-为让 App 直接消费导出结果同时支持编辑器无损往返，`LayoutPreset.root` 保持 resolved Zone 数据；编辑器特有 raw expression、变量与辅助 Grid 另放可选 `editor` 元数据。旧 preset 不带该元数据时，以数值 raw 导入。当前草图辅助 Grid 与正式 `Zone.arrangement.grid` 是不同概念：前者导出时透明展开，后者是正式运行时布局语义。
+为让 App 直接消费导出结果同时支持编辑器无损往返，`LayoutPreset.root` 保持 resolved Zone 数据；编辑器特有 raw expression、变量与辅助 Grid 另放可选 `editor` 元数据。旧 preset 不带该元数据时，以数值 raw 导入。草图辅助 Grid 只属于编辑器，导出时透明展开，不进入正式运行时几何。
 
 ### 4.2 Zone 与业务 Element 的绑定（目标契约）
 

@@ -27,7 +27,6 @@ const expectZonesToMatch = (actual: Zone, expected: Zone) => {
   expect(actual.localSize.w).toBeCloseTo(expected.localSize.w, 10);
   expect(actual.localSize.h).toBeCloseTo(expected.localSize.h, 10);
   expect(actual.rotationDeg).toBe(expected.rotationDeg);
-  expect(actual.arrangement).toEqual(expected.arrangement);
   expect(actual.children?.length ?? 0).toBe(expected.children?.length ?? 0);
   actual.children?.forEach((child, index) => expectZonesToMatch(child, expected.children![index]!));
 };
@@ -55,7 +54,6 @@ describe("layout sketch document", () => {
             anchorCenter: { x: 50, y: 50 },
             localSize: { w: 100, h: 100 },
             rotationDeg: 0,
-            arrangement: { mode: "absolute", points: [] },
             children: [],
           },
         }),
@@ -373,13 +371,11 @@ describe("layout sketch document", () => {
         children: [
           {
             id: "L1A",
-            arrangement: { mode: "absolute", points: [] },
             children: [
               {
                 id: "L1A-r1c2",
                 anchorCenter: { x: 75, y: 50 },
                 localSize: { w: 50, h: 100 },
-                arrangement: { mode: "absolute", points: [] },
                 children: [
                   {
                     id: "content",
@@ -435,7 +431,6 @@ describe("layout sketch document", () => {
         id: "free",
         anchorCenter: { x: 40, y: 55 },
         localSize: { w: 40, h: 50 },
-        arrangement: { mode: "absolute", points: [] },
       },
     ]);
     expect(JSON.stringify(preset.root)).not.toContain("L1A-r1c1");

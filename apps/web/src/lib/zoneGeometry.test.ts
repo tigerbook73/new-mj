@@ -7,7 +7,6 @@ const zone = (patch: Partial<Zone> = {}): Zone => ({
   anchorCenter: { x: 50, y: 50 },
   localSize: { w: 40, h: 20 },
   rotationDeg: 0,
-  arrangement: { mode: "absolute", points: [] },
   ...patch,
 });
 

@@ -82,9 +82,6 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
   const rotationDeg = item.rotationDeg;
   if (rotationDeg !== 0 && rotationDeg !== 90 && rotationDeg !== 180 && rotationDeg !== -90)
     throw new Error(`${path}.rotationDeg must be 0, 90, 180, or -90`);
-  const arrangement = objectRecord(item.arrangement);
-  if (!["absolute", "flex", "grid"].includes(arrangement.mode as string))
-    throw new Error(`${path}.arrangement.mode is invalid`);
   const children = item.children;
   if (children !== undefined && !Array.isArray(children))
     throw new Error(`${path}.children must be an array`);
@@ -99,7 +96,6 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
       h: importNumber(localSize.h, `${path}.localSize.h`, 0.1, 100),
     },
     rotationDeg,
-    arrangement: arrangement as Zone["arrangement"],
     ...(Array.isArray(children)
       ? {
           children: children.map((child, index) =>
@@ -629,7 +625,6 @@ export function applyGridTemplate(
   };
 }
 
-const absoluteArrangement = { mode: "absolute" as const, points: [] };
 const shouldExportZone = (node: SketchNode) =>
   node.kind !== "gridCell" || !node.shadow || node.children.length > 0;
 const exportChildren = (node: SketchNode): Zone[] =>
@@ -645,7 +640,6 @@ const exportZone = (node: SketchNode): Zone => {
     },
     localSize: { w: node.w.resolved, h: node.h.resolved },
     rotationDeg: node.rotationDeg ?? 0,
-    arrangement: absoluteArrangement,
     ...(children.length > 0 ? { children } : {}),
   };
 };
@@ -662,7 +656,6 @@ export const exportSketchDraft = (
     anchorCenter: { x: 50, y: 50 },
     localSize: { w: 100, h: 100 },
     rotationDeg: 0,
-    arrangement: absoluteArrangement,
     ...(exportChildren(draft.root).length > 0 ? { children: exportChildren(draft.root) } : {}),
   },
   editor: { version: 1, root: draft.root, variables },
