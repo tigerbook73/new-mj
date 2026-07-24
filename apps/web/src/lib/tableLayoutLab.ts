@@ -2,22 +2,12 @@ export const TABLE_LAYOUT_STORAGE_KEY = "new-mj:table-layout-lab:v1";
 
 export type TableLayoutConfig = {
   version: 1;
-  /** Outer ring: hand centered, with the drawn tile pinned to the right edge. Shared by the dev Layout Lab and the production Table board (see docs/process/table-ux-plan.md P4.1 收尾). */
+  /** Hand tile sizing. Zone placement itself comes from the checked-in desktop.table-layout.json (see desktopTablePreset.ts), not from this config. */
   hand: {
-    trackPct: number;
-    /** Layout Lab only — how many synthetic hand tiles to preview, independent of `meldInfo.meldGroupCount`. Production always uses the real hand. */
-    tileCount: number;
     tileHeightPct: number;
-    /** Width % of the hand region reserved for each side column — an empty spacer on the left, the drawn tile (right-aligned) on the right. */
-    sideWidthPct: number;
   };
-  /** Middle ring, in the space the board used to reserve for the wall: Meld (left, bottom-aligned) + per-seat info (right). Shared by the dev Layout Lab and the production Table board. */
+  /** Meld tile/column sizing within the Zone the board places it in. */
   meldInfo: {
-    trackPct: number;
-    /** Layout Lab only — number of synthetic 3-tile groups to preview; production renders however many real melds exist. */
-    meldGroupCount: number;
-    /** Width % of the Meld column; the info column takes the remainder. */
-    meldWidthPct: number;
     /** Height % of the Meld column, bottom-aligned within it. */
     meldHeightPct: number;
     meldTileHeightPct: number;
@@ -28,22 +18,16 @@ export type TableLayoutConfig = {
     discardShortPct: number;
     tileGapPx: number;
   };
-  discard: { trackPct: number; columns: number; rows: number };
+  discard: { columns: number; rows: number };
   debug: { showRegions: boolean };
 };
 
 export const DEFAULT_TABLE_LAYOUT_CONFIG: TableLayoutConfig = {
   version: 1,
   hand: {
-    trackPct: 12,
-    tileCount: 13,
     tileHeightPct: 51,
-    sideWidthPct: 12,
   },
   meldInfo: {
-    trackPct: 10,
-    meldGroupCount: 4,
-    meldWidthPct: 80,
     meldHeightPct: 94,
     meldTileHeightPct: 64,
   },
@@ -52,24 +36,17 @@ export const DEFAULT_TABLE_LAYOUT_CONFIG: TableLayoutConfig = {
     discardShortPct: 28,
     tileGapPx: 1.9,
   },
-  discard: { trackPct: 27, columns: 8, rows: 3 },
+  discard: { columns: 8, rows: 3 },
   debug: { showRegions: false },
 };
 
 const limits = {
-  handTrackPct: [5, 30],
-  handTileCount: [0, 13],
   handTileHeightPct: [5, 80],
-  handSideWidthPct: [5, 30],
-  meldInfoTrackPct: [5, 30],
-  meldGroupCount: [0, 4],
-  meldWidthPct: [10, 90],
   meldHeightPct: [10, 100],
   meldTileHeightPct: [5, 80],
   aspectRatio: [1.2, 1.8],
   discardShortPct: [5, 80],
   tileGapPx: [0, 8],
-  trackPct: [5, 34],
   columns: [4, 14],
   rows: [2, 4],
 } as const;
@@ -96,31 +73,13 @@ export function normalizeTableLayoutConfig(value: unknown): TableLayoutConfig {
   return {
     version: 1,
     hand: {
-      trackPct: numberAt(hand.trackPct, defaults.hand.trackPct, limits.handTrackPct),
-      tileCount: Math.round(
-        numberAt(hand.tileCount, defaults.hand.tileCount, limits.handTileCount),
-      ),
       tileHeightPct: numberAt(
         hand.tileHeightPct,
         defaults.hand.tileHeightPct,
         limits.handTileHeightPct,
       ),
-      sideWidthPct: numberAt(
-        hand.sideWidthPct,
-        defaults.hand.sideWidthPct,
-        limits.handSideWidthPct,
-      ),
     },
     meldInfo: {
-      trackPct: numberAt(meldInfo.trackPct, defaults.meldInfo.trackPct, limits.meldInfoTrackPct),
-      meldGroupCount: Math.round(
-        numberAt(meldInfo.meldGroupCount, defaults.meldInfo.meldGroupCount, limits.meldGroupCount),
-      ),
-      meldWidthPct: numberAt(
-        meldInfo.meldWidthPct,
-        defaults.meldInfo.meldWidthPct,
-        limits.meldWidthPct,
-      ),
       meldHeightPct: numberAt(
         meldInfo.meldHeightPct,
         defaults.meldInfo.meldHeightPct,
@@ -146,7 +105,6 @@ export function normalizeTableLayoutConfig(value: unknown): TableLayoutConfig {
       ),
     },
     discard: {
-      trackPct: numberAt(discard.trackPct, defaults.discard.trackPct, limits.trackPct),
       columns: Math.round(numberAt(discard.columns, defaults.discard.columns, limits.columns)),
       rows: Math.round(numberAt(discard.rows, defaults.discard.rows, limits.rows)),
     },

@@ -25,15 +25,14 @@ describe("table layout lab config", () => {
   it("clamps numbers and ignores unknown fields", () => {
     const normalized = normalizeTableLayoutConfig({
       version: 1,
-      hand: { trackPct: 999, sideWidthPct: 0, unknown: 1 },
-      meldInfo: { meldGroupCount: 99, meldWidthPct: 200 },
+      hand: { tileHeightPct: 999, unknown: 1 },
+      meldInfo: { meldHeightPct: 999, meldTileHeightPct: 0 },
       discard: { columns: 2.2, rows: 99 },
       debug: { showRegions: "yes" },
     });
-    expect(normalized.hand.trackPct).toBe(30);
-    expect(normalized.hand.sideWidthPct).toBe(5);
-    expect(normalized.meldInfo.meldGroupCount).toBe(4);
-    expect(normalized.meldInfo.meldWidthPct).toBe(90);
+    expect(normalized.hand.tileHeightPct).toBe(80);
+    expect(normalized.meldInfo.meldHeightPct).toBe(100);
+    expect(normalized.meldInfo.meldTileHeightPct).toBe(5);
     expect(normalized.discard.columns).toBe(4);
     expect(normalized.discard.rows).toBe(4);
     expect(normalized.debug.showRegions).toBe(false);

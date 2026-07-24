@@ -12,6 +12,7 @@ export const EVENT_TYPES = {
   claimWindowOpened: "ClaimWindowOpened",
   claimResponded: "ClaimResponded",
   claimWindowResolved: "ClaimWindowResolved",
+  legalActionsUpdated: "LegalActionsUpdated",
   gangMade: "GangMade",
   gangReplacementDrawn: "GangReplacementDrawn",
   huDeclared: "HuDeclared",

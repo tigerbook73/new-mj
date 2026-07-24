@@ -75,6 +75,8 @@ export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
   phase: JunkPhase;
   myClaimOptions?: JunkClaimOption[];
   myClaimResponse?: JunkAction;
+  /** Complete server-computed actions for this seat; pass is included during claims. */
+  myActionOptions?: JunkAction[];
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Private: only present when the requesting seat is the one that just drew. */
   justDrawn?: TileId;

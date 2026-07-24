@@ -38,7 +38,7 @@ export default defineConfig({
       // so an actual crash is still visible.
       command: "pnpm --filter @new-mj/server start",
       // NODE_ENV=test makes dotenv-flow load .env.test (blanks Supabase/DB vars, see decisions.md D23) and skip .env.development.local.
-      env: { PORT: String(SERVER_PORT), NODE_ENV: "test" },
+      env: { PORT: String(SERVER_PORT), NODE_ENV: "test", TEST_GAME_SEED: "121" },
       stdout: "ignore",
       stderr: "pipe",
       timeout: 180_000,

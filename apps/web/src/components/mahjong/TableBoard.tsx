@@ -28,6 +28,7 @@ interface TableBoardProps {
   seats: Record<SeatDirection, SeatContent>;
   discards: Record<SeatDirection, DiscardEntry[]>;
   center: ReactNode;
+  actionDock?: ReactNode;
   currentDirection?: SeatDirection | undefined;
 }
 
@@ -198,7 +199,14 @@ function DiscardTrack({
 }
 
 /** Production board placement is entirely driven by the caller-supplied LayoutPreset tree. */
-export function TableBoard({ preset, seats, discards, center, currentDirection }: TableBoardProps) {
+export function TableBoard({
+  preset,
+  seats,
+  discards,
+  center,
+  actionDock,
+  currentDirection,
+}: TableBoardProps) {
   assertLayoutPreset(preset, REQUIRED_TABLE_ZONE_IDS);
   return (
     <div
@@ -259,6 +267,19 @@ export function TableBoard({ preset, seats, discards, center, currentDirection }
                   {currentDirection && <TurnIndicator direction={currentDirection} />}
                 </div>
               );
+            case "actionDock":
+              return actionDock ? (
+                <section
+                  data-testid="action-dock-surface"
+                  className="flex h-full w-full items-center justify-center rounded-xl border border-white/25 bg-slate-950/55 p-3 shadow-2xl backdrop-blur-md"
+                  style={{
+                    containerType: "size",
+                    padding: "clamp(0.35rem, 4cqi, 0.75rem)",
+                  }}
+                >
+                  {actionDock}
+                </section>
+              ) : null;
             default:
               return null;
           }

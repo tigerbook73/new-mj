@@ -74,6 +74,22 @@ export class ConfigService {
   get claimTimeoutMs(): number {
     const raw = process.env["CLAIM_TIMEOUT_MS"];
     const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0 ? parsed : 5_000;
+    return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0 ? parsed : 20_000;
+  }
+
+  /** Server-owned pacing interval for one bot/autopilot action. */
+  get botActionDelayRangeMs(): readonly [number, number] {
+    // Unit/integration tests retain their deterministic synchronous model;
+    // the production interval itself is covered with an injected fake timer.
+    if (process.env["NODE_ENV"] === "test") return [0, 0];
+    return [600, 1_200];
+  }
+
+  /** Deterministic fixture only; production games always receive a random seed. */
+  get testGameSeed(): number | undefined {
+    if (process.env["NODE_ENV"] !== "test") return undefined;
+    const raw = process.env["TEST_GAME_SEED"];
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
   }
 }

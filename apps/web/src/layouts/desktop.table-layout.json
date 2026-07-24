@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "referenceCanvas": { "w": 1440, "h": 900 },
+  "referenceCanvas": { "w": 1, "h": 1 },
   "root": {
     "id": "table",
     "anchorCenter": { "x": 50, "y": 50 },
@@ -195,6 +195,12 @@
         "id": "center",
         "anchorCenter": { "x": 50, "y": 50 },
         "localSize": { "w": 27.968, "h": 27.968 },
+        "rotationDeg": 0
+      },
+      {
+        "id": "action-dock",
+        "anchorCenter": { "x": 50, "y": 57 },
+        "localSize": { "w": 30, "h": 30 },
         "rotationDeg": 0
       }
     ]

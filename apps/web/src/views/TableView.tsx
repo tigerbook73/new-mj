@@ -7,59 +7,25 @@ import type {
   GameEventEnvelope,
   GameSnapshot,
   RoomReadyChangedEvent,
-  SeatId,
   SessionResult,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
+import { ActionDock } from "@/components/mahjong/ActionDock";
 import { CenterStatus } from "@/components/mahjong/CenterStatus";
-import type { DiscardEntry } from "@/components/mahjong/DiscardPile";
-import type { Meld } from "@/components/mahjong/MeldGroup";
 import { RoundEndOverlay } from "@/components/mahjong/RoundEndOverlay";
-import { TableBoard, type SeatContent } from "@/components/mahjong/TableBoard";
+import { TableBoard } from "@/components/mahjong/TableBoard";
 import { DESKTOP_TABLE_PRESET } from "@/lib/desktopTablePreset";
 import { TableHud } from "@/components/mahjong/TableHud";
 import { ack } from "@/lib/socket";
-import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
 import { useSessionStore } from "@/store/session";
+import { useTablePresentation } from "./useTablePresentation";
 
 /**
- * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myClaimOptions），
+ * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myActionOptions），
  * 但那是玩法私有约定，不是 PlayerViewBase 的静态契约——protocol 的
  * PlayerViewBaseSchema 故意用 .catchall(z.unknown()) 放行这些字段，这里按约定
  * 读取，不 import 任何 ruleset 专属类型（架构铁律 6）。
  */
-type ClaimOption = { action: Record<string, unknown> };
-type JunkSeatExtra = {
-  handCount: number;
-  melds: Meld[];
-  discards: DiscardEntry[];
-  /** Public: this seat just drew and hasn't acted yet — see docs/variants/junk.md §7. */
-  justDrawn: boolean;
-};
-type GameResultLike =
-  | { type: "draw"; scoreDeltas: [number, number, number, number] }
-  | {
-      type: "win";
-      winner: number;
-      winners: number[];
-      winType: "zimo" | "ron";
-      from?: number;
-      scoreDeltas: [number, number, number, number];
-    };
-type ViewExtras = {
-  phase?: string;
-  myClaimOptions?: ClaimOption[];
-  seats?: JunkSeatExtra[];
-  /** Private: only present when it's my own seat's just-drawn tile. */
-  justDrawn?: number;
-  /** Public: the single most recent discard on the table — see docs/variants/junk.md §7. */
-  lastDiscard?: { seat: SeatId; tile: number };
-  /** Public: present once `phase==="finished"` — drives RoundEndOverlay below. */
-  result?: GameResultLike;
-};
-
-const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [], justDrawn: false };
-
 export function TableView() {
   const navigate = useNavigate();
   const socket = useSessionStore((state) => state.socket);
@@ -68,6 +34,7 @@ export function TableView() {
   const view = useSessionStore((state) => state.view);
   const gameSeq = useSessionStore((state) => state.gameSeq);
   const gameDeadline = useSessionStore((state) => state.gameDeadline);
+  const advice = useSessionStore((state) => state.advice);
   const snapshotRevision = useSessionStore((state) => state.snapshotRevision);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
@@ -197,6 +164,12 @@ export function TableView() {
     void navigate("/games");
   };
 
+  const presentation = useTablePresentation({
+    view,
+    players: room?.players,
+    onDiscard: (tile) => void sendAction({ type: "discard", tile }),
+  });
+
   if (!view) {
     // The table loader (router.tsx) only ever lets a `!view` room through
     // when the caller's own seat is permanently auto-piloted (session-
@@ -215,90 +188,30 @@ export function TableView() {
       );
     }
     return (
-      <div className="flex h-[100dvh] w-full items-center justify-center overflow-hidden p-6">
+      <div className="flex h-dvh w-full items-center justify-center overflow-hidden p-6">
         Waiting for game data…
       </div>
     );
   }
 
-  const extras = view as unknown as ViewExtras;
-  const isMyTurn = view.currentSeat === view.seat && extras.phase === "playing";
-  const claimOptions = extras.myClaimOptions ?? [];
+  if (!presentation) {
+    throw new Error("MISSING_TABLE_PRESENTATION");
+  }
+
+  const { actionOptions, currentDirection, discards, extras, hasDockActions, seats } = presentation;
+  const recommendedAction =
+    advice?.recommendedActionIndex === undefined
+      ? undefined
+      : advice.actions[advice.recommendedActionIndex];
   const isOwner = room?.ownerUserId === userId;
   const hasOtherPlayers = room?.players.some(
     (player, seat) => player !== null && seat !== view.seat,
   );
 
-  const seatData = (seat: SeatId): JunkSeatExtra => extras.seats?.[seat] ?? EMPTY_SEAT;
-  const playerInfo = (seat: SeatId) => room?.players[seat];
-
-  const seats = Object.fromEntries(
-    SEAT_DIRECTIONS.map((direction) => {
-      const seat = seatAt(view.seat, direction);
-      const data = seatData(seat);
-      const player = playerInfo(seat);
-      const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
-      const content: SeatContent = {
-        melds: data.melds.map((meld) => ({
-          ...meld,
-          ...(meld.from !== undefined
-            ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
-            : {}),
-        })),
-        // The just-drawn tile is pinned separately below — drop it from the main row/count so
-        // it isn't shown (or counted) twice.
-        handCount: drawnVisible ? data.handCount - 1 : data.handCount,
-        info: player?.nickname ?? `Seat ${seat + 1}`,
-        justDrawn:
-          direction === "bottom"
-            ? {
-                visible: extras.justDrawn !== undefined,
-                ...(extras.justDrawn !== undefined ? { tileId: extras.justDrawn } : {}),
-                ...(extras.justDrawn !== undefined && isMyTurn
-                  ? {
-                      onClick: () => void sendAction({ type: "discard", tile: extras.justDrawn }),
-                    }
-                  : {}),
-              }
-            : { visible: data.justDrawn },
-        ...(direction === "bottom"
-          ? {
-              hand:
-                extras.justDrawn !== undefined
-                  ? view.hand.filter((tile) => tile !== extras.justDrawn)
-                  : view.hand,
-              interactive: isMyTurn,
-              onDiscard: (tile: number) => void sendAction({ type: "discard", tile }),
-            }
-          : {}),
-      };
-      return [direction, content];
-    }),
-  ) as Record<SeatDirection, SeatContent>;
-
-  const discards = Object.fromEntries(
-    SEAT_DIRECTIONS.map((direction) => {
-      const seat = seatAt(view.seat, direction);
-      const entries = seatData(seat).discards.map((entry) => ({
-        ...entry,
-        claimedByDirection:
-          entry.claimedBy !== undefined
-            ? directionOf(view.seat, entry.claimedBy as SeatId)
-            : undefined,
-        justDiscarded: extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile,
-      }));
-      return [direction, entries];
-    }),
-  ) as Record<SeatDirection, DiscardEntry[]>;
-
-  const currentDirection = SEAT_DIRECTIONS.find(
-    (direction) => seatAt(view.seat, direction) === view.currentSeat,
-  );
-
   return (
     <div
       data-testid="table-page"
-      className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+      className="flex h-dvh w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
     >
       <TableHud
         roomName={room?.name ?? "Mahjong table"}
@@ -328,19 +241,27 @@ export function TableView() {
               phase={extras.phase ?? "unknown"}
               currentSeat={view.currentSeat}
               wallCount={view.wallCount}
-              actions={
-                claimOptions.length > 0 ? (
-                  <div className="flex flex-wrap justify-center gap-1">
-                    {claimOptions.map((option, index) => (
-                      <Button key={index} size="sm" onClick={() => void sendAction(option.action)}>
-                        {String(option.action["type"])}
-                      </Button>
-                    ))}
-                  </div>
-                ) : undefined
-              }
               error={error}
             />
+          }
+          actionDock={
+            hasDockActions ? (
+              <ActionDock
+                actions={actionOptions}
+                hand={view.hand}
+                melds={extras.seats?.[view.seat]?.melds}
+                deadline={gameDeadline}
+                error={error}
+                lastDiscard={extras.lastDiscard?.tile}
+                recommendedAction={
+                  typeof recommendedAction === "object" && recommendedAction !== null
+                    ? (recommendedAction as Record<string, unknown>)
+                    : undefined
+                }
+                justDrawn={extras.justDrawn}
+                onAction={(action) => void sendAction(action)}
+              />
+            ) : undefined
           }
         />
         {extras.result && sessionResult == null && room && (

@@ -9,11 +9,11 @@ describe("ConfigService.claimTimeoutMs", () => {
   });
 
   it.each([undefined, "", "nope", "Infinity", "1.5", "0", "-1"])(
-    "falls back to 5000 for %p",
+    "falls back to 20000 for %p",
     (value) => {
       if (value === undefined) delete process.env["CLAIM_TIMEOUT_MS"];
       else process.env["CLAIM_TIMEOUT_MS"] = value;
-      expect(new ConfigService().claimTimeoutMs).toBe(5_000);
+      expect(new ConfigService().claimTimeoutMs).toBe(20_000);
     },
   );
 

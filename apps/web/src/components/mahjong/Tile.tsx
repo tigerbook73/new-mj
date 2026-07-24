@@ -8,7 +8,9 @@ const tileVariants = cva(
   {
     variants: {
       clickable: {
-        true: "cursor-pointer transition-transform hover:-translate-y-1",
+        // Centered enlargement expands the hit target instead of moving it
+        // away from the pointer, unlike the old upward translation.
+        true: "origin-bottom cursor-pointer transition-[transform,border-color,box-shadow] hover:z-10 hover:scale-[1.2] hover:border-cyan-400 hover:ring-2 hover:ring-cyan-300 hover:shadow-lg",
         false: "",
       },
       selected: { true: "-translate-y-2 ring-2 ring-primary", false: "" },
@@ -23,19 +25,21 @@ const tileVariants = cva(
   },
 );
 
+/** Height / width of a real mahjong tile face — mirrors tableLayoutLab.ts's `tiles.aspectRatio` default. */
+const DEFAULT_TILE_ASPECT_RATIO = 1.333;
+
 export interface TileProps extends VariantProps<typeof tileVariants> {
   /** Omit (or set `back`) to render a face-down tile. */
   tileId?: number;
   back?: boolean;
   /**
-   * Exact pixel box for this tile. Callers on the real board
-   * (HandRow/MeldGroup/DiscardPile) always receive this from a shared
-   * fitTileGrid computation (HandTrack/MeldInfoTrack/DiscardPile itself); the
-   * default here only covers a bare standalone <Tile/> (e.g. a Storybook
-   * fixture with no surrounding grid).
+   * Pixel (or CSS percentage) box for this tile. Give both for an exact box
+   * (what the real board's fitTileGrid callers do); give only one and the
+   * other is derived by the browser via CSS `aspect-ratio` instead of the
+   * caller having to compute it.
    */
-  widthPx?: number;
-  heightPx?: number;
+  widthPx?: number | string;
+  heightPx?: number | string;
   onClick?: (() => void) | undefined;
   className?: string;
   testId?: string;
@@ -49,8 +53,8 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
 export function Tile({
   tileId,
   back = false,
-  widthPx = 44,
-  heightPx = 59,
+  widthPx,
+  heightPx,
   clickable,
   selected,
   dimmed,
@@ -63,6 +67,8 @@ export function Tile({
   const isBack = back || tileId === undefined;
   const isClickable = (clickable ?? Boolean(onClick)) && !isBack;
   const src = isBack ? tileBackImageSrc(tileTheme) : tileImageSrc(tileId!, tileTheme);
+  const hasWidth = widthPx !== undefined;
+  const hasHeight = heightPx !== undefined;
 
   return (
     <div
@@ -73,7 +79,15 @@ export function Tile({
         tileTheme === "Black" && "border-neutral-700 bg-neutral-950",
         className,
       )}
-      style={{ width: widthPx, height: heightPx }}
+      style={{
+        width: hasWidth ? widthPx : !hasHeight ? 44 : undefined,
+        height: hasHeight ? heightPx : !hasWidth ? 59 : undefined,
+        // Only relevant when exactly one side was omitted — that's what lets
+        // the browser derive it. Both given (the real board's usual case) or
+        // neither given (bare defaults above) both fully determine the box
+        // already, so aspect-ratio has nothing left to do.
+        aspectRatio: hasWidth === hasHeight ? undefined : `1 / ${DEFAULT_TILE_ASPECT_RATIO}`,
+      }}
       onClick={isClickable ? onClick : undefined}
       role={isClickable ? "button" : undefined}
       tabIndex={isClickable ? 0 : undefined}

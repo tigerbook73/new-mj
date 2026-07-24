@@ -38,6 +38,10 @@ interface ClaimTimer {
   timer: NodeJS.Timeout;
 }
 
+interface BotActionTimer {
+  timer: NodeJS.Timeout;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
@@ -52,6 +56,7 @@ export class RoomService {
   private readonly rooms = new Map<string, Room>();
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
   private readonly claimTimers = new Map<string, ClaimTimer>();
+  private readonly botActionTimers = new Map<string, BotActionTimer>();
   /**
    * userId → roomId, server-truth source for client restore (session:identity's
    * activeRoom, see docs/contracts/session-mechanics.md §12). Only tracks real
@@ -387,20 +392,32 @@ export class RoomService {
     return result;
   }
 
-  /**
-   * Drives every bot seat's turn until none has a legal action left (i.e.
-   * control has passed to a real player, or the room is no longer in-game).
-   * Iterative, not recursive into applyPlayerAction, so a bot-heavy multi-
-   * round session doesn't grow the call stack across rounds; re-reads
-   * getLegalActions() fresh each step so it never acts on stale state.
-   */
+  /** Schedules at most one server-owned bot/autopilot action for this room. */
   private autoPlayBots(room: Room): void {
-    const maxSteps = 2000;
-    for (let step = 0; step < maxSteps && room.phase === "in-game"; step += 1) {
+    if (room.phase !== "in-game" || this.botActionTimers.has(room.id)) return;
+    if (!this.nextBotAction(room)) return;
+    const [minDelayMs, maxDelayMs] = this.configService.botActionDelayRangeMs;
+    if (maxDelayMs === 0) {
       const next = this.nextBotAction(room);
       if (!next) return;
       this.runAction(room, next.seat, next.action);
+      this.autoPlayBots(room);
+      return;
     }
+    const delayMs = randomInt(minDelayMs, maxDelayMs + 1);
+    const timer = setTimeout(() => {
+      this.botActionTimers.delete(room.id);
+      const current = this.rooms.get(room.id);
+      if (!current || current.phase !== "in-game") return;
+      // Re-read after the wait: a human action, claim timeout, or room close
+      // may have changed control while this timer was pending.
+      const next = this.nextBotAction(current);
+      if (!next) return;
+      this.runAction(current, next.seat, next.action);
+      this.autoPlayBots(current);
+    }, delayMs);
+    timer.unref();
+    this.botActionTimers.set(room.id, { timer });
   }
 
   private nextBotAction(room: Room): { seat: SeatId; action: unknown } | undefined {
@@ -521,6 +538,7 @@ export class RoomService {
   }
 
   private closeAbandonedRoom(room: Room): void {
+    this.clearBotActionTimer(room.id);
     this.clearRoomClaimTimers(room.id);
     room.phase = "finished";
     room.status = "closed";
@@ -665,9 +683,10 @@ export class RoomService {
   }
 
   private beginGame(room: Room, emitInitialSnapshots = true): void {
+    this.clearBotActionTimer(room.id);
     this.clearRoomClaimTimers(room.id);
     room.gameNumber += 1;
-    room.seed = randomInt(MAX_SEED);
+    room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
     const result = this.gameService.createGame(room.config, room.seed, room.dealer);
     if ("error" in result) {
       throw new RoomServiceError("INVALID_CONFIG", result.error.code);
@@ -707,6 +726,7 @@ export class RoomService {
   }
 
   private handleGameEnd(room: Room): void {
+    this.clearBotActionTimer(room.id);
     this.clearRoomClaimTimers(room.id);
     const gameLog: FinishedGameLog = {
       gameNumber: room.gameNumber,
@@ -859,6 +879,12 @@ export class RoomService {
     for (let seat = 0; seat < ROOM_SIZE; seat += 1) {
       this.clearClaimTimer(roomId, seat as SeatId);
     }
+  }
+
+  private clearBotActionTimer(roomId: string): void {
+    const entry = this.botActionTimers.get(roomId);
+    if (entry) clearTimeout(entry.timer);
+    this.botActionTimers.delete(roomId);
   }
 
   private extractScoreDeltas(events: readonly GameEvent[]): [number, number, number, number] {

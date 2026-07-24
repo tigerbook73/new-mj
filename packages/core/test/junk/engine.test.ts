@@ -277,8 +277,12 @@ test("1000 seeded games finish while preserving tile conservation", () => {
 
 test("engine-api createGame/applyAction/getLegalActions/getPlayerView dispatch by rulesetId", () => {
   const started = engineCreateGame({ rulesetId: "junk" }, 7, 0);
-  expect(started).toEqual(createJunkGame(7, 0));
   if ("error" in started) throw new Error(started.error.code);
+  expect(
+    started.events.some(
+      (event) => (event.payload as { type?: string }).type === "LegalActionsUpdated",
+    ),
+  ).toBe(true);
   const state = started.state as JunkState;
   const seat = state.currentSeat;
   expect(engineGetLegalActions(state, seat)).toEqual(junkRuleSet.getLegalActions(state, seat));

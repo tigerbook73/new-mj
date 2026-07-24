@@ -516,6 +516,62 @@ describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)"
 });
 
 describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
+  it("delays one bot action, then re-reads and schedules the next step", () => {
+    jest.useFakeTimers();
+    try {
+      type FakeState = { turn: 0 | 1; seq: number };
+      const calls: Array<{ seat: number; action: unknown }> = [];
+      const fakeGameService = {
+        createGame: () => ({ state: { turn: 0, seq: 0 }, events: [] }),
+        applyAction: (state: FakeState, seat: number, action: unknown) => {
+          calls.push({ seat, action });
+          const nextTurn = seat === 0 ? 1 : 0;
+          const seq = state.seq + 1;
+          return {
+            state: { turn: nextTurn, seq },
+            events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+          };
+        },
+        getLegalActions: (state: FakeState, seat: number) =>
+          seat === state.turn ? [{ type: seat === 0 ? "open" : "bot" }] : [],
+        getPlayerView: (_state: FakeState, seat: 0 | 1 | 2 | 3) => ({
+          seat,
+          hand: [],
+          seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+          wallCount: 0,
+          currentSeat: 0,
+        }),
+        computeNextDealer: () => 0,
+      } as unknown as GameService;
+      const config = new ConfigService();
+      Object.defineProperty(config, "botActionDelayRangeMs", { value: [600, 600] });
+      const service = new RoomService(
+        fakeGameService,
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      service.addBot(room.id, "host");
+      service.addBot(room.id, "host");
+      service.addBot(room.id, "host");
+      service.ready(room.id, "host", true);
+      service.start(room.id);
+
+      service.applyPlayerAction(room.id, 0, { type: "open" });
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+      jest.advanceTimersByTime(599);
+      expect(calls).toHaveLength(1);
+      jest.advanceTimersByTime(1);
+      expect(calls).toEqual([
+        { seat: 0, action: { type: "open" } },
+        { seat: 1, action: { type: "bot" } },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("a single human plus 3 bots plays a complete junk session", () => {
     const service = newRoomService();
     const gameService = new GameService();
@@ -547,6 +603,290 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
 
     expect(room.phase).toBe("finished");
     expect(room.result?.gamesPlayed).toBe(4);
+  });
+});
+
+// Phase 3 leftover (table-ux-plan.md item 4): targeted regressions for the
+// single-timer bot scheduler crossing paths with game end, leave, disconnect
+// takeover, and the independent claim-window timer.
+describe("RoomService — bot auto-play timer interplay (phase 3 regression)", () => {
+  it("clears a pending bot timer when a different seat's response ends the game first", () => {
+    jest.useFakeTimers();
+    try {
+      type FakeState = { turn: 0 | 1; seq: number; ended: boolean };
+      const calls: Array<{ seat: number; action: unknown }> = [];
+      const fakeGameService = {
+        createGame: () => ({ state: { turn: 0, seq: 0, ended: false }, events: [] }),
+        applyAction: (state: FakeState, seat: number, action: { type: string }) => {
+          calls.push({ seat, action });
+          const seq = state.seq + 1;
+          if (action.type === "hu") {
+            return {
+              state: { ...state, seq, ended: true },
+              events: [{ seq, visibility: { type: "public" }, payload: { type: "GameEnded" } }],
+            };
+          }
+          const nextTurn = seat === 0 ? 1 : 0;
+          return {
+            state: { turn: nextTurn, seq, ended: false },
+            events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+          };
+        },
+        // seat 2 always has an out-of-turn "hu" claim available, independent
+        // of whose normal turn it is — models a claim window that can end the
+        // game while a bot's own turn action is already scheduled.
+        getLegalActions: (state: FakeState, seat: number) => {
+          if (state.ended) return [];
+          if (seat === 2) return [{ type: "hu" }];
+          return seat === state.turn ? [{ type: seat === 0 ? "open" : "bot" }] : [];
+        },
+        getPlayerView: (_state: FakeState, seat: 0 | 1 | 2 | 3) => ({
+          seat,
+          hand: [],
+          seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+          wallCount: 0,
+          currentSeat: 0,
+        }),
+        computeNextDealer: () => 0,
+      } as unknown as GameService;
+      const config = new ConfigService();
+      Object.defineProperty(config, "botActionDelayRangeMs", { value: [600, 600] });
+      const service = new RoomService(
+        fakeGameService,
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      // best-of-3 so a single GameEnded event finishes the whole session
+      // (shouldContinue is always false), keeping the fixture minimal.
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" }, "best-of-3");
+      service.join(room.id, "p2", "P2");
+      service.join(room.id, "p3", "P3");
+      service.join(room.id, "p4", "P4");
+      for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+      service.start(room.id);
+
+      service.applyPlayerAction(room.id, 0, { type: "open" });
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+
+      // Seat 2's claim ends the game before the seat-1 bot timer (600ms) fires.
+      service.applyPlayerAction(room.id, 2, { type: "hu" });
+      expect(room.phase).toBe("finished");
+
+      jest.advanceTimersByTime(10_000);
+      expect(calls).toEqual([
+        { seat: 0, action: { type: "open" } },
+        { seat: 2, action: { type: "hu" } },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // seat 0 = host (real player), seat 1 = bot; seats 2/3 are bystander humans
+  // who never take a turn in this fixture — they exist only so the room
+  // still has a human left once seat 0 goes auto-piloted (otherwise
+  // markAutoPiloted's hasNoHumanLeft check would close the room outright,
+  // masking the behavior under test).
+  const twoSeatCycleFixture = () => {
+    type FakeState = { turn: 0 | 1; seq: number };
+    const calls: Array<{ seat: number }> = [];
+    const fakeGameService = {
+      createGame: () => ({ state: { turn: 0, seq: 0 }, events: [] }),
+      applyAction: (state: FakeState, seat: number) => {
+        calls.push({ seat });
+        const seq = state.seq + 1;
+        const nextTurn = seat === 0 ? 1 : 0;
+        return {
+          state: { turn: nextTurn, seq },
+          events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+        };
+      },
+      getLegalActions: (state: FakeState, seat: number) =>
+        seat === state.turn ? [{ type: "step" }] : [],
+      getPlayerView: (_state: FakeState, seat: 0 | 1 | 2 | 3) => ({
+        seat,
+        hand: [],
+        seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+        wallCount: 0,
+        currentSeat: 0,
+      }),
+      computeNextDealer: () => 0,
+    } as unknown as GameService;
+    return { fakeGameService, calls };
+  };
+
+  it("leaving mid-game while a bot timer is pending hands off control without a duplicate schedule", () => {
+    jest.useFakeTimers();
+    try {
+      const { fakeGameService, calls } = twoSeatCycleFixture();
+      const config = new ConfigService();
+      Object.defineProperty(config, "botActionDelayRangeMs", { value: [600, 600] });
+      const service = new RoomService(
+        fakeGameService,
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      service.addBot(room.id, "host", 1);
+      service.join(room.id, "p3", "P3", 2);
+      service.join(room.id, "p4", "P4", 3);
+      for (const userId of ["host", "p3", "p4"]) service.ready(room.id, userId, true);
+      service.start(room.id);
+
+      // seat 0 (host) takes its turn, which schedules a bot timer for seat 1.
+      service.applyPlayerAction(room.id, 0, { type: "step" });
+      expect(calls).toEqual([{ seat: 0 }]);
+
+      // Host leaves while that timer is still pending — markAutoPiloted's
+      // trailing autoPlayBots() call must see the existing timer and no-op
+      // rather than scheduling a second one.
+      service.leave(room.id, "host");
+      expect(room.players[0]).toMatchObject({ isAutoPiloted: true });
+
+      jest.advanceTimersByTime(600);
+      expect(calls).toEqual([{ seat: 0 }, { seat: 1 }]);
+
+      // Turn cycles back to seat 0, now auto-piloted — it must keep playing
+      // itself without any further human input.
+      jest.advanceTimersByTime(600);
+      expect(calls).toEqual([{ seat: 0 }, { seat: 1 }, { seat: 0 }]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("a disconnect-grace takeover overlapping a pending bot timer does not double-schedule", () => {
+    jest.useFakeTimers();
+    process.env["DISCONNECT_GRACE_MS"] = "700";
+    try {
+      const { fakeGameService, calls } = twoSeatCycleFixture();
+      const config = new ConfigService();
+      Object.defineProperty(config, "botActionDelayRangeMs", { value: [1_000, 1_000] });
+      const service = new RoomService(
+        fakeGameService,
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      service.addBot(room.id, "host", 1);
+      service.join(room.id, "p3", "P3", 2);
+      service.join(room.id, "p4", "P4", 3);
+      for (const userId of ["host", "p3", "p4"]) service.ready(room.id, userId, true);
+      service.start(room.id);
+
+      // seat 0's turn schedules a bot timer for seat 1, due at t=1000.
+      service.applyPlayerAction(room.id, 0, { type: "step" });
+      expect(calls).toEqual([{ seat: 0 }]);
+
+      // Host disconnects at t=0; the 700ms grace timer will elapse at t=700,
+      // while the 1000ms bot timer for seat 1 is still pending.
+      service.handleDisconnect(room.id, "host");
+
+      jest.advanceTimersByTime(700);
+      // markAutoPiloted's trailing autoPlayBots() call must see the still-live
+      // seat-1 timer and no-op instead of scheduling a second one — if it
+      // didn't, a stray extra action would appear ahead of schedule below.
+      expect(room.players[0]).toMatchObject({ isAutoPiloted: true, isDisconnected: false });
+      expect(calls).toEqual([{ seat: 0 }]);
+
+      jest.advanceTimersByTime(300);
+      expect(calls).toEqual([{ seat: 0 }, { seat: 1 }]);
+
+      // Turn cycles back to the now-autopiloted seat 0 and keeps going, right
+      // on the normal 1000ms cadence — no early/duplicate firing.
+      jest.advanceTimersByTime(999);
+      expect(calls).toEqual([{ seat: 0 }, { seat: 1 }]);
+      jest.advanceTimersByTime(1);
+      expect(calls).toEqual([{ seat: 0 }, { seat: 1 }, { seat: 0 }]);
+    } finally {
+      jest.useRealTimers();
+      delete process.env["DISCONNECT_GRACE_MS"];
+    }
+  });
+
+  it("an independent claim-window timeout does not disturb an already-pending bot action timer", () => {
+    jest.useFakeTimers();
+    process.env["CLAIM_TIMEOUT_MS"] = "100";
+    try {
+      type FakeState = { responders: number[]; botTurn: boolean; seq: number };
+      const calls: Array<{ seat: number; action: unknown }> = [];
+      const fakeGameService = {
+        createGame: () => ({ state: { responders: [], botTurn: false, seq: 0 }, events: [] }),
+        applyAction: (state: FakeState, seat: number, action: { type: string }) => {
+          calls.push({ seat, action });
+          const seq = state.seq + 1;
+          if (action.type === "open") {
+            return {
+              state: { responders: [2], botTurn: true, seq },
+              events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+            };
+          }
+          // "pass"/"bot" both just clear their own actor from availability.
+          const responders = state.responders.filter((candidate) => candidate !== seat);
+          const botTurn = seat === 1 ? false : state.botTurn;
+          return {
+            state: { responders, botTurn, seq },
+            events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+          };
+        },
+        getLegalActions: (state: FakeState, seat: number) => {
+          if (state.responders.includes(seat)) return [{ type: "pass" }];
+          if (seat === 1 && state.botTurn) return [{ type: "bot" }];
+          return seat === 0 && state.responders.length === 0 && !state.botTurn
+            ? [{ type: "open" }]
+            : [];
+        },
+        getPlayerView: (_state: FakeState, seat: 0 | 1 | 2 | 3) => ({
+          seat,
+          hand: [],
+          seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+          wallCount: 0,
+          currentSeat: 0,
+        }),
+        computeNextDealer: () => 0,
+      } as unknown as GameService;
+      const config = new ConfigService();
+      Object.defineProperty(config, "botActionDelayRangeMs", { value: [250, 250] });
+      const service = new RoomService(
+        fakeGameService,
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      // seat 2 (the claim responder) stays human; seats 1 and 3 are bots.
+      service.addBot(room.id, "host", 1);
+      service.join(room.id, "p2", "P2", 2);
+      service.addBot(room.id, "host", 3);
+      for (const userId of ["host", "p2"]) service.ready(room.id, userId, true);
+      service.start(room.id);
+
+      // Opens both a 100ms claim window for seat 2 and a 250ms bot timer for
+      // seat 1 at the same moment.
+      service.applyPlayerAction(room.id, 0, { type: "open" });
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+
+      jest.advanceTimersByTime(100);
+      // Claim timeout submitted seat 2's forced pass; the still-pending bot
+      // timer for seat 1 must not have been touched by it.
+      expect(calls).toEqual([
+        { seat: 0, action: { type: "open" } },
+        { seat: 2, action: { type: "pass" } },
+      ]);
+
+      jest.advanceTimersByTime(150);
+      expect(calls).toEqual([
+        { seat: 0, action: { type: "open" } },
+        { seat: 2, action: { type: "pass" } },
+        { seat: 1, action: { type: "bot" } },
+      ]);
+    } finally {
+      jest.useRealTimers();
+      delete process.env["CLAIM_TIMEOUT_MS"];
+    }
   });
 });
 

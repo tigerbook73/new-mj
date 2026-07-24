@@ -8,7 +8,8 @@ export type TableZoneBinding =
   | { role: "meld"; direction: SeatDirection }
   | { role: "info"; direction: SeatDirection }
   | { role: "discard"; direction: SeatDirection }
-  | { role: "center" };
+  | { role: "center" }
+  | { role: "actionDock" };
 
 const entries = SEAT_DIRECTIONS.flatMap(
   (direction) =>
@@ -27,6 +28,7 @@ const entries = SEAT_DIRECTIONS.flatMap(
 export const TABLE_ZONE_REGISTRY: Readonly<Record<string, TableZoneBinding>> = {
   ...Object.fromEntries(entries),
   center: { role: "center" },
+  "action-dock": { role: "actionDock" },
 };
 
 export const resolveTableZone = (id: string) => TABLE_ZONE_REGISTRY[id];

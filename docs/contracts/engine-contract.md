@@ -50,7 +50,7 @@
 
 `PlayerViewBase`（`packages/core/src/types.ts`）只含跨玩法一致的字段：`seat`/`hand`/`seats[].handCount`/`wallCount`/`currentSeat`，无时间字段（倒计时 deadline 由 server 在协议层附加，`decisions.md` D5）。
 
-玩法私有字段不放进公共骨架，各 ruleset 用交叉类型扩展（`phase`/`myClaimOptions`/`lastDiscard`/`result`、公开副露与牌河的具体表示等）；不同玩法甚至可以选择不同的敏感度表示方式（如 TileId vs TileKind），这是契约允许的自由度，具体选择见各 `variants/*.md`。
+玩法私有字段不放进公共骨架，各 ruleset 用交叉类型扩展（`phase`/`myActionOptions`/`myClaimOptions`/`lastDiscard`/`result`、公开副露与牌河的具体表示等）。`myActionOptions` 是该 seat 完整的 server-computed 可执行动作；声明窗口包含 `pass`，`myClaimOptions` 仅保留声明选项与已响应状态的兼容语义。为保持事件重建等价，动作改变时以 seat-private `LegalActionsUpdated { actions }` 事件同步。不同玩法甚至可以选择不同的敏感度表示方式（如 TileId vs TileKind），这是契约允许的自由度，具体选择见各 `variants/*.md`。
 
 ## 6. 事件信封（公共部分）
 

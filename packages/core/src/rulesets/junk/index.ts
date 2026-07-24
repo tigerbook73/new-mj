@@ -1,12 +1,13 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { GameEvent } from "../../events.ts";
+import { EVENT_TYPES, type GameEvent } from "../../events.ts";
 import type { RulesetModule } from "../../engine.ts";
 import { parseJunkConfig } from "./config.ts";
 import {
   applyAnGang,
   applyBuGang,
   applyDiscard,
+  appendEvent,
   cloneState,
   computeNextJunkDealer,
   createJunkGame,
@@ -14,6 +15,7 @@ import {
   finishWin,
   isWin,
   sameKind,
+  seatVisibility,
 } from "./state-machine.ts";
 import { applyClaimResponse } from "./claims.ts";
 import { getPlayerView, rebuildPlayerView } from "./view.ts";
@@ -36,7 +38,11 @@ export type {
 } from "./types.ts";
 
 export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
-  createGame: createJunkGame,
+  createGame: (config, dealer) => {
+    const result = createJunkGame(config, dealer);
+    if ("state" in result) appendLegalActions(result.state, result.events);
+    return result;
+  },
   computeNextDealer: computeNextJunkDealer,
   getLegalActions: (state, seat) => {
     if (state.phase === "awaiting-claims") {
@@ -79,9 +85,24 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
               return { state, events };
             })();
     } else result = fail("UNKNOWN_ACTION");
-    if ("state" in result) assertTileConservation(result.state);
+    if ("state" in result) {
+      appendLegalActions(result.state, result.events);
+      assertTileConservation(result.state);
+    }
     return result;
   },
-  getPlayerView,
+  getPlayerView: (state, seat) => ({
+    ...getPlayerView(state, seat),
+    myActionOptions: junkRuleSet.getLegalActions(state, seat),
+  }),
   rebuildPlayerView,
 };
+
+function appendLegalActions(state: JunkState, events: GameEvent[]): void {
+  for (const seat of [0, 1, 2, 3] as const) {
+    appendEvent(state, events, seatVisibility(seat), {
+      type: EVENT_TYPES.legalActionsUpdated,
+      actions: junkRuleSet.getLegalActions(state, seat),
+    });
+  }
+}

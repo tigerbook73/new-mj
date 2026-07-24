@@ -135,6 +135,9 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
       case "ClaimWindowOpened":
         view.myClaimOptions = [...((payload.options as JunkPlayerView["myClaimOptions"]) ?? [])];
         break;
+      case "LegalActionsUpdated":
+        view.myActionOptions = [...(payload.actions as JunkAction[])];
+        break;
       case "ClaimResponded":
         view.myClaimResponse = payload.action as JunkAction;
         break;
