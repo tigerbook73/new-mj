@@ -171,8 +171,11 @@ test("junk claim dock submits a direct pass or a hovered multi-option chi", asyn
       const chiAction = dock.getByRole("button", { name: /^吃/ });
       await expect(passAction).toBeVisible();
       await expect(chiAction).toBeVisible();
-      const actionFontSize = await passAction.evaluate((element) =>
-        Number.parseFloat(getComputedStyle(element).fontSize),
+      // Action labels render as SVG viewBox text (scales with the button's own
+      // box, not CSS font-size), so the responsive signal to check is the
+      // button's own rendered height instead of a computed font-size.
+      const actionButtonHeight = await passAction.evaluate(
+        (element) => element.getBoundingClientRect().height,
       );
       let candidateTileWidth: number;
 
@@ -207,7 +210,7 @@ test("junk claim dock submits a direct pass or a hovered multi-option chi", asyn
         await candidate.press("Space");
       }
       await expect(dock).toBeHidden({ timeout: 10_000 });
-      return { actionFontSize, candidateTileWidth };
+      return { actionButtonHeight, candidateTileWidth };
     } finally {
       for (const page of players) await page.context().close();
     }
@@ -215,7 +218,7 @@ test("junk claim dock submits a direct pass or a hovered multi-option chi", asyn
 
   const largeViewport = await runClaim("pass");
   const compactViewport = await runClaim("chi");
-  expect(largeViewport.actionFontSize).toBeGreaterThan(compactViewport.actionFontSize);
+  expect(largeViewport.actionButtonHeight).toBeGreaterThan(compactViewport.actionButtonHeight);
   expect(largeViewport.candidateTileWidth).toBeGreaterThan(compactViewport.candidateTileWidth);
 });
 

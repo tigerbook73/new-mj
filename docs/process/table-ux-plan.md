@@ -38,9 +38,17 @@ Dock 交互约束：动作名使用中文（吃/碰/胡/杠/自摸/过）；上�
 
 ### Phase 4 — 布局重构与优化
 
-目标：待规划。
+目标：布局重构与优化，具体范围随任务逐项确定；每项任务开工前先形成简要实现计划并由用户确认（同阶段门规则）。
 
-具体范围、动机与验收标准尚未确定，进入此阶段前需先形成简要实现计划并由用户确认（同阶段门规则）。
+当前实施顺序：
+
+1. `ActionDock` 重构：内部由 CSS container-query + `clamp()` 曲线改为纯 CSS 百分比逐级缩放——ActionDock 自身垂直切上 Actions/下 Options 两区（默认 40/60，`tableLayoutLab.ts` 的 `TableLayoutConfig.actionDock` 新增分区可调），Actions 区按钮高度为区域高度的固定百分比、宽度按标签字数用 `aspect-ratio` 派生（1 字方形、2 字 1.4 倍宽），字体改用 SVG `<text>`（`ActionLabel` 组件，按钮/候选文字统一复用）按自身 viewBox 缩放，不再依赖 CSS `font-size` 或 container query；候选牌高度同样是 Options 区高度的固定百分比，宽度改用 `Tile.tsx` 已有的单维度 aspect-ratio 派生（不再和高度各自套一条 clamp 曲线导致比例失真）。声明倒计时从内联文字改成独立的 `DeadlineCountdown` 组件（纯数字徽标，绝对定位左上角，支持 UI-only 的 `onTimeout` 钩子但不接任何动作提交）。服务端拒绝错误从内联 `role="alert"` 改为全局 Toaster（shadcn `sonner`，`RootLayout.tsx` 挂载一次）。`action-dock` Zone 与候选/按钮的透明度、尺寸细节仍在人工调参中。ActionDock 的"推荐动作"后续改为不再有独立视觉：`recommendedAction` 只决定默认激活哪一组（`defaultGroup` 逻辑不变），按钮自身高亮态与候选区"选中"态统一用同一条"是否为当前 active 组"规则判断，hover 其他组会把高亮转移过去。
+
+2. `TableBoard` 拆成框架层与可替换场景：`TableBoard.tsx` 只剩 `TableZoneContext`/`TableZoneComponent`/`TableScenario` 类型定义和 `ZoneRenderer` 接线，原来的 `switch(role)` 换成 `scenario.components[zone.id]` 直接查表；desktop 的全部 zone 组件绑定收进 `components/mahjong/scenarios/desktop.tsx` + `desktopZoneComponents.tsx`，`preset`+`components` 打包成一个 `TableScenario` 整体切换，为后续手机横竖屏场景（各自一份 preset JSON + 一份组件表）预留接口，本阶段未实现第二个场景。
+   手牌/牌河/副露/座位信息四类子组件全部去掉 `useMeasuredSize`（ResizeObserver）/`fitTileGrid` 的 JS 尺寸测量，改用纯 CSS：`Tile.tsx` 支持只给 `heightPx`（含百分比字符串）、宽度靠 CSS `aspect-ratio` 派生；手牌区域收进单个 `SeatContent.handTiles: number[]`（+`revealed: boolean`）数组，固定以两个尾部占位（空档 + 摸到的牌或另一个空档）表达"钉住摸牌"，取代原来 `hand-content-*`/`hand-drawn-*` 两个独立 Zone 和已删除的 `HandTrack.tsx`/`handTrackContext.ts`；牌河从测量驱动的 CSS Grid 改成两级 flex（行不换行、列换行，无效 id 补齐末行对齐）；副露高度改成按 `meldTileHeightPct/meldHeightPct` 预算好的固定百分比；`InfoSlot` 旋转宽高互换与字号改用 `cqw`/`cqh` 容器查询单位（`DirectionalSurface` 已在用的同一技巧）。任意负数 TileId 在 `Tile.tsx` 统一渲染为不可见占位，不再单独定义手牌专用哨兵常量。
+   顺带清理：`fitTileGrid`（`tableGeometry.ts`）、`useMeasuredSize.ts`、`TableGeometry.tsx`（`Ring`/`DirectionalSurface`，已被 Zone 自身 `rotationDeg` 取代但从未删除）、`PlayerBadge.tsx` 均已零调用方，连同 `MeldInfoTrack`/`CenterStatus` 里从未被覆盖的可选 prop 一并删除；修了一个牌河认领徽章因非正方形父盒渲染成椭圆的真 bug（`width/height:55%` 改成 `width:55%,aspect-ratio:1`，另发现 lucide 图标自带 `<svg width/height>` 会让只设一个 CSS 维度时 aspect-ratio 失效，需额外包一层无固有尺寸的 div），DiscardPile/MeldGroup 共用的部分抽成 `TileClaimSlot`；另修了 `HandRow` 一处把 `tileId` 条件性略去导致占位格误渲染成暗牌背景的 bug。
+
+验收：`pnpm --filter @new-mj/web verify` 与根目录 `pnpm verify`（含 core 的 junk 1000 局、bloodbattle 10000 局 fuzz）均全绿。Phase 4 已完成。
 
 ### Phase 5 — 动画与全站体验统一
 

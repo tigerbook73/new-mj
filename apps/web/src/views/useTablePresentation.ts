@@ -2,6 +2,7 @@ import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
 import type { DiscardEntry } from "@/components/mahjong/DiscardPile";
 import type { Meld } from "@/components/mahjong/MeldGroup";
 import type { SeatContent } from "@/components/mahjong/TableBoard";
+import { sortTilesForDisplay } from "@/lib/mahjongTiles";
 import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
 
 type JunkSeatExtra = {
@@ -68,6 +69,27 @@ export function useTablePresentation({
       const data = seatData(seat);
       const player = players?.[seat];
       const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
+      // Render order: the rest of the concealed hand, then always exactly two trailing
+      // slots — an empty gap, then the just-drawn tile (or another empty slot when nobody
+      // has just drawn) — so the pinned position never shifts the row's total width.
+      // Opponents have no real TileIds to show, so their "rest" slots are meaningless
+      // filler (0) that HandRow never reads as an id because `revealed` is false.
+      const handTiles: number[] =
+        direction === "bottom"
+          ? [
+              ...sortTilesForDisplay(
+                extras.justDrawn !== undefined
+                  ? view.hand.filter((tile) => tile !== extras.justDrawn)
+                  : view.hand,
+              ),
+              -1,
+              extras.justDrawn ?? -1,
+            ]
+          : [
+              ...Array<number>(drawnVisible ? data.handCount - 1 : data.handCount).fill(0),
+              -1,
+              drawnVisible ? 0 : -1,
+            ];
       const content: SeatContent = {
         melds: data.melds.map((meld) => ({
           ...meld,
@@ -75,30 +97,10 @@ export function useTablePresentation({
             ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
             : {}),
         })),
-        // The just-drawn tile is pinned separately below — drop it from the main row/count so
-        // it isn't shown (or counted) twice.
-        handCount: drawnVisible ? data.handCount - 1 : data.handCount,
+        handTiles,
+        revealed: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
-        justDrawn:
-          direction === "bottom"
-            ? {
-                visible: extras.justDrawn !== undefined,
-                ...(extras.justDrawn !== undefined ? { tileId: extras.justDrawn } : {}),
-                ...(extras.justDrawn !== undefined && isMyTurn
-                  ? { onClick: () => onDiscard(extras.justDrawn!) }
-                  : {}),
-              }
-            : { visible: data.justDrawn },
-        ...(direction === "bottom"
-          ? {
-              hand:
-                extras.justDrawn !== undefined
-                  ? view.hand.filter((tile) => tile !== extras.justDrawn)
-                  : view.hand,
-              interactive: isMyTurn,
-              onDiscard,
-            }
-          : {}),
+        ...(direction === "bottom" ? { interactive: isMyTurn, onDiscard } : {}),
       };
       return [direction, content];
     }),

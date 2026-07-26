@@ -1,8 +1,7 @@
-import { fitTileGrid } from "@/lib/tableGeometry";
-import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
+import type { SeatDirection } from "@/lib/seatLayout";
 import type { TableLayoutMetrics } from "@/lib/desktopTablePreset";
-import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
 import { Tile } from "./Tile";
+import { TileClaimSlot } from "./TileClaimSlot";
 
 export type DiscardEntry = {
   tile: number;
@@ -14,98 +13,64 @@ export type DiscardEntry = {
 };
 
 interface DiscardPileProps {
-  /** This pile's own seat direction — the claim badge counter-rotates against DirectionalSurface's ambient rotation for this direction so it always reads in true screen orientation, the same technique MeldInfoTrack uses for its info label. */
+  /** This pile's own seat direction — TileClaimSlot's badge counter-rotates against the ambient Zone rotation for this direction so it always reads in true screen orientation, the same technique InfoSlot uses for its label. */
   direction: SeatDirection;
   discards: DiscardEntry[];
-  /** Real measured content-box pixels of the discard region (see fitTileGrid). */
-  containerWidthPx: number;
-  containerHeightPx: number;
   metrics: TableLayoutMetrics;
 }
 
 /**
  * claimedBy'd entries stay in the pile (tombstone — see DiscardEntry docs), just dimmed.
  *
- * Fixed grid, not flex-wrap: every slot (including not-yet-discarded ones, up to
- * `columns * rows`) is reserved up front, row-major left-to-right/top-to-bottom from a fixed
- * top-left origin. A flex-wrap layout re-centers its whole content block every time a row is
- * added, which visibly nudges every earlier tile — a fixed grid's footprint is constant
- * (`columns * rows` slots) until discards actually overflow it, so already-placed tiles never
- * move once drawn.
+ * Two-level flex, not a measured grid: rows stack top-to-bottom (growing downward once
+ * discards exceed the configured row count — never shrinking tiles to force a fit), each row
+ * itself lays out left-to-right and centers its own content. The last row is padded with
+ * invalid (negative) TileIds up to `columns` so its tiles stay column-aligned with the rows
+ * above instead of collapsing toward one side — Tile.tsx renders those as invisible
+ * placeholders that still occupy a slot. Row height is a fixed percentage of the pile's own
+ * container height; each tile fills 100% of its row's height and derives its own width from
+ * the aspect ratio, so none of this needs a measured container size.
  */
-export function DiscardPile({
-  direction,
-  discards,
-  containerWidthPx,
-  containerHeightPx,
-  metrics,
-}: DiscardPileProps) {
+export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) {
   const { columns, rows } = metrics.discard;
-  const { tileWidthPx, tileHeightPx } = fitTileGrid(containerWidthPx, containerHeightPx, {
-    columns,
-    rows,
-    heightPct: metrics.tiles.discardShortPct,
-    aspectRatio: metrics.tiles.aspectRatio,
-    tileGapPx: metrics.tiles.tileGapPx,
-  });
-  // Extra rows only ever append past the configured minimum — never fewer — so a pile that's
-  // still within capacity always renders the same slot count.
   const totalRows = Math.max(rows, Math.ceil(discards.length / columns));
 
   return (
     <div
-      className="grid"
-      style={{
-        gridTemplateColumns: `repeat(${columns}, ${tileWidthPx}px)`,
-        gridAutoRows: `${tileHeightPx}px`,
-        gap: `${metrics.tiles.tileGapPx}px`,
-      }}
+      className="flex h-full w-full min-h-0 min-w-0 flex-col"
+      style={{ gap: `${metrics.tiles.tileGapPx}px` }}
     >
-      {Array.from({ length: totalRows * columns }, (_, index) => {
-        const entry = discards[index];
-        if (!entry) {
-          return (
-            <div
-              key={`empty-${index}`}
-              data-testid="discard-slot-empty"
-              style={{ width: tileWidthPx, height: tileHeightPx }}
-            />
-          );
-        }
-        const ClaimIcon = entry.claimedByDirection
-          ? DIRECTION_ARROW_ICON[entry.claimedByDirection]
-          : undefined;
-        return (
-          <div
-            key={`${entry.tile}-${index}`}
-            className="relative"
-            style={{ width: tileWidthPx, height: tileHeightPx }}
-          >
-            <Tile
-              tileId={entry.tile}
-              widthPx={tileWidthPx}
-              heightPx={tileHeightPx}
-              dimmed={entry.claimedBy !== undefined}
-              justDiscarded={entry.justDiscarded}
-            />
-            {ClaimIcon && (
-              // Centered (not corner-anchored) so DirectionalSurface's rotation never pushes it
-              // outside the tile footprint; counter-rotated so the arrow itself always points in
-              // the true on-screen direction regardless of this pile's ambient rotation.
-              <div
-                className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                style={{ transform: `rotate(${-SEAT_ROTATION[direction]}deg)` }}
-              >
-                <ClaimIcon
-                  data-testid="discard-claim-icon"
-                  className="rounded-full bg-background text-foreground ring-1 ring-border"
-                  style={{ width: tileWidthPx * 0.55, height: tileWidthPx * 0.55 }}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {Array.from({ length: totalRows }, (_, rowIndex) => (
+        <div
+          key={rowIndex}
+          className="flex w-full min-w-0 items-center justify-center"
+          style={{
+            height: `${metrics.tiles.discardShortPct}%`,
+            gap: `${metrics.tiles.tileGapPx}px`,
+          }}
+        >
+          {Array.from({ length: columns }, (_, columnIndex) => {
+            const entry = discards[rowIndex * columns + columnIndex];
+            if (!entry) {
+              return (
+                <Tile key={columnIndex} testId="discard-slot-empty" tileId={-1} heightPx="100%" />
+              );
+            }
+            return (
+              <TileClaimSlot
+                key={columnIndex}
+                direction={direction}
+                claimFromDirection={entry.claimedByDirection}
+                aspectRatio={metrics.tiles.aspectRatio}
+                claimTestId="discard-claim-icon"
+                tileId={entry.tile}
+                dimmed={entry.claimedBy !== undefined}
+                justDiscarded={entry.justDiscarded}
+              />
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

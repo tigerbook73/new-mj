@@ -1,5 +1,6 @@
 import { Outlet, useNavigation } from "react-router";
 import { RevalidateOnSessionLoss } from "@/components/RevalidateOnSessionLoss";
+import { Toaster } from "@/components/ui/sonner";
 
 /**
  * Wraps every route (including /login, /auth/callback, /session-blocked).
@@ -13,6 +14,7 @@ export function RootLayout() {
   return (
     <>
       <RevalidateOnSessionLoss />
+      <Toaster />
       <div
         className={navigation.state === "loading" ? "pointer-events-none opacity-60" : undefined}
       >

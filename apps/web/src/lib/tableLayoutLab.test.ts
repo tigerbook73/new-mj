@@ -39,6 +39,24 @@ describe("table layout lab config", () => {
     expect(normalized).not.toHaveProperty("unknown");
   });
 
+  it("clamps actionDock numbers and ignores unknown fields", () => {
+    const normalized = normalizeTableLayoutConfig({
+      version: 1,
+      actionDock: {
+        actionsHeightPct: 999,
+        actionButtonHeightPct: 0,
+        wideLabelWidthRatio: 5,
+        candidateHeightPct: 0,
+        unknown: 1,
+      },
+    });
+    expect(normalized.actionDock.actionsHeightPct).toBe(60);
+    expect(normalized.actionDock.actionButtonHeightPct).toBe(30);
+    expect(normalized.actionDock.wideLabelWidthRatio).toBe(2.0);
+    expect(normalized.actionDock.candidateHeightPct).toBe(30);
+    expect(normalized.actionDock).not.toHaveProperty("unknown");
+  });
+
   it("accepts the legacy percentage tile gap as a pixel fallback", () => {
     const normalized = normalizeTableLayoutConfig({
       version: 1,

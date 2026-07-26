@@ -29,14 +29,21 @@ const tileVariants = cva(
 const DEFAULT_TILE_ASPECT_RATIO = 1.333;
 
 export interface TileProps extends VariantProps<typeof tileVariants> {
-  /** Omit (or set `back`) to render a face-down tile. */
+  /**
+   * Omit (or set `back`) to render a face-down tile. Any negative value is a
+   * layout-only placeholder — real TileIds are never negative (see
+   * @new-mj/protocol) — and renders nothing at all (still occupies its box),
+   * so callers can pad a row to a fixed slot count without a dedicated
+   * sentinel constant.
+   */
   tileId?: number;
   back?: boolean;
   /**
    * Pixel (or CSS percentage) box for this tile. Give both for an exact box
-   * (what the real board's fitTileGrid callers do); give only one and the
-   * other is derived by the browser via CSS `aspect-ratio` instead of the
-   * caller having to compute it.
+   * (what MeldGroup's measured pixel sizing does); give only one — hand and
+   * discard tiles pass only `heightPx`, as a CSS percentage — and the other
+   * is derived by the browser via CSS `aspect-ratio` instead of the caller
+   * having to compute it.
    */
   widthPx?: number | string;
   heightPx?: number | string;
@@ -47,8 +54,9 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
 
 /**
  * Always rendered upright, in local (unrotated) coordinates. Any per-seat
- * visual rotation is applied by the ancestor DirectionalSurface to the
- * whole region at once, not per tile — see components/mahjong/TableGeometry.tsx.
+ * visual rotation comes from the ancestor Zone's own `rotationDeg` (applied
+ * once by ZoneRenderer's `zoneStyle()`, see lib/layoutPreset.ts) to the whole
+ * region at once, not per tile.
  */
 export function Tile({
   tileId,
@@ -64,6 +72,24 @@ export function Tile({
   testId,
 }: TileProps) {
   const tileTheme = useTableLayoutStore((state) => state.tileTheme);
+  const isPlaceholder = tileId !== undefined && tileId < 0;
+  if (isPlaceholder) {
+    const hasWidth = widthPx !== undefined;
+    const hasHeight = heightPx !== undefined;
+    return (
+      <div
+        data-testid={testId}
+        data-empty
+        aria-hidden="true"
+        className={cn("shrink-0", className)}
+        style={{
+          width: widthPx,
+          height: heightPx,
+          aspectRatio: hasWidth === hasHeight ? undefined : `1 / ${DEFAULT_TILE_ASPECT_RATIO}`,
+        }}
+      />
+    );
+  }
   const isBack = back || tileId === undefined;
   const isClickable = (clickable ?? Boolean(onClick)) && !isBack;
   const src = isBack ? tileBackImageSrc(tileTheme) : tileImageSrc(tileId!, tileTheme);

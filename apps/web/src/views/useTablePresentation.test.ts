@@ -33,12 +33,14 @@ describe("useTablePresentation", () => {
     if (!presentation) throw new Error("missing presentation");
 
     expect(presentation.hasDockActions).toBe(true);
-    expect(presentation.seats.bottom.hand).toEqual([1, 2]);
-    expect(presentation.seats.bottom.handCount).toBe(2);
-    expect(presentation.seats.bottom.justDrawn).toMatchObject({ visible: true, tileId: 3 });
+    // Rest of the hand, then always exactly two trailing slots: an empty gap (-1), then the
+    // pinned just-drawn tile (3) — see SeatContent.handTiles.
+    expect(presentation.seats.bottom.handTiles).toEqual([1, 2, -1, 3]);
+    expect(presentation.seats.bottom.revealed).toBe(true);
     expect(presentation.discards.right[0]).toMatchObject({ tile: 9, justDiscarded: true });
+    // A regular hand tile and the pinned just-drawn tile both discard through the same callback.
     presentation.seats.bottom.onDiscard?.(1);
-    presentation.seats.bottom.justDrawn.onClick?.();
+    presentation.seats.bottom.onDiscard?.(3);
     expect(onDiscard).toHaveBeenNthCalledWith(1, 1);
     expect(onDiscard).toHaveBeenNthCalledWith(2, 3);
   });

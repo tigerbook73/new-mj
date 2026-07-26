@@ -19,6 +19,17 @@ export type TableLayoutConfig = {
     tileGapPx: number;
   };
   discard: { columns: number; rows: number };
+  /** ActionDock's internal percentage cascade — see components/mahjong/ActionDock.tsx. */
+  actionDock: {
+    /** Height % of the Actions row within the whole dock; the Options row gets the rest. */
+    actionsHeightPct: number;
+    /** Action button height % of the Actions row. */
+    actionButtonHeightPct: number;
+    /** Two-character label button width = height × ratio (one-character buttons stay square). */
+    wideLabelWidthRatio: number;
+    /** Candidate tile height % of the Options row. */
+    candidateHeightPct: number;
+  };
   debug: { showRegions: boolean };
 };
 
@@ -37,6 +48,12 @@ export const DEFAULT_TABLE_LAYOUT_CONFIG: TableLayoutConfig = {
     tileGapPx: 1.9,
   },
   discard: { columns: 8, rows: 3 },
+  actionDock: {
+    actionsHeightPct: 40,
+    actionButtonHeightPct: 70,
+    wideLabelWidthRatio: 1.4,
+    candidateHeightPct: 70,
+  },
   debug: { showRegions: false },
 };
 
@@ -49,6 +66,10 @@ const limits = {
   tileGapPx: [0, 8],
   columns: [4, 14],
   rows: [2, 4],
+  actionsHeightPct: [20, 60],
+  actionButtonHeightPct: [30, 90],
+  wideLabelWidthRatio: [1.0, 2.0],
+  candidateHeightPct: [30, 90],
 } as const;
 
 const numberAt = (value: unknown, fallback: number, [min, max]: readonly [number, number]) =>
@@ -68,6 +89,7 @@ export function normalizeTableLayoutConfig(value: unknown): TableLayoutConfig {
   const meldInfo = recordAt(root.meldInfo);
   const tiles = recordAt(root.tiles);
   const discard = recordAt(root.discard);
+  const actionDock = recordAt(root.actionDock);
   const debug = recordAt(root.debug);
   const defaults = DEFAULT_TABLE_LAYOUT_CONFIG;
   return {
@@ -107,6 +129,28 @@ export function normalizeTableLayoutConfig(value: unknown): TableLayoutConfig {
     discard: {
       columns: Math.round(numberAt(discard.columns, defaults.discard.columns, limits.columns)),
       rows: Math.round(numberAt(discard.rows, defaults.discard.rows, limits.rows)),
+    },
+    actionDock: {
+      actionsHeightPct: numberAt(
+        actionDock.actionsHeightPct,
+        defaults.actionDock.actionsHeightPct,
+        limits.actionsHeightPct,
+      ),
+      actionButtonHeightPct: numberAt(
+        actionDock.actionButtonHeightPct,
+        defaults.actionDock.actionButtonHeightPct,
+        limits.actionButtonHeightPct,
+      ),
+      wideLabelWidthRatio: numberAt(
+        actionDock.wideLabelWidthRatio,
+        defaults.actionDock.wideLabelWidthRatio,
+        limits.wideLabelWidthRatio,
+      ),
+      candidateHeightPct: numberAt(
+        actionDock.candidateHeightPct,
+        defaults.actionDock.candidateHeightPct,
+        limits.candidateHeightPct,
+      ),
     },
     debug: {
       showRegions: booleanAt(debug.showRegions, defaults.debug.showRegions),

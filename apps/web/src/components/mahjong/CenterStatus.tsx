@@ -1,14 +1,11 @@
-import type { ReactNode } from "react";
-
 interface CenterStatusProps {
   phase: string;
   currentSeat: number;
   wallCount: number;
-  actions?: ReactNode;
   error?: string | null;
 }
 
-export function CenterStatus({ phase, currentSeat, wallCount, actions, error }: CenterStatusProps) {
+export function CenterStatus({ phase, currentSeat, wallCount, error }: CenterStatusProps) {
   return (
     <section
       data-testid="table-center-status"
@@ -18,7 +15,6 @@ export function CenterStatus({ phase, currentSeat, wallCount, actions, error }: 
       <p>
         Turn: seat {currentSeat + 1} · Wall: {wallCount}
       </p>
-      {actions}
       {error && <p className="text-destructive">{error}</p>}
     </section>
   );

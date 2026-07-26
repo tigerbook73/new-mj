@@ -14,7 +14,7 @@ import { ActionDock } from "@/components/mahjong/ActionDock";
 import { CenterStatus } from "@/components/mahjong/CenterStatus";
 import { RoundEndOverlay } from "@/components/mahjong/RoundEndOverlay";
 import { TableBoard } from "@/components/mahjong/TableBoard";
-import { DESKTOP_TABLE_PRESET } from "@/lib/desktopTablePreset";
+import { DESKTOP_TABLE_SCENARIO } from "@/components/mahjong/scenarios/desktop";
 import { TableHud } from "@/components/mahjong/TableHud";
 import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
@@ -232,7 +232,7 @@ export function TableView() {
         style={{ containerType: "size" }}
       >
         <TableBoard
-          preset={DESKTOP_TABLE_PRESET}
+          scenario={DESKTOP_TABLE_SCENARIO}
           seats={seats}
           discards={discards}
           currentDirection={currentDirection}

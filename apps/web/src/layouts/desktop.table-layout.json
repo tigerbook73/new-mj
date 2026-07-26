@@ -11,81 +11,25 @@
         "id": "hand-bottom",
         "anchorCenter": { "x": 50, "y": 94 },
         "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": 0,
-        "children": [
-          {
-            "id": "hand-content-bottom",
-            "anchorCenter": { "x": 50, "y": 50 },
-            "localSize": { "w": 76, "h": 100 },
-            "rotationDeg": 0
-          },
-          {
-            "id": "hand-drawn-bottom",
-            "anchorCenter": { "x": 94, "y": 50 },
-            "localSize": { "w": 12, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
+        "rotationDeg": 0
       },
       {
         "id": "hand-right",
         "anchorCenter": { "x": 94, "y": 50 },
         "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": -90,
-        "children": [
-          {
-            "id": "hand-content-right",
-            "anchorCenter": { "x": 50, "y": 50 },
-            "localSize": { "w": 76, "h": 100 },
-            "rotationDeg": 0
-          },
-          {
-            "id": "hand-drawn-right",
-            "anchorCenter": { "x": 94, "y": 50 },
-            "localSize": { "w": 12, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
+        "rotationDeg": -90
       },
       {
         "id": "hand-top",
         "anchorCenter": { "x": 50, "y": 6 },
         "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": 180,
-        "children": [
-          {
-            "id": "hand-content-top",
-            "anchorCenter": { "x": 50, "y": 50 },
-            "localSize": { "w": 76, "h": 100 },
-            "rotationDeg": 0
-          },
-          {
-            "id": "hand-drawn-top",
-            "anchorCenter": { "x": 94, "y": 50 },
-            "localSize": { "w": 12, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
+        "rotationDeg": 180
       },
       {
         "id": "hand-left",
         "anchorCenter": { "x": 6, "y": 50 },
         "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": 90,
-        "children": [
-          {
-            "id": "hand-content-left",
-            "anchorCenter": { "x": 50, "y": 50 },
-            "localSize": { "w": 76, "h": 100 },
-            "rotationDeg": 0
-          },
-          {
-            "id": "hand-drawn-left",
-            "anchorCenter": { "x": 94, "y": 50 },
-            "localSize": { "w": 12, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
+        "rotationDeg": 90
       },
       {
         "id": "meld-info-bottom",
@@ -200,7 +144,7 @@
       {
         "id": "action-dock",
         "anchorCenter": { "x": 50, "y": 57 },
-        "localSize": { "w": 30, "h": 30 },
+        "localSize": { "w": 60, "h": 25 },
         "rotationDeg": 0
       }
     ]

@@ -19,16 +19,14 @@ describe("ActionDock", () => {
 
     expect(markup).toContain('data-testid="action-dock"');
     expect(markup).toContain(">碰<");
-    expect(markup).toContain(">过 · 推荐<");
+    expect(markup).toContain(">过<");
     expect(markup).toContain("text-foreground");
     expect(markup).not.toContain(">discard<");
     expect(markup).not.toContain(">pass<");
-    expect(markup).toContain("推荐");
-    expect(markup).toContain("16cqb");
-    expect(markup).toContain("8cqi");
-    expect(markup).toContain('data-testid="action-deadline"');
-    expect(markup).toContain('role="alert"');
-    expect(markup).toContain("ILLEGAL_ACTION");
+    // Error display moved to a toast side effect (useEffect), which SSR
+    // (renderToStaticMarkup) never runs — assert it's no longer inlined.
+    expect(markup).not.toContain('role="alert"');
+    expect(markup).not.toContain("ILLEGAL_ACTION");
     expect(markup).toContain('data-tile-id="76"');
   });
 

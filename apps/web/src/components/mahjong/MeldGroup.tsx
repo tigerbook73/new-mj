@@ -1,7 +1,6 @@
-import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
+import type { SeatDirection } from "@/lib/seatLayout";
 import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
-import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
-import { Tile } from "./Tile";
+import { TileClaimSlot } from "./TileClaimSlot";
 
 export type Meld = {
   type: string;
@@ -15,18 +14,26 @@ interface MeldGroupProps {
   /** This track's own seat direction — counter-rotates the source-arrow badge, same technique as DiscardPile. */
   direction: SeatDirection;
   melds: Meld[];
-  /** Precomputed by the shared MeldInfoTrack shell (see components/mahjong/MeldInfoTrack.tsx). */
-  tileWidthPx: number;
-  tileHeightPx: number;
+  /**
+   * Percent of MeldGroup's own height every meld row (and thus every tile)
+   * should be — precomputed by MeldSlot (see
+   * components/mahjong/scenarios/desktopZoneComponents.tsx) from
+   * meldTileHeightPct/meldHeightPct so nesting inside the meld row's own
+   * percentage box still lands at the same absolute size. Every row gets the
+   * same fixed percentage regardless of how many melds wrap onto their own
+   * row, so extra rows simply add height rather than shrinking existing
+   * ones — overflow-hidden above clips whatever doesn't fit instead.
+   */
+  tileHeightPct: number;
   config: TableLayoutConfig;
 }
 
 /**
  * Bottom-aligned, left-anchored, wraps whole melds onto a new row instead of
- * shrinking — tile size is driven purely by the shared shell's sizing, never
- * squeezed by a fixed column count.
+ * shrinking — tile size is a fixed percentage of the shared shell's own
+ * height, never squeezed by a fixed column count.
  */
-export function MeldGroup({ direction, melds, tileWidthPx, tileHeightPx, config }: MeldGroupProps) {
+export function MeldGroup({ direction, melds, tileHeightPct, config }: MeldGroupProps) {
   if (melds.length === 0) return null;
 
   return (
@@ -40,29 +47,21 @@ export function MeldGroup({ direction, melds, tileWidthPx, tileHeightPx, config 
         // claims.ts's `[...useTiles, discard.tile]` and state-machine.ts's applyBuGang.
         const fromTileIndex =
           meld.type === "buGang" ? meld.tiles.length - 2 : meld.tiles.length - 1;
-        const ClaimIcon = meld.fromDirection ? DIRECTION_ARROW_ICON[meld.fromDirection] : undefined;
         return (
-          <div key={meldIndex} className="flex" style={{ gap: `${config.tiles.tileGapPx}px` }}>
+          <div
+            key={meldIndex}
+            className="flex"
+            style={{ height: `${tileHeightPct}%`, gap: `${config.tiles.tileGapPx}px` }}
+          >
             {meld.tiles.map((tile, tileIndex) => (
-              <div
+              <TileClaimSlot
                 key={`${tile}-${tileIndex}`}
-                className="relative"
-                style={{ width: tileWidthPx, height: tileHeightPx }}
-              >
-                <Tile tileId={tile} widthPx={tileWidthPx} heightPx={tileHeightPx} />
-                {ClaimIcon && tileIndex === fromTileIndex && (
-                  <div
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                    style={{ transform: `rotate(${-SEAT_ROTATION[direction]}deg)` }}
-                  >
-                    <ClaimIcon
-                      data-testid="meld-claim-icon"
-                      className="rounded-full bg-background text-foreground ring-1 ring-border"
-                      style={{ width: tileWidthPx * 0.55, height: tileWidthPx * 0.55 }}
-                    />
-                  </div>
-                )}
-              </div>
+                direction={direction}
+                claimFromDirection={tileIndex === fromTileIndex ? meld.fromDirection : undefined}
+                aspectRatio={config.tiles.aspectRatio}
+                claimTestId="meld-claim-icon"
+                tileId={tile}
+              />
             ))}
           </div>
         );

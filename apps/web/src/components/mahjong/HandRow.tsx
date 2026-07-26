@@ -1,58 +1,59 @@
-import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
-import { sortTilesForDisplay } from "@/lib/mahjongTiles";
+import type { SeatDirection } from "@/lib/seatLayout";
 import { Tile } from "./Tile";
 
 interface HandRowProps {
-  /** Present only for the seat rendering as "bottom" (me) — everyone else only exposes handCount. */
-  hand?: number[] | undefined;
-  handCount: number;
+  direction: SeatDirection;
+  /** See SeatContent.handTiles (components/mahjong/TableBoard.tsx) for the slot layout. */
+  handTiles: number[];
+  revealed: boolean;
   interactive?: boolean | undefined;
   onDiscard?: ((tile: number) => void) | undefined;
-  /** Precomputed by the shared HandTrack shell (see components/mahjong/HandTrack.tsx) so the drawn-tile slot next to it always matches. */
-  tileWidthPx: number;
-  tileHeightPx: number;
-  config: TableLayoutConfig;
+  tileHeightPct: number;
+  tileGapPx: number;
 }
 
+/**
+ * One flat, right-anchored row for every seat. The trailing slot (index
+ * length-1) is always the pinned just-drawn tile or an empty gap-sized
+ * placeholder; the one before it is always an empty spacer — both come
+ * pre-baked into `handTiles` (see useTablePresentation.ts) so this component
+ * never has to reason about drawn-tile state itself.
+ */
 export function HandRow({
-  hand,
-  handCount,
+  direction,
+  handTiles,
+  revealed,
   interactive,
   onDiscard,
-  tileWidthPx,
-  tileHeightPx,
-  config,
+  tileHeightPct,
+  tileGapPx,
 }: HandRowProps) {
-  if (hand) {
-    const displayHand = sortTilesForDisplay(hand);
-    return (
-      <div
-        className="flex h-full w-full flex-nowrap items-center justify-end"
-        style={{ gap: `${config.tiles.tileGapPx}px` }}
-      >
-        {displayHand.map((tile, index) => (
-          <Tile
-            key={`${tile}-${index}`}
-            tileId={tile}
-            widthPx={tileWidthPx}
-            heightPx={tileHeightPx}
-            clickable={interactive}
-            onClick={interactive ? () => onDiscard?.(tile) : undefined}
-            testId="hand-tile"
-          />
-        ))}
-      </div>
-    );
-  }
-
+  const drawnIndex = handTiles.length - 1;
   return (
     <div
-      className="flex h-full w-full items-center justify-end"
-      style={{ gap: `${config.tiles.tileGapPx}px` }}
+      className="flex h-full w-full flex-nowrap items-center justify-end"
+      style={{ gap: `${tileGapPx}px` }}
     >
-      {Array.from({ length: handCount }, (_, index) => (
-        <Tile key={index} back widthPx={tileWidthPx} heightPx={tileHeightPx} />
-      ))}
+      {handTiles.map((tileId, index) => {
+        const isPlaceholder = tileId < 0;
+        const isReal = revealed && !isPlaceholder;
+        const isDrawnSlot = index === drawnIndex;
+        return (
+          <Tile
+            key={index}
+            tileId={tileId}
+            back={!revealed && !isPlaceholder}
+            heightPx={`${tileHeightPct}%`}
+            clickable={interactive && isReal}
+            {...(interactive && isReal ? { onClick: () => onDiscard?.(tileId) } : {})}
+            {...(isDrawnSlot
+              ? { testId: `hand-track-drawn-${direction}` }
+              : isReal
+                ? { testId: "hand-tile" }
+                : {})}
+          />
+        );
+      })}
     </div>
   );
 }

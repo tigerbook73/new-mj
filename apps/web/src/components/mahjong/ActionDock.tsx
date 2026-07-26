@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DESKTOP_TABLE_METRICS } from "@/lib/desktopTablePreset";
 import { sortTilesForDisplay, tileKindOf } from "@/lib/mahjongTiles";
+import { cn } from "@/lib/utils";
+import { ActionLabel } from "./ActionLabel";
+import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Tile } from "./Tile";
 
 type Action = Record<string, unknown>;
@@ -32,18 +37,8 @@ interface ActionDockProps {
 const actionLabel = (type: string) => ACTION_LABELS[type] ?? type;
 const actionKey = (action: Action) => JSON.stringify(action);
 const CLAIM_MELD_TYPES = new Set(["chi", "peng", "minGang"]);
-const ACTION_BUTTON_STYLE = {
-  height: "clamp(1.5rem, 16cqb, 2.5rem)",
-  paddingInline: "clamp(0.35rem, 3cqi, 0.75rem)",
-  fontSize: "clamp(0.5rem, 5cqi, 1rem)",
-};
-const CANDIDATE_BUTTON_STYLE = {
-  paddingInline: "clamp(0.35rem, 2cqi, 0.7rem)",
-  paddingBlock: "clamp(0.2rem, 1.5cqb, 0.45rem)",
-  fontSize: "clamp(0.5rem, 5cqi, 1rem)",
-};
-const CANDIDATE_TILE_WIDTH = "clamp(12px, 8cqi, 44px)";
-const CANDIDATE_TILE_HEIGHT = "clamp(16px, 11cqi, 59px)";
+const { actionDock: metrics } = DESKTOP_TABLE_METRICS;
+const CANDIDATE_TILE_HEIGHT_PCT = `${metrics.candidateHeightPct}%`;
 
 function ActionCandidate({
   action,
@@ -103,7 +98,7 @@ function ActionCandidate({
       : ownTiles;
   if (tiles.length > 0) {
     return (
-      <span className="flex" style={{ gap: "clamp(2px, 1cqi, 6px)" }}>
+      <span className="flex h-full items-center gap-1">
         {tiles.map((tile, index) => {
           const isTarget =
             (isClaimMeld && Number(tile) === lastDiscard) ||
@@ -112,8 +107,7 @@ function ActionCandidate({
             <Tile
               key={`${String(tile)}-${index}`}
               tileId={Number(tile)}
-              widthPx={CANDIDATE_TILE_WIDTH}
-              heightPx={CANDIDATE_TILE_HEIGHT}
+              heightPx={CANDIDATE_TILE_HEIGHT_PCT}
               justDiscarded={isTarget}
               {...(isTarget ? { testId: "action-target-tile" } : {})}
             />
@@ -122,9 +116,13 @@ function ActionCandidate({
       </span>
     );
   }
+  const label = action.kind === undefined ? actionLabel(String(action.type)) : String(action.kind);
   return (
-    <span>
-      {action.kind === undefined ? actionLabel(String(action.type)) : String(action.kind)}
+    <span
+      className="flex items-center"
+      style={{ height: CANDIDATE_TILE_HEIGHT_PCT, aspectRatio: label.length >= 2 ? 1.4 : 1 }}
+    >
+      <ActionLabel text={label} />
     </span>
   );
 }
@@ -142,7 +140,6 @@ export function ActionDock({
 }: ActionDockProps) {
   const [activeType, setActiveType] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Record<string, string>>({});
-  const [now, setNow] = useState<number | null>(null);
   const groups = Object.values(
     actions
       .filter((action) => action.type !== "discard")
@@ -158,16 +155,10 @@ export function ActionDock({
     groups[0];
   const activeGroup = groups.find((group) => String(group[0]?.type) === activeType) ?? defaultGroup;
   const hideHuCandidateUntilHover = activeType === null && activeGroup?.[0]?.type === "hu";
-  const remainingSeconds =
-    deadline === undefined || deadline === null || now === null
-      ? undefined
-      : Math.max(0, Math.ceil((deadline - now) / 1_000));
 
   useEffect(() => {
-    if (deadline === undefined || deadline === null) return;
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, [deadline]);
+    if (error) toast.error(error);
+  }, [error]);
 
   if (groups.length === 0) return null;
 
@@ -185,40 +176,49 @@ export function ActionDock({
     <div
       data-testid="action-dock"
       aria-label="合法动作"
-      className="flex h-full w-full flex-wrap justify-center gap-1"
-      style={{ containerType: "size", gap: "clamp(0.2rem, 1.5cqi, 0.5rem)" }}
+      className="relative flex h-full w-full flex-col"
     >
-      {groups.map((group) => {
-        const type = String(group[0]?.type);
-        const multiple = group.length > 1;
-        const recommended = group.some((action) => actionKey(action) === recommendedKey);
-        return (
-          <Button
-            key={type}
-            size="sm"
-            variant={recommended ? "default" : "outline"}
-            className={recommended ? undefined : "bg-background/80 text-foreground"}
-            style={ACTION_BUTTON_STYLE}
-            onMouseEnter={() => activate(group)}
-            onFocus={() => activate(group)}
-            onClick={() => {
-              if (multiple) activate(group);
-              else onAction(group[0]!);
-            }}
-          >
-            {actionLabel(type)}
-            {recommended ? " · 推荐" : ""}
-          </Button>
-        );
-      })}
+      <DeadlineCountdown deadline={deadline} />
+      <div
+        style={{ height: `${metrics.actionsHeightPct}%` }}
+        className="flex w-full flex-wrap items-center justify-center gap-2"
+      >
+        {groups.map((group) => {
+          const type = String(group[0]?.type);
+          const multiple = group.length > 1;
+          // Recommendation only picks which group is active by default (via
+          // defaultGroup above) — it gets no visual treatment of its own
+          // beyond that; a button looks "picked" exactly when it's the
+          // active group, same as a candidate looks "picked" when selected.
+          const isActive = type === String(activeGroup?.[0]?.type);
+          const label = actionLabel(type);
+          const isWideLabel = label.length >= 2;
+          return (
+            <Button
+              key={type}
+              aria-label={label}
+              variant={isActive ? "default" : "outline"}
+              className={cn("p-0", !isActive && "bg-background/80 text-foreground")}
+              style={{
+                height: `${metrics.actionButtonHeightPct}%`,
+                aspectRatio: isWideLabel ? metrics.wideLabelWidthRatio : 1,
+              }}
+              onMouseEnter={() => activate(group)}
+              onFocus={() => activate(group)}
+              onClick={() => {
+                if (multiple) activate(group);
+                else onAction(group[0]!);
+              }}
+            >
+              <ActionLabel className="size-full" text={label} />
+            </Button>
+          );
+        })}
+      </div>
       <div
         data-testid="action-candidates"
-        className="flex w-full flex-wrap justify-center border-t border-white/20"
-        style={{
-          minHeight: "clamp(3rem, 42cqb, 8rem)",
-          gap: "clamp(0.25rem, 2cqi, 0.75rem)",
-          paddingTop: "clamp(0.3rem, 3cqb, 0.75rem)",
-        }}
+        style={{ height: `${100 - metrics.actionsHeightPct}%` }}
+        className="flex w-full flex-wrap items-center justify-center gap-2 border-t border-white/20"
       >
         {!hideHuCandidateUntilHover &&
           activeGroup?.map((action, index) => {
@@ -236,8 +236,7 @@ export function ActionDock({
                 aria-pressed={selected}
                 data-selected={selected || undefined}
                 variant={selected ? "default" : "outline"}
-                className="h-auto gap-1 bg-background/70"
-                style={CANDIDATE_BUTTON_STYLE}
+                className="h-full items-center gap-1 bg-background/60 p-1"
                 onMouseEnter={() =>
                   setSelectedKeys((previous) => ({ ...previous, [type]: actionKey(action) }))
                 }
@@ -257,35 +256,6 @@ export function ActionDock({
             );
           })}
       </div>
-      {remainingSeconds !== undefined && (
-        <p
-          data-testid="action-deadline"
-          aria-live="polite"
-          className="w-full text-center text-white/80"
-          style={{ fontSize: "clamp(0.5rem, 5cqi, 0.85rem)" }}
-        >
-          声明倒计时：{remainingSeconds} 秒
-        </p>
-      )}
-      {remainingSeconds === undefined && deadline !== undefined && deadline !== null && (
-        <p
-          data-testid="action-deadline"
-          aria-live="polite"
-          className="w-full text-center text-white/80"
-          style={{ fontSize: "clamp(0.5rem, 5cqi, 0.85rem)" }}
-        >
-          声明窗口已开启
-        </p>
-      )}
-      {error && (
-        <p
-          role="alert"
-          className="w-full text-center font-medium text-red-200"
-          style={{ fontSize: "clamp(0.5rem, 5cqi, 0.85rem)" }}
-        >
-          {error}
-        </p>
-      )}
     </div>
   );
 }

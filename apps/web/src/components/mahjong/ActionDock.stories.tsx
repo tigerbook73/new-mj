@@ -7,10 +7,7 @@ const meta = {
   parameters: { layout: "centered" },
   decorators: [
     (Story) => (
-      <div
-        className="w-[560px] rounded-xl bg-slate-950/80 p-4 text-white"
-        style={{ containerType: "size" }}
-      >
+      <div className="h-75 w-200 rounded-xl bg-slate-950/80 p-4 text-white">
         <Story />
       </div>
     ),
@@ -62,6 +59,7 @@ export const ClaimHuAndPass: Story = {
     actions: [{ type: "hu" }, { type: "pass" }],
     recommendedAction: { type: "hu" },
     lastDiscard: 76,
+    deadline: Date.now() + 8_000,
     onAction,
   },
 };
