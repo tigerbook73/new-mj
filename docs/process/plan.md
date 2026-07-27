@@ -12,16 +12,15 @@
 
 TypeScript monorepo、垃圾胡/血战到底 RuleSet、CLI/replay/fuzz、多房间 server、AI 补位与断线托管、Web 登录/大厅/房间/牌桌、主题、对局归档与 Supabase OAuth 均已落地。**Junk Table UX（桌面）专题（Phase 1–6，含 Phase 6 收尾后追加的动画优化）已全部完成并收尾**，细节归档见 [`table-ux-plan.md`](./table-ux-plan.md)：Zone/LayoutPreset 几何层、完整操作 Dock（真人+AI 混桌可玩）、纯 CSS 布局重构、出牌/摸牌/副露成型/结算四类事件动画（`motion`，见 `decisions.md` D31）、以及抓牌/打牌/认领三条跨区域飞行动画（`ClaimFlipGhost.tsx`/`DrawFlipGhost.tsx`/`DiscardFlipGhost.tsx`，均为独立临时克隆、真实手牌/牌河/副露渲染逻辑不受影响，动画曲线按用户实测反馈简化过一轮——去掉了不必要的放大/中途停顿）均已落地并通过 e2e/Storybook 验收；已知缺口（Replay 页面与慢网络场景无专属 e2e）见 `table-ux-plan.md` 尾部，不阻塞收尾。bloodbattle 仍停留在公共桌面骨架（血战专属 UI 留待后续专题）。Nest server 构建使用 SWC，类型检查仍由独立 `typecheck` 脚本负责。最近一次根目录 `pnpm verify` 于 2026-07-26 全绿，覆盖 format、typecheck、lint、build、unit、e2e，以及 core 的 junk 1000 局和 bloodbattle 10000 局 fuzz。
 
-## 当前工作：无（本分支已收尾）
+## 当前工作：Table Layout Lab 增强及优化
 
-Junk Table UX 专题（Phase 1–6，含收尾后追加的动画优化）已完全收尾，本分支（`table-ux-phase5`）待合并（未推送/未合并，仍等用户指示）。下一阶段「Table Layout Lab 增强及优化」已拆到独立分支 `table-layout-lab-enhance`，进度与待办见该分支的 `docs/process/plan.md`（同名文件、不同分支）与 `table-layout-lab-plan.md`。
+Junk Table UX 专题（Phase 1–6，含收尾后追加的动画优化）已完全收尾并 squash-merge 进 main（`table-ux-phase5` 分支已完成使命，可删除）。当前工作在独立分支 `table-layout-lab-enhance` 上进行，进度与待办见该分支的 `docs/process/table-layout-lab-plan.md`（该分支尚未合并回 main）。
 
-**下一步第一个动作**：等待用户指示是否/何时把本分支合并到 main。
+**下一步第一个动作**：切到 `table-layout-lab-enhance` 分支继续——嵌套 grid 与 World View 越界这两条待办，先挑一条开始复现分析，还是两条一起看，需要和用户对齐后再动工。
 
 ## 待办
 
-- [ ] 决定 `table-ux-phase5` 分支合并时机（Junk Table UX 已收尾，等用户指示）。
-- [ ] Table Layout Lab 增强及优化（已拆到 `table-layout-lab-enhance` 分支，见该分支的 `table-layout-lab-plan.md`）。
+- [ ] Table Layout Lab 增强及优化（当前工作，见 `table-layout-lab-enhance` 分支的 `table-layout-lab-plan.md`）。
 - [ ] 部署 Supabase/应用，配置生产 OAuth 回调并验收。
 - [ ] 基于 Zone/LayoutPreset 规划手机横屏/竖屏（Junk Table UX 收尾后可评估）。
 - [ ] 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
