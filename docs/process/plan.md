@@ -10,30 +10,21 @@
 
 ## 已完成能力
 
-TypeScript monorepo、垃圾胡/血战到底 RuleSet、CLI/replay/fuzz、多房间 server、AI 补位与断线托管、Web 登录/大厅/房间/牌桌、主题、对局归档与 Supabase OAuth 均已落地。Nest server 构建使用 SWC，类型检查仍由独立 `typecheck` 脚本负责。最近一次根目录 `pnpm verify` 于 2026-07-26 全绿，覆盖 format、typecheck、lint、build、unit、e2e，以及 core 的 junk 1000 局和 bloodbattle 10000 局 fuzz。
+TypeScript monorepo、垃圾胡/血战到底 RuleSet、CLI/replay/fuzz、多房间 server、AI 补位与断线托管、Web 登录/大厅/房间/牌桌、主题、对局归档与 Supabase OAuth 均已落地。**Junk Table UX（桌面）专题（Phase 1–6，含 Phase 6 收尾后追加的动画优化）已全部完成并收尾**，细节归档见 [`table-ux-plan.md`](./table-ux-plan.md)：Zone/LayoutPreset 几何层、完整操作 Dock（真人+AI 混桌可玩）、纯 CSS 布局重构、出牌/摸牌/副露成型/结算四类事件动画（`motion`，见 `decisions.md` D31）、以及抓牌/打牌/认领三条跨区域飞行动画（`ClaimFlipGhost.tsx`/`DrawFlipGhost.tsx`/`DiscardFlipGhost.tsx`，均为独立临时克隆、真实手牌/牌河/副露渲染逻辑不受影响，动画曲线按用户实测反馈简化过一轮——去掉了不必要的放大/中途停顿）均已落地并通过 e2e/Storybook 验收；已知缺口（Replay 页面与慢网络场景无专属 e2e）见 `table-ux-plan.md` 尾部，不阻塞收尾。bloodbattle 仍停留在公共桌面骨架（血战专属 UI 留待后续专题）。Nest server 构建使用 SWC，类型检查仍由独立 `typecheck` 脚本负责。最近一次根目录 `pnpm verify` 于 2026-07-26 全绿，覆盖 format、typecheck、lint、build、unit、e2e，以及 core 的 junk 1000 局和 bloodbattle 10000 局 fuzz。
 
-## 当前工作：Junk Table UX（桌面）
+## 当前工作：无（本分支已收尾）
 
-详见 [`table-ux-plan.md`](./table-ux-plan.md)。只完整验收 junk；bloodbattle 保持公共桌面骨架可用。
+Junk Table UX 专题（Phase 1–6，含收尾后追加的动画优化）已完全收尾，本分支（`table-ux-phase5`）待合并（未推送/未合并，仍等用户指示）。下一阶段「Table Layout Lab 增强及优化」已拆到独立分支 `table-layout-lab-enhance`，进度与待办见该分支的 `docs/process/plan.md`（同名文件、不同分支）与 `table-layout-lab-plan.md`。
 
-- [x] 基线：权威快照、声明超时、AI advice、桌面牌桌骨架。
-- [x] Phase 1：Zone/LayoutPreset 几何层、桌面迁移、布局 Lab 与 JSON export。Phase 1a 已合入 `main`（`3beacb9`）；1b 已完成验证并 squash merge 到 `main`。
-- [x] Phase 2：Lab export → production renderer 打通。
-- [x] Phase 3：桌面交互与视觉覆盖层。
-- [x] Phase 4：布局重构与优化。
-- [ ] Phase 5：事件动画与全站体验统一。
-- [ ] Phase 6：综合验收与收尾。
-
-**当前状态**：手机横屏/竖屏不在桌面专题阶段内，待桌面收尾后重新评估。Phase 3 已完成完整 `myActionOptions`/seat-private 更新事件、独立 `action-dock` Zone（中文动作名、常驻候选区、hover 候选、单候选直提、多候选选项提交、AI 默认选中及胡/过/自摸上下文牌）、`TableView` 展示派生拆分、server 单步随机 AI 动作延迟，以及 Dock 的合法 AI recommendation/声明 deadline 展示；ActionDock Storybook 已提供多吃、胡/过、自摸审阅场景。吃/碰/明杠候选均直接复用 `lastDiscard` 显示并突出目标牌；吃按牌面顺序排列，碰/明杠从现有 `hand` 派生同牌面手牌并将目标牌固定在最后；暗杠展示四张手牌，补杠展示既有碰牌加本次补入牌，不扩充 PlayerView 接口。Dock 的面板边距、动作按钮、候选按钮/牌、字体与提示文字均以 action-dock Zone 的 container size 使用 `clamp()` 缩放。首次 hover 后保留最后查看的候选，避免移出 Dock 时消失（胡仅在从未 hover 前隐藏候选）。固定 seed 的真实 e2e 已覆盖 claim `pass` 与多组合 chi、候选 hover 持久选中、两个目标桌面视口、Enter/Space 键盘路径，以及 `hasTouch` context 下无 hover 状态的纯 tap 路径（单候选直提与多候选先展开后提交）。服务端拒绝错误会在 Dock 内作为 alert 显示。`autoPlayBots` 单步延迟调度已补齐结束局/离房/托管切换/声明 deadline 并存的针对性回归（fake-timer，`room.service.spec.ts`），Phase 3 收尾完成。
-
-**当前状态（续）**：Phase 4 已完成，详见 `table-ux-plan.md` Phase 4 两项记录——(1) `ActionDock` 改为纯 CSS 百分比逐级缩放 + SVG `<text>` 缩放字体 + 独立 `DeadlineCountdown` + 全局 Toaster；"推荐动作"后续又改成不再有独立视觉，只决定默认激活哪一组，按钮高亮与候选区"选中"用同一条规则。(2) `TableBoard` 拆成框架层（`TableBoard.tsx`，只管 Zone 树接线）+ 可替换的 `TableScenario`（`preset`+`components` 打包，desktop 场景收进 `scenarios/desktop.tsx`，id→组件直接查表取代 switch，为手机场景切换预留接口）；手牌/牌河/副露/座位信息四类子组件全部去掉 `useMeasuredSize`/`fitTileGrid` 的 JS 尺寸测量，改用纯 CSS 百分比 + `aspect-ratio`/`cqw`/`cqh`；顺带删除 `TableGeometry.tsx`（`Ring`/`DirectionalSurface`，已被 Zone 自身 `rotationDeg` 取代但从未删除的死代码）、`PlayerBadge.tsx`、`fitTileGrid`/`useMeasuredSize.ts`；修了牌河认领徽章非正圆和 `HandRow` 占位格误渲染成暗牌背景两个真 bug。`pnpm --filter @new-mj/web verify` 与根目录 `pnpm verify`（含 core 的 junk 1000 局、bloodbattle 10000 局 fuzz）均已重新跑过，全绿。
-
-**下一步第一个动作**：从最新 `main` 建 Phase 5 分支；按阶段门规则，先和用户一起定出 Phase 5 的简要实现计划——具体是从哪一类事件（摸牌/打牌/吃碰杠胡/结算）的 authoritative/presented 双状态动画入手，以及 reduced-motion/重连追平怎么验收——经用户确认后再动工，不要直接开始实现。
+**下一步第一个动作**：等待用户指示是否/何时把本分支合并到 main。
 
 ## 待办
 
+- [ ] 决定 `table-ux-phase5` 分支合并时机（Junk Table UX 已收尾，等用户指示）。
+- [ ] Table Layout Lab 增强及优化（已拆到 `table-layout-lab-enhance` 分支，见该分支的 `table-layout-lab-plan.md`）。
 - [ ] 部署 Supabase/应用，配置生产 OAuth 回调并验收。
-- [ ] 桌面 Table UX 收尾后，基于 Zone/LayoutPreset 重新规划手机横屏/竖屏。
+- [ ] 基于 Zone/LayoutPreset 规划手机横屏/竖屏（Junk Table UX 收尾后可评估）。
 - [ ] 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - [ ] mobile 路线与 Expo 实现；日麻立项时复审 `architecture/variant-boundary.md`。
 - [ ] 可选沉浸体验：音效、音量与静音设置。
+- [ ] Junk Table UX 已知缺口：Replay 页面（`ReplayView.tsx`）与慢网络场景补 e2e（不紧急，见 `table-ux-plan.md`）。

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Dialog } from "@base-ui/react/dialog";
+import { AnimatePresence } from "motion/react";
 import type {
   DebugOmniscientView,
   GameAdviceResponse,
@@ -16,8 +17,10 @@ import { RoundEndOverlay } from "@/components/mahjong/RoundEndOverlay";
 import { TableBoard } from "@/components/mahjong/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/components/mahjong/scenarios/desktop";
 import { TableHud } from "@/components/mahjong/TableHud";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";
+import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
 import { useTablePresentation } from "./useTablePresentation";
 
 /**
@@ -44,6 +47,21 @@ export function TableView() {
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
+  // Pure click-time geometry for the discard-flying-out ghost (see
+  // DiscardFlipGhost.tsx / HandRow.tsx's captureTileRect) — never read as
+  // game state, only handed to useTablePresentation to attach onto the
+  // matching DiscardEntry once the server's own snapshot actually lands.
+  // Deliberately never explicitly cleared: a TileId never repeats within a
+  // round (architecture iron rule 4), and DiscardPile's per-entry slot
+  // (DiscardTileSlot) only ever reads this once, at the single render where
+  // it mounts — so a stale value just sits unread forever until a later
+  // click overwrites it; no correctness or leak concern worth a clearing
+  // effect (which this project's lint config forbids doing synchronously
+  // in an effect body anyway — react-hooks/set-state-in-effect).
+  const [pendingDiscardOrigin, setPendingDiscardOrigin] = useState<{
+    tile: number;
+    rect: DOMRect;
+  } | null>(null);
 
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
@@ -164,10 +182,17 @@ export function TableView() {
     void navigate("/games");
   };
 
+  const isIncrementalSnapshot = useIsIncrementalSnapshot(gameSeq);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const presentation = useTablePresentation({
     view,
     players: room?.players,
-    onDiscard: (tile) => void sendAction({ type: "discard", tile }),
+    onDiscard: (tile, originRect) => {
+      if (originRect) setPendingDiscardOrigin({ tile, rect: originRect });
+      void sendAction({ type: "discard", tile });
+    },
+    canAnimateEntries: isIncrementalSnapshot && !prefersReducedMotion,
+    pendingDiscardOrigin,
   });
 
   if (!view) {
@@ -264,16 +289,21 @@ export function TableView() {
             ) : undefined
           }
         />
-        {extras.result && sessionResult == null && room && (
-          <RoundEndOverlay
-            result={extras.result}
-            gameNumber={room.gameNumber}
-            totalGames={room.totalGames ?? 1}
-            players={room.players}
-            myConfirmed={room.players[view.seat]?.isReady === true}
-            onConfirm={() => void confirmNextRound()}
-          />
-        )}
+        <AnimatePresence>
+          {extras.result && sessionResult == null && room && (
+            <RoundEndOverlay
+              key="round-end-overlay"
+              result={extras.result}
+              gameNumber={room.gameNumber}
+              totalGames={room.totalGames ?? 1}
+              players={room.players}
+              myConfirmed={room.players[view.seat]?.isReady === true}
+              onConfirm={() => void confirmNextRound()}
+              entering={isIncrementalSnapshot && !prefersReducedMotion}
+              reducedMotion={prefersReducedMotion}
+            />
+          )}
+        </AnimatePresence>
       </main>
 
       {sessionResult != null && (

@@ -1,72 +1,34 @@
 # Junk Table UX 计划
 
-> 范围：只完成 junk 的桌面 Web 体验（1440×900、1366×768）。手机横屏/竖屏、bloodbattle 专属 UI 与音效不在本专题内。项目总状态见 [`plan.md`](./plan.md)。
+> 范围：只完成 junk 的桌面 Web 体验（1440×900、1366×768）。手机横屏/竖屏、bloodbattle 专属 UI 与音效不在本专题内。项目总状态见 [`plan.md`](./plan.md)。**本专题（Phase 1–6）已全部完成**，本文件按阶段收尾仪式（`../doc-map.md` §6）压缩为归档记录；后续同类专题（手机适配等）另开新的 `process/<phase 简称>.md`。
 
 ## 目标与既定边界
 
-牌桌必须以 server 权威快照为最终状态；事件只驱动动画。合法动作和 AI 推荐均来自 server/core，客户端不重算规则；时间只由 server 处理。完整契约见 `../contracts/`、`../variants/junk.md` 和根 `AGENTS.md`。
+牌桌以 server 权威快照为最终状态；事件只驱动动画。合法动作和 AI 推荐均来自 server/core，客户端不重算规则；时间只由 server 处理。完整契约见 `../contracts/`、`../variants/junk.md` 和根 `AGENTS.md`。
 
 ## 已完成（归档）
 
-- 基线：权威逐动作快照、可配置声明超时、AI advice 数据链路、桌面牌桌骨架、Tile Storybook 与布局 Lab 均已完成并验证。
-- Phase 1：Zone/LayoutPreset schema、桌面 preset、Grid 等效几何、集中 registry 与桌面迁移已完成；1a 已以 `3beacb9` 合入 main。
-- Phase 1b：层级布局 Lab 已完成多 draft、变量、Grid、持久化、导入、JSON export 和浏览器回归，并已 squash merge 到 main。这是完成项，不再保留控件和实施步骤清单。
-- Phase 2：正式 Table 已直接消费 Lab 导出的 desktop preset；递归 `ZoneFrame → Service(children)` renderer 使每个 Zone 仅有一个定位 DOM，并在运行时校验 registry 所需插槽。手牌、副露/信息 service 不再重建子 Zone 定位，桌面交互与两种目标视口回归已通过。
+- **基线**：权威逐动作快照、可配置声明超时、AI advice 数据链路、桌面牌桌骨架、Tile Storybook 与布局 Lab。
+- **Phase 1/1b**：Zone/LayoutPreset schema、桌面 preset、Grid 等效几何、集中 registry；层级布局 Sketch（多 draft、变量、Grid、持久化、导入、JSON export）。已 squash merge 到 main（`3beacb9` 起）。
+- **Phase 2**：正式 Table 直接消费 Sketch 导出的 desktop preset；递归 `ZoneFrame → Service(children)` renderer，每个 Zone 仅一个定位 DOM，运行时校验 registry 插槽。
+- **Phase 3**：完整操作 Dock（`ActionDock`/`useTablePresentation`，动作名中文、候选区、hover/键盘/触屏可达性、AI recommendation 与 server deadline 展示）；`RoomService.autoPlayBots` 改为可取消的单步随机延迟调度，AI 动作带可感知停顿。真人与 AI 混桌可完成一局 junk，两个目标视口无滚动/裁切。
+- **Phase 4**：`ActionDock` 改纯 CSS 百分比缩放 + SVG `<text>`（`ActionLabel`）+ 独立 `DeadlineCountdown` + 全局 Toaster；`TableBoard` 拆成框架层（`TableZoneContext`/`TableScenario`）+ 可替换场景（`scenarios/desktop.tsx`，为手机场景预留接口）；手牌/牌河/副露/座位信息全部去掉 JS 尺寸测量（`useMeasuredSize`/`fitTileGrid`/`TableGeometry.tsx` 已删除），改用纯 CSS 百分比 + `aspect-ratio`/`cqw`/`cqh`。
+- **Phase 5（事件动画）**：出牌/摸牌/副露成型/结算四类事件动画统一走同一套 scaffold——`useIsIncrementalSnapshot`（`views/`）+ `usePrefersReducedMotion`（`hooks/`）在 `TableView.tsx` 组合成 `canAnimateEntries`，只对"活的、原地推进"的快照播放入场动画，reconnect/首次加载/reduced-motion 一律直接呈现终态。动画引擎是 `motion`（`motion/react`，见 `decisions.md` D31，含避坑记录）：`Tile.tsx`（出牌/摸牌/副露，`entering` prop 驱动 `initial`/`animate`）与 `RoundEndOverlay.tsx`（结算遮罩，`TableView.tsx` 用 `<AnimatePresence>` 包裹）。吃/碰/杠的"牌从牌河飞进副露"最终用的是 `ClaimFlipGhost.tsx`——一个只在认领那一刻挂载、测一次牌河源位置和副露落点、用 `createPortal` 渲染的临时克隆，播完自己卸载；牌河墓碑（`Tile.tsx`）和副露真实那张牌（`MeldGroup.tsx`）全程不受影响，各自的入场/变暗动画逻辑完全没改。这不是首选方案——先试过 motion 自带的 `layoutId` 共享布局 FLIP（牌河牌与副露牌共用一个 id），机制上真的能让副露那张牌飞过来，但会让牌河这张牌被 motion 隐式当成"正在退场"处理（自动淡出到 0 + `pointer-events:none`），跟牌河墓碑必须永久保留、只是变暗的既定设计（架构铁律 4）冲突，`layout="position"` 也压不住这个副作用，只能放弃、改成完全解耦的克隆方案。完整踩坑记录见 `decisions.md` D31。
+- **Phase 6（综合验收）**：真人+AI混桌、刷新/断线恢复、reduced-motion 均有 e2e 覆盖；声明超时与结算的服务端行为由 `apps/server` 既有测试覆盖（`room.service.spec.ts`/socket.io-client 整局 e2e），`RoundEndOverlay` 的挂载/卸载动画因真实打满一局成本过高改用可交互 Storybook story + Playwright 截图验证（见 `decisions.md` D31 关联记录）；Replay 页面（`ReplayView.tsx`）与慢网络场景尚无专属 e2e，留作已知缺口，不阻塞本专题收尾。
 
-## 后续阶段
+验收记录：`pnpm --filter @new-mj/web verify` 与根目录 `pnpm verify`（含 core 的 junk 1000 局、bloodbattle 10000 局 fuzz）在 Phase 3–6 各自完成时均已跑绿；桌面视口（1440×900、1366×768）无页面滚动或关键内容裁切。
 
-### Phase 3 — 桌面交互与视觉覆盖层
+## Phase 6 收尾后追加的动画优化（用户提出，分阶段做）
 
-目标：完成一局 junk 所需的可见信息、操作与反馈。
+范围：**1** 抓牌从桌面中心区域飞到手牌位置；**2A** 打牌时其余手牌收拢补位；**2B** 被打出的牌从手牌直接飞到牌河（最初想过中途在牌河区域中点放大停顿，用户实测后反馈不需要，见下）；**3** 跨区域动画尽量独立管理、不侵入基于状态的正常布局代码。按 2A → 1 → 2B 的顺序做（2A 风险最低最先做；2B 比 1 多一层"源头会真的消失、需要在点击那一刻提前测好起点"的复杂度，放最后）。**四项均已完成。**
 
-- 完整操作 Dock：所有合法动作、组合选项、确认/禁用/错误反馈、键盘与触屏可达性。
-- 接入一个合法 AI 推荐；展示 server deadline，普通出牌超时仍只由 server 代提交。
-- AI/托管座位的每次自动动作由 server 单步随机延迟调度；人类动作后的 AI 摸牌与出牌、以及 AI 对 AI 的连续回合都保留可感知停顿。声明窗口仍以既有 server deadline 为准。
-- 完成桌面视觉层级：玩家信息、中心状态、结算、离桌/设置/日志等覆盖层，并把关键视口回归纳入 e2e。
+- **2A 其余手牌收拢补位（已完成）**：`HandRow.tsx` 里手牌的 key 从纯 `index` 改成"钉住摸牌槽用 `drawnSlotKey`、真实揭示的手牌用 `` `tile-${tileId}` ``、其余（对手的匿名填充位、固定的空档位）用 `` `slot-${index}` ``"，让打出一张牌时只有那一个具体实例卸载，而不是后面每个格子"原地换脸"；`Tile.tsx` 新增 `reflow` prop 映射 motion 的 `layout`（跟 `layoutId` 无关，是"兄弟元素增删时自动补位"的标准用法，不是共享位置转移那一套，不会踩 `ClaimFlipGhost` 那次的坑），只在 `HandRow` 里使用，`DiscardPile`/`MeldGroup` 不受影响。**过程中抓到一个真 bug**：key 前缀化之前，`index` 和 `tileId` 共用同一数字空间，实测出现过一手牌里某张牌的 TileId 恰好等于空档格子的 index（如 `13`），触发 React 重复 key 警告、两个格子抢一个 DOM 节点——字符串前缀（`tile-`/`slot-`）从根上让两套 key 空间不可能相交，这是比"祈祷数值不会撞"更稳的做法，供以后任何"混用 index 和业务 id 做 key"的场景参考。用密集截图/`transform` 轨迹验证过：其余手牌确实平滑滑动补位，不是瞬间跳变。e2e 覆盖时发现校验窗口（600ms）在 `pnpm verify` 全量并发场景下不够用——点击到动画真正开始之间的延迟在重负载下会变长，挤占了留给动画本身播完的时间，放宽到 1500ms 后稳定。
+- **1 抓牌从中心飞入（已完成，后经用户实测反馈简化两次）**：新增 `DrawFlipGhost.tsx`，跟 `ClaimFlipGhost.tsx` 同一套隔离原则（只在真正摸牌那一刻挂载一次、播完自己卸载、不碰真实钉住槽 Tile 的动画状态），但"起点"跟认领动画不一样——牌墙里的牌没有任何单独的视觉表示（架构上就没有逐张牌的 DOM 元素），没有真实的"源头元素"可测，所以起点用 `CenterStatus`（`table-center-status`）的**中心点**而不是某个具体元素的 rect。最初按"先扩大再回到正常大小"的字面要求做了 `[0.4, 1.4, 1]` 的放大过冲曲线（先缩小淡入、途中放大超过正常尺寸、最后回落定住），用户实测后反馈不需要放大过冲，改成 `[0.4, 1]` 直接从缩小状态长到正常大小；再次实测后用户反馈连这个"从小长大"也不需要，最终去掉全部 `scale` 动画，只保留位置飞入 + 透明度淡入，全程保持正常大小。自己摸牌显示真实牌面，对手摸牌显示牌背（复用 `Tile.tsx` 已有的"不传 `tileId` 即牌背"逻辑）。
+- **2B 打牌飞出（已完成，后经用户实测反馈简化一次）**：手牌里被打出的那张牌会真的从数组消失（不是像牌河墓碑那样永久保留），等新快照渲染出来时源头元素已经不在了，测不到它的位置——解法是在点击那一刻（`HandRow.tsx` 的 `captureTileRect`，同步读一次 `getBoundingClientRect()`）就把这张牌的源头 rect 量好，随 `onDiscard(tile, originRect)` 一路带到 `TableView.tsx` 的 `pendingDiscardOrigin` state，再经 `useTablePresentation.ts` 按 TileId 匹配挂到对应的 `DiscardEntry.flightOrigin` 上，最终由 `DiscardPile.tsx` 新增的 `DiscardTileSlot` 包装组件在这张牌真正落地的那次挂载时读取一次、交给新的 `DiscardFlipGhost.tsx`。这纯粹是几何测量，不写任何游戏状态，也不依赖命令 ack——真正触发幽灵飞行的仍然是 server 权威快照落地那一刻，跟摸牌/认领动画完全同一套触发时机，不违反架构铁律 5。最初按"中途在牌河区域中点放大停顿"的要求做了三点关键帧（手牌位置 → `CenterStatus` 中心停顿放大 → 牌河终点位置回落），用户实测后反馈不需要中途停顿，改成跟 `ClaimFlipGhost` 完全一样的直接两点 rect-to-rect FLIP（手牌位置 → 牌河终点位置）。`pendingDiscardOrigin` 故意不做任何清空逻辑：TileId 全局唯一、一局内不会重复用到同一张牌，`DiscardTileSlot` 也只在这张牌真正挂载的那一次渲染读它一次，多余的旧值不读不用，放着也没有正确性或泄漏问题（反而是想在 `useEffect` 里清空会撞上本项目 `react-hooks/set-state-in-effect` 的 lint 规则，属于没必要解决的假问题）。**过程中顺带抓到一个 Stage 1 遗留的真 bug**：`HandRow.tsx` 的 `DrawnSlotTile` 给钉住摸牌槽包了一层 `<div className="h-full">` 用作 `DrawFlipGhost` 的落点 ref，但里面的 `Tile` 只占 `${tileHeightPct}%`（不是 100%）——wrapper 满高、内容不到满高、又没有自己的居中样式，导致这张牌贴着 wrapper 顶部，比其余手牌整体高了一截、不在同一条线上；`DiscardPile.tsx`/`MeldGroup.tsx` 的同款 wrapper 之所以没这个问题，是因为它们包的 `TileClaimSlot` 自己就是 `h-full`（满高包满高，不存在"更矮的内容飘在顶部"这一层）。修法是给 wrapper 补上 `flex items-center`，让它跟外层 `HandRow` 的行内对齐方式（同样是 `items-center`）保持一致。
+- **3 独立管理原则（已完成，随 1/2A/2B 一并达成，不是单独的一步）**：`ClaimFlipGhost`/`DrawFlipGhost`/`DiscardFlipGhost` 三个飞行动画统一走同一套模式——真实的手牌/牌河/副露渲染逻辑完全不知道飞行动画的存在（`Tile.tsx`/`DiscardPile.tsx`/`MeldGroup.tsx`/`HandRow.tsx` 各自的入场/变暗/reflow 逻辑全程不因为"这次要不要飞"而改变一行），飞行效果全部由独立的、只在状态转换那一刻挂载一次、播完自毁的临时克隆元素负责，跟真实元素之间除了共享同一个 TileId 的牌面外没有任何状态耦合。
 
-当前实施顺序：
+## 已知缺口（留给下一次触碰桌面 UX 时处理，不阻塞收尾）
 
-1. 完成 `myActionOptions` 与 seat-private `LegalActionsUpdated` 的 core/protocol/rebuild 回归；保留 `myClaimOptions` 兼容语义，声明窗口的 `pass` 只属于完整动作列表。
-2. 将桌面 `action-dock` 作为独立 preset Zone：无动作时 service 返回空且穿透；有动作时渲染半透明磨砂面板。已抽出 `ActionDock` 与 `useTablePresentation`，避免继续扩大 `TableView`。
-3. 覆盖 Dock 的键盘/触屏可达性、`pass`、chi 多组合选择、错误反馈和两种桌面视口；已接入合法 AI recommendation 与 server deadline 展示，并以固定 seed 的真实 e2e 覆盖 `pass` 与 chi 组合提交、两个目标桌面视口、Enter/Space 键盘路径，以及 `hasTouch` context 下无 hover 状态的纯 tap 路径（单候选直提与多候选先展开后提交）。服务端拒绝错误会在 Dock 内作为 alert 显示。
-
-Dock 交互约束：动作名使用中文（吃/碰/胡/杠/自摸/过）；上排按动作类型归组。下方候选区始终预留固定高度，默认展示 AI 推荐动作组（无推荐则第一组）的候选图形；hover 上排动作会切换展示组，指针移入候选区后不能收起。某类型仅有一个 server 下发的合法 action 时，上排动作或下方候选都可直接提交；同类型存在多个候选（例如多种吃或杠）时，上排只用于展开，必须点击一个具体候选才提交。每组默认选中 AI 推荐候选（该组无推荐则第一项）；hover 进入其他候选会持久改选中态，移出不回退。胡/过候选显示刚打出的牌，自摸候选显示刚摸的牌。候选区直接消费 server 给出的 action，不在客户端推导组合；Storybook 提供多吃、胡/过、自摸场景供视觉审阅。
-
-4. 已将 `RoomService.autoPlayBots` 的同步循环改为可取消的单步随机延迟调度；每次 timer 触发后重新读取合法动作，AI 对 AI 亦逐步等待，并有 fake-timer 回归。已补齐结束、离房、托管切换与声明 deadline 并存的针对性回归（`room.service.spec.ts` 的 "bot auto-play timer interplay" 描述块）：结束局时清掉挂起的 bot timer 不再补发动作；离房/托管切换发生在 bot timer 挂起期间不会重复调度，且座位转自动打牌后无需人工输入即可续接；声明超时与 bot action timer 各自独立触发、互不干扰。
-
-验收：真人与 AI 混桌可完成一局 junk，所有合法动作可操作，两个目标桌面视口无页面滚动或关键内容裁切。Phase 3 已完成。
-
-### Phase 4 — 布局重构与优化
-
-目标：布局重构与优化，具体范围随任务逐项确定；每项任务开工前先形成简要实现计划并由用户确认（同阶段门规则）。
-
-当前实施顺序：
-
-1. `ActionDock` 重构：内部由 CSS container-query + `clamp()` 曲线改为纯 CSS 百分比逐级缩放——ActionDock 自身垂直切上 Actions/下 Options 两区（默认 40/60，`tableLayoutLab.ts` 的 `TableLayoutConfig.actionDock` 新增分区可调），Actions 区按钮高度为区域高度的固定百分比、宽度按标签字数用 `aspect-ratio` 派生（1 字方形、2 字 1.4 倍宽），字体改用 SVG `<text>`（`ActionLabel` 组件，按钮/候选文字统一复用）按自身 viewBox 缩放，不再依赖 CSS `font-size` 或 container query；候选牌高度同样是 Options 区高度的固定百分比，宽度改用 `Tile.tsx` 已有的单维度 aspect-ratio 派生（不再和高度各自套一条 clamp 曲线导致比例失真）。声明倒计时从内联文字改成独立的 `DeadlineCountdown` 组件（纯数字徽标，绝对定位左上角，支持 UI-only 的 `onTimeout` 钩子但不接任何动作提交）。服务端拒绝错误从内联 `role="alert"` 改为全局 Toaster（shadcn `sonner`，`RootLayout.tsx` 挂载一次）。`action-dock` Zone 与候选/按钮的透明度、尺寸细节仍在人工调参中。ActionDock 的"推荐动作"后续改为不再有独立视觉：`recommendedAction` 只决定默认激活哪一组（`defaultGroup` 逻辑不变），按钮自身高亮态与候选区"选中"态统一用同一条"是否为当前 active 组"规则判断，hover 其他组会把高亮转移过去。
-
-2. `TableBoard` 拆成框架层与可替换场景：`TableBoard.tsx` 只剩 `TableZoneContext`/`TableZoneComponent`/`TableScenario` 类型定义和 `ZoneRenderer` 接线，原来的 `switch(role)` 换成 `scenario.components[zone.id]` 直接查表；desktop 的全部 zone 组件绑定收进 `components/mahjong/scenarios/desktop.tsx` + `desktopZoneComponents.tsx`，`preset`+`components` 打包成一个 `TableScenario` 整体切换，为后续手机横竖屏场景（各自一份 preset JSON + 一份组件表）预留接口，本阶段未实现第二个场景。
-   手牌/牌河/副露/座位信息四类子组件全部去掉 `useMeasuredSize`（ResizeObserver）/`fitTileGrid` 的 JS 尺寸测量，改用纯 CSS：`Tile.tsx` 支持只给 `heightPx`（含百分比字符串）、宽度靠 CSS `aspect-ratio` 派生；手牌区域收进单个 `SeatContent.handTiles: number[]`（+`revealed: boolean`）数组，固定以两个尾部占位（空档 + 摸到的牌或另一个空档）表达"钉住摸牌"，取代原来 `hand-content-*`/`hand-drawn-*` 两个独立 Zone 和已删除的 `HandTrack.tsx`/`handTrackContext.ts`；牌河从测量驱动的 CSS Grid 改成两级 flex（行不换行、列换行，无效 id 补齐末行对齐）；副露高度改成按 `meldTileHeightPct/meldHeightPct` 预算好的固定百分比；`InfoSlot` 旋转宽高互换与字号改用 `cqw`/`cqh` 容器查询单位（`DirectionalSurface` 已在用的同一技巧）。任意负数 TileId 在 `Tile.tsx` 统一渲染为不可见占位，不再单独定义手牌专用哨兵常量。
-   顺带清理：`fitTileGrid`（`tableGeometry.ts`）、`useMeasuredSize.ts`、`TableGeometry.tsx`（`Ring`/`DirectionalSurface`，已被 Zone 自身 `rotationDeg` 取代但从未删除）、`PlayerBadge.tsx` 均已零调用方，连同 `MeldInfoTrack`/`CenterStatus` 里从未被覆盖的可选 prop 一并删除；修了一个牌河认领徽章因非正方形父盒渲染成椭圆的真 bug（`width/height:55%` 改成 `width:55%,aspect-ratio:1`，另发现 lucide 图标自带 `<svg width/height>` 会让只设一个 CSS 维度时 aspect-ratio 失效，需额外包一层无固有尺寸的 div），DiscardPile/MeldGroup 共用的部分抽成 `TileClaimSlot`；另修了 `HandRow` 一处把 `tileId` 条件性略去导致占位格误渲染成暗牌背景的 bug。
-
-验收：`pnpm --filter @new-mj/web verify` 与根目录 `pnpm verify`（含 core 的 junk 1000 局、bloodbattle 10000 局 fuzz）均全绿。Phase 4 已完成。
-
-### Phase 5 — 动画与全站体验统一
-
-目标：在不改变权威状态语义的前提下提升反馈与一致性。
-
-- 事件动画采用 authoritative/presented 双状态；支持 reduced-motion、重连和积压时直接追平。
-- 将成熟的视觉 token、加载/空/错状态、Toast 与路由恢复推广到登录、游戏选择、大厅、房间和 Replay。
-
-验收：动画不提前暴露下一权威状态；跨页错误恢复不显示裸协议错误；明暗主题与键盘路径可用。
-
-### Phase 6 — 综合验收与收尾
-
-目标：完成 junk 桌面端收尾。
-
-- 覆盖真人 + AI、刷新/断线恢复、声明超时、结算、Replay、慢网络和 reduced-motion。
-- 执行根目录 `pnpm verify`，按 `../doc-map.md` §6 吸纳耐久结论，清理本文件的阶段过程内容。
-- 评估是否启动手机适配，并在 `plan.md` 写明下一专题的首个动作。
-
-## 阶段门
-
-每个阶段从最新 main 建分支；先形成并由用户确认当前阶段的简要实现计划，再实现与测试。阶段完成后运行定向检查和根 `pnpm verify`，更新本文件与 `plan.md`、提交并停止；未经用户明确指令不得 merge、推送或创建 PR。
+- Replay 页面（`ReplayView.tsx`）没有专属 e2e——目前是 JSON-only 渲染，风险面小，但完全没有自动化覆盖。
+- 慢网络/高延迟下的 UI 行为（loading 态、超时反馈）没有专属验证。
+- 声明超时的**客户端**行为（deadline 真的归零时 UI 表现）没有从 web e2e 层面单独验证过——服务端超时代提交机制本身有覆盖，客户端只是纯展示 `DeadlineCountdown`，风险判断为低，但同样是纯展示未被自动化盯住的一个点。

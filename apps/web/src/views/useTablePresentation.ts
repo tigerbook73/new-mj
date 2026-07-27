@@ -49,10 +49,16 @@ export function useTablePresentation({
   view,
   players,
   onDiscard,
+  canAnimateEntries = false,
+  pendingDiscardOrigin,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
-  onDiscard: (tile: number) => void;
+  onDiscard: (tile: number, originRect?: DOMRect) => void;
+  /** Gates one-shot entry animations (e.g. a freshly discarded tile sliding into the pile) — see useIsIncrementalSnapshot and usePrefersReducedMotion. */
+  canAnimateEntries?: boolean;
+  /** See TableView.tsx — a click-time rect capture for the discard-flying-out ghost, matched against the newly-landed discard entry by TileId. */
+  pendingDiscardOrigin?: { tile: number; rect: DOMRect } | null;
 }) {
   if (!view) {
     return undefined;
@@ -90,6 +96,21 @@ export function useTablePresentation({
               -1,
               drawnVisible ? 0 : -1,
             ];
+      // A real TileId is globally unique (architecture iron rule 4), so keying my
+      // own drawn slot by it already changes on every new draw. Opponents never
+      // expose a real TileId here (public events can't reveal concealed hands —
+      // architecture iron rule 2); their handCount toggles between two values
+      // across a draw/discard cycle, which is enough to tell "this draw" from
+      // "last draw" apart across the one render transition that matters, even
+      // though the same numeric value recurs turn after turn.
+      const drawnSlotKey =
+        direction === "bottom"
+          ? extras.justDrawn !== undefined
+            ? `own-${extras.justDrawn}`
+            : "none"
+          : drawnVisible
+            ? `opp-${seat}-${data.handCount}`
+            : "none";
       const content: SeatContent = {
         melds: data.melds.map((meld) => ({
           ...meld,
@@ -100,6 +121,9 @@ export function useTablePresentation({
         handTiles,
         revealed: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
+        drawnSlotKey,
+        drawnSlotEntering: drawnVisible && canAnimateEntries,
+        meldEntering: canAnimateEntries,
         ...(direction === "bottom" ? { interactive: isMyTurn, onDiscard } : {}),
       };
       return [direction, content];
@@ -109,14 +133,21 @@ export function useTablePresentation({
   const discards = Object.fromEntries(
     SEAT_DIRECTIONS.map((direction) => {
       const seat = seatAt(view.seat, direction);
-      const entries = seatData(seat).discards.map((entry) => ({
-        ...entry,
-        claimedByDirection:
-          entry.claimedBy !== undefined
-            ? directionOf(view.seat, entry.claimedBy as SeatId)
-            : undefined,
-        justDiscarded: extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile,
-      }));
+      const entries = seatData(seat).discards.map((entry) => {
+        const justDiscarded =
+          extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile;
+        return {
+          ...entry,
+          claimedByDirection:
+            entry.claimedBy !== undefined
+              ? directionOf(view.seat, entry.claimedBy as SeatId)
+              : undefined,
+          justDiscarded,
+          enterAnimation: justDiscarded && canAnimateEntries,
+          flightOrigin:
+            pendingDiscardOrigin?.tile === entry.tile ? pendingDiscardOrigin.rect : undefined,
+        };
+      });
       return [direction, entries];
     }),
   ) as Record<SeatDirection, DiscardEntry[]>;

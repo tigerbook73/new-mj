@@ -19,8 +19,31 @@ export interface SeatContent {
   /** True only for my own seat — opponents' handTiles entries render face-down. */
   revealed: boolean;
   interactive?: boolean | undefined;
-  onDiscard?: ((tile: number) => void) | undefined;
+  /** See HandRow.tsx's `captureTileRect` for why `originRect` is a plain measured value, not game state. */
+  onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   info: ReactNode;
+  /**
+   * React key for the pinned drawn-tile slot (the last `handTiles` entry) —
+   * distinct from every other slot's plain index key so a genuinely new draw
+   * mounts a fresh Tile instance (motion's `initial`/`animate` only fires on
+   * mount, see Tile.tsx). Stable/unchanged across re-renders that don't
+   * represent a new draw, so it never remounts (and thus never replays the
+   * entry animation) for unrelated state changes.
+   */
+  drawnSlotKey: string;
+  /** Gates the pinned drawn-tile slot's one-shot entry animation — see useIsIncrementalSnapshot / usePrefersReducedMotion. */
+  drawnSlotEntering: boolean;
+  /**
+   * Gates meld tiles' one-shot entry animation. Unlike drawnSlotEntering, no
+   * per-tile targeting is needed: a whole new meld (chi/peng/minGang/anGang)
+   * is a brand-new `melds` array entry, and buGang's added 4th tile is a
+   * genuinely new TileId within an existing meld — both cases already mount
+   * fresh Tile instances under MeldGroup's existing tile-identity keys, so
+   * passing this uniformly to every meld tile only visibly animates the ones
+   * that actually mount this render (see Tile.tsx's `initial`-only-at-mount
+   * semantics).
+   */
+  meldEntering: boolean;
 }
 
 /**

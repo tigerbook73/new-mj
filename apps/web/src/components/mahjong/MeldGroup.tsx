@@ -1,5 +1,7 @@
+import { useRef, useState } from "react";
 import type { SeatDirection } from "@/lib/seatLayout";
 import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
+import { ClaimFlipGhost } from "./ClaimFlipGhost";
 import { TileClaimSlot } from "./TileClaimSlot";
 
 export type Meld = {
@@ -26,6 +28,8 @@ interface MeldGroupProps {
    */
   tileHeightPct: number;
   config: TableLayoutConfig;
+  /** See SeatContent.meldEntering (components/mahjong/TableBoard.tsx). */
+  entering: boolean;
 }
 
 /**
@@ -33,7 +37,7 @@ interface MeldGroupProps {
  * shrinking — tile size is a fixed percentage of the shared shell's own
  * height, never squeezed by a fixed column count.
  */
-export function MeldGroup({ direction, melds, tileHeightPct, config }: MeldGroupProps) {
+export function MeldGroup({ direction, melds, tileHeightPct, config, entering }: MeldGroupProps) {
   if (melds.length === 0) return null;
 
   return (
@@ -53,19 +57,72 @@ export function MeldGroup({ direction, melds, tileHeightPct, config }: MeldGroup
             className="flex"
             style={{ height: `${tileHeightPct}%`, gap: `${config.tiles.tileGapPx}px` }}
           >
-            {meld.tiles.map((tile, tileIndex) => (
-              <TileClaimSlot
-                key={`${tile}-${tileIndex}`}
-                direction={direction}
-                claimFromDirection={tileIndex === fromTileIndex ? meld.fromDirection : undefined}
-                aspectRatio={config.tiles.aspectRatio}
-                claimTestId="meld-claim-icon"
-                tileId={tile}
-              />
-            ))}
+            {meld.tiles.map((tile, tileIndex) => {
+              const isFromClaim = tileIndex === fromTileIndex && meld.fromDirection !== undefined;
+              return (
+                <MeldClaimTile
+                  key={`${tile}-${tileIndex}`}
+                  direction={direction}
+                  fromDirection={isFromClaim ? meld.fromDirection : undefined}
+                  entering={entering}
+                  aspectRatio={config.tiles.aspectRatio}
+                  tile={tile}
+                />
+              );
+            })}
           </div>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Owns the per-tile hook state a plain `.map()` callback can't (rules of
+ * hooks) — specifically, whether to mount a `ClaimFlipGhost` alongside this
+ * tile. Captured once via `useState` rather than read live from `entering`:
+ * `entering` (== canAnimateEntries) is only true for the single render right
+ * after a live snapshot lands (see useIsIncrementalSnapshot), so deciding
+ * "should this tile get a ghost" on every render would unmount the ghost
+ * mid-flight the moment any unrelated re-render happens to land while it's
+ * still playing.
+ */
+function MeldClaimTile({
+  direction,
+  fromDirection,
+  entering,
+  aspectRatio,
+  tile,
+}: {
+  direction: SeatDirection;
+  /** Set only for the tile that came from a claim (chi/peng/gang), at the render it was claimed — see MeldGroup's `isFromClaim`. */
+  fromDirection: SeatDirection | undefined;
+  entering: boolean;
+  aspectRatio: number;
+  tile: number;
+}) {
+  const [shouldGhost] = useState(fromDirection !== undefined && entering);
+  const toRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <>
+      <div ref={toRef} className="h-full">
+        <TileClaimSlot
+          direction={direction}
+          claimFromDirection={fromDirection}
+          aspectRatio={aspectRatio}
+          claimTestId="meld-claim-icon"
+          tileId={tile}
+          entering={entering}
+        />
+      </div>
+      {shouldGhost && fromDirection !== undefined && (
+        <ClaimFlipGhost
+          tileId={tile}
+          fromSelector={`[data-testid="table-area-${fromDirection}"] [data-tile-id="${tile}"]`}
+          toRef={toRef}
+        />
+      )}
+    </>
   );
 }

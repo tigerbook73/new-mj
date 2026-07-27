@@ -1,5 +1,7 @@
+import { useRef, useState } from "react";
 import type { SeatDirection } from "@/lib/seatLayout";
 import type { TableLayoutMetrics } from "@/lib/desktopTablePreset";
+import { DiscardFlipGhost } from "./DiscardFlipGhost";
 import { Tile } from "./Tile";
 import { TileClaimSlot } from "./TileClaimSlot";
 
@@ -10,6 +12,17 @@ export type DiscardEntry = {
   claimedByDirection?: SeatDirection;
   /** True for the single most recent discard on the table (view.lastDiscard). */
   justDiscarded?: boolean;
+  /** True when justDiscarded should also play its one-shot entry animation — see useIsIncrementalSnapshot. */
+  enterAnimation?: boolean;
+  /**
+   * This tile's own hand-side rect, captured at click time (see HandRow.tsx's
+   * `captureTileRect`) — only ever present for my own discards, and only for
+   * the single render where this entry is genuinely new. Drives
+   * DiscardFlipGhost below; absent (e.g. an opponent's discard, or a page
+   * reload) just means this entry gets the plain grow-in entry animation with
+   * no flight.
+   */
+  flightOrigin?: DOMRect;
 };
 
 interface DiscardPileProps {
@@ -57,20 +70,60 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
               );
             }
             return (
-              <TileClaimSlot
+              <DiscardTileSlot
                 key={columnIndex}
                 direction={direction}
-                claimFromDirection={entry.claimedByDirection}
+                entry={entry}
                 aspectRatio={metrics.tiles.aspectRatio}
-                claimTestId="discard-claim-icon"
-                tileId={entry.tile}
-                dimmed={entry.claimedBy !== undefined}
-                justDiscarded={entry.justDiscarded}
               />
             );
           })}
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Owns the per-entry hook state a plain `.map()` callback can't (rules of
+ * hooks) — specifically, whether to mount a `DiscardFlipGhost` alongside this
+ * slot's real tile. `ghostOrigin` is captured once via `useState` (not read
+ * live from `entry.flightOrigin` on every render), same reasoning as
+ * MeldGroup.tsx's `MeldClaimTile`: TableView clears its own pending-origin
+ * state once the next snapshot arrives (see TableView.tsx), which would flip
+ * `entry.flightOrigin` back to `undefined` on the very next render — reading
+ * it live here would yank the ghost off mid-flight for a reason that has
+ * nothing to do with the flight itself actually finishing.
+ */
+function DiscardTileSlot({
+  direction,
+  entry,
+  aspectRatio,
+}: {
+  direction: SeatDirection;
+  entry: DiscardEntry;
+  aspectRatio: number;
+}) {
+  const [ghostOrigin] = useState<DOMRect | null>(() =>
+    entry.enterAnimation && entry.flightOrigin ? entry.flightOrigin : null,
+  );
+  const toRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <>
+      <div ref={toRef} className="h-full">
+        <TileClaimSlot
+          direction={direction}
+          claimFromDirection={entry.claimedByDirection}
+          aspectRatio={aspectRatio}
+          claimTestId="discard-claim-icon"
+          tileId={entry.tile}
+          dimmed={entry.claimedBy !== undefined}
+          justDiscarded={entry.justDiscarded}
+          entering={entry.enterAnimation}
+        />
+      </div>
+      {ghostOrigin && <DiscardFlipGhost tileId={entry.tile} fromRect={ghostOrigin} toRef={toRef} />}
+    </>
   );
 }

@@ -123,6 +123,14 @@ test("junk desktop table fits both target viewports and a discard succeeds", asy
   await expect
     .poll(() => handTiles.first().evaluate((tile) => getComputedStyle(tile).cursor))
     .toBe("pointer");
+  // Regression: motion.div's entry animation (Tile.tsx's `initial`/`animate`)
+  // writes `transform` as a permanent inline style once mounted, which used
+  // to silently beat the CSS `hover:scale-*` utility outright (inline always
+  // wins over any stylesheet rule) — the enlargement moved to motion's own
+  // `whileHover` prop specifically so this keeps working.
+  await expect
+    .poll(() => handTiles.first().evaluate((tile) => getComputedStyle(tile).transform))
+    .not.toBe("none");
   const tileCountBefore = await handTiles.count();
   const displayedTileIds = (await handTiles.evaluateAll((tiles) =>
     tiles.map((tile) => Number(tile.getAttribute("data-tile-id"))),
@@ -151,6 +159,535 @@ test("junk desktop table fits both target viewports and a discard succeeds", asy
 
   for (const page of players) {
     await page.context().close();
+  }
+});
+
+// Phase 5 follow-up: discarding a hand tile unmounts exactly that instance
+// (HandRow.tsx keys revealed hand tiles by their own TileId, not position —
+// see the comment there) so the tiles after it glide into the closed-up gap
+// via motion's `layout` (Tile.tsx's `reflow` prop) instead of silently
+// swapping to the next tile's face. Verified by hand first via a raw
+// transform trace on the tile that shifts into the vacated first slot,
+// showing a smooth non-identity `transform` (translateX) decaying to `none`
+// over ~300ms rather than an instant snap.
+test("discarding a hand tile makes the rest glide into the closed-up gap", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-reflow");
+  const [host] = players;
+  try {
+    const handTiles = host.getByTestId("hand-tile");
+    await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
+    // handTiles is sorted (see the existing "discard succeeds" test above),
+    // so the second tile is guaranteed to shift left into the first tile's
+    // slot once the first is discarded.
+    const shiftingTileId = await handTiles.nth(1).getAttribute("data-tile-id");
+
+    // expect.poll's interval isn't tight enough to reliably catch a ~300ms
+    // transition window (the reflow can start and finish between two of its
+    // polls) — start a tight rAF-driven trace on the page itself, right
+    // before triggering the discard, same technique used to verify this by
+    // hand first.
+    const tracePromise = host.evaluate((tileId) => {
+      return new Promise<string[]>((resolve) => {
+        const values: string[] = [];
+        const start = performance.now();
+        function tick() {
+          const el = document.querySelector(`[data-testid="hand-tile"][data-tile-id="${tileId}"]`);
+          if (el) values.push(getComputedStyle(el).transform);
+          // Generous window: under heavy parallel test load the click→server
+          // roundtrip→re-render latency before the transition even starts
+          // can eat well into a tighter budget, leaving too little of it for
+          // the actual ~300ms transition to finish and settle within.
+          if (performance.now() - start < 1500) requestAnimationFrame(tick);
+          else resolve(values);
+        }
+        requestAnimationFrame(tick);
+      });
+    }, shiftingTileId);
+    await handTiles.first().click();
+    const trace = await tracePromise;
+
+    expect(trace.some((value) => value !== "none")).toBe(true);
+    expect(trace.at(-1)).toBe("none");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Regression: an opponent's hand row must never visibly slide as a block.
+// HandRow's `reflow` (motion's `layout`) used to be unconditional, including
+// on opponents' anonymous position-keyed filler tiles — when a claim (chi/
+// peng) pulls tiles out of their concealed hand, handCount shrinks, the
+// surviving filler slots keep the same `slot-${index}` key (so they're the
+// same persistent element, not a fresh mount) and just land at a new
+// right-anchored position, and with `layout` on that reads as their entire
+// hand sliding as one block. There's nothing meaningful to animate there
+// (none of those tiles represent an identifiable gap closing, unlike a
+// tileId-keyed real hand tile) — fixed by scoping `reflow` to `revealed`
+// (my own row) only.
+test("an opponent's hand does not visibly slide when a claim shrinks it", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-noslide");
+  const [host, claimant, secondClaimant] = players;
+  try {
+    // host observes claimant (seat 1) at direction "right" — see seatLayout.ts's directionOf.
+    const tracePromise = host.evaluate(() => {
+      return new Promise<string[]>((resolve) => {
+        const values: string[] = [];
+        const start = performance.now();
+        function tick() {
+          const firstFiller = document.querySelector(
+            '[data-testid="player-track-right"] > div > div:first-child',
+          );
+          if (firstFiller) values.push(getComputedStyle(firstFiller).transform);
+          if (performance.now() - start < 2000) requestAnimationFrame(tick);
+          else resolve(values);
+        }
+        requestAnimationFrame(tick);
+      });
+    });
+
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+
+    const claimantDock = claimant.getByTestId("action-dock");
+    await expect(claimantDock).toBeVisible({ timeout: 10_000 });
+    await claimantDock.getByRole("button", { name: /^吃/ }).hover();
+    await claimantDock.getByTestId("action-candidates").locator("button").first().click();
+
+    const secondDock = secondClaimant.getByTestId("action-dock");
+    await expect(secondDock).toBeVisible({ timeout: 10_000 });
+    await secondDock.getByRole("button", { name: /^过/ }).click();
+
+    await expect(claimantDock).toBeHidden({ timeout: 10_000 });
+    await expect(secondDock).toBeHidden({ timeout: 10_000 });
+
+    const trace = await tracePromise;
+    expect(trace.every((value) => value === "none")).toBe(true);
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Phase 5a: the discard that just landed plays a one-shot motion entry
+// animation (Tile.tsx's `entering` prop, motion's initial/animate) only for
+// a live, in-place update — not for the first snapshot after a reload, which
+// resumes mid-game exactly like a reconnect and must never replay animations
+// for events the viewer didn't watch happen (session-mechanics.md § "评审点
+// I"). `data-entering` is a stable marker captured once at mount (Tile.tsx's
+// `wasEntering` state) — motion's own inline style converges to the same
+// settled opacity/transform either way, so it's the only thing left to
+// assert on after the animation finishes.
+test("discard entry animation plays live but not after a reload mid-game", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-discard-anim");
+  const [host] = players;
+  try {
+    const handTiles = host.getByTestId("hand-tile");
+    await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
+    const displayedTileIds = (await handTiles.evaluateAll((tiles) =>
+      tiles.map((tile) => Number(tile.getAttribute("data-tile-id"))),
+    )) as number[];
+    const discardedTileId = displayedTileIds[0]!;
+    await handTiles.first().click();
+
+    const discardedTile = host
+      .getByTestId("table-area-bottom")
+      .locator(`[data-tile-id="${discardedTileId}"]`);
+    await expect(discardedTile).toBeVisible({ timeout: 10_000 });
+    await expect(discardedTile).toHaveAttribute("data-entering", "true");
+
+    await host.reload();
+    const discardedTileAfterReload = host
+      .getByTestId("table-area-bottom")
+      .locator(`[data-tile-id="${discardedTileId}"]`);
+    await expect(discardedTileAfterReload).toBeVisible({ timeout: 10_000 });
+    await expect(discardedTileAfterReload).not.toHaveAttribute("data-entering");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+test("discard entry animation is suppressed under prefers-reduced-motion", async ({ browser }) => {
+  // Short prefix on purpose: deriveUserId(nickname) (devAuth.ts) slugs+slices
+  // to 20 chars, and a longer "junk-discard-reduced-*" prefix collapsed all
+  // four players' suffixed nicknames onto the identical truncated userId,
+  // triggering a same-account takeover prompt on p2/p3/p4's login instead of
+  // 4 distinct dev accounts — caught via isolated repro, not a Playwright/
+  // reducedMotion issue.
+  const { players } = await createAndStartRoom(browser, "junk", "junk-reduced", {
+    reducedMotion: "reduce",
+  });
+  const [host] = players;
+  try {
+    const handTiles = host.getByTestId("hand-tile");
+    await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
+    const displayedTileIds = (await handTiles.evaluateAll((tiles) =>
+      tiles.map((tile) => Number(tile.getAttribute("data-tile-id"))),
+    )) as number[];
+    const discardedTileId = displayedTileIds[0]!;
+    await handTiles.first().click();
+
+    const discardedTile = host
+      .getByTestId("table-area-bottom")
+      .locator(`[data-tile-id="${discardedTileId}"]`);
+    await expect(discardedTile).toBeVisible({ timeout: 10_000 });
+    await expect(discardedTile).not.toHaveAttribute("data-entering");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// 2B: a discarded tile flies from its hand position out to the discard pile,
+// via a ghost clone measured at click time (HandRow.tsx's captureTileRect) —
+// the source tile genuinely leaves the hand array, unlike a claim's permanent
+// tombstone, so there's no live "from" element left by the time this mounts.
+test("a discarded tile flies out from hand via a ghost clone", async ({ browser }) => {
+  // "junk-toss"/"junk-nomo" on purpose — see the deriveUserId truncation and
+  // room-name substring-match notes above passAllClaims: neither may be a
+  // literal prefix of the other, or of any other identityPrefix in this file.
+  const { players } = await createAndStartRoom(browser, "junk", "junk-toss");
+  const [host] = players;
+  try {
+    const handTiles = host.getByTestId("hand-tile");
+    await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
+    const discardedTileId = await handTiles.first().getAttribute("data-tile-id");
+    await handTiles.first().click();
+
+    const ghost = host.getByTestId("discard-flip-ghost");
+    await expect(ghost).toBeVisible({ timeout: 10_000 });
+    // Self-removes once its transition completes (onAnimationComplete).
+    await expect(ghost).toBeHidden({ timeout: 10_000 });
+
+    // The real discard-pile tile must have settled correctly — the whole
+    // point of the ghost is that it never touched the real tile's own state.
+    const landedTile = host
+      .getByTestId("table-area-bottom")
+      .locator(`[data-tile-id="${discardedTileId}"]`);
+    await expect(landedTile).toBeVisible();
+    await expect(landedTile).toHaveAttribute("data-entering", "true");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+test("the discard flip ghost is suppressed under prefers-reduced-motion", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-nomo", {
+    reducedMotion: "reduce",
+  });
+  const [host] = players;
+  try {
+    const handTiles = host.getByTestId("hand-tile");
+    await expect(handTiles.first()).toBeVisible({ timeout: 10_000 });
+    const discardedTileId = await handTiles.first().getAttribute("data-tile-id");
+    await handTiles.first().click();
+
+    const landedTile = host
+      .getByTestId("table-area-bottom")
+      .locator(`[data-tile-id="${discardedTileId}"]`);
+    await expect(landedTile).toBeVisible({ timeout: 10_000 });
+    await expect(host.getByTestId("discard-flip-ghost")).toHaveCount(0);
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Phase 5b: the pinned drawn-tile slot (HandRow's last slot) plays the same
+// one-shot entry animation as a fresh discard, but needs a content-based key
+// instead of array-growth to trigger a remount — see SeatContent.drawnSlotKey.
+// TEST_GAME_SEED=121 gives the dealer TileId 4, seat 1 a legal chi/pass, AND
+// seat 2 a legal pon/pass on it — the claim window only closes once every
+// seat with a legal claim has responded, so both seat 1 and seat 2 must pass
+// (not just the one this test cares about) before seat 1's turn actually
+// advances into a draw.
+async function passAllClaims(claimants: import("@playwright/test").Page[]) {
+  for (const page of claimants) {
+    const dock = page.getByTestId("action-dock");
+    await expect(dock).toBeVisible({ timeout: 10_000 });
+    await dock.getByRole("button", { name: /^过/ }).click();
+    await expect(dock).toBeHidden({ timeout: 10_000 });
+  }
+}
+
+test("draw entry animation plays live but not after a reload mid-game", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-draw-anim");
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+    await passAllClaims([claimant, secondClaimant]);
+
+    const ownDrawnTile = claimant.getByTestId("hand-track-drawn-bottom");
+    await expect(ownDrawnTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
+    // Host sees the same draw from the opponent side — SeatContent's
+    // "opp-{seat}-{handCount}" keying branch, distinct from the own-seat
+    // "own-{tileId}" branch the assertion above exercises.
+    const opponentDrawnTile = host.getByTestId("hand-track-drawn-right");
+    await expect(opponentDrawnTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
+
+    await claimant.reload();
+    const ownDrawnTileAfterReload = claimant.getByTestId("hand-track-drawn-bottom");
+    await expect(ownDrawnTileAfterReload).toBeVisible({ timeout: 10_000 });
+    await expect(ownDrawnTileAfterReload).not.toHaveAttribute("data-entering");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+test("draw entry animation is suppressed under prefers-reduced-motion", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-drawrm", {
+    reducedMotion: "reduce",
+  });
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+    await passAllClaims([claimant, secondClaimant]);
+
+    const ownDrawnTile = claimant.getByTestId("hand-track-drawn-bottom");
+    await expect(ownDrawnTile).toBeVisible({ timeout: 10_000 });
+    await expect(ownDrawnTile).not.toHaveAttribute("data-entering");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Post-Phase-6 follow-up: a freshly drawn tile flies in from the table's
+// center via a temporary clone (DrawFlipGhost.tsx, `data-testid="draw-flip-
+// ghost"`) — same isolation principle as ClaimFlipGhost.tsx (measures once,
+// portals a clone, self-removes; never touches the real pinned-slot tile's
+// own animation state). Verified by hand first via a raw transform trace on
+// the ghost element showing its scale rise past 1 to an overshoot peak
+// (~1.4) before settling back to 1 while position converges to the hand
+// slot, then the element disappearing.
+test("a drawn tile flies in from the center via a ghost clone", async ({ browser }) => {
+  // Short, non-overlapping prefix on purpose — see the deriveUserId
+  // 20-char-truncation note above passAllClaims, plus createAndStartRoom's
+  // room-name lookup does a substring match, so this must not be a prefix of
+  // "junk-dghorm" below (or vice versa) either.
+  const { players } = await createAndStartRoom(browser, "junk", "junk-dwgho");
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+    await passAllClaims([claimant, secondClaimant]);
+
+    const ghost = claimant.getByTestId("draw-flip-ghost");
+    await expect(ghost).toBeVisible({ timeout: 10_000 });
+    // Self-removes once its transition completes (onAnimationComplete).
+    await expect(ghost).toBeHidden({ timeout: 10_000 });
+
+    // The real pinned-slot tile must have settled correctly — the whole
+    // point of the ghost is that it never touched the real tile's own state.
+    const ownDrawnTile = claimant.getByTestId("hand-track-drawn-bottom");
+    await expect(ownDrawnTile).toHaveAttribute("data-entering", "true");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+test("the draw flip ghost is suppressed under prefers-reduced-motion", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-dghorm", {
+    reducedMotion: "reduce",
+  });
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+    await passAllClaims([claimant, secondClaimant]);
+
+    const ownDrawnTile = claimant.getByTestId("hand-track-drawn-bottom");
+    await expect(ownDrawnTile).toBeVisible({ timeout: 10_000 });
+    await expect(claimant.getByTestId("draw-flip-ghost")).toHaveCount(0);
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Regression: a claimed discard's tombstone must visibly dim (architecture
+// iron rule 4 — the claimed tile moves into a meld but leaves a dimmed
+// tombstone in the river, it isn't removed). Tile.tsx used to drive this via
+// a static `opacity-40` CSS class; once entry animation switched to motion,
+// motion's own `animate` target permanently wrote `opacity: 1` as an inline
+// style every render (inline always beats a stylesheet class), silently
+// undimming every tombstone. Fixed by folding `dimmed` into the same
+// `animate` target motion already owns instead of fighting it with CSS.
+test("a claimed discard's tombstone visibly dims", async ({ browser }) => {
+  // Short prefix on purpose — see the deriveUserId 20-char-truncation note above passAllClaims.
+  const { players } = await createAndStartRoom(browser, "junk", "junk-dim");
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+
+    const claimantDock = claimant.getByTestId("action-dock");
+    await expect(claimantDock).toBeVisible({ timeout: 10_000 });
+    await claimantDock.getByRole("button", { name: /^吃/ }).hover();
+    await claimantDock.getByTestId("action-candidates").locator("button").first().click();
+
+    // seat 2 also has a legal claim (pon) on this same discard — the window
+    // only resolves once every eligible seat responds (see passAllClaims above).
+    const secondDock = secondClaimant.getByTestId("action-dock");
+    await expect(secondDock).toBeVisible({ timeout: 10_000 });
+    await secondDock.getByRole("button", { name: /^过/ }).click();
+
+    await expect(claimantDock).toBeHidden({ timeout: 10_000 });
+    await expect(secondDock).toBeHidden({ timeout: 10_000 });
+
+    const tombstone = host.getByTestId("table-area-bottom").locator('[data-tile-id="4"]');
+    await expect(tombstone).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(() => tombstone.evaluate((tile) => getComputedStyle(tile).opacity))
+      .toBe("0.4");
+    await expect(host.getByTestId("discard-claim-icon")).toHaveCount(1);
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Phase 5c: a newly formed meld's tiles play the same one-shot entry
+// animation as a discard/draw — no per-tile targeting needed, since a brand
+// new meld is a genuinely new `melds` array entry (see SeatContent.meldEntering).
+test("meld entry animation plays live but not after a reload mid-game", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-meld-anim");
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+
+    const claimantDock = claimant.getByTestId("action-dock");
+    await expect(claimantDock).toBeVisible({ timeout: 10_000 });
+    await claimantDock.getByRole("button", { name: /^吃/ }).hover();
+    await claimantDock.getByTestId("action-candidates").locator("button").first().click();
+
+    const secondDock = secondClaimant.getByTestId("action-dock");
+    await expect(secondDock).toBeVisible({ timeout: 10_000 });
+    await secondDock.getByRole("button", { name: /^过/ }).click();
+
+    await expect(claimantDock).toBeHidden({ timeout: 10_000 });
+    await expect(secondDock).toBeHidden({ timeout: 10_000 });
+
+    const ownMeldTile = claimant
+      .getByTestId("meld-info-track-bottom")
+      .locator('[data-tile-id="4"]');
+    await expect(ownMeldTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
+    // Host sees the same new meld from the opponent side.
+    const opponentMeldTile = host
+      .getByTestId("meld-info-track-right")
+      .locator('[data-tile-id="4"]');
+    await expect(opponentMeldTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
+
+    await claimant.reload();
+    const ownMeldTileAfterReload = claimant
+      .getByTestId("meld-info-track-bottom")
+      .locator('[data-tile-id="4"]');
+    await expect(ownMeldTileAfterReload).toBeVisible({ timeout: 10_000 });
+    await expect(ownMeldTileAfterReload).not.toHaveAttribute("data-entering");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+test("meld entry animation is suppressed under prefers-reduced-motion", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-meldrm", {
+    reducedMotion: "reduce",
+  });
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+
+    const claimantDock = claimant.getByTestId("action-dock");
+    await expect(claimantDock).toBeVisible({ timeout: 10_000 });
+    await claimantDock.getByRole("button", { name: /^吃/ }).hover();
+    await claimantDock.getByTestId("action-candidates").locator("button").first().click();
+
+    const secondDock = secondClaimant.getByTestId("action-dock");
+    await expect(secondDock).toBeVisible({ timeout: 10_000 });
+    await secondDock.getByRole("button", { name: /^过/ }).click();
+
+    await expect(claimantDock).toBeHidden({ timeout: 10_000 });
+    await expect(secondDock).toBeHidden({ timeout: 10_000 });
+
+    const ownMeldTile = claimant
+      .getByTestId("meld-info-track-bottom")
+      .locator('[data-tile-id="4"]');
+    await expect(ownMeldTile).toBeVisible({ timeout: 10_000 });
+    await expect(ownMeldTile).not.toHaveAttribute("data-entering");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+// Phase 5c follow-up: the claimed tile flies from the discard pile into the
+// meld via a temporary clone (ClaimFlipGhost.tsx, `data-testid="claim-flip-
+// ghost"`), not motion's `layoutId` shared-layout system — that was tried
+// first and reverted (see Tile.tsx's docs): sharing a `layoutId` between the
+// permanent discard tombstone and the new meld tile made motion treat the
+// tombstone as exiting, silently overriding its `dimmed` target. The ghost
+// is fully decoupled — it measures both rects once, animates a portal clone
+// between them, then removes itself; neither the tombstone nor the real
+// meld tile's own animation state is ever touched. Verified by hand first
+// (a raw transform trace on the ghost element showing it appear with a
+// non-identity transform, decay to `none` over ~300ms, then disappear)
+// before encoding the same signal as an automated check.
+test("a claimed tile FLIPs from the discard pile into the meld via a ghost clone", async ({
+  browser,
+}) => {
+  // "junk-flipgo" on purpose, not "junk-flip": the room-name button lookup in
+  // createAndStartRoom uses a substring match, and "junk-flip" is itself a
+  // prefix of "junk-fliprm" (the reduced-motion test below), which made
+  // `getByRole("button", { name: roomName })` match both rooms' buttons at
+  // once and fail with a strict-mode violation.
+  const { players } = await createAndStartRoom(browser, "junk", "junk-flipgo");
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+
+    const claimantDock = claimant.getByTestId("action-dock");
+    await expect(claimantDock).toBeVisible({ timeout: 10_000 });
+    await claimantDock.getByRole("button", { name: /^吃/ }).hover();
+    await claimantDock.getByTestId("action-candidates").locator("button").first().click();
+
+    const secondDock = secondClaimant.getByTestId("action-dock");
+    await expect(secondDock).toBeVisible({ timeout: 10_000 });
+    await secondDock.getByRole("button", { name: /^过/ }).click();
+
+    const ghost = claimant.getByTestId("claim-flip-ghost");
+    await expect(ghost).toBeVisible({ timeout: 10_000 });
+    // Self-removes once its transition completes (onAnimationComplete) —
+    // give it generous headroom since the transition itself is ~300ms.
+    await expect(ghost).toBeHidden({ timeout: 10_000 });
+
+    // The real meld tile and the discard tombstone must both have settled
+    // correctly — the whole point of the ghost is that neither one's own
+    // animation state was ever touched by the flight.
+    const meldTile = claimant.getByTestId("meld-info-track-bottom").locator('[data-tile-id="4"]');
+    await expect(meldTile).toHaveAttribute("data-entering", "true");
+    await expect
+      .poll(() =>
+        host
+          .getByTestId("table-area-bottom")
+          .locator('[data-tile-id="4"]')
+          .evaluate((tile) => getComputedStyle(tile).opacity),
+      )
+      .toBe("0.4");
+  } finally {
+    for (const page of players) await page.context().close();
+  }
+});
+
+test("the claim FLIP ghost is suppressed under prefers-reduced-motion", async ({ browser }) => {
+  const { players } = await createAndStartRoom(browser, "junk", "junk-fliprm", {
+    reducedMotion: "reduce",
+  });
+  const [host, claimant, secondClaimant] = players;
+  try {
+    await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
+
+    const claimantDock = claimant.getByTestId("action-dock");
+    await expect(claimantDock).toBeVisible({ timeout: 10_000 });
+    await claimantDock.getByRole("button", { name: /^吃/ }).hover();
+    await claimantDock.getByTestId("action-candidates").locator("button").first().click();
+
+    const secondDock = secondClaimant.getByTestId("action-dock");
+    await expect(secondDock).toBeVisible({ timeout: 10_000 });
+    await secondDock.getByRole("button", { name: /^过/ }).click();
+
+    const meldTile = claimant.getByTestId("meld-info-track-bottom").locator('[data-tile-id="4"]');
+    await expect(meldTile).toBeVisible({ timeout: 10_000 });
+    await expect(claimant.getByTestId("claim-flip-ghost")).toHaveCount(0);
+  } finally {
+    for (const page of players) await page.context().close();
   }
 });
 

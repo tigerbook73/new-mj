@@ -38,6 +38,8 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
         onDiscard={seat.onDiscard}
         tileHeightPct={DESKTOP_TABLE_METRICS.hand.tileHeightPct}
         tileGapPx={DESKTOP_TABLE_METRICS.tiles.tileGapPx}
+        drawnSlotKey={seat.drawnSlotKey}
+        drawnSlotEntering={seat.drawnSlotEntering}
       />
     </div>
   );
@@ -58,6 +60,7 @@ export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: 
           melds={seat.melds}
           tileHeightPct={(meldTileHeightPct / meldHeightPct) * 100}
           config={DESKTOP_TABLE_METRICS}
+          entering={seat.meldEntering}
         />
       </div>
     </div>
