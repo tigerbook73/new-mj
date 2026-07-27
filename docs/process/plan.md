@@ -1,6 +1,6 @@
 # plan：项目状态与当前工作
 
-> 本文件只保留项目基线、已完成能力、当前阶段与下一步。专题的范围、阶段目标和验收见 [`table-ux-plan.md`](./table-ux-plan.md)。过程细节在阶段收尾时清理，耐久结论进入 contracts、architecture 或 decisions。
+> 本文件只保留项目基线、已完成能力、当前阶段与下一步。复杂阶段的范围、目标和待办另立 `process/<phase 简称>.md`，由本文件当前工作区链接过去（见 `doc-map.md` §5）。过程细节在阶段收尾时清理，耐久结论进入 contracts、architecture 或 decisions。
 
 ## 项目基线
 
@@ -10,7 +10,7 @@
 
 ## 已完成能力
 
-TypeScript monorepo、垃圾胡/血战到底 RuleSet、CLI/replay/fuzz、多房间 server、AI 补位与断线托管、Web 登录/大厅/房间/牌桌、主题、对局归档与 Supabase OAuth 均已落地。**Junk Table UX（桌面）专题（Phase 1–6，含 Phase 6 收尾后追加的动画优化）已全部完成并收尾**，细节归档见 [`table-ux-plan.md`](./table-ux-plan.md)：Zone/LayoutPreset 几何层、完整操作 Dock（真人+AI 混桌可玩）、纯 CSS 布局重构、出牌/摸牌/副露成型/结算四类事件动画（`motion`，见 `decisions.md` D31）、以及抓牌/打牌/认领三条跨区域飞行动画（`ClaimFlipGhost.tsx`/`DrawFlipGhost.tsx`/`DiscardFlipGhost.tsx`，均为独立临时克隆、真实手牌/牌河/副露渲染逻辑不受影响，动画曲线按用户实测反馈简化过一轮——去掉了不必要的放大/中途停顿）均已落地并通过 e2e/Storybook 验收；已知缺口（Replay 页面与慢网络场景无专属 e2e）见 `table-ux-plan.md` 尾部，不阻塞收尾。bloodbattle 仍停留在公共桌面骨架（血战专属 UI 留待后续专题）。Nest server 构建使用 SWC，类型检查仍由独立 `typecheck` 脚本负责。最近一次根目录 `pnpm verify` 于 2026-07-26 全绿，覆盖 format、typecheck、lint、build、unit、e2e，以及 core 的 junk 1000 局和 bloodbattle 10000 局 fuzz。
+TypeScript monorepo、垃圾胡/血战到底 RuleSet、CLI/replay/fuzz、多房间 server、AI 补位与断线托管、Web 登录/大厅/房间/牌桌、主题、对局归档与 Supabase OAuth 均已落地。**Junk Table UX（桌面）专题（Phase 1–6，含 Phase 6 收尾后追加的动画优化）已全部完成并收尾**：Zone/LayoutPreset 几何层设计见 `architecture/frontend-layout.md`，完整操作 Dock（真人+AI 混桌可玩）、纯 CSS 布局重构均已落地；出牌/摸牌/副露成型/结算四类事件动画与三条跨区域飞行动画（独立临时克隆、不侵入真实渲染逻辑）已落地并通过 e2e/Storybook 验收，动画技术选型与踩坑记录见 `decisions.md` D31；已知缺口见下方待办。bloodbattle 仍停留在公共桌面骨架（血战专属 UI 留待后续专题）。Nest server 构建使用 SWC，类型检查仍由独立 `typecheck` 脚本负责。最近一次根目录 `pnpm verify` 于 2026-07-26 全绿，覆盖 format、typecheck、lint、build、unit、e2e，以及 core 的 junk 1000 局和 bloodbattle 10000 局 fuzz。
 
 ## 当前工作：Table Layout Lab 增强及优化
 
@@ -26,4 +26,4 @@ Junk Table UX 专题（Phase 1–6，含收尾后追加的动画优化）已完�
 - [ ] 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - [ ] mobile 路线与 Expo 实现；日麻立项时复审 `architecture/variant-boundary.md`。
 - [ ] 可选沉浸体验：音效、音量与静音设置。
-- [ ] Junk Table UX 已知缺口：Replay 页面（`ReplayView.tsx`）与慢网络场景补 e2e（不紧急，见 `table-ux-plan.md`）。
+- [ ] Junk Table UX 已知缺口（不紧急）：Replay 页面（`ReplayView.tsx`，纯 JSON 渲染，风险面小）、慢网络/高延迟下的 UI 行为（loading 态、超时反馈）、声明超时归零时客户端 `DeadlineCountdown` 的展示行为——均无专属 e2e。
