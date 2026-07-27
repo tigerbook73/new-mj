@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ClipboardCopy, Copy, FileInput, Plus, Trash2, Upload } from "lucide-react";
+import { ClipboardCopy, Copy, HardDriveDownload, Plus, Save, Trash2, Upload } from "lucide-react";
 import { type SketchDraft } from "@/lib/layoutSketch";
 import { RatioField } from "./SketchFields";
 import { confirmOrCancelStringEdit } from "./editorInput";
@@ -15,12 +15,22 @@ export function SketchHeader({
   onNew,
   onCopyDraft,
   onDeleteDraft,
+  canDeleteDraft,
+  deleteTitle,
   onToggleBoundaries,
   onViewportMode,
   onViewportSize,
   onExport,
-  onImportDesktop,
   onImportJson,
+  onSave,
+  canSaveDraft,
+  saveTitle,
+  needsSaveFilename,
+  defaultSaveFilename,
+  onLoad,
+  canLoadDraft,
+  loadTitle,
+  loadConfirmMessage,
   coordinateView,
   onCoordinateView,
   viewInfo,
@@ -34,20 +44,35 @@ export function SketchHeader({
   onNew: () => void;
   onCopyDraft: () => void;
   onDeleteDraft: () => void;
+  canDeleteDraft: boolean;
+  deleteTitle: string;
   onToggleBoundaries: (value: boolean) => void;
   onViewportMode: (mode: string) => void;
   onViewportSize: (key: "w" | "h", value: number) => void;
   onExport: () => void;
-  onImportDesktop: () => void;
   onImportJson: (source: string) => string | undefined;
+  onSave: (filename?: string) => Promise<string | undefined>;
+  canSaveDraft: boolean;
+  saveTitle: string;
+  needsSaveFilename: boolean;
+  defaultSaveFilename: string;
+  onLoad: () => Promise<string | undefined>;
+  canLoadDraft: boolean;
+  loadTitle: string;
+  loadConfirmMessage: string;
   coordinateView: "world" | "parent" | "zone";
   onCoordinateView: (view: "world" | "parent" | "zone") => void;
   viewInfo?: string | undefined;
 }) {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
+  const [isLoadConfirmOpen, setIsLoadConfirmOpen] = useState(false);
   const [source, setSource] = useState("");
   const [importError, setImportError] = useState<string>();
+  const [saveAsFilename, setSaveAsFilename] = useState(defaultSaveFilename);
+  const [saveAsError, setSaveAsError] = useState<string>();
+  const [loadError, setLoadError] = useState<string>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const submitImport = () => {
     const error = onImportJson(source);
@@ -57,6 +82,27 @@ export function SketchHeader({
       setImportError(undefined);
       setIsImportOpen(false);
     }
+  };
+  const clickSave = () => {
+    if (needsSaveFilename) {
+      setSaveAsFilename(defaultSaveFilename);
+      setSaveAsError(undefined);
+      setIsSaveAsOpen(true);
+      return;
+    }
+    void onSave();
+  };
+  const submitSaveAs = () => {
+    void onSave(saveAsFilename).then((error) => {
+      if (error) setSaveAsError(error);
+      else setIsSaveAsOpen(false);
+    });
+  };
+  const confirmLoad = () => {
+    void onLoad().then((error) => {
+      if (error) setLoadError(error);
+      else setIsLoadConfirmOpen(false);
+    });
   };
   return (
     <header className="absolute inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-700 bg-slate-900 px-4">
@@ -78,55 +124,78 @@ export function SketchHeader({
         onBlur={(event) => onRenameDraft(event.currentTarget.value, event.currentTarget)}
         onKeyDown={(event) => confirmOrCancelStringEdit(event, draft.name)}
       />
-      <button
-        aria-label="New draft"
-        className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
-        title="New draft"
-        onClick={onNew}
-      >
-        <Plus size={16} aria-hidden />
-      </button>
-      <button
-        aria-label="Copy draft"
-        className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
-        title="Copy draft"
-        onClick={onCopyDraft}
-      >
-        <Copy size={16} aria-hidden />
-      </button>
-      <button
-        aria-label="Delete draft"
-        className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-400 hover:bg-red-900 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-        title={drafts.length === 1 ? "At least one draft is required" : "Delete draft"}
-        disabled={drafts.length === 1}
-        onClick={() => setIsDeleteConfirmOpen(true)}
-      >
-        <Trash2 size={16} aria-hidden />
-      </button>
-      <button
-        aria-label="Copy LayoutPreset JSON"
-        className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
-        title="Copy LayoutPreset JSON"
-        onClick={onExport}
-      >
-        <ClipboardCopy size={16} aria-hidden />
-      </button>
-      <button
-        aria-label="Import desktop preset"
-        className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
-        title="Import desktop preset (rotation/layout approximation)"
-        onClick={onImportDesktop}
-      >
-        <FileInput size={16} aria-hidden />
-      </button>
-      <button
-        aria-label="Import LayoutPreset JSON"
-        className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
-        title="Import LayoutPreset JSON"
-        onClick={() => setIsImportOpen(true)}
-      >
-        <Upload size={16} aria-hidden />
-      </button>
+      <div className="flex items-center gap-1 border-l border-slate-700 pl-3">
+        <button
+          aria-label="New draft"
+          className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
+          title="New draft"
+          onClick={onNew}
+        >
+          <Plus size={16} aria-hidden />
+        </button>
+        <button
+          aria-label="Copy draft"
+          className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-300 hover:bg-slate-700 hover:text-white"
+          title="Copy draft"
+          onClick={onCopyDraft}
+        >
+          <Copy size={16} aria-hidden />
+        </button>
+        <button
+          aria-label="Delete draft"
+          className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-400 hover:bg-red-900 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+          title={deleteTitle}
+          disabled={!canDeleteDraft}
+          onClick={() => setIsDeleteConfirmOpen(true)}
+        >
+          <Trash2 size={16} aria-hidden />
+        </button>
+      </div>
+      <div className="flex items-center gap-1 border-l border-slate-700 pl-3">
+        <button
+          aria-label="Save"
+          className="flex items-center gap-1 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          title={saveTitle}
+          disabled={!canSaveDraft}
+          onClick={clickSave}
+        >
+          <Save size={16} aria-hidden />
+          Save
+        </button>
+        <button
+          aria-label="Load"
+          className="flex items-center gap-1 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          title={loadTitle}
+          disabled={!canLoadDraft}
+          onClick={() => {
+            setLoadError(undefined);
+            setIsLoadConfirmOpen(true);
+          }}
+        >
+          <HardDriveDownload size={16} aria-hidden />
+          Load
+        </button>
+      </div>
+      <div className="flex items-center gap-1 border-l border-slate-700 pl-3">
+        <button
+          aria-label="Copy JSON"
+          className="flex items-center gap-1 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700 hover:text-white"
+          title="Copy the current draft's LayoutPreset JSON to the clipboard"
+          onClick={onExport}
+        >
+          <ClipboardCopy size={16} aria-hidden />
+          Copy JSON
+        </button>
+        <button
+          aria-label="Import JSON"
+          className="flex items-center gap-1 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-300 hover:bg-slate-700 hover:text-white"
+          title="Paste LayoutPreset JSON to create a new local draft"
+          onClick={() => setIsImportOpen(true)}
+        >
+          <Upload size={16} aria-hidden />
+          Import JSON
+        </button>
+      </div>
       <label className="flex items-center gap-2 text-xs text-slate-300">
         <input
           aria-label="Show boundaries"
@@ -263,6 +332,82 @@ export function SketchHeader({
                 }}
               >
                 Delete
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {isSaveAsOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-6">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Save as"
+            className="w-full max-w-sm rounded border border-slate-600 bg-slate-900 p-4 shadow-xl"
+          >
+            <h2 className="font-semibold text-slate-100">Save as</h2>
+            <input
+              aria-label="Filename"
+              className="mt-3 w-full rounded border border-slate-600 bg-slate-800 px-2 py-1 text-sm text-slate-100"
+              value={saveAsFilename}
+              onChange={(event) => {
+                setSaveAsFilename(event.target.value);
+                setSaveAsError(undefined);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitSaveAs();
+                if (event.key === "Escape") setIsSaveAsOpen(false);
+              }}
+            />
+            {saveAsError && (
+              <p role="alert" className="mt-2 text-sm text-red-300">
+                {saveAsError}
+              </p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="rounded border border-slate-600 px-3 py-1 text-sm hover:bg-slate-800"
+                onClick={() => setIsSaveAsOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded bg-amber-500 px-3 py-1 text-sm font-medium text-slate-950 hover:bg-amber-400"
+                onClick={submitSaveAs}
+              >
+                Save
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {isLoadConfirmOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 p-6">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Load confirmation"
+            className="w-full max-w-sm rounded border border-slate-600 bg-slate-900 p-4 shadow-xl"
+          >
+            <h2 className="font-semibold text-slate-100">Reload from disk?</h2>
+            <p className="mt-2 text-sm text-slate-300">{loadConfirmMessage}</p>
+            {loadError && (
+              <p role="alert" className="mt-2 text-sm text-red-300">
+                {loadError}
+              </p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="rounded border border-slate-600 px-3 py-1 text-sm hover:bg-slate-800"
+                onClick={() => setIsLoadConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded bg-amber-500 px-3 py-1 text-sm font-medium text-slate-950 hover:bg-amber-400"
+                onClick={confirmLoad}
+              >
+                Load
               </button>
             </div>
           </section>

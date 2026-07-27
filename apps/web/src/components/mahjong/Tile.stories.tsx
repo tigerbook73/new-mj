@@ -10,7 +10,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Matches DEFAULT_TABLE_LAYOUT_CONFIG.tiles.aspectRatio (height / width). */
+/** Matches desktopTableLayoutConfig.shared.aspectRatio (height / width) — see layouts/desktop.table-config.ts. */
 const ASPECT_RATIO = 1.333;
 const dims = (widthPx: number) => ({ widthPx, heightPx: Math.round(widthPx * ASPECT_RATIO) });
 

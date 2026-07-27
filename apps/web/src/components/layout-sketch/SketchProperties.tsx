@@ -1,7 +1,8 @@
-import { type RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import { type RotationDeg } from "@/lib/layoutPreset";
-import { type SketchNode, type SketchPercentage } from "@/lib/layoutSketch";
-import { PercentageField } from "./SketchFields";
+import { roundRatio, type SketchNode, type SketchPercentage } from "@/lib/layoutSketch";
+import { useVariableAutocomplete } from "@/hooks/useVariableAutocomplete";
+import { AutocompleteDropdown, PercentageField } from "./SketchFields";
 import { confirmOrCancelStringEdit } from "./editorInput";
 
 export function SketchProperties({
@@ -17,6 +18,7 @@ export function SketchProperties({
   onRotationChange,
   onShadowChange,
   resolveExpression,
+  variableNames,
 }: {
   selected: SketchNode;
   nameInputRef: RefObject<HTMLInputElement | null>;
@@ -30,11 +32,14 @@ export function SketchProperties({
   onRotationChange: (value: RotationDeg) => void;
   onShadowChange: (shadow: boolean) => void;
   resolveExpression: (raw: string, minimum: number) => SketchPercentage | undefined;
+  variableNames: readonly string[];
 }) {
+  const gridInputRef = useRef<HTMLInputElement>(null);
+  const gridAutocomplete = useVariableAutocomplete(variableNames);
   return (
     <aside
       data-testid="layout-properties-panel"
-      className="layout-lab-scrollbar col-start-1 row-start-2 overflow-x-auto overflow-y-scroll border-r border-slate-700 bg-slate-900 p-3 [scrollbar-gutter:stable]"
+      className="layout-lab-scrollbar col-start-1 row-start-2 overflow-x-auto overflow-y-scroll border-r border-slate-700 bg-slate-900 p-3 scrollbar-gutter-stable"
     >
       <h2 className="mb-2 font-semibold">Properties</h2>
       {selected.kind === "gridCell" && (
@@ -66,11 +71,13 @@ export function SketchProperties({
             {[
               [
                 "Center X",
-                selected.centerX?.raw ?? String(selected.x.resolved + selected.w.resolved / 2),
+                selected.centerX?.raw ??
+                  String(roundRatio(selected.x.resolved + selected.w.resolved / 2)),
               ],
               [
                 "Center Y",
-                selected.centerY?.raw ?? String(selected.y.resolved + selected.h.resolved / 2),
+                selected.centerY?.raw ??
+                  String(roundRatio(selected.y.resolved + selected.h.resolved / 2)),
               ],
               ["W", selected.w.raw],
               ["H", selected.h.raw],
@@ -117,18 +124,19 @@ export function SketchProperties({
                 value={
                   key === "centerX"
                     ? (selected.centerX ?? {
-                        raw: String(selected.x.resolved + selected.w.resolved / 2),
-                        resolved: selected.x.resolved + selected.w.resolved / 2,
+                        raw: String(roundRatio(selected.x.resolved + selected.w.resolved / 2)),
+                        resolved: roundRatio(selected.x.resolved + selected.w.resolved / 2),
                       })
                     : key === "centerY"
                       ? (selected.centerY ?? {
-                          raw: String(selected.y.resolved + selected.h.resolved / 2),
-                          resolved: selected.y.resolved + selected.h.resolved / 2,
+                          raw: String(roundRatio(selected.y.resolved + selected.h.resolved / 2)),
+                          resolved: roundRatio(selected.y.resolved + selected.h.resolved / 2),
                         })
                       : selected[key]
                 }
-                minimum={key === "w" || key === "h" ? 0.1 : 0}
+                minimum={key === "w" || key === "h" ? 0.001 : 0}
                 resolve={resolveExpression}
+                variableNames={variableNames}
                 onChange={(value) =>
                   key === "centerX" || key === "centerY"
                     ? onCenterChange(key, value)
@@ -155,14 +163,34 @@ export function SketchProperties({
           {selected.kind === "grid" && (
             <label className="mt-2 grid gap-1 text-sm">
               <span>Grid (columns)(rows), * fills remaining</span>
-              <input
-                key={selected.grid!.raw}
-                aria-label="Grid template"
-                className="rounded border border-slate-600 bg-slate-800 px-2 py-1 font-mono text-slate-100"
-                defaultValue={selected.grid!.raw}
-                onBlur={(event) => onGridChange(event.currentTarget.value, event.currentTarget)}
-                onKeyDown={(event) => confirmOrCancelStringEdit(event, selected.grid!.raw)}
-              />
+              <div className="relative">
+                <input
+                  ref={gridInputRef}
+                  key={selected.grid!.raw}
+                  aria-label="Grid template"
+                  className="w-full rounded border border-slate-600 bg-slate-800 px-2 py-1 font-mono text-slate-100"
+                  defaultValue={selected.grid!.raw}
+                  onInput={gridAutocomplete.onInput}
+                  onBlur={(event) => onGridChange(event.currentTarget.value, event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (gridAutocomplete.onKeyDown(event)) {
+                      event.preventDefault();
+                      return;
+                    }
+                    confirmOrCancelStringEdit(event, selected.grid!.raw);
+                  }}
+                />
+                {gridAutocomplete.open && (
+                  <AutocompleteDropdown
+                    candidates={gridAutocomplete.candidates}
+                    selectedIndex={gridAutocomplete.selectedIndex}
+                    onSelect={(index) => {
+                      if (gridInputRef.current)
+                        gridAutocomplete.select(gridInputRef.current, index);
+                    }}
+                  />
+                )}
+              </div>
             </label>
           )}
         </>

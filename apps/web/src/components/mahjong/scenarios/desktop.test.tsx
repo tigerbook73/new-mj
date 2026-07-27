@@ -18,11 +18,15 @@ describe("desktop table scenario", () => {
   });
 
   it("has no unbound zone ids left over in the preset tree", () => {
-    // The preset root itself is purely structural (no business content of its
-    // own) and is intentionally left unbound; every other id must resolve.
+    // The preset root and these two wrapper zones are purely structural (no
+    // business content of their own, just coordinate grouping — see
+    // architecture/frontend-layout.md on unregistered/structural Zones) and
+    // are intentionally left unbound; every other id must resolve.
+    const structural = new Set(["hand-inner", "meld-inner"]);
     const root = DESKTOP_TABLE_SCENARIO.preset.root;
     const ids = (root.children ?? []).flatMap(zoneIds);
     for (const id of ids) {
+      if (structural.has(id)) continue;
       expect(DESKTOP_TABLE_SCENARIO.components[id]).toBeDefined();
     }
   });

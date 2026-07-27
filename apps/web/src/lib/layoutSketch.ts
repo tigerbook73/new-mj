@@ -30,30 +30,58 @@ export type SketchNode = {
   rotationDeg?: RotationDeg;
   grid?: SketchGrid;
   backgroundColor: SketchBackgroundColor;
+  /** Canvas-only visibility toggle — never reaches exportZone/the exported LayoutPreset. */
+  hidden?: boolean;
   children: SketchNode[];
 };
-export type SketchDraft = { name: string; viewport: { w: number; h: number }; root: SketchNode };
+export type SketchDraft = {
+  name: string;
+  viewport: { w: number; h: number };
+  root: SketchNode;
+  variables: SketchVariable[];
+  /** Filename this draft is bound to under apps/web/src/layouts/, if it's been opened from or saved to disk. */
+  sourceFile?: string;
+  /** Disk mtime as of the last successful Save/Load, used to detect external edits. */
+  sourceMtimeMs?: number;
+  /** exportSketchDraft(draft) JSON as of the last successful Save/Load, used to detect local edits. */
+  savedSnapshot?: string;
+};
 export type SketchDocument = {
-  version: 2;
+  version: 4;
   drafts: SketchDraft[];
   activeDraft: string;
   selectedName: string;
   leftWidth: number;
   leftTreeHeight: number;
   rightWidth: number;
-  variables: SketchVariable[];
 };
 
 const sketchPercentage = (resolved: number): SketchPercentage => ({
   raw: String(resolved),
   resolved,
 });
+
+// Preserves whatever expression the user typed, only collapsing whitespace
+// (leading/trailing trim + interior runs to a single space) — never
+// reformats the expression itself (operator spacing, term order, etc.).
+const normalizeRawExpression = (value: string) => value.trim().replace(/\s+/g, " ");
+
+// Plain float arithmetic on the 0-1 ratio scale hits binary-representation
+// noise even for "nice" round inputs (0.2 + 0.1 = 0.30000000000000004) —
+// something the old, coarser 0-100 scale mostly didn't surface. Used
+// anywhere a ratio gets synthesized from arithmetic on other ratios
+// (derived center points, expression results, copy-paste offsets), not on
+// values that already came straight from a user's raw string.
+export const roundRatio = (value: number) => Math.round(value * 1e6) / 1e6;
+// Production Zones stay on the 0-100 percentage scale (see exportZone's
+// matching *100 at the other end) — the Lab's own internal scale is 0-1
+// ratios, so importing a real Zone's geometry needs /100 here.
 const importZone = (zone: Zone): SketchNode => ({
   name: zone.id,
-  x: sketchPercentage(zone.anchorCenter.x - zone.localSize.w / 2),
-  y: sketchPercentage(zone.anchorCenter.y - zone.localSize.h / 2),
-  w: sketchPercentage(zone.localSize.w),
-  h: sketchPercentage(zone.localSize.h),
+  x: sketchPercentage((zone.anchorCenter.x - zone.localSize.w / 2) / 100),
+  y: sketchPercentage((zone.anchorCenter.y - zone.localSize.h / 2) / 100),
+  w: sketchPercentage(zone.localSize.w / 100),
+  h: sketchPercentage(zone.localSize.h / 100),
   kind: "element",
   shadow: false,
   rotationDeg: zone.rotationDeg,
@@ -126,10 +154,10 @@ export function parseLayoutPresetJson(source: string): LayoutPreset {
       h: importNumber(referenceCanvas.h, "referenceCanvas.h", 0.1, 100_000),
     },
     root: parseImportedZone(item.root, "root", names),
-    ...(editor.version === 1 && editor.root !== undefined && Array.isArray(editor.variables)
+    ...(editor.version === 2 && editor.root !== undefined && Array.isArray(editor.variables)
       ? {
           editor: {
-            version: 1 as const,
+            version: 2 as const,
             root: editor.root,
             variables: editor.variables as { name: string; value: string }[],
           },
@@ -139,40 +167,47 @@ export function parseLayoutPresetJson(source: string): LayoutPreset {
 }
 
 /** Imports Zone geometry and rotation; arrangement remains editor metadata for now. */
-export const importLayoutPreset = (preset: LayoutPreset): SketchDraft => {
-  if (preset.editor) {
-    return readSketchDocument({
-      getItem: () =>
-        JSON.stringify({
-          version: 2,
-          drafts: [
-            { name: preset.name, viewport: preset.referenceCanvas, root: preset.editor!.root },
-          ],
-          activeDraft: preset.name,
-          selectedName: "viewport",
-          leftWidth: 240,
-          leftTreeHeight: 280,
-          rightWidth: 280,
-          variables: preset.editor!.variables,
-        }),
-    }).drafts[0]!;
-  }
-  const scale = Math.max(preset.referenceCanvas.w, preset.referenceCanvas.h) / 16;
-  return {
-    name: preset.name,
-    viewport: { w: preset.referenceCanvas.w / scale, h: preset.referenceCanvas.h / scale },
-    root: {
-      name: "viewport",
-      x: sketchPercentage(0),
-      y: sketchPercentage(0),
-      w: sketchPercentage(100),
-      h: sketchPercentage(100),
-      kind: "element",
-      shadow: false,
-      backgroundColor: "#fde2e4",
-      children: preset.root.children?.map(importZone) ?? [],
-    },
-  };
+export const importLayoutPreset = (preset: LayoutPreset, sourceFile?: string): SketchDraft => {
+  const draft: SketchDraft = preset.editor
+    ? readSketchDocument({
+        getItem: () =>
+          JSON.stringify({
+            version: 4,
+            drafts: [
+              {
+                name: preset.name,
+                viewport: preset.referenceCanvas,
+                root: preset.editor!.root,
+                variables: preset.editor!.variables,
+              },
+            ],
+            activeDraft: preset.name,
+            selectedName: "viewport",
+            leftWidth: 240,
+            leftTreeHeight: 280,
+            rightWidth: 280,
+          }),
+      }).drafts[0]!
+    : (() => {
+        const scale = Math.max(preset.referenceCanvas.w, preset.referenceCanvas.h) / 16;
+        return {
+          name: preset.name,
+          viewport: { w: preset.referenceCanvas.w / scale, h: preset.referenceCanvas.h / scale },
+          root: {
+            name: "viewport",
+            x: sketchPercentage(0),
+            y: sketchPercentage(0),
+            w: sketchPercentage(1),
+            h: sketchPercentage(1),
+            kind: "element" as const,
+            shadow: false,
+            backgroundColor: "#fde2e4" as const,
+            children: preset.root.children?.map(importZone) ?? [],
+          },
+          variables: [],
+        };
+      })();
+  return sourceFile ? { ...draft, sourceFile } : draft;
 };
 
 const colorForName = (value: string): SketchBackgroundColor =>
@@ -186,18 +221,18 @@ const root = (): SketchNode => ({
   name: "viewport",
   x: { raw: "0", resolved: 0 },
   y: { raw: "0", resolved: 0 },
-  w: { raw: "100", resolved: 100 },
-  h: { raw: "100", resolved: 100 },
+  w: { raw: "1", resolved: 1 },
+  h: { raw: "1", resolved: 1 },
   kind: "element",
   shadow: false,
   backgroundColor: "#fde2e4",
   children: [
     {
       name: "L1A",
-      x: { raw: "10", resolved: 10 },
-      y: { raw: "10", resolved: 10 },
-      w: { raw: "30", resolved: 30 },
-      h: { raw: "20", resolved: 20 },
+      x: { raw: "0.1", resolved: 0.1 },
+      y: { raw: "0.1", resolved: 0.1 },
+      w: { raw: "0.3", resolved: 0.3 },
+      h: { raw: "0.2", resolved: 0.2 },
       kind: "element",
       shadow: false,
       backgroundColor: randomSketchBackgroundColor(),
@@ -206,14 +241,13 @@ const root = (): SketchNode => ({
   ],
 });
 export const defaultSketchDocument = (): SketchDocument => ({
-  version: 2,
-  drafts: [{ name: "draft1", viewport: { w: 16, h: 9 }, root: root() }],
+  version: 4,
+  drafts: [{ name: "draft1", viewport: { w: 16, h: 9 }, root: root(), variables: [] }],
   activeDraft: "draft1",
   selectedName: "L1A",
   leftWidth: 240,
   leftTreeHeight: 280,
   rightWidth: 280,
-  variables: [],
 });
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -226,7 +260,9 @@ const number = (value: unknown, fallback: number, min: number, max: number) =>
     : fallback;
 const percentage = (value: unknown, fallback: SketchPercentage, min: number): SketchPercentage => {
   if (typeof value === "number") {
-    const resolved = number(value, fallback.resolved, min, 100);
+    // No upper bound — values over 1 (over 100% once exported) are a
+    // legitimate real-world layout, not a parsing mistake to clamp away.
+    const resolved = number(value, fallback.resolved, min, Infinity);
     return { raw: String(resolved), resolved };
   }
   const item = record(value);
@@ -236,12 +272,28 @@ const percentage = (value: unknown, fallback: SketchPercentage, min: number): Sk
     (typeof item.resolved === "number" && Number.isFinite(item.resolved)
       ? item.resolved
       : undefined);
-  return resolved !== undefined && resolved >= min ? { raw: item.raw.trim(), resolved } : fallback;
+  return resolved !== undefined && resolved >= min
+    ? { raw: normalizeRawExpression(item.raw), resolved }
+    : fallback;
 };
 const name = (value: unknown, fallback: string) =>
   typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value) ? value : fallback;
+const parseVariables = (value: unknown): SketchVariable[] =>
+  Array.isArray(value)
+    ? value.reduce<SketchVariable[]>((variables, entry) => {
+        const item = record(entry);
+        if (
+          typeof item.name === "string" &&
+          /^[A-Za-z0-9_]+$/.test(item.name) &&
+          typeof item.value === "string" &&
+          !variables.some((variable) => variable.name === item.name)
+        )
+          variables.push({ name: item.name, value: item.value });
+        return variables;
+      }, [])
+    : [];
 
-function node(value: unknown, fallback: SketchNode, legacyGridAxes = false): SketchNode {
+function node(value: unknown, fallback: SketchNode): SketchNode {
   const item = record(value);
   const kind: SketchNodeKind =
     item.kind === "grid" || item.kind === "gridCell" ? item.kind : "element";
@@ -249,8 +301,8 @@ function node(value: unknown, fallback: SketchNode, legacyGridAxes = false): Ske
     name: name(item.name, fallback.name),
     x: percentage(item.x, fallback.x, 0),
     y: percentage(item.y, fallback.y, 0),
-    w: percentage(item.w, fallback.w, 0.1),
-    h: percentage(item.h, fallback.h, 0.1),
+    w: percentage(item.w, fallback.w, 0.001),
+    h: percentage(item.h, fallback.h, 0.001),
     kind,
     shadow:
       kind === "gridCell"
@@ -272,33 +324,23 @@ function node(value: unknown, fallback: SketchNode, legacyGridAxes = false): Ske
     )
       ? (item.backgroundColor as SketchBackgroundColor)
       : colorForName(name(item.name, fallback.name)),
+    hidden: typeof item.hidden === "boolean" ? item.hidden : false,
     children: Array.isArray(item.children)
       ? item.children.map((child, index) =>
-          node(child, { ...fallback, name: `object${index + 1}`, children: [] }, legacyGridAxes),
+          node(child, { ...fallback, name: `object${index + 1}`, children: [] }),
         )
       : [],
   };
   result.centerX =
     typeof record(item.centerX).raw === "string"
       ? percentage(item.centerX, { raw: "0", resolved: 0 }, 0)
-      : {
-          raw: String(result.x.resolved + result.w.resolved / 2),
-          resolved: result.x.resolved + result.w.resolved / 2,
-        };
+      : sketchPercentage(roundRatio(result.x.resolved + result.w.resolved / 2));
   result.centerY =
     typeof record(item.centerY).raw === "string"
       ? percentage(item.centerY, { raw: "0", resolved: 0 }, 0)
-      : {
-          raw: String(result.y.resolved + result.h.resolved / 2),
-          resolved: result.y.resolved + result.h.resolved / 2,
-        };
+      : sketchPercentage(roundRatio(result.y.resolved + result.h.resolved / 2));
   return result.kind === "grid"
-    ? (applyGridTemplate(
-        result,
-        legacyGridAxes
-          ? swapGridAxes(result.grid?.raw ?? "(100)(100)")
-          : (result.grid?.raw ?? "(100)(100)"),
-      ) ?? result)
+    ? (applyGridTemplate(result, result.grid?.raw ?? "(1)(1)") ?? result)
     : result;
 }
 
@@ -309,13 +351,17 @@ export function readSketchDocument(
     const raw = storage.getItem(LAYOUT_SKETCH_STORAGE_KEY);
     if (!raw) return defaultSketchDocument();
     const parsed = record(JSON.parse(raw));
-    if (
-      (parsed.version !== 1 && parsed.version !== 2) ||
-      !Array.isArray(parsed.drafts) ||
-      parsed.drafts.length === 0
-    )
+    // Only the current document version is accepted — versions 1 and 2 both
+    // predate the switch from a 0-100 percentage scale to 0-1 ratios (see
+    // parsePercentage's docs), and reinterpreting their raw numbers under
+    // the new scale without rescaling them would silently produce zones
+    // 100x too large; version 3 predates moving `variables` from
+    // document-level to per-draft. Deliberately not migrated: this is a
+    // local, single-developer dev tool with no real user-data-loss stakes,
+    // so an old document just falls back to a blank draft — same path as
+    // any other malformed/unparseable storage content below.
+    if (parsed.version !== 4 || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0)
       return defaultSketchDocument();
-    const legacyGridAxes = parsed.version === 1;
     const drafts = parsed.drafts.map((draft, index) => {
       const item = record(draft);
       const fallback = defaultSketchDocument().drafts[0]!;
@@ -325,7 +371,13 @@ export function readSketchDocument(
           w: number(record(item.viewport).w, fallback.viewport.w, 1, 32),
           h: number(record(item.viewport).h, fallback.viewport.h, 1, 32),
         },
-        root: node(item.root, fallback.root, legacyGridAxes),
+        root: node(item.root, fallback.root),
+        variables: parseVariables(item.variables),
+        ...(typeof item.sourceFile === "string" ? { sourceFile: item.sourceFile } : {}),
+        ...(typeof item.sourceMtimeMs === "number" && Number.isFinite(item.sourceMtimeMs)
+          ? { sourceMtimeMs: item.sourceMtimeMs }
+          : {}),
+        ...(typeof item.savedSnapshot === "string" ? { savedSnapshot: item.savedSnapshot } : {}),
       };
     });
     if (new Set(drafts.map((draft) => draft.name)).size !== drafts.length)
@@ -334,7 +386,7 @@ export function readSketchDocument(
       drafts.find((draft) => draft.name === parsed.activeDraft)?.root ?? drafts[0]!.root,
     ).map((item) => item.name);
     return {
-      version: 2,
+      version: 4,
       drafts,
       activeDraft: drafts.some((draft) => draft.name === parsed.activeDraft)
         ? (parsed.activeDraft as string)
@@ -346,19 +398,6 @@ export function readSketchDocument(
       leftWidth: number(parsed.leftWidth, 240, 160, 480),
       leftTreeHeight: number(parsed.leftTreeHeight, 280, 120, 1200),
       rightWidth: number(parsed.rightWidth, 280, 180, 520),
-      variables: Array.isArray(parsed.variables)
-        ? parsed.variables.reduce<SketchVariable[]>((variables, value) => {
-            const item = record(value);
-            if (
-              typeof item.name === "string" &&
-              /^[A-Za-z0-9_]+$/.test(item.name) &&
-              typeof item.value === "string" &&
-              !variables.some((variable) => variable.name === item.name)
-            )
-              variables.push({ name: item.name, value: item.value });
-            return variables;
-          }, [])
-        : [],
     };
   } catch {
     return defaultSketchDocument();
@@ -373,6 +412,24 @@ export const flatten = (root: SketchNode): SketchNode[] => [
   root,
   ...root.children.flatMap(flatten),
 ];
+/**
+ * Names visible under a Tree search query: every node whose own name matches,
+ * plus every ancestor on the path down to it (so the tree stays structurally
+ * intact instead of collapsing to a flat list of hits). Empty query means
+ * everything is visible.
+ */
+export function namesMatchingQuery(root: SketchNode, query: string): Set<string> {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return new Set(flatten(root).map((node) => node.name));
+  const visible = new Set<string>();
+  const walk = (node: SketchNode, ancestors: string[]) => {
+    const path = [...ancestors, node.name];
+    if (node.name.toLowerCase().includes(trimmed)) path.forEach((name) => visible.add(name));
+    node.children.forEach((child) => walk(child, path));
+  };
+  walk(root, []);
+  return visible;
+}
 export const findNode = (root: SketchNode, target: string): SketchNode | undefined =>
   root.name === target ? root : root.children.map((child) => findNode(child, target)).find(Boolean);
 export const findParentNode = (root: SketchNode, target: string): SketchNode | undefined =>
@@ -387,6 +444,18 @@ export const updateNode = (
   root.name === target
     ? { ...root, ...patch }
     : { ...root, children: root.children.map((child) => updateNode(child, target, patch)) };
+const setHiddenDeep = (node: SketchNode, hidden: boolean): SketchNode => ({
+  ...node,
+  hidden,
+  children: node.children.map((child) => setHiddenDeep(child, hidden)),
+});
+// The root (Viewpoint) itself has no Tree row or toggle button and always
+// renders regardless of `hidden`, so it's left untouched — only its
+// children (the actual hideable items) get the flag.
+export const setAllHidden = (root: SketchNode, hidden: boolean): SketchNode => ({
+  ...root,
+  children: root.children.map((child) => setHiddenDeep(child, hidden)),
+});
 export const removeNode = (root: SketchNode, target: string): SketchNode => ({
   ...root,
   children: root.children
@@ -403,6 +472,26 @@ export const moveSibling = (root: SketchNode, target: string, direction: -1 | 1)
     return { ...root, children };
   }
   return { ...root, children: root.children.map((child) => moveSibling(child, target, direction)) };
+};
+/**
+ * Moves `target` to `newIndex` within its own sibling list (clamped to
+ * bounds) — same-level reordering only, never changes which parent it
+ * belongs to. `newIndex` is the position among the *other* siblings after
+ * `target` is removed (i.e. drop-target semantics, not "swap with").
+ */
+export const reorderSibling = (root: SketchNode, target: string, newIndex: number): SketchNode => {
+  const index = root.children.findIndex((child) => child.name === target);
+  if (index >= 0) {
+    const children = [...root.children];
+    const [moved] = children.splice(index, 1);
+    if (!moved) return root;
+    children.splice(Math.max(0, Math.min(newIndex, children.length)), 0, moved);
+    return { ...root, children };
+  }
+  return {
+    ...root,
+    children: root.children.map((child) => reorderSibling(child, target, newIndex)),
+  };
 };
 export function copyNodeWithUniqueNames(root: SketchNode, target: string): SketchNode | undefined {
   const source = findNode(root, target);
@@ -421,6 +510,10 @@ export function copyNodeWithUniqueNames(root: SketchNode, target: string): Sketc
       }
     }
   };
+  // Only names change (root name gets a unique suffix, descendant names are
+  // rewritten by substituting the old prefix for the new one so uniqueness
+  // holds tree-wide) — every other field, including raw expressions that
+  // reference variables, is carried over untouched by the `...node` spread.
   const copy = (node: SketchNode, sourceParent?: string, copyParent?: string): SketchNode => {
     const base =
       sourceParent && copyParent && node.name.startsWith(sourceParent)
@@ -429,12 +522,7 @@ export function copyNodeWithUniqueNames(root: SketchNode, target: string): Sketc
     const name = nextName(base);
     return { ...node, name, children: node.children.map((child) => copy(child, node.name, name)) };
   };
-  const result = copy(source);
-  const offset = (value: SketchPercentage): SketchPercentage => {
-    const resolved = Math.min(100, value.resolved + 10);
-    return { raw: String(resolved), resolved };
-  };
-  return { ...result, x: offset(source.x), y: offset(source.y) };
+  return copy(source);
 }
 export const insertSiblingAfter = (
   root: SketchNode,
@@ -476,40 +564,90 @@ export const addChild = (root: SketchNode, parent: string, child: SketchNode): S
     ? { ...root, children: [...root.children, child] }
     : { ...root, children: root.children.map((item) => addChild(item, parent, child)) };
 
-/** `1/2` means half of the parent, i.e. 50 percentage points. */
-export function parsePercentage(value: string): number | undefined {
-  const source = value.trim();
-  const fraction = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*\/\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(
-    source,
+// Only digits, a decimal point, `$name` variable references, `+ - * / ( )`,
+// and whitespace may appear — anything else (including any JS syntax beyond
+// plain arithmetic) is rejected before the string ever reaches `Function`.
+const EXPRESSION_PATTERN = /^(?:\s|\d+(?:\.\d*)?|\.\d+|\$[A-Za-z0-9_]+|[+\-*/()])*$/;
+const VARIABLE_REFERENCE_PATTERN = /\$([A-Za-z0-9_]+)/g;
+
+/**
+ * Bare numbers, `$name` references, and full arithmetic expressions
+ * combining both (`+ - * /`, parentheses, unary +/-) all resolve to a plain
+ * ratio of the parent — not a 0-100 percentage (despite the name, kept as-is
+ * to avoid a purely mechanical rename churning every call site — see
+ * `table-layout-lab-plan.md`'s "变量及属性支持表达式" entry for the full
+ * scale-change writeup). `1/2` is just ordinary division (0.5), not a
+ * special-cased fraction shorthand: since the whole tool's unit changed
+ * from 0-100 to 0-1, plain division already produces the intended value
+ * with no special-casing needed.
+ *
+ * `$name` references are resolved to plain numbers by `resolveVar` first
+ * (recursively, with cycle detection via `seen` — a cycle anywhere in the
+ * expression tree, not just a single `$a`→`$b`→`$a` chain, resolves to
+ * `undefined` instead of infinitely recursing) — the actual arithmetic
+ * combination is then delegated to `new Function` rather than a hand-rolled
+ * parser: every caller of this module is a local developer working against
+ * their own browser, this tool is entirely excluded from the production
+ * bundle (gated behind `import.meta.env.DEV` in router.tsx — verified empty
+ * in the built output), and the whitelist above means `Function` only ever
+ * evaluates plain arithmetic over already-resolved numbers, never sees the
+ * original `$name` syntax or anything else.
+ */
+function evaluateExpression(
+  source: string,
+  resolveVar: (name: string, seen: Set<string>) => number | undefined,
+  seen: Set<string>,
+): number | undefined {
+  const trimmed = source.trim();
+  if (trimmed === "" || !EXPRESSION_PATTERN.test(trimmed)) return undefined;
+  const names = new Set(
+    [...trimmed.matchAll(VARIABLE_REFERENCE_PATTERN)].map((match) => match[1]!),
   );
-  const numeric = Number(source);
-  const parsed = fraction
-    ? (Number(fraction[1]) / Number(fraction[2])) * 100
-    : Math.abs(numeric - 1) < 1e-6
-      ? 100
-      : numeric > 0 && numeric < 1
-        ? numeric * 100
-        : numeric;
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : undefined;
+  const vars: Record<string, number> = {};
+  for (const name of names) {
+    const value = resolveVar(name, seen);
+    if (value === undefined) return undefined;
+    vars[name] = value;
+  }
+  const jsExpression = trimmed.replace(
+    VARIABLE_REFERENCE_PATTERN,
+    (_match, name: string) => `vars[${JSON.stringify(name)}]`,
+  );
+  try {
+    const evaluate = new Function("vars", `"use strict"; return (${jsExpression});`) as (
+      vars: Record<string, number>,
+    ) => unknown;
+    const result = evaluate(vars);
+    return typeof result === "number" && Number.isFinite(result) ? roundRatio(result) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function parsePercentage(value: string): number | undefined {
+  return evaluateExpression(value, () => undefined, new Set());
 }
 
 export const resolvePercentage = (raw: string, minimum = 0): SketchPercentage | undefined => {
   const resolved = parsePercentage(raw);
-  return resolved !== undefined && resolved >= minimum ? { raw: raw.trim(), resolved } : undefined;
+  return resolved !== undefined && resolved >= minimum
+    ? { raw: normalizeRawExpression(raw), resolved }
+    : undefined;
 };
 
 export function resolveVariablePercentage(raw: string, variables: SketchVariable[], minimum = 0) {
   const lookup = new Map(variables.map((variable) => [variable.name, variable.value]));
-  const resolve = (source: string, seen: Set<string>): number | undefined => {
-    const reference = /^\$([A-Za-z0-9_]+)$/.exec(source.trim());
-    if (!reference) return parsePercentage(source);
-    const name = reference[1]!;
+  const resolveVar = (name: string, seen: Set<string>): number | undefined => {
     if (seen.has(name)) return undefined;
     const value = lookup.get(name);
-    return value === undefined ? undefined : resolve(value, new Set([...seen, name]));
+    return value === undefined
+      ? undefined
+      : evaluateExpression(value, resolveVar, new Set([...seen, name]));
   };
-  const resolved = resolve(raw, new Set());
-  return resolved !== undefined && resolved >= minimum ? { raw: raw.trim(), resolved } : undefined;
+  const resolved = evaluateExpression(raw, resolveVar, new Set());
+  return resolved !== undefined && resolved >= minimum
+    ? { raw: normalizeRawExpression(raw), resolved }
+    : undefined;
 }
 
 export type SketchGridDefinition = { rows: SketchPercentage[]; columns: SketchPercentage[] };
@@ -518,11 +656,6 @@ const gridAxes = (source: string) => {
   return match
     ? [match[1]!.trim().split(/\s+/).filter(Boolean), match[2]!.trim().split(/\s+/).filter(Boolean)]
     : undefined;
-};
-
-const swapGridAxes = (source: string) => {
-  const axes = gridAxes(source);
-  return axes ? `(${axes[1]!.join(" ")})(${axes[0]!.join(" ")})` : source;
 };
 
 export const formatGridTemplate = (source: string) => {
@@ -539,14 +672,14 @@ export function parseGridTemplate(
   const resolveAxis = (source: string) => {
     const tokens = source.trim().split(/\s+/).filter(Boolean);
     const stars = tokens.filter((token) => token === "*").length;
-    const fixed = tokens.map((token) => (token === "*" ? undefined : resolve(token, 0.1)));
+    const fixed = tokens.map((token) => (token === "*" ? undefined : resolve(token, 0.001)));
     if (tokens.length === 0 || fixed.some((value, index) => tokens[index] !== "*" && !value))
       return undefined;
     const fixedTotal = fixed.reduce((sum, value) => sum + (value?.resolved ?? 0), 0);
     if (stars === 0)
-      return Math.abs(fixedTotal - 100) < 1e-6 ? (fixed as SketchPercentage[]) : undefined;
-    const auto = (100 - fixedTotal) / stars;
-    if (auto < 0.1) return undefined;
+      return Math.abs(fixedTotal - 1) < 1e-6 ? (fixed as SketchPercentage[]) : undefined;
+    const auto = (1 - fixedTotal) / stars;
+    if (auto < 0.001) return undefined;
     return tokens.map((token, index) =>
       token === "*" ? { raw: "*", resolved: auto } : fixed[index]!,
     );
@@ -573,6 +706,7 @@ const gridCell = (
   definition: SketchGridDefinition,
   children: SketchNode[],
   shadow = true,
+  hidden = false,
 ): SketchNode => {
   const y = definition.rows.slice(0, row).reduce((sum, value) => sum + value.resolved, 0);
   const x = definition.columns.slice(0, column).reduce((sum, value) => sum + value.resolved, 0);
@@ -585,9 +719,18 @@ const gridCell = (
     kind: "gridCell",
     shadow,
     backgroundColor: colorForName(`${grid.name}-${row}-${column}`),
+    hidden,
     children,
   };
 };
+
+// A cell slot is identified by name (`<grid>-r<row>c<col>`), not by kind — a
+// cell converted into its own nested grid (kind "grid") is still one of its
+// parent grid's slots, not a free child, even though it no longer has kind
+// "gridCell". Used both to reconcile a grid's children on template changes
+// (applyGridTemplate) and to group the Tree panel's display the same way.
+export const isGridCellSlotName = (gridName: string, childName: string) =>
+  new RegExp(`^${gridName}-r\\d+c\\d+$`).test(childName);
 
 export function applyGridTemplate(
   grid: SketchNode,
@@ -597,10 +740,16 @@ export function applyGridTemplate(
   const definition = parseGridTemplate(raw, resolve);
   const formatted = formatGridTemplate(raw);
   if (!definition || !formatted) return undefined;
+  // Free children are whatever doesn't match the naming scheme for the
+  // *current* template (row/column counts can shrink between edits,
+  // orphaning some cell names into free children, which is intentional —
+  // it's how a shrunk grid hands content back instead of deleting it).
   const existingCells = new Map(
-    grid.children.filter((child) => child.kind === "gridCell").map((child) => [child.name, child]),
+    grid.children
+      .filter((child) => isGridCellSlotName(grid.name, child.name))
+      .map((child) => [child.name, child]),
   );
-  const freeChildren = grid.children.filter((child) => child.kind !== "gridCell");
+  const freeChildren = grid.children.filter((child) => !isGridCellSlotName(grid.name, child.name));
   return {
     ...grid,
     kind: "grid",
@@ -610,6 +759,21 @@ export function applyGridTemplate(
         definition.columns.map((_, column) => {
           const name = `${grid.name}-r${row + 1}c${column + 1}`;
           const existing = existingCells.get(name);
+          if (existing?.kind === "grid") {
+            // Preserve a nested grid's own kind/template/children — only
+            // reposition it to track this regenerated outer cell's slot.
+            const y = definition.rows.slice(0, row).reduce((sum, value) => sum + value.resolved, 0);
+            const x = definition.columns
+              .slice(0, column)
+              .reduce((sum, value) => sum + value.resolved, 0);
+            return {
+              ...existing,
+              x: { raw: String(x), resolved: x },
+              y: { raw: String(y), resolved: y },
+              w: definition.columns[column]!,
+              h: definition.rows[row]!,
+            };
+          }
           return gridCell(
             grid,
             row,
@@ -617,6 +781,7 @@ export function applyGridTemplate(
             definition,
             existing?.children ?? [],
             existing?.shadow ?? true,
+            existing?.hidden ?? false,
           );
         }),
       ),
@@ -630,25 +795,38 @@ const shouldExportZone = (node: SketchNode) =>
 const exportChildren = (node: SketchNode): Zone[] =>
   node.children.filter(shouldExportZone).map(exportZone);
 
+// The one place that converts the Lab's internal 0-1 ratios back to the
+// 0-100 percentages production Zones already expect (see importZone's
+// matching /100 at the other end) — production rendering code never has to
+// know the Lab's own scale changed.
+// Rounded to 6 decimal places (of a 0-100 percentage, so ~1e-8 of the
+// parent) — plain float arithmetic on the *100 conversion hits binary-
+// representation noise even for "nice" inputs (e.g. 0.55 * 100 =
+// 55.00000000000001), and this is the one boundary whose output gets
+// checked into the repo as production LayoutPreset JSON.
+const roundExportedPercentage = (value: number) => Math.round(value * 1e6) / 1e6;
+
 const exportZone = (node: SketchNode): Zone => {
   const children = exportChildren(node);
+  const centerX = node.centerX?.resolved ?? node.x.resolved + node.w.resolved / 2;
+  const centerY = node.centerY?.resolved ?? node.y.resolved + node.h.resolved / 2;
   return {
     id: node.name,
     anchorCenter: {
-      x: node.centerX?.resolved ?? node.x.resolved + node.w.resolved / 2,
-      y: node.centerY?.resolved ?? node.y.resolved + node.h.resolved / 2,
+      x: roundExportedPercentage(centerX * 100),
+      y: roundExportedPercentage(centerY * 100),
     },
-    localSize: { w: node.w.resolved, h: node.h.resolved },
+    localSize: {
+      w: roundExportedPercentage(node.w.resolved * 100),
+      h: roundExportedPercentage(node.h.resolved * 100),
+    },
     rotationDeg: node.rotationDeg ?? 0,
     ...(children.length > 0 ? { children } : {}),
   };
 };
 
 /** Exports resolved geometry only; empty Grid-cell placeholders are omitted. */
-export const exportSketchDraft = (
-  draft: SketchDraft,
-  variables: SketchVariable[] = [],
-): LayoutPreset => ({
+export const exportSketchDraft = (draft: SketchDraft): LayoutPreset => ({
   name: draft.name,
   referenceCanvas: { ...draft.viewport },
   root: {
@@ -658,5 +836,5 @@ export const exportSketchDraft = (
     rotationDeg: 0,
     ...(exportChildren(draft.root).length > 0 ? { children: exportChildren(draft.root) } : {}),
   },
-  editor: { version: 1, root: draft.root, variables },
+  editor: { version: 2, root: draft.root, variables: draft.variables },
 });

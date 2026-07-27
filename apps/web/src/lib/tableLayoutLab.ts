@@ -1,180 +1,50 @@
-export const TABLE_LAYOUT_STORAGE_KEY = "new-mj:table-layout-lab:v1";
-
+/**
+ * Table presentation parameters: content-level sizing knobs for what goes
+ * inside each Zone (see layoutPreset.ts for the geometry itself). Kept as a
+ * plain type — no runtime parsing/clamping — because the only producer is a
+ * hand-authored, type-checked TS constant (see layouts/desktop.table-config.ts),
+ * not JSON or localStorage. If the Table Layout Lab ever needs to edit this
+ * data, reintroduce validation for whatever untyped input path that adds.
+ */
 export type TableLayoutConfig = {
-  version: 1;
-  /** Hand tile sizing. Zone placement itself comes from the checked-in desktop.table-layout.json (see desktopTablePreset.ts), not from this config. */
-  hand: {
-    tileHeightPct: number;
-  };
-  /** Meld tile/column sizing within the Zone the board places it in. */
-  meldInfo: {
-    /** Height % of the Meld column, bottom-aligned within it. */
-    meldHeightPct: number;
-    meldTileHeightPct: number;
-  };
-  /** Common tile-sizing knobs, plus the field still read by production's DiscardPile. */
-  tiles: {
+  /** Sizing shared across hand/meld/discard tiles alike. */
+  shared: {
+    /** height / width. Range: [1.2, 1.8]. */
     aspectRatio: number;
-    discardShortPct: number;
+    /** Gap between adjacent tiles, in px. Range: [0, 8]. */
     tileGapPx: number;
   };
-  discard: { columns: number; rows: number };
-  /** ActionDock's internal percentage cascade — see components/mahjong/ActionDock.tsx. */
-  actionDock: {
-    /** Height % of the Actions row within the whole dock; the Options row gets the rest. */
-    actionsHeightPct: number;
-    /** Action button height % of the Actions row. */
-    actionButtonHeightPct: number;
-    /** Two-character label button width = height × ratio (one-character buttons stay square). */
+  /** The hand-bottom/-left/-right/-top zone family. */
+  handZone: {
+    /** Height % of the Hand zone. Range: [5, 80]. */
+    tileHeight: number;
+  };
+  /** The meld-bottom/-left/-right/-top zone family. */
+  meldZone: {
+    /** Height % of the Meld column, bottom-aligned within it. Range: [10, 100]. */
+    meldHeight: number;
+    /** Tile height % within the meld row. Range: [5, 80]. */
+    meldTileHeight: number;
+  };
+  /** The discard-bottom/-left/-right/-top zone family. */
+  discardZone: {
+    /** Range: [4, 14]. */
+    columns: number;
+    /** Range: [2, 4]. */
+    rows: number;
+    /** Row height % of the pile. Range: [5, 80]. */
+    discardShort: number;
+  };
+  /** The single action-dock zone. See components/mahjong/ActionDock.tsx. */
+  actionDockZone: {
+    /** Height % of the Actions row within the whole dock; the Options row gets the rest. Range: [20, 60]. */
+    actionsHeight: number;
+    /** Action button height % of the Actions row. Range: [30, 90]. */
+    actionButtonHeight: number;
+    /** Two-character label button width = height × ratio (one-character buttons stay square). Range: [1.0, 2.0]. */
     wideLabelWidthRatio: number;
-    /** Candidate tile height % of the Options row. */
-    candidateHeightPct: number;
+    /** Candidate tile height % of the Options row. Range: [30, 90]. */
+    candidateHeight: number;
   };
   debug: { showRegions: boolean };
 };
-
-export const DEFAULT_TABLE_LAYOUT_CONFIG: TableLayoutConfig = {
-  version: 1,
-  hand: {
-    tileHeightPct: 51,
-  },
-  meldInfo: {
-    meldHeightPct: 94,
-    meldTileHeightPct: 64,
-  },
-  tiles: {
-    aspectRatio: 1.333,
-    discardShortPct: 28,
-    tileGapPx: 1.9,
-  },
-  discard: { columns: 8, rows: 3 },
-  actionDock: {
-    actionsHeightPct: 40,
-    actionButtonHeightPct: 70,
-    wideLabelWidthRatio: 1.4,
-    candidateHeightPct: 70,
-  },
-  debug: { showRegions: false },
-};
-
-const limits = {
-  handTileHeightPct: [5, 80],
-  meldHeightPct: [10, 100],
-  meldTileHeightPct: [5, 80],
-  aspectRatio: [1.2, 1.8],
-  discardShortPct: [5, 80],
-  tileGapPx: [0, 8],
-  columns: [4, 14],
-  rows: [2, 4],
-  actionsHeightPct: [20, 60],
-  actionButtonHeightPct: [30, 90],
-  wideLabelWidthRatio: [1.0, 2.0],
-  candidateHeightPct: [30, 90],
-} as const;
-
-const numberAt = (value: unknown, fallback: number, [min, max]: readonly [number, number]) =>
-  typeof value === "number" && Number.isFinite(value)
-    ? Math.min(max, Math.max(min, value))
-    : fallback;
-const booleanAt = (value: unknown, fallback: boolean) =>
-  typeof value === "boolean" ? value : fallback;
-const recordAt = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-
-export function normalizeTableLayoutConfig(value: unknown): TableLayoutConfig {
-  const root = recordAt(value);
-  const hand = recordAt(root.hand);
-  const meldInfo = recordAt(root.meldInfo);
-  const tiles = recordAt(root.tiles);
-  const discard = recordAt(root.discard);
-  const actionDock = recordAt(root.actionDock);
-  const debug = recordAt(root.debug);
-  const defaults = DEFAULT_TABLE_LAYOUT_CONFIG;
-  return {
-    version: 1,
-    hand: {
-      tileHeightPct: numberAt(
-        hand.tileHeightPct,
-        defaults.hand.tileHeightPct,
-        limits.handTileHeightPct,
-      ),
-    },
-    meldInfo: {
-      meldHeightPct: numberAt(
-        meldInfo.meldHeightPct,
-        defaults.meldInfo.meldHeightPct,
-        limits.meldHeightPct,
-      ),
-      meldTileHeightPct: numberAt(
-        meldInfo.meldTileHeightPct,
-        defaults.meldInfo.meldTileHeightPct,
-        limits.meldTileHeightPct,
-      ),
-    },
-    tiles: {
-      aspectRatio: numberAt(tiles.aspectRatio, defaults.tiles.aspectRatio, limits.aspectRatio),
-      discardShortPct: numberAt(
-        tiles.discardShortPct,
-        defaults.tiles.discardShortPct,
-        limits.discardShortPct,
-      ),
-      tileGapPx: numberAt(
-        tiles.tileGapPx ?? tiles.tileGapPct,
-        defaults.tiles.tileGapPx,
-        limits.tileGapPx,
-      ),
-    },
-    discard: {
-      columns: Math.round(numberAt(discard.columns, defaults.discard.columns, limits.columns)),
-      rows: Math.round(numberAt(discard.rows, defaults.discard.rows, limits.rows)),
-    },
-    actionDock: {
-      actionsHeightPct: numberAt(
-        actionDock.actionsHeightPct,
-        defaults.actionDock.actionsHeightPct,
-        limits.actionsHeightPct,
-      ),
-      actionButtonHeightPct: numberAt(
-        actionDock.actionButtonHeightPct,
-        defaults.actionDock.actionButtonHeightPct,
-        limits.actionButtonHeightPct,
-      ),
-      wideLabelWidthRatio: numberAt(
-        actionDock.wideLabelWidthRatio,
-        defaults.actionDock.wideLabelWidthRatio,
-        limits.wideLabelWidthRatio,
-      ),
-      candidateHeightPct: numberAt(
-        actionDock.candidateHeightPct,
-        defaults.actionDock.candidateHeightPct,
-        limits.candidateHeightPct,
-      ),
-    },
-    debug: {
-      showRegions: booleanAt(debug.showRegions, defaults.debug.showRegions),
-    },
-  };
-}
-
-export function readTableLayoutConfig(
-  storage: Pick<Storage, "getItem"> = localStorage,
-): TableLayoutConfig {
-  try {
-    const raw = storage.getItem(TABLE_LAYOUT_STORAGE_KEY);
-    if (!raw) return structuredClone(DEFAULT_TABLE_LAYOUT_CONFIG);
-    const parsed: unknown = JSON.parse(raw);
-    if (recordAt(parsed).version !== 1) return structuredClone(DEFAULT_TABLE_LAYOUT_CONFIG);
-    return normalizeTableLayoutConfig(parsed);
-  } catch {
-    return structuredClone(DEFAULT_TABLE_LAYOUT_CONFIG);
-  }
-}
-
-export function writeTableLayoutConfig(
-  config: TableLayoutConfig,
-  storage: Pick<Storage, "setItem"> = localStorage,
-) {
-  storage.setItem(TABLE_LAYOUT_STORAGE_KEY, JSON.stringify(normalizeTableLayoutConfig(config)));
-}

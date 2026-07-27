@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { DESKTOP_TABLE_METRICS } from "@/lib/desktopTablePreset";
+import { desktopTableLayoutConfig } from "@/layouts/desktop.table-config";
 import { sortTilesForDisplay, tileKindOf } from "@/lib/mahjongTiles";
 import { cn } from "@/lib/utils";
 import { ActionLabel } from "./ActionLabel";
@@ -37,8 +37,8 @@ interface ActionDockProps {
 const actionLabel = (type: string) => ACTION_LABELS[type] ?? type;
 const actionKey = (action: Action) => JSON.stringify(action);
 const CLAIM_MELD_TYPES = new Set(["chi", "peng", "minGang"]);
-const { actionDock: metrics } = DESKTOP_TABLE_METRICS;
-const CANDIDATE_TILE_HEIGHT_PCT = `${metrics.candidateHeightPct}%`;
+const { actionDockZone: metrics } = desktopTableLayoutConfig;
+const CANDIDATE_TILE_HEIGHT_PCT = `${metrics.candidateHeight}%`;
 
 function ActionCandidate({
   action,
@@ -180,7 +180,7 @@ export function ActionDock({
     >
       <DeadlineCountdown deadline={deadline} />
       <div
-        style={{ height: `${metrics.actionsHeightPct}%` }}
+        style={{ height: `${metrics.actionsHeight}%` }}
         className="flex w-full flex-wrap items-center justify-center gap-2"
       >
         {groups.map((group) => {
@@ -200,7 +200,7 @@ export function ActionDock({
               variant={isActive ? "default" : "outline"}
               className={cn("p-0", !isActive && "bg-background/80 text-foreground")}
               style={{
-                height: `${metrics.actionButtonHeightPct}%`,
+                height: `${metrics.actionButtonHeight}%`,
                 aspectRatio: isWideLabel ? metrics.wideLabelWidthRatio : 1,
               }}
               onMouseEnter={() => activate(group)}
@@ -217,7 +217,7 @@ export function ActionDock({
       </div>
       <div
         data-testid="action-candidates"
-        style={{ height: `${100 - metrics.actionsHeightPct}%` }}
+        style={{ height: `${100 - metrics.actionsHeight}%` }}
         className="flex w-full flex-wrap items-center justify-center gap-2 border-t border-white/20"
       >
         {!hideHuCandidateUntilHover &&

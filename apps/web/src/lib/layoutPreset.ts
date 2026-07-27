@@ -15,7 +15,17 @@ export type LayoutPreset = {
   name: string;
   referenceCanvas: { w: number; h: number };
   root: Zone;
-  editor?: { version: 1; root: unknown; variables: { name: string; value: string }[] } | undefined;
+  /**
+   * Round-trip metadata for Table Layout Lab re-imports only — production
+   * code never reads this. `version` bumped to 2 when the Lab's internal
+   * geometry scale changed from 0-100 percentages to 0-1 ratios (see
+   * `layoutSketch.ts`'s `parsePercentage` docs); a stale `version: 1` blob
+   * is deliberately ignored on import (not migrated) rather than risk
+   * silently reinterpreting old-scale numbers as new-scale ones — falls
+   * back to re-deriving an approximation from `root` instead (see
+   * `importLayoutPreset`).
+   */
+  editor?: { version: 2; root: unknown; variables: { name: string; value: string }[] } | undefined;
 };
 
 export type ZoneSize = { w: number; h: number };

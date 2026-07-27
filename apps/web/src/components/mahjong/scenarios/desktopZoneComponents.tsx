@@ -1,5 +1,6 @@
-import { DESKTOP_TABLE_METRICS } from "@/lib/desktopTablePreset";
-import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
+import { desktopTableLayoutConfig } from "@/layouts/desktop.table-config";
+import { type SeatDirection } from "@/lib/seatLayout";
+import { ActionLabel } from "../ActionLabel";
 import { DIRECTION_ARROW_ICON } from "../directionArrowIcon";
 import { DiscardPile, type DiscardEntry } from "../DiscardPile";
 import { HandRow } from "../HandRow";
@@ -36,8 +37,8 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
         revealed={seat.revealed}
         interactive={seat.interactive}
         onDiscard={seat.onDiscard}
-        tileHeightPct={DESKTOP_TABLE_METRICS.hand.tileHeightPct}
-        tileGapPx={DESKTOP_TABLE_METRICS.tiles.tileGapPx}
+        tileHeightPct={desktopTableLayoutConfig.handZone.tileHeight}
+        tileGapPx={desktopTableLayoutConfig.shared.tileGapPx}
         drawnSlotKey={seat.drawnSlotKey}
         drawnSlotEntering={seat.drawnSlotEntering}
       />
@@ -46,10 +47,12 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
 }
 
 export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: SeatContent }) {
-  const { meldHeightPct, meldTileHeightPct } = DESKTOP_TABLE_METRICS.meldInfo;
+  const { meldHeight: meldHeightPct, meldTileHeight: meldTileHeightPct } =
+    desktopTableLayoutConfig.meldZone;
   return (
     <div
-      className={`flex h-full w-full flex-col justify-end border-2 border-dashed ${DESKTOP_TABLE_METRICS.debug.showRegions ? "border-orange-300 bg-orange-300/10" : "border-transparent"}`}
+      data-testid={`meld-track-${direction}`}
+      className={`flex h-full w-full flex-col justify-end border-2 border-dashed ${desktopTableLayoutConfig.debug.showRegions ? "border-orange-300 bg-orange-300/10" : "border-transparent"}`}
     >
       <div
         className="flex items-center"
@@ -59,7 +62,7 @@ export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: 
           direction={direction}
           melds={seat.melds}
           tileHeightPct={(meldTileHeightPct / meldHeightPct) * 100}
-          config={DESKTOP_TABLE_METRICS}
+          config={desktopTableLayoutConfig}
           entering={seat.meldEntering}
         />
       </div>
@@ -68,28 +71,13 @@ export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: 
 }
 
 export function InfoSlot({ direction, seat }: { direction: SeatDirection; seat: SeatContent }) {
-  const vertical = direction === "left" || direction === "right";
   return (
     <div
       data-testid={`player-info-${direction}`}
-      className={`h-full w-full border-2 border-dashed ${DESKTOP_TABLE_METRICS.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
+      className={`h-full w-full border-2 border-dashed ${desktopTableLayoutConfig.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
       style={{ containerType: "size" }}
     >
-      <div
-        className="absolute top-1/2 left-1/2 flex items-center justify-center overflow-hidden"
-        style={{
-          width: vertical ? "100cqh" : "100cqw",
-          height: vertical ? "100cqw" : "100cqh",
-          transform: `translate(-50%,-50%) rotate(${-SEAT_ROTATION[direction]}deg)`,
-        }}
-      >
-        <span
-          className="truncate rounded bg-black/30 px-2 py-0.5 text-white"
-          style={{ fontSize: "25cqh", maxWidth: "100%" }}
-        >
-          {seat.info}
-        </span>
-      </div>
+      <ActionLabel text={seat.info} className="text-white w-[40%] h-[40%]" />
     </div>
   );
 }
@@ -106,7 +94,7 @@ export function DiscardTrack({
       data-testid={`table-area-${direction}`}
       className="pointer-events-none grid h-full w-full place-items-center"
     >
-      <DiscardPile direction={direction} discards={discards} metrics={DESKTOP_TABLE_METRICS} />
+      <DiscardPile direction={direction} discards={discards} metrics={desktopTableLayoutConfig} />
     </div>
   );
 }

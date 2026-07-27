@@ -81,7 +81,7 @@ production 已通过集中 registry 落地该递归 service 结构。每个 serv
 
 桌面生产布局应以静态 `desktop.table-layout.json` 保存，内容为可由 Layout Lab 导出的 `LayoutPreset`；Game Page 通过显式 `preset` prop 传入 `TableBoard`，而不是由 `TableBoard` 内部 import 某个预设。运行时先校验通用 Zone 合法性、id 全局唯一性与 registry 所需业务插槽完整性，再交给 `ZoneRenderer`。`editor` 元数据可保留以支持 Lab 无损导入，但运行时不得依赖它。
 
-`LayoutPreset` 保持纯几何：区域内牌尺寸、间距、弃牌行列等麻将展示参数仍由独立的 Table presentation 配置承担。若未来需要由 Lab 一并编辑，使用包裹 `LayoutPreset` 的麻将专用 document，而不将业务组件字段加入通用 schema。
+`LayoutPreset` 保持纯几何：区域内牌尺寸、间距、弃牌行列等麻将展示参数由独立的 `TableLayoutConfig`（`apps/web/src/lib/tableLayoutLab.ts`）承担，不加入通用 Zone schema。**已实现**：两者不合并进同一个 wrapper document，而是各自一个文件、靠文件名前缀配对——`apps/web/src/layouts/desktop.table-layout.json`（geometry，Lab 可编辑+存盘）配 `apps/web/src/layouts/desktop.table-config.ts`（presentation，手写 TS 常量，Lab 目前不编辑）。`TableLayoutConfig` 内部按"zone 种类"分组命名（`handZone`/`meldZone`/`discardZone`/`actionDockZone`，对应 `hand-*`/`meld-*`/`discard-*` 这类同族 zone id 共享同一份配置，`action-dock` 是单例），外加一个不属于任何单一 zone 的 `shared`（tile `aspectRatio`/`tileGapPx`，手牌/副露/弃牌共用）和顶层 `debug`。取舍见 `decisions.md` D32。
 
 ## 5. 区域组合：原子 vs 组合（目标状态）
 
@@ -116,6 +116,8 @@ production 已通过集中 registry 落地该递归 service 结构。每个 serv
 ## 10. 已上线代码的迁移路径
 
 `TableLayoutConfig`（`apps/web/src/lib/tableLayoutLab.ts`）是 P4.1 已合入 main、经过真实浏览器验收的桌面布局配置，不因为"有了新抽象"就冲动重写。迁移策略：用现有桌面布局（唯一已验证、有完整 Playwright 回归覆盖的场景）作为 Zone/LayoutPreset schema 的第一个消费者——用既有回归测试当安全网，把 `TableLayoutConfig` 的数值手工翻译成一份桌面 `LayoutPreset`，验证 schema 设计本身站不站得住脚，视觉零变化才算通过。新的 `layoutMode`（手机横屏/竖屏）之后直接基于这份 schema 设计，不再各自摸索一套平行的扁平 config。
+
+后续增量（见 D32）把 `TableLayoutConfig` 从硬编码在 `tableLayoutLab.ts` 里的一个 TS 常量，挪到跟 `desktop.table-layout.json` 同目录、同前缀的独立文件 `desktop.table-config.ts`，字段改按 zone 种类命名；`tableLayoutLab.ts` 只保留类型定义，运行时校验/兜底（`normalizeTableLayoutConfig` 等）随之整体删除，因为唯一生产者变成了 TS 类型检查过的手写常量，不再有未经类型检查的 JSON/localStorage 输入需要防御。
 
 ## 11. 未决问题
 

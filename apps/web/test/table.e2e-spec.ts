@@ -557,19 +557,15 @@ test("meld entry animation plays live but not after a reload mid-game", async ({
     await expect(claimantDock).toBeHidden({ timeout: 10_000 });
     await expect(secondDock).toBeHidden({ timeout: 10_000 });
 
-    const ownMeldTile = claimant
-      .getByTestId("meld-info-track-bottom")
-      .locator('[data-tile-id="4"]');
+    const ownMeldTile = claimant.getByTestId("meld-track-bottom").locator('[data-tile-id="4"]');
     await expect(ownMeldTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
     // Host sees the same new meld from the opponent side.
-    const opponentMeldTile = host
-      .getByTestId("meld-info-track-right")
-      .locator('[data-tile-id="4"]');
+    const opponentMeldTile = host.getByTestId("meld-track-right").locator('[data-tile-id="4"]');
     await expect(opponentMeldTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
 
     await claimant.reload();
     const ownMeldTileAfterReload = claimant
-      .getByTestId("meld-info-track-bottom")
+      .getByTestId("meld-track-bottom")
       .locator('[data-tile-id="4"]');
     await expect(ownMeldTileAfterReload).toBeVisible({ timeout: 10_000 });
     await expect(ownMeldTileAfterReload).not.toHaveAttribute("data-entering");
@@ -598,9 +594,7 @@ test("meld entry animation is suppressed under prefers-reduced-motion", async ({
     await expect(claimantDock).toBeHidden({ timeout: 10_000 });
     await expect(secondDock).toBeHidden({ timeout: 10_000 });
 
-    const ownMeldTile = claimant
-      .getByTestId("meld-info-track-bottom")
-      .locator('[data-tile-id="4"]');
+    const ownMeldTile = claimant.getByTestId("meld-track-bottom").locator('[data-tile-id="4"]');
     await expect(ownMeldTile).toBeVisible({ timeout: 10_000 });
     await expect(ownMeldTile).not.toHaveAttribute("data-entering");
   } finally {
@@ -651,7 +645,7 @@ test("a claimed tile FLIPs from the discard pile into the meld via a ghost clone
     // The real meld tile and the discard tombstone must both have settled
     // correctly — the whole point of the ghost is that neither one's own
     // animation state was ever touched by the flight.
-    const meldTile = claimant.getByTestId("meld-info-track-bottom").locator('[data-tile-id="4"]');
+    const meldTile = claimant.getByTestId("meld-track-bottom").locator('[data-tile-id="4"]');
     await expect(meldTile).toHaveAttribute("data-entering", "true");
     await expect
       .poll(() =>
@@ -683,7 +677,7 @@ test("the claim FLIP ghost is suppressed under prefers-reduced-motion", async ({
     await expect(secondDock).toBeVisible({ timeout: 10_000 });
     await secondDock.getByRole("button", { name: /^过/ }).click();
 
-    const meldTile = claimant.getByTestId("meld-info-track-bottom").locator('[data-tile-id="4"]');
+    const meldTile = claimant.getByTestId("meld-track-bottom").locator('[data-tile-id="4"]');
     await expect(meldTile).toBeVisible({ timeout: 10_000 });
     await expect(claimant.getByTestId("claim-flip-ghost")).toHaveCount(0);
   } finally {

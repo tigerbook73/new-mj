@@ -10,7 +10,7 @@
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint src",
+    "lint": "eslint src dev",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build && pnpm build-storybook"

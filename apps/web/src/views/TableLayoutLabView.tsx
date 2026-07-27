@@ -6,7 +6,7 @@ import { VIEWPORT_PRESETS } from "@/components/layout-sketch/viewportPresets";
 import { SketchProperties } from "@/components/layout-sketch/SketchProperties";
 import { SketchTreePanel } from "@/components/layout-sketch/SketchTree";
 import { SketchVariables } from "@/components/layout-sketch/SketchVariables";
-import { useSketchEditor } from "@/hooks/useSketchEditor";
+import { useSketchEditor, defaultLayoutFilename } from "@/hooks/useSketchEditor";
 
 const findSketchPath = (root: SketchNode, name: string): SketchNode[] | undefined => {
   if (root.name === name) return [root];
@@ -20,7 +20,7 @@ const findSketchPath = (root: SketchNode, name: string): SketchNode[] | undefine
 export function TableLayoutLabView() {
   const editor = useSketchEditor();
   const [hoveredName, setHoveredName] = useState<string>();
-  const [exportStatus, setExportStatus] = useState<"success" | "error">();
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string }>();
   const [coordinateView, setCoordinateView] = useState<"world" | "parent" | "zone">("world");
   const nameInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLElement>(null);
@@ -41,10 +41,14 @@ export function TableLayoutLabView() {
     }
   }, [editor.selected.name]);
   useEffect(() => {
-    if (!exportStatus) return;
-    const timer = window.setTimeout(() => setExportStatus(undefined), 2400);
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(undefined), 2400);
     return () => window.clearTimeout(timer);
-  }, [exportStatus]);
+  }, [toast]);
+  const variableNames = useMemo(
+    () => editor.draft.variables.map((variable) => variable.name),
+    [editor.draft.variables],
+  );
   const selectedParentName = useMemo(
     () => findParentNode(editor.draft.root, editor.selected.name)?.name,
     [editor.draft.root, editor.selected.name],
@@ -118,12 +122,60 @@ export function TableLayoutLabView() {
   };
   const exportPreset = () => {
     void navigator.clipboard
-      .writeText(
-        JSON.stringify(exportSketchDraft(editor.draft, editor.document.variables), null, 2),
-      )
-      .then(() => setExportStatus("success"))
-      .catch(() => setExportStatus("error"));
+      .writeText(JSON.stringify(exportSketchDraft(editor.draft), null, 2))
+      .then(() => setToast({ type: "success", message: "LayoutPreset JSON copied" }))
+      .catch(() => setToast({ type: "error", message: "Could not copy LayoutPreset JSON" }));
   };
+  const saveDraft = async (filename?: string) => {
+    const target = filename ?? editor.draft.sourceFile;
+    const error = await editor.saveDraft(filename);
+    setToast(
+      error ? { type: "error", message: error } : { type: "success", message: `Saved ${target}` },
+    );
+    return error;
+  };
+  const loadDraft = async () => {
+    const target = editor.draft.sourceFile;
+    const error = await editor.loadDraft();
+    setToast(
+      error
+        ? { type: "error", message: error }
+        : { type: "success", message: `Reloaded ${target}` },
+    );
+    return error;
+  };
+  const fileMissing = editor.isFileMissing(editor.draft);
+  const draftDirty = editor.isDraftDirty(editor.draft);
+  const diskNewer = editor.isDiskNewer(editor.draft);
+  const needsSaveFilename = editor.draft.sourceFile === undefined || fileMissing;
+  const canSaveDraft = needsSaveFilename || draftDirty;
+  const canLoadDraft =
+    editor.draft.sourceFile !== undefined && !fileMissing && (draftDirty || diskNewer);
+  const canDeleteDraft =
+    editor.document.drafts.length > 1 && (editor.draft.sourceFile === undefined || fileMissing);
+  const deleteTitle =
+    editor.document.drafts.length === 1
+      ? "At least one draft is required"
+      : canDeleteDraft
+        ? "Delete draft"
+        : "Saved files can't be deleted here — delete the file on disk if you need to";
+  const saveTitle = !canSaveDraft
+    ? "No unsaved changes"
+    : needsSaveFilename
+      ? "Save as a new file"
+      : "Save";
+  const loadTitle =
+    editor.draft.sourceFile === undefined
+      ? "This draft has no file yet"
+      : fileMissing
+        ? "The bound file is missing — use Save to save it as a new file"
+        : canLoadDraft
+          ? "Reload from disk, discarding local changes"
+          : "Local content matches disk — nothing to load";
+  const loadConfirmMessage =
+    diskNewer && !draftDirty
+      ? `The file on disk has changed since you last saved or loaded ${editor.draft.sourceFile}. Reload it and discard local state?`
+      : `Discard unsaved local changes and reload ${editor.draft.sourceFile} from disk?`;
   return (
     <main
       ref={pageRef}
@@ -144,22 +196,32 @@ export function TableLayoutLabView() {
         onNew={editor.newDraft}
         onCopyDraft={editor.copyDraft}
         onDeleteDraft={editor.deleteDraft}
+        canDeleteDraft={canDeleteDraft}
+        deleteTitle={deleteTitle}
         onToggleBoundaries={editor.setShowBoundaries}
         onViewportMode={modeChange}
         onViewportSize={editor.setViewportSize}
         onExport={exportPreset}
-        onImportDesktop={editor.importDesktop}
         onImportJson={editor.importPresetJson}
+        onSave={saveDraft}
+        canSaveDraft={canSaveDraft}
+        saveTitle={saveTitle}
+        needsSaveFilename={needsSaveFilename}
+        defaultSaveFilename={defaultLayoutFilename(editor.draft.name)}
+        onLoad={loadDraft}
+        canLoadDraft={canLoadDraft}
+        loadTitle={loadTitle}
+        loadConfirmMessage={loadConfirmMessage}
         coordinateView={coordinateView}
         onCoordinateView={setCoordinateView}
         viewInfo={viewInfo}
       />
-      {exportStatus && (
+      {toast && (
         <div
           role="status"
-          className={`absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded px-3 py-2 text-sm shadow-lg ${exportStatus === "success" ? "bg-emerald-700 text-white" : "bg-red-700 text-white"}`}
+          className={`absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded px-3 py-2 text-sm shadow-lg ${toast.type === "success" ? "bg-emerald-700 text-white" : "bg-red-700 text-white"}`}
         >
-          {exportStatus === "success" ? "LayoutPreset copied" : "Could not copy LayoutPreset"}
+          {toast.message}
         </div>
       )}
       <SketchTreePanel
@@ -172,6 +234,9 @@ export function TableLayoutLabView() {
         onDelete={editor.remove}
         onCopy={editor.copy}
         onConvertToGrid={editor.convertToGrid}
+        onSetHidden={editor.setHidden}
+        onSetAllHidden={editor.setAllItemsHidden}
+        onReorder={editor.reorder}
       />
       <div
         role="separator"
@@ -233,13 +298,16 @@ export function TableLayoutLabView() {
         onRotationChange={editor.updateRotation}
         onShadowChange={editor.setCellShadow}
         resolveExpression={editor.resolveExpression}
+        variableNames={variableNames}
       />
       <SketchVariables
-        variables={editor.document.variables}
+        variables={editor.draft.variables}
         onAdd={editor.addVariable}
         onUpdate={editor.updateVariable}
         onRemove={editor.removeVariable}
+        onReorder={editor.reorderVariable}
         isUsed={editor.isVariableUsed}
+        variableNames={variableNames}
       />
       <div
         role="separator"

@@ -1,151 +1,1029 @@
 {
   "name": "desktop",
-  "referenceCanvas": { "w": 1, "h": 1 },
+  "referenceCanvas": {
+    "w": 1,
+    "h": 1
+  },
   "root": {
-    "id": "table",
-    "anchorCenter": { "x": 50, "y": 50 },
-    "localSize": { "w": 100, "h": 100 },
+    "id": "viewport",
+    "anchorCenter": {
+      "x": 50,
+      "y": 50
+    },
+    "localSize": {
+      "w": 100,
+      "h": 100
+    },
     "rotationDeg": 0,
     "children": [
       {
         "id": "hand-bottom",
-        "anchorCenter": { "x": 50, "y": 94 },
-        "localSize": { "w": 76, "h": 12 },
+        "anchorCenter": {
+          "x": 50,
+          "y": 95
+        },
+        "localSize": {
+          "w": 80,
+          "h": 10
+        },
         "rotationDeg": 0
       },
       {
-        "id": "hand-right",
-        "anchorCenter": { "x": 94, "y": 50 },
-        "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": -90
-      },
-      {
-        "id": "hand-top",
-        "anchorCenter": { "x": 50, "y": 6 },
-        "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": 180
-      },
-      {
-        "id": "hand-left",
-        "anchorCenter": { "x": 6, "y": 50 },
-        "localSize": { "w": 76, "h": 12 },
-        "rotationDeg": 90
-      },
-      {
-        "id": "meld-info-bottom",
-        "anchorCenter": { "x": 50, "y": 84.2 },
-        "localSize": { "w": 60.8, "h": 7.6 },
+        "id": "hand-inner",
+        "anchorCenter": {
+          "x": 50,
+          "y": 50
+        },
+        "localSize": {
+          "w": 80,
+          "h": 80
+        },
         "rotationDeg": 0,
         "children": [
           {
             "id": "meld-bottom",
-            "anchorCenter": { "x": 40, "y": 50 },
-            "localSize": { "w": 80, "h": 100 },
+            "anchorCenter": {
+              "x": 50,
+              "y": 95.5
+            },
+            "localSize": {
+              "w": 82,
+              "h": 9
+            },
             "rotationDeg": 0
           },
-          {
-            "id": "info-bottom",
-            "anchorCenter": { "x": 90, "y": 50 },
-            "localSize": { "w": 20, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
-      },
-      {
-        "id": "meld-info-right",
-        "anchorCenter": { "x": 84.2, "y": 50 },
-        "localSize": { "w": 60.8, "h": 7.6 },
-        "rotationDeg": -90,
-        "children": [
-          {
-            "id": "meld-right",
-            "anchorCenter": { "x": 40, "y": 50 },
-            "localSize": { "w": 80, "h": 100 },
-            "rotationDeg": 0
-          },
-          {
-            "id": "info-right",
-            "anchorCenter": { "x": 90, "y": 50 },
-            "localSize": { "w": 20, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
-      },
-      {
-        "id": "meld-info-top",
-        "anchorCenter": { "x": 50, "y": 15.8 },
-        "localSize": { "w": 60.8, "h": 7.6 },
-        "rotationDeg": 180,
-        "children": [
           {
             "id": "meld-top",
-            "anchorCenter": { "x": 40, "y": 50 },
-            "localSize": { "w": 80, "h": 100 },
-            "rotationDeg": 0
+            "anchorCenter": {
+              "x": 50,
+              "y": 4.5
+            },
+            "localSize": {
+              "w": 82,
+              "h": 9
+            },
+            "rotationDeg": 180
           },
-          {
-            "id": "info-top",
-            "anchorCenter": { "x": 90, "y": 50 },
-            "localSize": { "w": 20, "h": 100 },
-            "rotationDeg": 0
-          }
-        ]
-      },
-      {
-        "id": "meld-info-left",
-        "anchorCenter": { "x": 15.8, "y": 50 },
-        "localSize": { "w": 60.8, "h": 7.6 },
-        "rotationDeg": 90,
-        "children": [
           {
             "id": "meld-left",
-            "anchorCenter": { "x": 40, "y": 50 },
-            "localSize": { "w": 80, "h": 100 },
-            "rotationDeg": 0
+            "anchorCenter": {
+              "x": 4.5,
+              "y": 50
+            },
+            "localSize": {
+              "w": 82,
+              "h": 9
+            },
+            "rotationDeg": 90
           },
           {
-            "id": "info-left",
-            "anchorCenter": { "x": 90, "y": 50 },
-            "localSize": { "w": 20, "h": 100 },
-            "rotationDeg": 0
+            "id": "meld-right",
+            "anchorCenter": {
+              "x": 95.5,
+              "y": 50
+            },
+            "localSize": {
+              "w": 82,
+              "h": 9
+            },
+            "rotationDeg": -90
+          },
+          {
+            "id": "meld-inner",
+            "anchorCenter": {
+              "x": 50,
+              "y": 50
+            },
+            "localSize": {
+              "w": 82,
+              "h": 82
+            },
+            "rotationDeg": 0,
+            "children": [
+              {
+                "id": "discard-top",
+                "anchorCenter": {
+                  "x": 50,
+                  "y": 12.5
+                },
+                "localSize": {
+                  "w": 50,
+                  "h": 25
+                },
+                "rotationDeg": 180
+              },
+              {
+                "id": "center",
+                "anchorCenter": {
+                  "x": 50,
+                  "y": 50
+                },
+                "localSize": {
+                  "w": 50,
+                  "h": 50
+                },
+                "rotationDeg": 0
+              },
+              {
+                "id": "discard-bottom",
+                "anchorCenter": {
+                  "x": 50,
+                  "y": 87.5
+                },
+                "localSize": {
+                  "w": 50,
+                  "h": 25
+                },
+                "rotationDeg": 0
+              },
+              {
+                "id": "discard-left",
+                "anchorCenter": {
+                  "x": 12.5,
+                  "y": 50
+                },
+                "localSize": {
+                  "w": 50,
+                  "h": 25
+                },
+                "rotationDeg": 90
+              },
+              {
+                "id": "discard-right",
+                "anchorCenter": {
+                  "x": 87.5,
+                  "y": 50
+                },
+                "localSize": {
+                  "w": 50,
+                  "h": 25
+                },
+                "rotationDeg": -90
+              }
+            ]
           }
         ]
       },
       {
-        "id": "discard-bottom",
-        "anchorCenter": { "x": 50, "y": 72.192 },
-        "localSize": { "w": 27.968, "h": 16.416 },
-        "rotationDeg": 0
-      },
-      {
-        "id": "discard-right",
-        "anchorCenter": { "x": 72.192, "y": 50 },
-        "localSize": { "w": 27.968, "h": 16.416 },
-        "rotationDeg": -90
-      },
-      {
-        "id": "discard-top",
-        "anchorCenter": { "x": 50, "y": 27.808 },
-        "localSize": { "w": 27.968, "h": 16.416 },
+        "id": "hand-top",
+        "anchorCenter": {
+          "x": 50,
+          "y": 5
+        },
+        "localSize": {
+          "w": 80,
+          "h": 10
+        },
         "rotationDeg": 180
       },
       {
-        "id": "discard-left",
-        "anchorCenter": { "x": 27.808, "y": 50 },
-        "localSize": { "w": 27.968, "h": 16.416 },
+        "id": "hand-left",
+        "anchorCenter": {
+          "x": 5,
+          "y": 50
+        },
+        "localSize": {
+          "w": 80,
+          "h": 10
+        },
         "rotationDeg": 90
       },
       {
-        "id": "center",
-        "anchorCenter": { "x": 50, "y": 50 },
-        "localSize": { "w": 27.968, "h": 27.968 },
+        "id": "hand-right",
+        "anchorCenter": {
+          "x": 95,
+          "y": 50
+        },
+        "localSize": {
+          "w": 80,
+          "h": 10
+        },
+        "rotationDeg": -90
+      },
+      {
+        "id": "info-top",
+        "anchorCenter": {
+          "x": 25.4,
+          "y": 18.2
+        },
+        "localSize": {
+          "w": 16.4,
+          "h": 16.4
+        },
+        "rotationDeg": 180
+      },
+      {
+        "id": "info-bottom",
+        "anchorCenter": {
+          "x": 74.6,
+          "y": 81.8
+        },
+        "localSize": {
+          "w": 16.4,
+          "h": 16.4
+        },
         "rotationDeg": 0
       },
       {
+        "id": "info-right",
+        "anchorCenter": {
+          "x": 81.8,
+          "y": 25.4
+        },
+        "localSize": {
+          "w": 16.4,
+          "h": 16.4
+        },
+        "rotationDeg": -90
+      },
+      {
+        "id": "info-left",
+        "anchorCenter": {
+          "x": 18.2,
+          "y": 74.6
+        },
+        "localSize": {
+          "w": 16.4,
+          "h": 16.4
+        },
+        "rotationDeg": 90
+      },
+      {
         "id": "action-dock",
-        "anchorCenter": { "x": 50, "y": 57 },
-        "localSize": { "w": 60, "h": 25 },
+        "anchorCenter": {
+          "x": 50,
+          "y": 60
+        },
+        "localSize": {
+          "w": 60,
+          "h": 25
+        },
         "rotationDeg": 0
+      }
+    ]
+  },
+  "editor": {
+    "version": 2,
+    "root": {
+      "name": "viewport",
+      "x": {
+        "raw": "0",
+        "resolved": 0
+      },
+      "y": {
+        "raw": "0",
+        "resolved": 0
+      },
+      "w": {
+        "raw": "1",
+        "resolved": 1
+      },
+      "h": {
+        "raw": "1",
+        "resolved": 1
+      },
+      "kind": "element",
+      "shadow": false,
+      "rotationDeg": 0,
+      "backgroundColor": "#fde2e4",
+      "hidden": false,
+      "children": [
+        {
+          "name": "hand-bottom",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$hand_w",
+            "resolved": 0.8
+          },
+          "h": {
+            "raw": "$hand_h",
+            "resolved": 0.1
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 0,
+          "backgroundColor": "#d6e5fa",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "$hand_c_x",
+            "resolved": 0.5
+          },
+          "centerY": {
+            "raw": "1-$hand_c_y",
+            "resolved": 0.95
+          }
+        },
+        {
+          "name": "hand-inner",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$hand_w",
+            "resolved": 0.8
+          },
+          "h": {
+            "raw": "$hand_w",
+            "resolved": 0.8
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 0,
+          "backgroundColor": "#fde2e4",
+          "hidden": false,
+          "children": [
+            {
+              "name": "meld-bottom",
+              "x": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "y": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "w": {
+                "raw": "$meld_w",
+                "resolved": 0.82
+              },
+              "h": {
+                "raw": "$meld_h",
+                "resolved": 0.09
+              },
+              "kind": "element",
+              "shadow": false,
+              "rotationDeg": 0,
+              "backgroundColor": "#e8d9ff",
+              "hidden": false,
+              "children": [],
+              "centerX": {
+                "raw": "$meld_c_x",
+                "resolved": 0.5
+              },
+              "centerY": {
+                "raw": "1-$meld_c_y",
+                "resolved": 0.955
+              }
+            },
+            {
+              "name": "meld-top",
+              "x": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "y": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "w": {
+                "raw": "$meld_w",
+                "resolved": 0.82
+              },
+              "h": {
+                "raw": "$meld_h",
+                "resolved": 0.09
+              },
+              "kind": "element",
+              "shadow": false,
+              "rotationDeg": 180,
+              "backgroundColor": "#e8d9ff",
+              "hidden": false,
+              "children": [],
+              "centerX": {
+                "raw": "$meld_c_x",
+                "resolved": 0.5
+              },
+              "centerY": {
+                "raw": "$meld_c_y",
+                "resolved": 0.045
+              }
+            },
+            {
+              "name": "meld-left",
+              "x": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "y": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "w": {
+                "raw": "$meld_w",
+                "resolved": 0.82
+              },
+              "h": {
+                "raw": "$meld_h",
+                "resolved": 0.09
+              },
+              "kind": "element",
+              "shadow": false,
+              "rotationDeg": 90,
+              "backgroundColor": "#e8d9ff",
+              "hidden": false,
+              "children": [],
+              "centerX": {
+                "raw": "$meld_c_y",
+                "resolved": 0.045
+              },
+              "centerY": {
+                "raw": "$meld_c_x",
+                "resolved": 0.5
+              }
+            },
+            {
+              "name": "meld-right",
+              "x": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "y": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "w": {
+                "raw": "$meld_w",
+                "resolved": 0.82
+              },
+              "h": {
+                "raw": "$meld_h",
+                "resolved": 0.09
+              },
+              "kind": "element",
+              "shadow": false,
+              "rotationDeg": -90,
+              "backgroundColor": "#e8d9ff",
+              "hidden": false,
+              "children": [],
+              "centerX": {
+                "raw": "1-$meld_c_y",
+                "resolved": 0.955
+              },
+              "centerY": {
+                "raw": "$meld_c_x",
+                "resolved": 0.5
+              }
+            },
+            {
+              "name": "meld-inner",
+              "x": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "y": {
+                "raw": "0.1",
+                "resolved": 0.1
+              },
+              "w": {
+                "raw": "$meld_w",
+                "resolved": 0.82
+              },
+              "h": {
+                "raw": "$meld_w",
+                "resolved": 0.82
+              },
+              "kind": "element",
+              "shadow": false,
+              "rotationDeg": 0,
+              "backgroundColor": "#e2f0cb",
+              "hidden": false,
+              "children": [
+                {
+                  "name": "discard-top",
+                  "x": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "y": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "w": {
+                    "raw": "$discard_w",
+                    "resolved": 0.5
+                  },
+                  "h": {
+                    "raw": "$discard_h",
+                    "resolved": 0.25
+                  },
+                  "kind": "element",
+                  "shadow": false,
+                  "rotationDeg": 180,
+                  "backgroundColor": "#fde2e4",
+                  "hidden": false,
+                  "children": [],
+                  "centerX": {
+                    "raw": "$discard_c_x",
+                    "resolved": 0.5
+                  },
+                  "centerY": {
+                    "raw": "$discard_c_y",
+                    "resolved": 0.125
+                  }
+                },
+                {
+                  "name": "center",
+                  "x": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "y": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "w": {
+                    "raw": "$discard_w",
+                    "resolved": 0.5
+                  },
+                  "h": {
+                    "raw": "$discard_w",
+                    "resolved": 0.5
+                  },
+                  "kind": "element",
+                  "shadow": false,
+                  "rotationDeg": 0,
+                  "backgroundColor": "#d6e5fa",
+                  "hidden": false,
+                  "children": [],
+                  "centerX": {
+                    "raw": "1/2",
+                    "resolved": 0.5
+                  },
+                  "centerY": {
+                    "raw": "1/2",
+                    "resolved": 0.5
+                  }
+                },
+                {
+                  "name": "discard-bottom",
+                  "x": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "y": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "w": {
+                    "raw": "$discard_w",
+                    "resolved": 0.5
+                  },
+                  "h": {
+                    "raw": "$discard_h",
+                    "resolved": 0.25
+                  },
+                  "kind": "element",
+                  "shadow": false,
+                  "rotationDeg": 0,
+                  "backgroundColor": "#fde2e4",
+                  "hidden": false,
+                  "children": [],
+                  "centerX": {
+                    "raw": "$discard_c_x",
+                    "resolved": 0.5
+                  },
+                  "centerY": {
+                    "raw": "1-$discard_c_y",
+                    "resolved": 0.875
+                  }
+                },
+                {
+                  "name": "discard-left",
+                  "x": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "y": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "w": {
+                    "raw": "$discard_w",
+                    "resolved": 0.5
+                  },
+                  "h": {
+                    "raw": "$discard_h",
+                    "resolved": 0.25
+                  },
+                  "kind": "element",
+                  "shadow": false,
+                  "rotationDeg": 90,
+                  "backgroundColor": "#d8f3f0",
+                  "hidden": false,
+                  "children": [],
+                  "centerX": {
+                    "raw": "$discard_c_y",
+                    "resolved": 0.125
+                  },
+                  "centerY": {
+                    "raw": "$discard_c_x",
+                    "resolved": 0.5
+                  }
+                },
+                {
+                  "name": "discard-right",
+                  "x": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "y": {
+                    "raw": "0.1",
+                    "resolved": 0.1
+                  },
+                  "w": {
+                    "raw": "$discard_w",
+                    "resolved": 0.5
+                  },
+                  "h": {
+                    "raw": "$discard_h",
+                    "resolved": 0.25
+                  },
+                  "kind": "element",
+                  "shadow": false,
+                  "rotationDeg": -90,
+                  "backgroundColor": "#e2f0cb",
+                  "hidden": false,
+                  "children": [],
+                  "centerX": {
+                    "raw": "1-$discard_c_y",
+                    "resolved": 0.875
+                  },
+                  "centerY": {
+                    "raw": "$discard_c_x",
+                    "resolved": 0.5
+                  }
+                }
+              ],
+              "centerX": {
+                "raw": "1/2",
+                "resolved": 0.5
+              },
+              "centerY": {
+                "raw": "1/2",
+                "resolved": 0.5
+              }
+            }
+          ],
+          "centerX": {
+            "raw": "1/2",
+            "resolved": 0.5
+          },
+          "centerY": {
+            "raw": "1/2",
+            "resolved": 0.5
+          }
+        },
+        {
+          "name": "hand-top",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$hand_w",
+            "resolved": 0.8
+          },
+          "h": {
+            "raw": "$hand_h",
+            "resolved": 0.1
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 180,
+          "backgroundColor": "#e8d9ff",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "$hand_c_x",
+            "resolved": 0.5
+          },
+          "centerY": {
+            "raw": "$hand_c_y",
+            "resolved": 0.05
+          }
+        },
+        {
+          "name": "hand-left",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$hand_w",
+            "resolved": 0.8
+          },
+          "h": {
+            "raw": "$hand_h",
+            "resolved": 0.1
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 90,
+          "backgroundColor": "#d6e5fa",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "$hand_c_y",
+            "resolved": 0.05
+          },
+          "centerY": {
+            "raw": "$hand_c_x",
+            "resolved": 0.5
+          }
+        },
+        {
+          "name": "hand-right",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$hand_w",
+            "resolved": 0.8
+          },
+          "h": {
+            "raw": "$hand_h",
+            "resolved": 0.1
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": -90,
+          "backgroundColor": "#fde2e4",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "1-$hand_c_y",
+            "resolved": 0.95
+          },
+          "centerY": {
+            "raw": "$hand_c_x",
+            "resolved": 0.5
+          }
+        },
+        {
+          "name": "info-top",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$info_w",
+            "resolved": 0.164
+          },
+          "h": {
+            "raw": "$info_h",
+            "resolved": 0.164
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 180,
+          "backgroundColor": "#fde2e4",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "$info_c_x",
+            "resolved": 0.254
+          },
+          "centerY": {
+            "raw": "$info_c_y",
+            "resolved": 0.182
+          }
+        },
+        {
+          "name": "info-bottom",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$info_w",
+            "resolved": 0.164
+          },
+          "h": {
+            "raw": "$info_h",
+            "resolved": 0.164
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 0,
+          "backgroundColor": "#fde2e4",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "1-$info_c_x",
+            "resolved": 0.746
+          },
+          "centerY": {
+            "raw": "1-$info_c_y",
+            "resolved": 0.818
+          }
+        },
+        {
+          "name": "info-right",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$info_w",
+            "resolved": 0.164
+          },
+          "h": {
+            "raw": "$info_h",
+            "resolved": 0.164
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": -90,
+          "backgroundColor": "#fde2e4",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "1-$info_c_y",
+            "resolved": 0.818
+          },
+          "centerY": {
+            "raw": "$info_c_x",
+            "resolved": 0.254
+          }
+        },
+        {
+          "name": "info-left",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "$info_w",
+            "resolved": 0.164
+          },
+          "h": {
+            "raw": "$info_h",
+            "resolved": 0.164
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 90,
+          "backgroundColor": "#fde2e4",
+          "hidden": false,
+          "children": [],
+          "centerX": {
+            "raw": "$info_c_y",
+            "resolved": 0.182
+          },
+          "centerY": {
+            "raw": "1-$info_c_x",
+            "resolved": 0.746
+          }
+        },
+        {
+          "name": "action-dock",
+          "x": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "y": {
+            "raw": "0.1",
+            "resolved": 0.1
+          },
+          "w": {
+            "raw": "6/10",
+            "resolved": 0.6
+          },
+          "h": {
+            "raw": "1/4",
+            "resolved": 0.25
+          },
+          "kind": "element",
+          "shadow": false,
+          "rotationDeg": 0,
+          "backgroundColor": "#e2f0cb",
+          "hidden": true,
+          "children": [],
+          "centerX": {
+            "raw": "1/2",
+            "resolved": 0.5
+          },
+          "centerY": {
+            "raw": "6/10",
+            "resolved": 0.6
+          }
+        }
+      ],
+      "centerX": {
+        "raw": "0.5",
+        "resolved": 0.5
+      },
+      "centerY": {
+        "raw": "0.5",
+        "resolved": 0.5
+      }
+    },
+    "variables": [
+      {
+        "name": "hand_w",
+        "value": "80/100"
+      },
+      {
+        "name": "hand_h",
+        "value": "(1-$hand_w)/2"
+      },
+      {
+        "name": "hand_c_x",
+        "value": "1/2"
+      },
+      {
+        "name": "hand_c_y",
+        "value": "$hand_h/2"
+      },
+      {
+        "name": "meld_w",
+        "value": "82/100"
+      },
+      {
+        "name": "meld_h",
+        "value": "(1-$meld_w)/2"
+      },
+      {
+        "name": "meld_c_x",
+        "value": "1/2"
+      },
+      {
+        "name": "meld_c_y",
+        "value": "$meld_h/2"
+      },
+      {
+        "name": "discard_w",
+        "value": "50/100"
+      },
+      {
+        "name": "discard_h",
+        "value": "(1-$discard_w)/2"
+      },
+      {
+        "name": "discard_c_x",
+        "value": "1/2"
+      },
+      {
+        "name": "discard_c_y",
+        "value": "$discard_h/2"
+      },
+      {
+        "name": "info_w",
+        "value": "$info_h"
+      },
+      {
+        "name": "info_h",
+        "value": "$hand_w * $meld_w * $discard_h"
+      },
+      {
+        "name": "info_c_x",
+        "value": "$hand_h+ $hand_w*$meld_h + $hand_w * $meld_w*$discard_h/2"
+      },
+      {
+        "name": "info_c_y",
+        "value": "$hand_h+ $info_w/2"
       }
     ]
   }

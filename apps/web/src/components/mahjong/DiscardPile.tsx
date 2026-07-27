@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { SeatDirection } from "@/lib/seatLayout";
-import type { TableLayoutMetrics } from "@/lib/desktopTablePreset";
+import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
 import { DiscardFlipGhost } from "./DiscardFlipGhost";
 import { Tile } from "./Tile";
 import { TileClaimSlot } from "./TileClaimSlot";
@@ -29,7 +29,7 @@ interface DiscardPileProps {
   /** This pile's own seat direction — TileClaimSlot's badge counter-rotates against the ambient Zone rotation for this direction so it always reads in true screen orientation, the same technique InfoSlot uses for its label. */
   direction: SeatDirection;
   discards: DiscardEntry[];
-  metrics: TableLayoutMetrics;
+  metrics: TableLayoutConfig;
 }
 
 /**
@@ -45,21 +45,21 @@ interface DiscardPileProps {
  * the aspect ratio, so none of this needs a measured container size.
  */
 export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) {
-  const { columns, rows } = metrics.discard;
+  const { columns, rows } = metrics.discardZone;
   const totalRows = Math.max(rows, Math.ceil(discards.length / columns));
 
   return (
     <div
-      className="flex h-full w-full min-h-0 min-w-0 flex-col"
-      style={{ gap: `${metrics.tiles.tileGapPx}px` }}
+      className="flex h-full w-full min-h-0 min-w-0 flex-col pt-2"
+      style={{ gap: `${metrics.shared.tileGapPx}px` }}
     >
       {Array.from({ length: totalRows }, (_, rowIndex) => (
         <div
           key={rowIndex}
           className="flex w-full min-w-0 items-center justify-center"
           style={{
-            height: `${metrics.tiles.discardShortPct}%`,
-            gap: `${metrics.tiles.tileGapPx}px`,
+            height: `${metrics.discardZone.discardShort}%`,
+            gap: `${metrics.shared.tileGapPx}px`,
           }}
         >
           {Array.from({ length: columns }, (_, columnIndex) => {
@@ -74,7 +74,7 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
                 key={columnIndex}
                 direction={direction}
                 entry={entry}
-                aspectRatio={metrics.tiles.aspectRatio}
+                aspectRatio={metrics.shared.aspectRatio}
               />
             );
           })}

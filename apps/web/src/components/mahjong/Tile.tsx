@@ -74,7 +74,7 @@ const TILE_ENTER_INITIAL = { opacity: 0, scale: 0.75, y: 24 };
 const TILE_ENTER_TRANSITION = { duration: 0.3, ease: "easeOut" } as const;
 const TILE_HOVER_SCALE = { scale: 1.2 };
 
-/** Height / width of a real mahjong tile face — mirrors tableLayoutLab.ts's `tiles.aspectRatio` default. */
+/** Height / width of a real mahjong tile face — mirrors layouts/desktop.table-config.ts's `shared.aspectRatio`. */
 const DEFAULT_TILE_ASPECT_RATIO = 1.333;
 
 export interface TileProps extends VariantProps<typeof tileVariants> {

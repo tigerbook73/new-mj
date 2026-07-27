@@ -43,7 +43,7 @@ export function MeldGroup({ direction, melds, tileHeightPct, config, entering }:
   return (
     <div
       className="flex h-full w-full flex-wrap content-end items-end justify-start overflow-hidden"
-      style={{ gap: `${config.tiles.tileGapPx * 2}px` }}
+      style={{ gap: `${config.shared.tileGapPx * 2}px` }}
     >
       {melds.map((meld, meldIndex) => {
         // The claimed tile is always the last one appended, except buGang: the self-drawn 4th
@@ -55,7 +55,7 @@ export function MeldGroup({ direction, melds, tileHeightPct, config, entering }:
           <div
             key={meldIndex}
             className="flex"
-            style={{ height: `${tileHeightPct}%`, gap: `${config.tiles.tileGapPx}px` }}
+            style={{ height: `${tileHeightPct}%`, gap: `${config.shared.tileGapPx}px` }}
           >
             {meld.tiles.map((tile, tileIndex) => {
               const isFromClaim = tileIndex === fromTileIndex && meld.fromDirection !== undefined;
@@ -65,7 +65,7 @@ export function MeldGroup({ direction, melds, tileHeightPct, config, entering }:
                   direction={direction}
                   fromDirection={isFromClaim ? meld.fromDirection : undefined}
                   entering={entering}
-                  aspectRatio={config.tiles.aspectRatio}
+                  aspectRatio={config.shared.aspectRatio}
                   tile={tile}
                 />
               );

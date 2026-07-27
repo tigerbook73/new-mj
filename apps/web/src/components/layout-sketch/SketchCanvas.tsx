@@ -34,10 +34,15 @@ function SketchBox({
         isRoot
           ? undefined
           : {
-              left: `${node.centerX?.resolved ?? node.x.resolved + node.w.resolved / 2}%`,
-              top: `${node.centerY?.resolved ?? node.y.resolved + node.h.resolved / 2}%`,
-              width: `${node.w.resolved}%`,
-              height: `${node.h.resolved}%`,
+              // Sketch geometry is a 0-1 ratio internally (see
+              // layoutSketch.ts's parsePercentage docs) — CSS percentages
+              // need the *100 conversion applied right here at the render
+              // boundary, same as exportZone does for the exported
+              // LayoutPreset.
+              left: `${(node.centerX?.resolved ?? node.x.resolved + node.w.resolved / 2) * 100}%`,
+              top: `${(node.centerY?.resolved ?? node.y.resolved + node.h.resolved / 2) * 100}%`,
+              width: `${node.w.resolved * 100}%`,
+              height: `${node.h.resolved * 100}%`,
               transform: "translate(-50%, -50%)",
             }
       }
@@ -97,51 +102,59 @@ function SketchBox({
             className={`pointer-events-none absolute inset-0 ${showBoundaries ? "border border-slate-500" : ""} ${selected === node.name ? "ring-2 ring-amber-500" : hovered === node.name ? "ring-2 ring-sky-400" : ""}`}
           />
         )}
-        {node.children.map((child) => (
-          <SketchBox
-            key={child.name}
-            node={child}
-            selected={selected}
-            hovered={hovered}
-            showBoundaries={showBoundaries}
-            onSelect={onSelect}
-            onHover={onHover}
-            coordinateView={coordinateView}
-            referenceName={referenceName}
-            unrotatedNames={unrotatedNames}
-            isRoot={false}
-          />
-        ))}
+        {node.children
+          .filter((child) => !child.hidden)
+          .map((child) => (
+            <SketchBox
+              key={child.name}
+              node={child}
+              selected={selected}
+              hovered={hovered}
+              showBoundaries={showBoundaries}
+              onSelect={onSelect}
+              onHover={onHover}
+              coordinateView={coordinateView}
+              referenceName={referenceName}
+              unrotatedNames={unrotatedNames}
+              isRoot={false}
+            />
+          ))}
       </div>
     </div>
   );
 }
 
-const nodesAtPoint = (root: SketchNode, x: number, y: number) => {
-  const matches: string[] = [];
-  const visit = (node: SketchNode, parent: { x: number; y: number; w: number; h: number }) => {
-    const box =
-      node.name === "viewport"
-        ? parent
-        : {
-            x: parent.x + (parent.w * node.x.resolved) / 100,
-            y: parent.y + (parent.h * node.y.resolved) / 100,
-            w: (parent.w * node.w.resolved) / 100,
-            h: (parent.h * node.h.resolved) / 100,
-          };
-    if (
-      node.name !== "viewport" &&
-      x >= box.x &&
-      x <= box.x + box.w &&
-      y >= box.y &&
-      y <= box.y + box.h
-    )
-      matches.push(node.name);
-    node.children.forEach((child) => visit(child, box));
-  };
-  visit(root, { x: 0, y: 0, w: 100, h: 100 });
-  return matches;
-};
+const SELECT_LABEL_PREFIX = "Select ";
+
+/**
+ * Which nodes' hit-test buttons actually sit under a screen point, ordered
+ * root-first (matching the cycling contract below). Delegates to the
+ * browser's own `elementsFromPoint` instead of re-deriving each node's box
+ * from its unrotated x/y/w/h percentages — that percentage math used to
+ * ignore `rotationDeg` entirely, so any 90°/270°-rotated node (left/right
+ * seat zones and everything nested under them in the desktop preset — half
+ * the tree) had a hit box with the wrong footprint compared to what was
+ * actually painted on screen, silently missing clicks on the visible shape
+ * or matching the wrong sibling. `elementsFromPoint` respects every CSS
+ * transform in the stack for free, since it's real paint-order hit-testing,
+ * not a JS reimplementation of it.
+ */
+const nodesAtScreenPoint = (clientX: number, clientY: number) =>
+  document
+    .elementsFromPoint(clientX, clientY)
+    .map((element) => element.getAttribute("aria-label"))
+    .filter((label): label is string => label !== null && label.startsWith(SELECT_LABEL_PREFIX))
+    .map((label) => label.slice(SELECT_LABEL_PREFIX.length))
+    // elementsFromPoint is topmost-paint-first, i.e. deepest descendant
+    // first (nested elements always paint over their own ancestors,
+    // regardless of every node sharing the same `z-20` wrapper class —
+    // z-index only orders siblings within a stacking context, it can't put
+    // an ancestor's background above its own descendant's content) —
+    // reversed to match the existing root-to-leaf cycling order (see the
+    // "cycles through objects" test: an overlapping child that's already
+    // selected cycles back out to its parent first, not the other way
+    // around).
+    .reverse();
 
 export function SketchCanvas({
   root,
@@ -160,12 +173,7 @@ export function SketchCanvas({
         style={style}
         onClickCapture={(event) => {
           if (event.detail === 0) return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const matches = nodesAtPoint(
-            root,
-            ((event.clientX - bounds.left) / bounds.width) * 100,
-            ((event.clientY - bounds.top) / bounds.height) * 100,
-          );
+          const matches = nodesAtScreenPoint(event.clientX, event.clientY);
           if (matches.length === 0) return;
           const current = matches.indexOf(props.selected);
           props.onSelect(

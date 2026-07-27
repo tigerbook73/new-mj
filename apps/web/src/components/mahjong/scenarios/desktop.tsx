@@ -1,4 +1,4 @@
-import { DESKTOP_TABLE_PRESET } from "@/lib/desktopTablePreset";
+import { desktopTableLayout } from "@/layouts/desktop.table-config";
 import { SEAT_DIRECTIONS } from "@/lib/seatLayout";
 import type { TableScenario, TableZoneComponent } from "../TableBoard";
 import {
@@ -8,7 +8,6 @@ import {
   MeldSlot,
   TurnIndicator,
 } from "./desktopZoneComponents";
-import { MeldInfoTrack } from "../MeldInfoTrack";
 
 const DESKTOP_ZONE_COMPONENTS: Record<string, TableZoneComponent> = {
   ...Object.fromEntries(
@@ -16,10 +15,6 @@ const DESKTOP_ZONE_COMPONENTS: Record<string, TableZoneComponent> = {
       [
         `hand-${direction}`,
         ({ seats }) => <HandSeatRow direction={direction} seat={seats[direction]} />,
-      ],
-      [
-        `meld-info-${direction}`,
-        ({ children }) => <MeldInfoTrack direction={direction}>{children}</MeldInfoTrack>,
       ],
       [
         `meld-${direction}`,
@@ -54,6 +49,6 @@ const DESKTOP_ZONE_COMPONENTS: Record<string, TableZoneComponent> = {
 
 /** The production desktop table: LayoutPreset + the zone components rendering into it, bundled as one swappable unit. */
 export const DESKTOP_TABLE_SCENARIO: TableScenario = {
-  preset: DESKTOP_TABLE_PRESET,
+  preset: desktopTableLayout,
   components: DESKTOP_ZONE_COMPONENTS,
 };

@@ -21,7 +21,8 @@ export interface SeatContent {
   interactive?: boolean | undefined;
   /** See HandRow.tsx's `captureTileRect` for why `originRect` is a plain measured value, not game state. */
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
-  info: ReactNode;
+  /** Player nickname (or "Seat N" fallback) — rendered as SVG text, see InfoSlot. */
+  info: string;
   /**
    * React key for the pinned drawn-tile slot (the last `handTiles` entry) —
    * distinct from every other slot's plain index key so a genuinely new draw
