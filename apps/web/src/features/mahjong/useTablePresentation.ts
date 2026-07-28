@@ -3,7 +3,12 @@ import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
 import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
-import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import {
+  directionOf,
+  seatAt,
+  SEAT_DIRECTIONS,
+  type SeatDirection,
+} from "@/features/mahjong/lib/seatLayout";
 
 type JunkSeatExtra = {
   handCount: number;
@@ -66,8 +71,8 @@ export function useTablePresentation({
   const extras = view as unknown as TableViewExtras;
   const isMyTurn = view.currentSeat === view.seat && extras.phase === "playing";
   const actionOptions = extras.myActionOptions ?? [];
-  // "draw" is core-gated but server-auto-submitted (docs/process/draw-action.md)
-  // — it must never render as a clickable dock affordance.
+  // "draw" is core-gated but server-auto-submitted (docs/contracts/session-mechanics.md
+  // "摸牌延时代提交") — it must never render as a clickable dock affordance.
   const hasDockActions = actionOptions.some(
     (action) => action.type !== "discard" && action.type !== "draw",
   );

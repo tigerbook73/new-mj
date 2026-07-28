@@ -87,8 +87,9 @@ export class ConfigService {
 
   /**
    * Server-owned pacing delay before a core "awaiting-draw" reveal is
-   * auto-submitted (docs/process/draw-action.md) — applies uniformly to every
-   * seat (human/bot/autopiloted alike), unlike botActionDelayRangeMs.
+   * auto-submitted (docs/contracts/session-mechanics.md "摸牌延时代提交") —
+   * applies uniformly to every seat (human/bot/autopiloted alike), unlike
+   * botActionDelayRangeMs.
    */
   get drawRevealDelayMs(): number {
     if (process.env["NODE_ENV"] === "test") return 0;

@@ -188,17 +188,13 @@ test("public draw and concealed-gang events never contain a TileId", () => {
   }
 });
 
-test(
-  "action logs replay a complete game and fuzz reports no failure",
-  () => {
-    const played = playJunkGame(31);
-    if ("error" in played) throw new Error(played.error);
-    const replayed = playJunkGame(31, {}, played.actions);
-    expect(replayed).toEqual(played);
-    expect(fuzzJunkGames(1000, 41)).toBeUndefined();
-  },
-  60_000,
-);
+test("action logs replay a complete game and fuzz reports no failure", () => {
+  const played = playJunkGame(31);
+  if ("error" in played) throw new Error(played.error);
+  const replayed = playJunkGame(31, {}, played.actions);
+  expect(replayed).toEqual(played);
+  expect(fuzzJunkGames(1000, 41)).toBeUndefined();
+}, 60_000);
 
 test("illegal actions do not mutate state or consume event sequence", () => {
   const started = createJunkGame(13, 0);

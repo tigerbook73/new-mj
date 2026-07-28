@@ -402,12 +402,12 @@ export class RoomService {
 
   /**
    * Server-paced reveal of a draw scheduled by core's "awaiting-draw" phase
-   * (docs/process/draw-action.md) — mirrors the claim-timeout/bot-delay
-   * pattern: a server-only timer, invisible to core/PlayerView/protocol, that
-   * auto-submits {type:"draw"} through the same runAction path as any other
-   * action. Unlike autoPlayBots, this fires for every seat control type
-   * (human/bot/autopiloted) — drawing is the only way out of this phase, not
-   * a decision any seat gets to make.
+   * (docs/contracts/session-mechanics.md "摸牌延时代提交") — mirrors the
+   * claim-timeout/bot-delay pattern: a server-only timer, invisible to
+   * core/PlayerView/protocol, that auto-submits {type:"draw"} through the
+   * same runAction path as any other action. Unlike autoPlayBots, this fires
+   * for every seat control type (human/bot/autopiloted) — drawing is the
+   * only way out of this phase, not a decision any seat gets to make.
    */
   private scheduleDrawReveal(room: Room): void {
     if (room.phase !== "in-game" || this.drawRevealTimers.has(room.id)) return;

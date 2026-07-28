@@ -903,9 +903,10 @@ describe("RoomService — bot auto-play timer interplay (phase 3 regression)", (
 // Fake core that models a two-seat "resolve, then someone must draw" cycle:
 // seat 0 acts, landing seat 1 in the single-legal-action "draw" state; seat 1
 // submitting {type:"draw"} returns control to seat 0. Mirrors the real
-// awaiting-draw phase (packages/core, see docs/process/draw-action.md)
-// closely enough to exercise scheduleDrawReveal without depending on junk's
-// actual rules.
+// awaiting-draw phase (packages/core, see docs/architecture/key-designs.md
+// §1 and docs/contracts/session-mechanics.md "摸牌延时代提交") closely
+// enough to exercise scheduleDrawReveal without depending on junk's actual
+// rules.
 describe("RoomService — draw reveal (server-paced awaiting-draw auto-submit)", () => {
   type FakeDrawState = { turn: 0 | 1; awaitingDraw: boolean; seq: number };
   const fakeDrawGameService = (calls: Array<{ seat: number; action: unknown }>): GameService =>
@@ -1066,7 +1067,12 @@ describe("RoomService — authoritative action snapshots", () => {
       // reveal itself (see the "draw reveal" describe block below for that).
       const config = new ConfigService();
       Object.defineProperty(config, "drawRevealDelayMs", { value: 10_000 });
-      const service = new RoomService(new GameService(), eventBus, fakePersistenceService(), config);
+      const service = new RoomService(
+        new GameService(),
+        eventBus,
+        fakePersistenceService(),
+        config,
+      );
       const gameService = new GameService();
       const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
       for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
@@ -1075,7 +1081,9 @@ describe("RoomService — authoritative action snapshots", () => {
 
       const emitted: Array<{ type: "event" | "snapshot"; seat?: number; seq: number }> = [];
       eventBus.on("game:event", ({ event }) => emitted.push({ type: "event", seq: event.seq }));
-      eventBus.on("game:snapshot", ({ seat, seq }) => emitted.push({ type: "snapshot", seat, seq }));
+      eventBus.on("game:snapshot", ({ seat, seq }) =>
+        emitted.push({ type: "snapshot", seat, seq }),
+      );
 
       const seat = ([0, 1, 2, 3] as const).find(
         (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
