@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { ClaimFlipGhost } from "./ClaimFlipGhost";
@@ -51,17 +52,23 @@ export function MeldGroup({ direction, melds, tileHeightPct, config, entering }:
         // claims.ts's `[...useTiles, discard.tile]` and state-machine.ts's applyBuGang.
         const fromTileIndex =
           meld.type === "buGang" ? meld.tiles.length - 2 : meld.tiles.length - 1;
+        const fromTileId = meld.fromDirection !== undefined ? meld.tiles[fromTileIndex] : undefined;
+        // Only chi mixes three different kinds in claim order rather than rank order, so only it
+        // needs re-sorting for display. Peng/gang tiles are all the same kind — keep the original
+        // construction order as-is, which already has the claimed tile last (or second-to-last
+        // for buGang); sorting those would just be a no-op dressed up as one.
+        const sortedTiles = meld.type === "chi" ? sortTilesForDisplay(meld.tiles) : meld.tiles;
         return (
           <div
             key={meldIndex}
             className="flex"
             style={{ height: `${tileHeightPct}%`, gap: `${config.shared.tileGapPx}px` }}
           >
-            {meld.tiles.map((tile, tileIndex) => {
-              const isFromClaim = tileIndex === fromTileIndex && meld.fromDirection !== undefined;
+            {sortedTiles.map((tile) => {
+              const isFromClaim = tile === fromTileId;
               return (
                 <MeldClaimTile
-                  key={`${tile}-${tileIndex}`}
+                  key={tile}
                   direction={direction}
                   fromDirection={isFromClaim ? meld.fromDirection : undefined}
                   entering={entering}
