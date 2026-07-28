@@ -1,8 +1,8 @@
 import type { Preview } from "@storybook/react-vite";
 import { withThemeByClassName } from "@storybook/addon-themes";
-import type { TileTheme } from "../src/lib/mahjongTiles";
-import { useTableLayoutStore } from "../src/store/tableLayout";
-import "../src/index.css";
+import type { TileTheme } from "../src/features/mahjong/lib/mahjongTiles";
+import { useTableLayoutStore } from "../src/features/mahjong/tableLayout.store";
+import "../src/app/index.css";
 
 const preview: Preview = {
   decorators: [

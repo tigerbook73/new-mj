@@ -8,7 +8,12 @@ import type { Connect, Plugin } from "vite";
 // gate against path traversal, so it's deliberately conservative.
 const FILENAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*\.table-layout\.json$/;
 
-export const resolveLayoutsDir = (root: string) => path.join(root, "src", "layouts");
+// Must stay in sync with where src/features/mahjong keeps its checked-in
+// layout data (src/features/mahjong/layouts/) — this plugin runs at Vite
+// config time (Node), so it can't import that feature's barrel to derive
+// the path without pulling app/React code into the build tooling.
+export const resolveLayoutsDir = (root: string) =>
+  path.join(root, "src", "features", "mahjong", "layouts");
 
 /** Resolves `name` to an absolute path inside `layoutsDir`, or undefined if it's invalid. */
 export function validateLayoutFilename(name: string, layoutsDir: string): string | undefined {
@@ -117,7 +122,7 @@ function createLayoutFilesHandler(layoutsDir: string): Connect.NextHandleFunctio
   };
 }
 
-/** Dev-only file read/write API for Table Layout Lab presets, backed by apps/web/src/layouts/. */
+/** Dev-only file read/write API for Table Layout Lab presets, backed by apps/web/src/features/mahjong/layouts/. */
 export function layoutFilesPlugin(): Plugin {
   return {
     name: "layout-files-dev-api",
