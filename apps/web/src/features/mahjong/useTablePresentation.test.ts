@@ -127,4 +127,30 @@ describe("useTablePresentation", () => {
     expect(presentation.seats.bottom.meldEntering).toBe(true);
     expect(presentation.seats.right.meldEntering).toBe(true);
   });
+
+  it("hides the action dock during awaiting-draw (draw is server-auto-submitted, never clickable)", () => {
+    const view = {
+      seat: 0,
+      hand: [1, 2, 3],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "awaiting-draw",
+      myActionOptions: [{ type: "draw" }],
+      seats: [
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [{ nickname: "Me" }, null, null, null],
+      onDiscard: vi.fn(),
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    expect(presentation.hasDockActions).toBe(false);
+  });
 });

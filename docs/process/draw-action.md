@@ -17,7 +17,9 @@
 
 - **Slice 1（使能，已完成）**：`packages/core` 两个玩法的相位/动作/`rebuildPlayerView`。验收 = `cross-ruleset-invariants.test.ts` 绿 + 两个玩法 fuzz ≥1000 局绿 + `pnpm --filter @new-mj/core verify` 全绿。
 - **Slice 2（已完成）**：`apps/server` 的 `drawRevealDelayMs` 配置 + `scheduleDrawReveal` 定时器 + 清理 + `nextBotAction` 跳过逻辑；`room.service.spec.ts`/`config.service.spec.ts` 新增用例，两处既有 `playJunkGame` 回放测试（unit + e2e）改为跳过录制日志里的 `{type:"draw"}`（server 自己会代提交），`rooms.gateway.e2e-spec.ts` 的单动作时序断言改用较大 `drawRevealDelayMs` 隔离级联。`pnpm --filter @new-mj/server verify` 全绿。
-- **Slice 3（进行中）**：`apps/web` 的 `useTablePresentation.ts` `hasDockActions` 排除 `draw`；单测 + 浏览器实跑。
+- **Slice 3（已完成）**：`apps/web` 的 `useTablePresentation.ts` `hasDockActions` 排除 `draw`（`ActionDock` 本就靠这个开关整体隐藏/显示，不需要再改 `ActionDock.tsx` 自己的过滤）；补单测；`pnpm --filter @new-mj/web verify` 全绿；浏览器真实起 dev server + bot 对局验证：`awaiting-draw` 期间(含自己回合)动作栏全程不出现，摸牌前后有真实可见的停顿（wall 计数在 `playing` 恢复前不变）。
+
+专题三个 slice 均已完成，可以收尾。
 
 ## 关键实现要点（junk）
 

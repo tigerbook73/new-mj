@@ -66,7 +66,11 @@ export function useTablePresentation({
   const extras = view as unknown as TableViewExtras;
   const isMyTurn = view.currentSeat === view.seat && extras.phase === "playing";
   const actionOptions = extras.myActionOptions ?? [];
-  const hasDockActions = actionOptions.some((action) => action.type !== "discard");
+  // "draw" is core-gated but server-auto-submitted (docs/process/draw-action.md)
+  // — it must never render as a clickable dock affordance.
+  const hasDockActions = actionOptions.some(
+    (action) => action.type !== "discard" && action.type !== "draw",
+  );
   const seatData = (seat: SeatId): JunkSeatExtra => extras.seats?.[seat] ?? EMPTY_SEAT;
 
   const seats = Object.fromEntries(
