@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { LoginForm } from "@/components/login-form";
-import { SocialLoginForm } from "@/components/social-login-form";
+import { LoginForm } from "@/features/auth/login-form";
+import { SocialLoginForm } from "@/features/auth/social-login-form";
 import { connectWithTakeoverPrompt, describeConnectError } from "@/lib/socket";
-import { clearDevSession, deriveUserId, signDevToken, writeDevSession } from "@/lib/devAuth";
+import { clearDevSession, deriveUserId, signDevToken, writeDevSession } from "@/features/auth/devAuth";
 import { establishSession } from "@/lib/sessionBootstrap";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";

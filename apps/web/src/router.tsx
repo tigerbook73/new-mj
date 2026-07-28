@@ -12,9 +12,9 @@ import {
 import { ensureConnected, establishSession } from "@/lib/sessionBootstrap";
 import { supabase } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
-import { LoginView } from "@/views/LoginView";
-import { AuthCallbackView } from "@/views/AuthCallbackView";
-import { SessionBlockedView } from "@/views/SessionBlockedView";
+import { LoginView } from "@/features/auth/LoginView";
+import { AuthCallbackView } from "@/features/auth/AuthCallbackView";
+import { SessionBlockedView } from "@/features/auth/SessionBlockedView";
 import { GamePickerView } from "@/views/GamePickerView";
 import { LobbyView } from "@/views/LobbyView";
 import { TableView } from "@/features/mahjong/TableView";

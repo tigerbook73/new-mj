@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { jwtVerify } from "jose";
-import { deriveUserId, signDevToken } from "@/lib/devAuth";
+import { deriveUserId, signDevToken } from "@/features/auth/devAuth";
 
 describe("deriveUserId", () => {
   it("slugifies the nickname into a deterministic pseudo-account id", () => {

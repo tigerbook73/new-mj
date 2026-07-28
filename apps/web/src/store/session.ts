@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
 import type { GameAdviceResponse, PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
-import { clearDevSession } from "@/lib/devAuth";
+import { clearDevSession } from "@/features/auth/devAuth";
 import { ack } from "@/lib/socket";
 import { supabase } from "@/lib/supabase";
 

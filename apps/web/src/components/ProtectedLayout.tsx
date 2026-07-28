@@ -1,5 +1,5 @@
 import { Outlet } from "react-router";
-import { SignOutButton } from "@/components/SignOutButton";
+import { SignOutButton } from "@/features/auth/SignOutButton";
 
 /**
  * Chrome-only layout for /games, /lobby/:roomId, /room/:roomId,

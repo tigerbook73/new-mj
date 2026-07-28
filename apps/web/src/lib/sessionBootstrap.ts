@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 import type { Socket } from "socket.io-client";
 import type { SessionIdentity } from "@new-mj/protocol";
-import { clearDevSession, readDevSession } from "./devAuth";
+import { clearDevSession, readDevSession } from "@/features/auth/devAuth";
 import { ack, connect } from "./socket";
 import { supabase } from "./supabase";
 import { useSessionStore } from "@/store/session";
