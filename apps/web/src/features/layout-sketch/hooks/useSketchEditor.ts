@@ -26,14 +26,14 @@ import {
   type SketchGeometryKey,
   type SketchPercentage,
   type SketchNode,
-} from "@/lib/layoutSketch";
+} from "@/features/layout-sketch/lib/layoutSketch";
 import { type RotationDeg } from "@/shared/lib/layoutPreset";
 import {
   listLayoutFiles,
   readLayoutFile,
   writeLayoutFile,
   type LayoutFileEntry,
-} from "@/lib/layoutFilesApi";
+} from "@/features/layout-sketch/lib/layoutFilesApi";
 
 // Matches the dev-server plugin's own filename validation
 // (apps/web/dev/layoutFilesPlugin.ts) — kept in sync manually, both are
@@ -123,7 +123,7 @@ export function useSketchEditor() {
   // draft change.
   const draftsRef = useRef(document.drafts);
   draftsRef.current = document.drafts;
-  // Auto-"opens" any apps/web/src/layouts/*.table-layout.json file that
+  // Auto-"opens" any apps/web/src/features/mahjong/layouts/*.table-layout.json file that
   // isn't already bound to a local draft, on mount and whenever the tab
   // regains focus (catches files created/edited outside the Lab). Files
   // already bound to a draft are left alone — this only discovers new

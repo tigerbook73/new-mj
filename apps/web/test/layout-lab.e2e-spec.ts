@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
-const LAYOUTS_DIR = fileURLToPath(new URL("../src/layouts/", import.meta.url));
+const LAYOUTS_DIR = fileURLToPath(new URL("../src/features/mahjong/layouts/", import.meta.url));
 
 test("layout sketch creates a selected child and persists numeric edits", async ({ page }) => {
   await page.goto("/dev/table-layout");
@@ -30,7 +30,7 @@ test("layout sketch copies the exported LayoutPreset JSON", async ({ page, conte
     .toMatch(/"name": "draft1"/);
 });
 
-// apps/web/src/layouts/desktop.table-layout.json auto-opens as a draft on
+// apps/web/src/features/mahjong/layouts/desktop.table-layout.json auto-opens as a draft on
 // cold start (see the Save/Load plan's "打开 Lab" scenario) — this replaces
 // the old manual "Import desktop preset" button, which is gone.
 test("the desktop preset file auto-opens as a draft on cold start", async ({ page }) => {
@@ -850,7 +850,7 @@ test("Parent-local uses an unrotated parent's local 4:1 aspect ratio", async ({ 
 });
 
 // These tests hardcode exact draft counts/names and/or write real files
-// into apps/web/src/layouts/ — the dev-only file API's target directory is
+// into apps/web/src/features/mahjong/layouts/ — the dev-only file API's target directory is
 // shared across every parallel worker hitting the same dev server, so a
 // file written by one test would auto-open as an extra draft in any other
 // concurrently-running page and throw off the others' counts. Serializing

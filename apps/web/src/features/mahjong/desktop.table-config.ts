@@ -1,6 +1,6 @@
 import type { LayoutPreset } from "@/shared/lib/layoutPreset";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
-import desktopTableLayoutJson from "../../layouts/desktop.table-layout.json";
+import desktopTableLayoutJson from "./layouts/desktop.table-layout.json";
 
 /** The checked-in Layout Lab export is the production desktop layout source of truth. */
 export const desktopTableLayout = desktopTableLayoutJson as LayoutPreset;

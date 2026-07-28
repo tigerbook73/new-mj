@@ -14,8 +14,8 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { isGridCellSlotName, namesMatchingQuery, type SketchNode } from "@/lib/layoutSketch";
-import { useDragSort } from "@/hooks/useDragSort";
+import { isGridCellSlotName, namesMatchingQuery, type SketchNode } from "@/features/layout-sketch/lib/layoutSketch";
+import { useDragSort } from "@/features/layout-sketch/hooks/useDragSort";
 
 type DragSort = ReturnType<typeof useDragSort>;
 

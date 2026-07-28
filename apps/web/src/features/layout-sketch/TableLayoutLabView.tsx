@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { findNode, findParentNode, exportSketchDraft, type SketchNode } from "@/lib/layoutSketch";
-import { SketchCanvas } from "@/components/layout-sketch/SketchCanvas";
-import { SketchHeader } from "@/components/layout-sketch/SketchHeader";
-import { VIEWPORT_PRESETS } from "@/components/layout-sketch/viewportPresets";
-import { SketchProperties } from "@/components/layout-sketch/SketchProperties";
-import { SketchTreePanel } from "@/components/layout-sketch/SketchTree";
-import { SketchVariables } from "@/components/layout-sketch/SketchVariables";
-import { useSketchEditor, defaultLayoutFilename } from "@/hooks/useSketchEditor";
+import { findNode, findParentNode, exportSketchDraft, type SketchNode } from "@/features/layout-sketch/lib/layoutSketch";
+import { SketchCanvas } from "@/features/layout-sketch/components/SketchCanvas";
+import { SketchHeader } from "@/features/layout-sketch/components/SketchHeader";
+import { VIEWPORT_PRESETS } from "@/features/layout-sketch/components/viewportPresets";
+import { SketchProperties } from "@/features/layout-sketch/components/SketchProperties";
+import { SketchTreePanel } from "@/features/layout-sketch/components/SketchTree";
+import { SketchVariables } from "@/features/layout-sketch/components/SketchVariables";
+import { useSketchEditor, defaultLayoutFilename } from "@/features/layout-sketch/hooks/useSketchEditor";
 
 const findSketchPath = (root: SketchNode, name: string): SketchNode[] | undefined => {
   if (root.name === name) return [root];

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { ClipboardCopy, Copy, HardDriveDownload, Plus, Save, Trash2, Upload } from "lucide-react";
-import { type SketchDraft } from "@/lib/layoutSketch";
+import { type SketchDraft } from "@/features/layout-sketch/lib/layoutSketch";
 import { RatioField } from "./SketchFields";
 import { confirmOrCancelStringEdit } from "./editorInput";
 import { VIEWPORT_PRESETS } from "./viewportPresets";

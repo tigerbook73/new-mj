@@ -1,5 +1,5 @@
 import { type CSSProperties } from "react";
-import { type SketchNode } from "@/lib/layoutSketch";
+import { type SketchNode } from "@/features/layout-sketch/lib/layoutSketch";
 
 type SketchBoxProps = {
   node: SketchNode;

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowUpDown, GripVertical, Plus, Search, Trash2 } from "lucide-react";
-import { type SketchVariable } from "@/lib/layoutSketch";
-import { useDragSort } from "@/hooks/useDragSort";
-import { useVariableAutocomplete } from "@/hooks/useVariableAutocomplete";
+import { type SketchVariable } from "@/features/layout-sketch/lib/layoutSketch";
+import { useDragSort } from "@/features/layout-sketch/hooks/useDragSort";
+import { useVariableAutocomplete } from "@/features/layout-sketch/hooks/useVariableAutocomplete";
 import { AutocompleteDropdown } from "./SketchFields";
 
 const SORT_GROUP = "variables";

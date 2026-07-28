@@ -37,7 +37,7 @@ const expectZonesToMatch = (actual: Zone, expected: Zone) => {
 describe("layout sketch document", () => {
   it("imports the checked-in desktop production layout JSON", () => {
     const source = readFileSync(
-      new URL("../layouts/desktop.table-layout.json", import.meta.url),
+      new URL("../../mahjong/layouts/desktop.table-layout.json", import.meta.url),
       "utf8",
     );
     const imported = parseLayoutPresetJson(source);

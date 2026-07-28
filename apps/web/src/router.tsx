@@ -19,7 +19,7 @@ import { GamePickerView } from "@/views/GamePickerView";
 import { LobbyView } from "@/views/LobbyView";
 import { TableView } from "@/features/mahjong/TableView";
 import { ReplayView } from "@/views/ReplayView";
-import { TableLayoutLabView } from "@/views/TableLayoutLabView";
+import { TableLayoutLabView } from "@/features/layout-sketch/TableLayoutLabView";
 
 /**
  * /login is outside ProtectedLayout, but still checks server-truth: a

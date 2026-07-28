@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { resolvePercentage, type SketchPercentage } from "@/lib/layoutSketch";
-import { useVariableAutocomplete } from "@/hooks/useVariableAutocomplete";
+import { resolvePercentage, type SketchPercentage } from "@/features/layout-sketch/lib/layoutSketch";
+import { useVariableAutocomplete } from "@/features/layout-sketch/hooks/useVariableAutocomplete";
 
 /** Popup rendered under a raw-expression input while `$partial` autocomplete is open — see useVariableAutocomplete. */
 export function AutocompleteDropdown({
