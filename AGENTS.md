@@ -11,7 +11,7 @@
 ## Ground Truth（冲突以 docs 为准）
 
 - 契约：docs/contracts/engine-contract.md · docs/contracts/protocol-shared.md · docs/contracts/session-mechanics.md · docs/variants/junk.md（定稿）· docs/variants/bloodbattle.md（定稿）
-- 原理与取舍：docs/architecture/system.md · docs/architecture/data-model.md · docs/architecture/key-designs.md · docs/architecture/variant-boundary.md · docs/decisions.md
+- 原理与取舍：docs/architecture/system.md · docs/architecture/data-model.md · docs/architecture/key-designs.md · docs/architecture/variant-boundary.md
 - 流程细则（DoD/Git/验收）：docs/process/workflow.md；测试策略：docs/testing-strategy.md；文档规则：docs/doc-map.md
 - 阶段与待办：docs/process/plan.md
 

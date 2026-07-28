@@ -32,4 +32,4 @@ Room（连续对局会话容器，apps/server）
 
 ## 4. 每个玩法自己的状态形状
 
-没有跨玩法共享的全局 `GameState`/`Action`/`Phase` 类型——每个 ruleset 在自己的模块里定义私有的 `<Id>State`/`<Id>Action`/`<Id>Phase`，公共骨架只提取真正跨玩法一致的最小交集（哪些字段、见 `engine-contract.md`）。这是有意的设计（`decisions.md` D12），不是尚未做的重构——具体原因见 `variant-boundary.md` 的判定准则。
+没有跨玩法共享的全局 `GameState`/`Action`/`Phase` 类型——每个 ruleset 在自己的模块里定义私有的 `<Id>State`/`<Id>Action`/`<Id>Phase`，公共骨架只提取真正跨玩法一致的最小交集（哪些字段、见 `engine-contract.md`）。这是有意的设计，不是尚未做的重构——具体原因见 `variant-boundary.md` 的判定准则。

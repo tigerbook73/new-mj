@@ -18,21 +18,21 @@ export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
   getPlayerView: (state: TState, seat: SeatId) => TView;
   /**
    * Given a just-finished game's own final state and the dealer who played
-   * it, returns the dealer for the next game. Ruleset-owned mahjong rule
-   * (D15) — today both rulesets ignore `finishedState` and simply rotate
-   * clockwise, but the signature is the extension point for future variants
-   * (e.g. dealer continuation) without touching server orchestration.
+   * it, returns the dealer for the next game. Ruleset-owned mahjong rule —
+   * today both rulesets ignore `finishedState` and simply rotate clockwise,
+   * but the signature is the extension point for future variants (e.g.
+   * dealer continuation) without touching server orchestration.
    */
   computeNextDealer: (finishedState: TState, currentDealer: SeatId) => SeatId;
   /**
    * Reconstructs a seat's view by replaying a stored event stream instead of
-   * deriving it from live state — same event-reconstruction logic
-   * getPlayerView's caller would see live (decisions.md D-事件重建≡直接派生),
-   * just fed historical events. Ruleset-owned (payload interpretation is
-   * ruleset-private), unlike getOmniscientView (D19) which is generic
-   * because it only reads the common `{ wall, seats }` shape — replaying
-   * events requires understanding what each event type means, so this can't
-   * be a single cross-ruleset function. Used by phase 4.5.
+   * deriving it from live state — same event-reconstruction-equals-direct-
+   * derivation invariant getPlayerView's caller would see live, just fed
+   * historical events. Ruleset-owned (payload interpretation is
+   * ruleset-private), unlike getOmniscientView which is generic because it
+   * only reads the common `{ wall, seats }` shape — replaying events
+   * requires understanding what each event type means, so this can't be a
+   * single cross-ruleset function. Used by phase 4.5.
    */
   rebuildPlayerView: (events: readonly GameEvent[], seat: SeatId) => TView;
 };

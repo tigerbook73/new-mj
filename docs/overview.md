@@ -26,11 +26,10 @@
 
 | 你是谁                    | 怎么读                                                                                                                                                                                            |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 新人，想快速理解系统      | `architecture/system.md`（系统长什么样）→ `architecture/key-designs.md`（为什么这么设计）→ `decisions.md`（懂取舍）                                                                               |
+| 新人，想快速理解系统      | `architecture/system.md`（系统长什么样）→ `architecture/key-designs.md`（为什么这么设计）                                                                                                         |
 | 想加一个新玩法            | `architecture/variant-boundary.md`（哪些能复用、哪些必须自己写）→ `contracts/engine-contract.md`（要实现哪些接口）→ 抄一份最接近的 `variants/*.md` 做模板 → `testing-strategy.md`（最低验收要求） |
 | 想改协议/房间逻辑         | `contracts/protocol-shared.md` / `contracts/session-mechanics.md`                                                                                                                                 |
 | 想查具体某个玩法的规则    | `variants/junk.md` / `variants/bloodbattle.md`                                                                                                                                                    |
-| 想知道某个技术选择的理由  | `decisions.md`（append-only 决策记录，位置不变；精简例外见 `doc-map.md` §2.2）                                                                                                                    |
 | Claude Code / AI 会话开工 | 根级/包级 `CLAUDE.md`/`AGENTS.md` → `process/plan.md` 状态区 → 按需读契约与规则文档                                                                                                               |
 
 ## 文档结构总览
@@ -53,7 +52,6 @@ testing-strategy.md             测试策略（先定后做）
 process/
   plan.md                       阶段路线与状态（过程文档）
   workflow.md                   流程细则（过程文档）
-decisions.md                    决策记录（append-only，记录级；精简例外见 doc-map.md §2.2）
 ```
 
 > 文档归属与维护规则见 `doc-map.md`。

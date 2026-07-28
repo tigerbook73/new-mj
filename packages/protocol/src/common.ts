@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 /**
- * docs/contracts/protocol-shared.md §1 / decisions.md D7 — protocol has no
- * version negotiation, only this constant to tell a drifted client to
- * refresh. Single source of truth: apps/server's ConfigService and
- * apps/web's handshake both import this instead of hardcoding "1.0".
+ * docs/contracts/protocol-shared.md §1 — protocol has no version
+ * negotiation, only this constant to tell a drifted client to refresh.
+ * Single source of truth: apps/server's ConfigService and apps/web's
+ * handshake both import this instead of hardcoding "1.0".
  */
 export const PROTOCOL_VERSION = "1.1";
 

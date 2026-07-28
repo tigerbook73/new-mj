@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { REGISTERED_RULESETS_FOR_TESTING } from "../src/support/registered-rulesets.ts";
 
-// "Event reconstruction ≡ direct derivation" (decisions.md G) is a core
-// invariant, not a junk-specific one — parameterized so a second ruleset
+// "Event reconstruction ≡ direct derivation" is a core invariant, not a
+// junk-specific one — parameterized so a second ruleset
 // only needs to be added to the registry, not re-authored here.
 for (const ruleset of REGISTERED_RULESETS_FOR_TESTING) {
   test(`${ruleset.id}: filtered events rebuild the same initial player view as direct derivation`, () => {

@@ -11,8 +11,8 @@ type BloodbattleScoringCase = {
 
 const standard = { capFan: 4, selfDrawBonus: "addFan" as const };
 
-// Tile-count convention (see docs/rules-bloodbattle.md "约定" and
-// decisions.md BB2): `input.hand` is the *pre-win* concealed hand; the
+// Tile-count convention (see docs/rules-bloodbattle.md "约定"):
+// `input.hand` is the *pre-win* concealed hand; the
 // complete hand for shape checking is `hand` plus `win.tile`. A kong is
 // always a 4-tile entry in `melds`, never bare copies in `hand` — except the
 // seven-pairs family (bb-006), where a "pair" being four-of-a-kind is the
@@ -188,7 +188,7 @@ export const bloodbattleScoringFixtures: BloodbattleScoringCase[] = [
   },
   {
     id: "bb-012",
-    desc: "杠上花（杠后补摸自摸；本质也是自摸，addFan 时 zimo 与 gangshanghua 同时计入，decisions.md BB2①）",
+    desc: "杠上花（杠后补摸自摸；本质也是自摸，addFan 时 zimo 与 gangshanghua 同时计入）",
     input: {
       config: standard,
       hand: ["1s", "2s", "3s", "4s", "5s", "6s", "7s", "8s", "9s", "2m", "3m", "4m", "9m"],
@@ -251,7 +251,7 @@ export const bloodbattleScoringFixtures: BloodbattleScoringCase[] = [
   },
   {
     id: "bb-017",
-    desc: "杠上炮+海底炮叠加：操作类附加番互不排斥（decisions.md BB2②），同一张弃牌两者都成立时都计入",
+    desc: "杠上炮+海底炮叠加：操作类附加番互不排斥，同一张弃牌两者都成立时都计入",
     input: {
       config: standard,
       hand: ["1s", "2s", "3s", "4s", "5s", "6s", "7s", "8s", "9s", "2m", "3m", "4m", "9m"],

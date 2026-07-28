@@ -158,8 +158,8 @@ export function TableView() {
     }
   };
 
-  // Dev/test-only escape hatch (decisions.md D19, protocol-shared.md §7) —
-  // raw TileIds, no tile-face rendering; server rejects unless
+  // Dev/test-only escape hatch (protocol-shared.md §7) — raw TileIds, no
+  // tile-face rendering; server rejects unless
   // ALLOW_DEBUG_OMNISCIENT is set, so this is a no-op against a normal deploy.
   const fetchDebugOmniscientView = async () => {
     setError(null);

@@ -7,7 +7,7 @@ test("root redirects to /login", async ({ page }) => {
 
 // Phase 5 smoke test: only checks the OAuth entry points render — actually
 // clicking through needs a real Supabase project + Google/GitHub OAuth
-// client secrets this sandbox doesn't have (see decisions.md phase 5 entry).
+// client secrets this sandbox doesn't have.
 test("the Google and GitHub sign-in buttons render on /login", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();

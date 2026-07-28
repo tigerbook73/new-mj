@@ -141,6 +141,13 @@ const finalize = (
   }
 
   const { win, context, config } = input;
+  // These two rule points weren't confirmed against an authoritative bloodbattle
+  // source (fixture author isn't a rules expert) and are handled as the generic
+  // implementation instead: (1) 杠上花 is fundamentally a self-draw, so when
+  // selfDrawBonus="addFan" the "zimo" and "gangshanghua" fans both apply, not
+  // mutually exclusive; (2) operational fans (gangshangpao/qiangganghu/haidilaoyue/
+  // haidipao) stack freely with each other — only the base fan types above are
+  // mutually exclusive.
   const isSelfDraw = win.by === "zimo" || win.by === "kongFlower";
   if (isSelfDraw && config.selfDrawBonus === "addFan") {
     fanTypes.push("zimo");

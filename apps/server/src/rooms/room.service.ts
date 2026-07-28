@@ -621,7 +621,7 @@ export class RoomService {
   }
 
   /**
-   * Dev/test-only escape hatch (decisions.md D19) — gate/membership check is
+   * Dev/test-only escape hatch — gate/membership check is
    * the caller's (RoomsGateway) responsibility.
    */
   getOmniscientView(roomId: string): OmniscientView {
@@ -736,7 +736,7 @@ export class RoomService {
     };
     room.finishedGames.push(gameLog);
     // Fire-and-forget: archival must never be able to interrupt this
-    // synchronous game-processing flow (decisions.md phase 5 entry).
+    // synchronous game-processing flow.
     this.persistenceService.fireAndForget(
       this.persistenceService.archiveGame(room.id, { ...gameLog, rulesetId: room.rulesetId }),
       `archiveGame(${room.id}, ${gameLog.gameNumber})`,

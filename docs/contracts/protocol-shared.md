@@ -1,6 +1,6 @@
 # 通用协议契约
 
-> 状态：迁移自 `_legacy/protocol.md`，v2，评审点 H/I 已定稿。全部消息以 zod schema 定义，三端共享（`decisions.md` D10）
+> 状态：迁移自 `_legacy/protocol.md`，v2，评审点 H/I 已定稿。全部消息以 zod schema 定义，三端共享。
 > **只放跨玩法/跨房间通用的传输层约定**：房间/会话专属消息（room:\*）见 `session-mechanics.md`；某玩法的 `game:action` 具体 payload 见对应 `variants/*.md`。
 > 通道：除 OAuth（Supabase SDK）外全走 Socket.IO；client→server 一律 ack 请求-响应，server→client 一律单向事件推送
 
@@ -36,7 +36,7 @@
 | `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤）；若该连接当前可合法 pass，则附 server 计算的绝对 deadline                  |
 | `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 开局以及每个已接受动作的可见 events 之后逐座位下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }` |
 
-身份一律取 `socket.data.userId`，payload 不含也不信任 userId（`decisions.md` D10 铁律）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
+身份一律取 `socket.data.userId`，payload 不含也不信任 userId（架构铁律 3）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
 
 `deadline` 是 Unix epoch 毫秒值，只由 server 生成。它只出现在当前具有合法 `{type:"pass"}` 的座位信封中；同一声明窗口内其他玩家先响应不会延长它。客户端本地归零不提交动作，server 到期后通过正常 `game:action` 内部路径代交 pass。中局 `room:enter` 的 `{room,view,seq,deadline?}` 会返回该座位尚未到期的同一个绝对 deadline。
 
@@ -85,4 +85,4 @@ B ← game:event TurnStarted(B)（B 碰后出牌）
 
 - 门控：server 侧 `ConfigService.allowDebugOmniscient`（读环境变量 `ALLOW_DEBUG_OMNISCIENT`，默认 `false`）关闭时一律拒绝，两条消息共用同一个开关。
 - 鉴权/成员校验复用现有机制，不新增错误码：开关关闭或请求者不是该房间已入座玩家 → `UNAUTHORIZED`（座位未找到细化为 `NOT_IN_ROOM`）；游戏未开始 → `GAME_NOT_STARTED`；`debug:replayOmniscientView` 的 `gameNumber` 未归档 → `GAME_NOT_FOUND`。
-- 故意绕开 core `getPlayerView` 的可见性过滤，直接读取隐藏手牌与未摸牌墙——这是显式受控的例外，不是"public 事件携带隐藏牌 id"（本消息不是 public 事件，是按需查询的单播 ack），不违反第 1 节以外的可见性铁律。取舍理由见 `decisions.md` D19，core 侧契约说明见 `engine-contract.md` §8。`debug:replayOmniscientView` 直接读取归档的 `finalState`（阶段 4.5，见 `session-mechanics.md` §10），不经过任何事件重放。
+- 故意绕开 core `getPlayerView` 的可见性过滤，直接读取隐藏手牌与未摸牌墙——这是显式受控的例外，不是"public 事件携带隐藏牌 id"（本消息不是 public 事件，是按需查询的单播 ack），不违反第 1 节以外的可见性铁律。core 侧契约说明见 `engine-contract.md` §8。`debug:replayOmniscientView` 直接读取归档的 `finalState`（阶段 4.5，见 `session-mechanics.md` §10），不经过任何事件重放。

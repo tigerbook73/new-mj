@@ -1,7 +1,7 @@
 # 垃圾胡规则（rulesetId: `junk`）
 
 > 状态：v2 定稿，阶段 1 已实现并测试通过（`packages/core/src/rulesets/junk/`）
-> 定位：最简玩法，用于验证 core 基建/插件分层（`decisions.md` D9）
+> 定位：最简玩法，用于验证 core 基建/插件分层
 > 本文件内聚了垃圾胡的全部知识：规则、专属类型、专属事件、跨局规则。公共契约见 `contracts/engine-contract.md`；即使某节内容和 `bloodbattle.md` 恰好一样，也各写一份，不互相链接（见 `architecture/variant-boundary.md`）。
 
 ## 1. 牌集与开局
@@ -42,7 +42,7 @@
   - `awaiting-claims`：声明窗口
   - `finished`：有人胡或流局
 - `JunkAction`（`packages/core/src/rulesets/junk/types.ts`）：discard/anGang/buGang/zimo/chi/peng/minGang/hu/pass
-- `JunkState`/`JunkPendingClaims` 见 `packages/core/src/rulesets/junk/types.ts`；不存在跨玩法共享的全局 `GameState`（`decisions.md` D12）
+- `JunkState`/`JunkPendingClaims` 见 `packages/core/src/rulesets/junk/types.ts`；不存在跨玩法共享的全局 `GameState`
 
 `source='robKong'` 仅在 `robKong=true` 时出现：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸；若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
 
@@ -86,12 +86,12 @@
 | `robKong`       | **false ✓**      | 抢杠胡（他家补杠时可胡该张）是否允许                                     |
 | `multiHuPolicy` | **'headJump' ✓** | 多家可同时点炮胡时：头跳（按逆时针最近者独胡）或 'all'（均胡）。头跳最简 |
 
-第一版三项全取默认（最简），使垃圾胡 RuleSet 体量最小；config 解析与 fuzz 随机化已按 `decisions.md` D8 口径覆盖三项。
+第一版三项全取默认（最简），使垃圾胡 RuleSet 体量最小；config 解析与 fuzz 随机化已覆盖三项。
 
 ## 9. 已知信息泄漏（记录，不处理）
 
-声明窗口的存在/时长可能向他家暗示"有人能碰/杠/胡"。非商用项目不做混淆处理（`decisions.md` D7 口径），记录备查。
+声明窗口的存在/时长可能向他家暗示"有人能碰/杠/胡"。非商用项目不做混淆处理，记录备查。
 
 ## 10. 状态
 
-v2 定稿，阶段 1 已实现并测试通过；fuzz 1000 局通过。相关决策：D9（垃圾胡为第一玩法的理由）。
+v2 定稿，阶段 1 已实现并测试通过；fuzz 1000 局通过。

@@ -22,9 +22,8 @@ pnpm fuzz --seed 47 --games 10000
 ## 文档阅读路径
 
 1. `docs/architecture.md` —— 系统怎么运转（一页纸）
-2. `docs/decisions.md` —— 为什么这样设计
-3. `docs/` 规格四件套 —— 做事时查的契约
-4. 协作流程：`docs/workflow.md`；文档规则：`docs/doc-map.md`
+2. `docs/` 规格四件套 —— 做事时查的契约
+3. 协作流程：`docs/workflow.md`；文档规则：`docs/doc-map.md`
 
 `CLAUDE.md` 为 AI 会话规范，不在人的必读路径。
 

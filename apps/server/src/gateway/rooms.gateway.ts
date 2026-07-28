@@ -408,8 +408,8 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
   }
 
   /**
-   * Dev/test-only escape hatch (decisions.md D19, protocol-shared.md §7) —
-   * gated by ALLOW_DEBUG_OMNISCIENT, never reachable from production UI.
+   * Dev/test-only escape hatch (protocol-shared.md §7) — gated by
+   * ALLOW_DEBUG_OMNISCIENT, never reachable from production UI.
    * Deliberately bypasses getPlayerView's visibility filtering.
    */
   @SubscribeMessage("debug:omniscientView")

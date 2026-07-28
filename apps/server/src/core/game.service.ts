@@ -48,8 +48,8 @@ export class GameService {
   }
 
   /**
-   * Dev/test-only escape hatch (decisions.md D19) — not one of the four
-   * engine-api signatures, deliberately bypasses getPlayerView's visibility
+   * Dev/test-only escape hatch — not one of the four engine-api signatures,
+   * deliberately bypasses getPlayerView's visibility
    * filtering. Callers must gate access themselves.
    */
   getOmniscientView(state: unknown): OmniscientView {

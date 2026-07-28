@@ -13,7 +13,7 @@
 
 - `src/lib/` 只放不带玩法立场的纯函数积木；`rulesets/*` 不 import 其他 ruleset 的流程代码。
 - 公共、玩法、计分、事件常量按模块归拢；Action/State 类型保留可读字面量联合。
-- `src` 与 `test` 内跨层引用一律用相对路径 + `.ts` 后缀（不用 `@/*` alias——Node 原生 `require()`/Vite 都不认识 tsconfig `paths`，`development` export 条件下 server/web 直接消费本包源码，见 `decisions.md` D24）。
+- `src` 与 `test` 内跨层引用一律用相对路径 + `.ts` 后缀（不用 `@/*` alias——Node 原生 `require()`/Vite 都不认识 tsconfig `paths`）。这也是 `development` export 条件下 server/web 能直接消费本包 `src` 源码、生产态仍消费 `dist` 的前提：只监听 `dist/*.d.ts` 曾实测在"改实现不改签名"时不触发 `tsc --watch` 重新编译，改成让真实源码进入监听范围更可靠。
 - 测试文件位置/命名遵循根 AGENTS.md 全局约定（`docs/testing-strategy.md` §1.1）；无 core 专属偏离。
 - 已导出的领域状态、事件和跨模块结果优先定义专门的 `type`/`interface`；这样可复用、可被契约引用，并减少后续接口调整时的漂移。
 - 仅在模块内部使用、语义一次性且不会成为跨包契约的简单结果，允许使用内联返回类型；不为形式统一而制造无意义类型名。

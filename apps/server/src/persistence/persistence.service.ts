@@ -20,9 +20,9 @@ export interface ArchivedSession {
  * Persists the three phase-5 tables (profiles/room_sessions/game_logs, see
  * prisma/schema.prisma). Callers on the write side treat this as
  * fire-and-forget (RoomService never awaits archiveGame/archiveSession
- * inside its synchronous game-processing flow — decisions.md phase 5 entry,
- * "写入路径 fire-and-forget"). Json columns round-trip data this service
- * itself wrote, so read-side casts trust that shape rather than re-validating.
+ * inside its synchronous game-processing flow). Json columns round-trip
+ * data this service itself wrote, so read-side casts trust that shape
+ * rather than re-validating.
  */
 @Injectable()
 export class PersistenceService {

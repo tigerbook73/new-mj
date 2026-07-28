@@ -24,8 +24,8 @@ export class ConfigService {
   }
 
   /**
-   * Dev/test-only escape hatch (decisions.md D19, protocol-shared.md §7):
-   * gates the `debug:omniscientView` channel. Defaults off — must be
+   * Dev/test-only escape hatch (protocol-shared.md §7): gates the
+   * `debug:omniscientView` channel. Defaults off — must be
    * explicitly opted into, never set in a shipped deployment.
    */
   get allowDebugOmniscient(): boolean {

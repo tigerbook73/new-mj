@@ -64,7 +64,7 @@
 
 ## 5. 跨局规则
 
-- **庄家轮换公式**（对应 `contracts/engine-contract.md` §4 的 `computeNextDealer` 契约）：当前不看上一局结果，顺时针轮转——和垃圾胡当前实现一样，但这是各自独立维护的实现，不是共享代码；血战规则定稿未提连庄，若未来要支持连庄/抢庄/叠倍，只改这里，不动契约签名或房间编排代码（`decisions.md` D15）。
+- **庄家轮换公式**（对应 `contracts/engine-contract.md` §4 的 `computeNextDealer` 契约）：当前不看上一局结果，顺时针轮转——和垃圾胡当前实现一样，但这是各自独立维护的实现，不是共享代码；血战规则定稿未提连庄，若未来要支持连庄/抢庄/叠倍，只改这里，不动契约签名或房间编排代码。
 - **会话排名**：当前复用房间层的通用实现（纯分数从高到低排序），见 `contracts/session-mechanics.md` §4 的现状说明与警示。
 
 ## 6. Config 清单
@@ -81,7 +81,7 @@
 | `selfDrawBonus`     | 'addFan'         | 'addBase'（自摸加底）    |
 | `mustHuOnLastFour`  | false            | true（成都比赛细则）     |
 
-`checkHuaZhu=true` 时 `capFan` 必须为数字（花猪罚分取封顶分）；否则 config 非法。`mustHuOnLastFour=true` 时，牌墙剩余不多于 4 张且某家存在合法胡牌动作，该家必须选择胡牌，不能 `pass` 或继续出牌。地方差异一律通过本表达，不做成结构级 RuleSet 分叉（`decisions.md` D8）。
+`checkHuaZhu=true` 时 `capFan` 必须为数字（花猪罚分取封顶分）；否则 config 非法。`mustHuOnLastFour=true` 时，牌墙剩余不多于 4 张且某家存在合法胡牌动作，该家必须选择胡牌，不能 `pass` 或继续出牌。地方差异一律通过本表达，不做成结构级 RuleSet 分叉。
 
 ## 7. Phase、Action 与私有状态
 
@@ -89,7 +89,7 @@
   - `exchanging`/`choosing-lack`：四家独立提交，全员提交后自动转移
   - `playing`：缺门出牌、碰/胡声明、多赢家、杠、抢杠胡、呼叫转移、三家胡/牌墙耗尽与流局终局结算
 - `BloodbattleAction`（`packages/core/src/rulesets/bloodbattle/types.ts`）：前置阶段的 exchangeThree/chooseLack，playing 阶段动作与垃圾胡同构复用
-- `BloodbattleState` 顶层可选字段（无独立 `variantState` 命名空间，`decisions.md` D12）：换三张阶段数据 `exchange?`、定缺选择 `lack?`、playing 阶段各家已胡标记与胡牌快照、基础杠分流水、补杠抢杠胡窗口、抢杠胡后的呼叫转移、流局查花猪/退税/查大叫
+- `BloodbattleState` 顶层可选字段（无独立 `variantState` 命名空间）：换三张阶段数据 `exchange?`、定缺选择 `lack?`、playing 阶段各家已胡标记与胡牌快照、基础杠分流水、补杠抢杠胡窗口、抢杠胡后的呼叫转移、流局查花猪/退税/查大叫
 
 摸牌为引擎自动转移，不是玩家 Action，杠后补摸同理。
 
@@ -131,4 +131,4 @@
 
 ## 11. 状态
 
-v2 定稿，阶段 1.5 已实现；番型 fixture 20 条、core 测试 57 条通过；多配置 10000 局 fuzz 通过。相关决策：D8（配置边界）、D9（作为第二个玩法矫正 RuleSet 抽象）、D12（接口调整）。
+v2 定稿，阶段 1.5 已实现；番型 fixture 20 条、core 测试 57 条通过；多配置 10000 局 fuzz 通过。血战作为第二个玩法验证并矫正了垃圾胡验证过的 RuleSet 抽象。
