@@ -14,13 +14,24 @@ function readPort(name: string, fallback: number): number {
   return port;
 }
 
+function readWorkers(): number | undefined {
+  const raw = process.env["E2E_WORKERS"];
+  if (!raw) return undefined;
+  const workers = Number(raw);
+  if (!Number.isInteger(workers) || workers < 1)
+    throw new Error(`E2E_WORKERS must be a positive integer; received ${raw}`);
+  return workers;
+}
+
 const WEB_PORT = readPort("E2E_WEB_PORT", 5274);
 const SERVER_PORT = readPort("E2E_SERVER_PORT", 3100);
+const WORKERS = readWorkers();
 
 export default defineConfig({
   testDir: "./test",
   testMatch: "**/*.e2e-spec.ts",
   fullyParallel: true,
+  workers: WORKERS,
   reporter: "list",
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,

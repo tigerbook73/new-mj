@@ -63,6 +63,7 @@ const envFor = (config: WorktreeConfig): NodeJS.ProcessEnv => ({
   VITE_SERVER_URL: `http://localhost:${config.devServerPort}`,
   E2E_SERVER_PORT: String(config.e2eServerPort),
   E2E_WEB_PORT: String(config.e2eWebPort),
+  E2E_WORKERS: "1",
 });
 
 const printStatus = (root: string): void => {
