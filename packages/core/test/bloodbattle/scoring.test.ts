@@ -11,7 +11,7 @@ type BloodbattleScoringCase = {
 
 const standard = { capFan: 4, selfDrawBonus: "addFan" as const };
 
-// Tile-count convention (see docs/rules-bloodbattle.md "约定"):
+// Tile-count convention (see docs/variants/bloodbattle.md "约定"):
 // `input.hand` is the *pre-win* concealed hand; the
 // complete hand for shape checking is `hand` plus `win.tile`. A kong is
 // always a 4-tile entry in `melds`, never bare copies in `hand` — except the

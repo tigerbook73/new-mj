@@ -8,7 +8,7 @@ import type { TileTheme } from "@/features/mahjong/lib/mahjongTiles";
  * all: hand, discard and meld tiles are sized with plain CSS (percentage
  * height, CSS `aspect-ratio` for width), and InfoSlot's rotated footprint /
  * font size use container query units (cqw/cqh) — see
- * docs/process/table-ux-plan.md's P4.1 "接入正式 Table" sub-step.
+ * docs/architecture/frontend-layout.md's formal Table boundary.
  */
 export type TableLayoutState = {
   tileTheme: TileTheme;

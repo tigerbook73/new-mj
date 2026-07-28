@@ -1,6 +1,6 @@
 # core 引擎公共契约（engine-api）
 
-> 状态：v3 迁移自 `_legacy/core-types-and-events.md`，阶段 1/1.5 已实现并测试通过（`packages/core`）
+> 状态：v3，已实现并测试通过（`packages/core`）
 > **只放跨玩法真正共用的契约**：具体某个玩法怎么实现，见对应 `variants/*.md`。凡是本文件之外的类型/事件/字段，一律是玩法私有的。
 > 原则回顾：applyAction 对外纯函数；时间不进 core；事件带可见性
 

@@ -1,6 +1,6 @@
 # 垃圾胡规则（rulesetId: `junk`）
 
-> 状态：v2 定稿，阶段 1 已实现并测试通过（`packages/core/src/rulesets/junk/`）
+> 状态：v2 定稿，已实现并测试通过（`packages/core/src/rulesets/junk/`）
 > 定位：最简玩法，用于验证 core 基建/插件分层
 > 本文件内聚了垃圾胡的全部知识：规则、专属类型、专属事件、跨局规则。公共契约见 `contracts/engine-contract.md`；即使某节内容和 `bloodbattle.md` 恰好一样，也各写一份，不互相链接（见 `architecture/variant-boundary.md`）。
 
@@ -94,4 +94,4 @@
 
 ## 10. 状态
 
-v2 定稿，阶段 1 已实现并测试通过；fuzz 1000 局通过。
+v2 定稿，已实现并测试通过；fuzz 1000 局通过。

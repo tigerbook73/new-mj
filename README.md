@@ -21,9 +21,9 @@ pnpm fuzz --seed 47 --games 10000
 
 ## 文档阅读路径
 
-1. `docs/architecture.md` —— 系统怎么运转（一页纸）
-2. `docs/` 规格四件套 —— 做事时查的契约
-3. 协作流程：`docs/workflow.md`；文档规则：`docs/doc-map.md`
+1. `docs/overview.md` —— 项目入口与阅读地图
+2. `docs/contracts/` + `docs/variants/` —— 做事时查的契约与规则
+3. 协作流程：`docs/process/workflow.md`；文档规则：`docs/doc-map.md`
 
 `CLAUDE.md` 为 AI 会话规范，不在人的必读路径。
 
@@ -33,4 +33,4 @@ pnpm fuzz --seed 47 --games 10000
 
 ## 状态
 
-阶段 1（引擎基建 + junk RuleSet + CLI fuzz）已完成。下一阶段是血战到底 RuleSet；阶段路线见 `docs/plan.md`。
+Junk 与 bloodbattle RuleSet、Web 对局、持久化和本地 OAuth 验收均已完成；当前工作与 Backlog 见 `docs/process/plan.md`。

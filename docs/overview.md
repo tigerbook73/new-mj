@@ -20,7 +20,7 @@
 
 ## 现状
 
-规则、core 引擎、server、web 竖切、垃圾胡 AI 对战/UI/Replay，以及事件日志/战绩 PG 持久化和真正的 Supabase OAuth 均已完成；OAuth 已通过本地 Supabase 容器使用真实 Google/GitHub 账号做端到端验证，尚未正式部署到云端。当前工作转为垃圾胡 Table UX 分阶段重做，进度见 `process/plan.md`。文档结构本身是在 server 完成、web 开工前重构的，见 `doc-map.md` 的 v2 说明。
+规则、core 引擎、server、web 竖切、Junk 可玩牌桌/Replay，以及事件日志/战绩 PG 持久化和 Supabase OAuth 均已完成；OAuth 已通过本地 Supabase 容器使用真实 Google/GitHub 账号端到端验证，尚未正式部署到云端。当前工作与 Backlog 见 `process/plan.md`。
 
 ## 阅读地图
 

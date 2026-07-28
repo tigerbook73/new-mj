@@ -1,125 +1,49 @@
-# 前端布局架构：几何数据层 / 渲染层 / 动作逻辑层
+# 前端布局架构：几何数据、渲染场景与展示逻辑
 
-> 叙事文档：讲 web 端跨屏适配"是什么、为什么"。吸纳自 `process/multi-screen-refactor.md`（讨论草稿，内容已并入本文件后删除，原文见 git 历史）。目标状态与已落地状态混杂在同一份代码里，本文件用「已实现」/「目标状态」标注区分。
+> 范围仅限 web 牌桌。本文记录当前已落地的桌面架构和仍未决定的跨屏策略；调参值、编辑器草稿与实现过程不在这里保存。
 
-## 1. 为什么不用连续 responsive
+## 1. 边界
 
-麻将桌是空间化布局——座位、弃牌区、手牌区的相对位置本身就是语义（谁是对家、弃牌堆在谁面前），不是"内容重排"式的信息流。经典 responsive design（流式重排 + 连续媒体查询断点）针对文字/卡片这类可以自由折叠、堆叠、隐藏的内容，不适合牌桌这种几何布局。
+麻将桌是空间化 UI：座位、手牌、弃牌区的位置本身携带语义，不能把桌面设计简单压缩成流式卡片布局。因此每个 `layoutMode` 应有独立的参考画布和区域配置；横竖屏不是把同一画布旋转 90 度。
 
-改用离散 `layoutMode`（如 landscape/portrait）：每个 mode 定义自己的参照画布（reference canvas）和区域配置，整体用固定宽高比 + 整体缩放去适配实际视口，不做连续插值断点——判断某类 UI 该用哪种适配方式，看它是不是空间化布局，经典 responsive 针对可以自由折叠堆叠隐藏的内容，不适合几何布局硬套。
+这不决定 Expo/mobile 是否与 web 共用渲染实现；该产品/技术选择仍在 `process/plan.md` Backlog。
 
-这只覆盖 web 端内部（同一 SPA，从手机浏览器窄屏到桌面宽屏）；web vs mobile App（Expo/React Native）是不同渲染栈，要不要 `react-native-web` 统一是另一个待决架构问题（见 `process/plan.md` 待办），不在本文档范围。
+## 2. 当前三层
 
-## 2. 三层解耦架构
+- **几何数据**：`src/shared/lib/layoutPreset.ts` 定义并校验 `LayoutPreset`/`Zone`。Zone 只描述中心锚点、本地尺寸、四分之一旋转和父子关系，不携带业务数据或 React 组件。
+- **场景渲染**：`ZoneRenderer` 递归把 Zone 转成定位容器。`features/mahjong/components/TableBoard.tsx` 将 preset 与按稳定 `zone.id` 绑定的场景组件打包为 `TableScenario`；桌面场景在 `components/scenarios/desktop.tsx`。业务组件可包裹 `children`，但不得重建子 Zone 的定位层。
+- **展示逻辑**：`features/mahjong/TableView.tsx` 和 `useTablePresentation.ts` 从权威 `PlayerView` 派生可渲染数据；展示组件只接收数据和回调，不重新判断玩法规则或直接调用协议。
 
-- **几何数据层**：纯数据，不含 React/DOM，描述每个区域（Zone）的位置、尺寸、旋转角度、内部排布方式。**目标状态**，见 §4 Zone schema。
-- **渲染层**：一组"翻译"组件，把 Zone 数据转成实际 CSS/DOM，只认坐标不认业务。**部分已实现**：旋转/锚定原语（§3）已经是生产代码；把 Zone 树整体翻译成 DOM 的通用渲染组件是目标状态。
-- **动作/逻辑层**：集中的会话控制器，持有当前合法动作、派发函数；展示组件是"哑"组件，只消费数据、触发回调，不直接碰协议/引擎。**目标状态**——`TableView.tsx` 目前直接订阅 socket、派生视图、派发动作，是本层要拆解的对象，尚未拆解。
+游戏领域状态留在 `shared/store/session.ts`；纯展示偏好留在 `features/mahjong/tableLayout.store.ts`，两者不混合。
 
-这样设计的核心价值：布局因为适配屏幕而重新组合（比如某个信息区在竖屏下换到完全不同的组件树位置）时，不会牵连业务逻辑；业务逻辑改动也不需要关心自己被渲染在哪个屏幕方向下。这跟 `RoomService` 不知道 socket 映射是同一思路在前端的延伸。
+## 3. Zone 模型与布局文件
 
-## 3. 座位旋转技巧（已实现）
+`Zone` 使用父级未旋转的局部坐标；`rotationDeg` 只允许 `0 | 90 | 180 | -90`。父子结构保留旋转和层叠上下文，避免把每个子项拍平后重复计算坐标。
 
-每个玩家的手牌/弃牌区永远按同一套"本地/自然朝向"坐标写死（统一从左到右），外层套一个 CSS `transform: rotate()` 摆到该座位的实际角度——`apps/web/src/components/mahjong/TableGeometry.tsx` 的 `DirectionalSurface` 就是这个技巧：`absolute top-1/2 left-1/2` + `translate(-50%,-50%) rotate(...)`，中心点旋转前后不变；旋转角度只有 `apps/web/src/features/mahjong/lib/seatLayout.ts` 的 `SEAT_ROTATION`（`bottom:0 left:90 top:180 right:-90`）四种，子内容只在这一层容器上设置一次旋转，子孙元素不重复设置角度、靠 CSS 层叠自动继承（`transform` 只影响绘制阶段，不影响子元素 `left/top` 的布局基准）。
+- 几何文件：`src/features/mahjong/layouts/desktop.table-layout.json`，可由 Layout Sketch 读写。
+- 展示参数：`src/features/mahjong/desktop.table-config.ts`，包含牌尺寸、间距、弃牌行列等；其类型在 `lib/tableLayoutConfig.ts`。它与几何文件同主题配对，但不属于 `LayoutPreset`。
+- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。
 
-要区分两种旋转，不能混用同一套处理方式：
+该分离使新布局可以替换几何，而不把牌桌业务参数或编辑器元数据耦合进通用 schema。
 
-- **座位旋转**（对家倒过来、左右家竖着）——上面这套技巧，跟设备方向无关，任何 `layoutMode` 下都适用，已实现。
-- **设备方向切换**（手机横屏↔竖屏）——不能靠把横屏设计整体转 90 度复用，宽高比会变，直接转会挤压或留白。应该是两套独立的 `layoutMode` 参照画布配置，只是每套内部仍然复用座位旋转技巧。
+## 4. 座位与区域组合
 
-**Tile 本身**：排列方向不需要 Tile 自己管，完全是容器级的事（上面这套技巧已解决），`Tile.tsx` 不需要知道自己在哪个座位。牌面朝向（文字/花色是否要保持正读）是独立的产品体验决策，不是技术限制——容器整体旋转后牌面内容也会跟着转，如果要"始终易读"需要 Tile 内部再套一层独立的反向 `transform`，架构上可以做成 Tile 的可选 prop，目前未实现，是否需要留待未决（见 §7）。
+座位 Zone 使用容器旋转，子内容在同一局部坐标系内排布。牌面是否反向旋转以保持正读是产品决定，不是当前 schema 的限制。
 
-## 4. Zone/LayoutPreset schema（目标状态）
+Tile、ActionButton 等展示原子可跨场景复用；不同屏幕下“怎样组合原子”（四家独立牌河或合并牌河）由场景组件决定。不要为尚未出现的场景预建动态拼装引擎。
 
-```ts
-type Zone = {
-  id: string;
-  anchorCenter: { x: number; y: number }; // 中心点锚点，旋转前后不变
-  localSize: { w: number; h: number }; // 旋转前（本地朝向）的宽高
-  rotationDeg: 0 | 90 | 180 | -90;
-  children?: Zone[]; // 坐标相对父级本地坐标系（旋转前），随父级一起旋转
-};
+## 5. 动画边界
 
-type LayoutPreset = {
-  name: string; // 如 "desktop" / "landscape" / "portrait"，按 layoutMode 命名，不按阶段命名
-  referenceCanvas: { w: number; h: number };
-  root: Zone;
-};
-```
+动画只影响观感，最终状态始终以 `game:snapshot` 为准。当前实现：
 
-关键设计点：
+- 手牌/新条目使用 Motion 的局部入场或 reflow 动画；`prefers-reduced-motion` 会禁用它们。
+- 摸牌、出牌、认领的跨区域运动由 `DrawFlipGhost`、`DiscardFlipGhost`、`ClaimFlipGhost` 创建独立临时克隆并测量两端 rect；不让真实业务节点承担跨容器动画。
+- 不使用 `layoutId` 在牌河墓碑与副露之间共享布局：墓碑不卸载，隐式共享布局会产生错误退场语义。
 
-- **锚点用中心点，不用左上角**：与 §3 已实现的旋转技巧同一套心智——CSS `transform: rotate()` 默认绕元素中心旋转，`anchorCenter` 在旋转前后是同一个值，省掉一次换算。
-- **`localSize` 存旋转前尺寸**。旋转后的最终尺寸按"90 度整数倍时宽高互换，0°/180° 不互换"从 `localSize`+`rotationDeg` 推导，这条规则只对 90 的整数倍角度成立（麻将四座位场景恰好都是这几个角度）。
-- **`rotationDeg` 的语义**：类型上每个 Zone 都能设，但实践中绝大多数 Zone 的 `rotationDeg` 应该是 `0`——只有代表"某个座位的整个区域"的根 Zone 才设非零值（对应 §3 `DirectionalSurface` 的用法），子孙 Zone 不需要、也不应该在渲染时把自己的角度和父级角度相加。渲染翻译组件实现时应该只在这一类"座位根"节点上应用 CSS 旋转，其余节点旋转恒为 0，避免被理解成"每层都要算旋转叠加"。
-- **保留父子层级，不拍平**：子区域坐标相对父级本地坐标系书写，父级一转，子级自动跟着转。拍平会导致两个问题：一是旋转要在每个子元素上单独计算，重新引入"每张牌自己算三角函数"的问题；二是层叠顺序失去 DOM 树天然的父子级作用域，需要维护一份全局 `z-index` 表，还会撞上"带 `transform` 的元素各自创建新层叠上下文"这个 CSS 坑。保留层级则两个问题都不存在，`z-index` 只需要在同一父容器内局部唯一。
-- **不引入 Yoga 或 canvas 类库**（react-konva/pixi）：UI 用 DOM + Motion，浏览器自带的 CSS 排版就是这层要用的引擎。
+任何新动画都不能读取/修改规则状态，也不能以 `game:event` 重建视图；事件目前只作为诊断日志，snapshot 是唯一视图权威来源。
 
-Zone 只表达区域几何；区域内部（如一手牌）的 flex/grid 排布由对应业务组件管理，不进入通用 preset。
+## 6. 未来工作与验证方式
 
-### 4.1 多级旋转与编辑参照系
-
-`rotationDeg` 不再只限于座位根 Zone；每一层 Zone 都可设 `0 | 90 | 180 | -90`。最终渲染按祖先到自身依次累积 CSS transform；导出数据不做拍平或补偿。所有位置都定义在**父 Zone 未旋转的局部坐标系**。
-
-草图编辑器围绕当前选中 Zone 提供三种参照视图，三者只投影同一份 `LayoutPreset` 数据：
-
-- **World**：最终生产效果；所有祖先和自身旋转生效，选中 Zone 子树正常显示、其余对象淡化。
-- **Parent-local**：逆转选中 Zone 的全部祖先旋转，但保留它自身旋转；用于编辑其相对父级的中心点、本地宽高与 rotation。
-- **Zone-local**：同时逆转祖先与选中 Zone 自身旋转；当前 Zone 填满局部预览，用于编辑直接子对象。
-
-字段必须标明参照系：`center X/Y` 属于父局部坐标；`local W/H`、`rotation` 属于当前 Zone。World 的最终视觉矩形先作为可见结果；在仅支持四分之一转的前提下，后续可精确反算为可编辑输入。
-
-为让 App 直接消费导出结果同时支持编辑器无损往返，`LayoutPreset.root` 保持 resolved Zone 数据；编辑器特有 raw expression、变量与辅助 Grid 另放可选 `editor` 元数据。旧 preset 不带该元数据时，以数值 raw 导入。草图辅助 Grid 只属于编辑器，导出时透明展开，不进入正式运行时几何。
-
-### 4.2 Zone 与业务 Element 的绑定（目标契约）
-
-`LayoutPreset` 只描述几何，不能携带 React 组件名或业务数据。运行时由一个集中 renderer registry 按稳定 `Zone.id`（必要时按 `id + direction` resolver）找到可选的业务 service；`ZoneRenderer` 对每个 Zone 只创建一次定位容器，并递归渲染其子 Zone。若该 Zone 有 service，service 作为定位容器的内容包裹子 Zone：`ZoneFrame → Service(children) → child ZoneFrame`；没有 service 时，定位容器直接包裹子 Zone。这样所有绝对定位只归 ZoneFrame，service 不得重新创建同一子 Zone 的定位层；需要给子 service 共享尺寸或交互状态的 service 用 Context 包裹 `children`。未注册的 Zone 是合法的结构 Zone：可用于坐标分组、旋转或编辑器 Grid 展开，不渲染业务内容。
-
-production 已通过集中 registry 落地该递归 service 结构。每个 service 都接收 `children`；父级 service 负责业务 Context/本区视觉壳，叶子 service 负责本区业务内容。测试校验必需业务 Zone 存在且唯一、每个绑定都能解析、未绑定 Zone 只产生结构容器，以及父 service 不与 renderer 重复生成子 Zone DOM。
-
-### 4.3 生产布局文件（下一切片）
-
-桌面生产布局应以静态 `desktop.table-layout.json` 保存，内容为可由 Layout Lab 导出的 `LayoutPreset`；Game Page 通过显式 `preset` prop 传入 `TableBoard`，而不是由 `TableBoard` 内部 import 某个预设。运行时先校验通用 Zone 合法性、id 全局唯一性与 registry 所需业务插槽完整性，再交给 `ZoneRenderer`。`editor` 元数据可保留以支持 Lab 无损导入，但运行时不得依赖它。
-
-`LayoutPreset` 保持纯几何：区域内牌尺寸、间距、弃牌行列等麻将展示参数由独立的 `TableLayoutConfig`（`apps/web/src/features/mahjong/lib/tableLayoutConfig.ts`）承担，不加入通用 Zone schema——把 presentation 数据挂到 `Zone.meta` 上会违反本节"`LayoutPreset` 只描述几何"这条为跨 `layoutMode`/未来 Expo 复用而定的规则（同 §1 的可移植性理由）。**已实现**：两者不合并进同一个 wrapper document，而是各自一个文件、靠文件名前缀配对——`apps/web/src/features/mahjong/layouts/desktop.table-layout.json`（geometry，Lab 可编辑+存盘）配 `apps/web/src/features/mahjong/desktop.table-config.ts`（presentation，手写 TS 常量，Lab 目前不编辑，因为 Lab 目前完全不消费这份配置，没必要绑进 Lab 的 draft/存盘生命周期）。也否决了"具名 profile 表 + zone 引用 profile 名字"这层间接——目前没有"多个 zone 需要不同 profile"的具体场景，是为假设需求预先建抽象，判定为 YAGNI。`TableLayoutConfig` 内部按"zone 种类"分组命名（`handZone`/`meldZone`/`discardZone`/`actionDockZone`，对应 `hand-*`/`meld-*`/`discard-*` 这类同族 zone id 共享同一份配置，`action-dock` 是单例），外加一个不属于任何单一 zone 的 `shared`（tile `aspectRatio`/`tileGapPx`，手牌/副露/弃牌共用）和顶层 `debug`。
-
-## 5. 区域组合：原子 vs 组合（目标状态）
-
-拆成"展示原子"和"组合方式"两层：Tile、ActionButton 这类最小展示单元跨 `layoutMode` 复用，不感知自己被摆在哪；"多个展示原子怎么分组排布"（独立弃牌区 vs 合并牌河）是真正因布局而异的部分，值得写成不同的组合组件，但消费同一份底层数据，不出现两套平行的数据处理逻辑。空间受限的 `layoutMode`（尤其竖屏）可能需要把多个区域合并显示（如四家弃牌合并成一个带来源标记的公共牌河）；目前只有桌面+计划中的横竖屏几种，几个组合组件就够，不需要提前搭一个通用的动态拼装引擎。
-
-## 6. 跨区域动画（目标状态）
-
-区域内部排布用 flex/grid 天然连续，不需要特殊处理。真正需要坐标的场景是跨区域移动（摸牌飞入手牌、打出的牌飞到弃牌堆、吃碰杠汇聚成一组）——这类跨容器动画普通 CSS transition 做不到平滑过渡（DOM 节点换父容器动画会断）。UI 用 Motion，其 `layoutId` 共享布局动画机制正是为这个场景设计的，自动计算元素跨容器移动前后的位置差值做插值。
-
-**用 TileId 复用为 `layoutId`**：不强制每张牌都要有，但给客户端知道真实身份的牌配上成本很低。评审点 A 已决定牌用实例 ID（TileId）作为 React key，直接复用同一个 TileId 作为 `layoutId` 即可，不用另起一套判断逻辑。
-
-**例外——对手未公开的牌**：按可见性模型（`key-designs.md` §2），这类牌的真实 TileId 客户端根本不知道，只知道数量，只能渲染成占位牌，靠位置/序号做简单过渡，不存在身份延续。等它被打出/吃碰/亮牌后才拿到真实 TileId，从那一刻起才能用 `layoutId` 做身份延续动画；占位牌切换到真身这个瞬间用简单淡入/替换处理即可，不强求做成无缝共享布局过渡。
-
-`motion`/`framer-motion` 目前不是 `apps/web` 的依赖，引入时机随 Table UX 计划 Phase 5（事件驱动牌桌动画）落地。
-
-## 7. 动画的场景化与降级策略（目标状态）
-
-动画需要因场景（`layoutMode`、设备性能、事件密集程度如一炮多响/抢杠胡、`prefers-reduced-motion`）调整表现，但有一条不可破的底线：**动画只影响观感，绝不影响最终状态正确性**。这呼应核心不变量"事件重建 ≡ 直接派生"（`key-designs.md` §4）——不管动画放不放、放多快，应用完事件流之后的 UI 状态必须收敛到跟 `getPlayerView` 直接派生的结果一致。
-
-建议在事件流和渲染层之间加一个轻量动画调度层：接收事件，根据当前场景信号（`layoutMode` 性能预算、`prefers-reduced-motion`、短时间内事件积压量）决定"这次完整播放/简化/直接跳到终态"。各展示组件不需要自己判断该不该播动画，调度层已经决定好该给它什么样的过渡。具体阈值/规则留到 Table UX 计划 Phase 5 实现时再定，先用最简单的规则（事件积压超过阈值就跳过动画）。
-
-## 8. 动作/逻辑层与 store 边界（目标状态）
-
-业务逻辑（判断合法动作、调用协议/引擎、派发动作）集中在一处，展示组件只接受数据 + 回调，不直接调用协议/引擎，也不自己维护业务状态。集中方式 hook/context/store 都可以，关键规则是"业务逻辑只有一个来源，展示组件不能绕过它自己实现"。考虑到布局会因 `layoutMode` 大幅重组（同一组件在不同布局下可能出现在组件树完全不同的位置），用现有的 Zustand（`useSessionStore`）让组件不管自己在树的哪个位置都能直接订阅，比强行按 props 一层层传更合适。
-
-用 store 时保持一条边界：把"游戏领域状态"（PlayerView、合法动作、派发函数）和"视图/布局状态"（当前 `layoutMode`、动画降级标志）分成清楚独立的 slice，即使用同一个 store 库也不要混在一起——`useSessionStore`（领域）与 `useTableLayoutStore`（视图，目前只存 tile 主题）已经是这个模式的雏形，新增 `layoutMode`/动画降级状态时延续这个拆分，不要往 `useSessionStore` 里加"根据 `layoutMode` 判断能不能碰"这类逻辑。
-
-## 9. 起草工具
-
-沿用现有 Lab 模式（`/dev/table-layout`，滑块+数字输入实时调参、localStorage 持久化）——这套模式已经在 P4.1 桌面布局的真实验收里证明够用，不需要引入 `react-moveable` 之类的拖拽/旋转可视化编辑工具，除非滑块方式被证明不够用。Table UX 计划 Phase 1 会把这个工具升级为能编辑/导出 §4 的 `LayoutPreset` JSON，工具内部实现细节（是否需要扁平存储+导出时计算旋转前坐标）留到那时再定。
-
-## 10. 已上线代码的迁移路径
-
-`TableLayoutConfig`（`apps/web/src/features/mahjong/lib/tableLayoutConfig.ts`）是 P4.1 已合入 main、经过真实浏览器验收的桌面布局配置，不因为"有了新抽象"就冲动重写。迁移策略：用现有桌面布局（唯一已验证、有完整 Playwright 回归覆盖的场景）作为 Zone/LayoutPreset schema 的第一个消费者——用既有回归测试当安全网，把 `TableLayoutConfig` 的数值手工翻译成一份桌面 `LayoutPreset`，验证 schema 设计本身站不站得住脚，视觉零变化才算通过。新的 `layoutMode`（手机横屏/竖屏）之后直接基于这份 schema 设计，不再各自摸索一套平行的扁平 config。
-
-后续增量（见 §4.3）把 `TableLayoutConfig` 从硬编码在 `tableLayoutLab.ts` 里的一个 TS 常量，挪到跟 `desktop.table-layout.json` 同目录、同前缀的独立文件 `desktop.table-config.ts`，字段改按 zone 种类命名；`tableLayoutLab.ts` 只保留类型定义，运行时校验/兜底（`normalizeTableLayoutConfig` 等）随之整体删除，因为唯一生产者变成了 TS 类型检查过的手写常量，不再有未经类型检查的 JSON/localStorage 输入需要防御。
-
-## 11. 未决问题
-
-- **设备方向实时切换**：是否允许同一局游戏中旋转设备切换横竖屏（而非锁定方向）？如果允许，需要专门验证 `layoutMode` 切换时动画状态、正在进行的跨区域过渡不会丢失或错乱。
-- **牌面是否需要反向旋转保持正读**：产品体验决策，见 §3；架构上预留可选 prop，用不用没有定。
+- 手机横屏/竖屏应先建立一个最小场景：手写 preset、由正式 `TableBoard` 消费、验证一个典型对局；通过后再扩展编辑器能力。
+- 若布局编辑工具未来改变正式产物或被多个场景复用，应作为独立的使能 slice，按 `process/workflow.md` 的重估规则推进，而不是嵌入某个 UI slice。
+- 设备运行中切换方向、牌面是否正读，均为尚未决定的产品问题；决定后再补相应视觉/e2e 验收。

@@ -99,7 +99,7 @@ export const createBloodbattlePrelude = (
   return { state, events };
 };
 
-// docs/rules-bloodbattle.md 定稿未提连庄：结果不影响庄家，纯顺时针轮转（D15）。
+// docs/variants/bloodbattle.md 定稿未提连庄：结果不影响庄家，纯顺时针轮转（D15）。
 export const computeNextBloodbattleDealer = (
   _finished: BloodbattleState,
   currentDealer: SeatId,

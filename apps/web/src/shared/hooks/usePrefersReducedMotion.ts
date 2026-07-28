@@ -6,7 +6,7 @@ function readPreference(): boolean {
   return typeof window !== "undefined" && window.matchMedia(QUERY).matches;
 }
 
-/** OS-level reduced-motion preference — gates table entry animations (table-ux-plan.md Phase 5). */
+/** OS-level reduced-motion preference — gates table entry animations. */
 export function usePrefersReducedMotion(): boolean {
   const [prefersReduced, setPrefersReduced] = useState(readPreference);
   useEffect(() => {

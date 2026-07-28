@@ -1,6 +1,6 @@
 import type { TileKind } from "../../lib/ids.ts";
 
-// Tile-count convention (see docs/rules-bloodbattle.md "约定"): a kong
+// Tile-count convention (see docs/variants/bloodbattle.md "约定"): a kong
 // (anGang/minGang/buGang) is always represented as a 4-tile entry in `melds`,
 // never as four bare copies sitting in `hand` — except the seven-pairs family
 // (七对/龙七对), where a "pair" being four-of-a-kind is the variant's own

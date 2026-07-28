@@ -1,6 +1,6 @@
 # 血战到底规则（rulesetId: `bloodbattle`）
 
-> 状态：v2 定稿，阶段 1.5 已实现并测试通过（`packages/core/src/rulesets/bloodbattle/`）。采用大众线上川麻「血战到底 + 换三张」口径，地方差异仅通过本文件 §6 的 config 表达。
+> 状态：v2 定稿，已实现并测试通过（`packages/core/src/rulesets/bloodbattle/`）。采用大众线上川麻「血战到底 + 换三张」口径，地方差异仅通过本文件 §6 的 config 表达。
 > 本文件内聚了血战到底的全部知识：规则、专属类型、专属事件、跨局规则。公共契约见 `contracts/engine-contract.md`；即使某节内容和 `junk.md` 恰好一样，也各写一份，不互相链接（见 `architecture/variant-boundary.md`）。
 
 ## 1. 牌集与开局
@@ -131,4 +131,4 @@
 
 ## 11. 状态
 
-v2 定稿，阶段 1.5 已实现；番型 fixture 20 条、core 测试 57 条通过；多配置 10000 局 fuzz 通过。血战作为第二个玩法验证并矫正了垃圾胡验证过的 RuleSet 抽象。
+v2 定稿，已实现；番型 fixture 20 条、core 测试 57 条通过；多配置 10000 局 fuzz 通过。血战作为第二个玩法验证并矫正了垃圾胡验证过的 RuleSet 抽象。

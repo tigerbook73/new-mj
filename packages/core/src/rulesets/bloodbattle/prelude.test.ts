@@ -11,7 +11,7 @@ import {
 } from "../../index.ts";
 
 // Hand-rolled state for the pre-play phases only (no wall/turn machinery
-// needed — see docs/plan.md 阶段 1.5). Four disjoint 13-tile concealed hands.
+// needed — see docs/variants/bloodbattle.md). Four disjoint 13-tile concealed hands.
 // TileIds 0-107 map to the same kind under STANDARD_TILE_SET and the
 // bloodbattle (m/p/s-only) tile set, since honors are appended last in
 // TILE_KINDS — safe to build hands from allTileIds() here as long as ids stay

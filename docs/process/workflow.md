@@ -1,67 +1,44 @@
 # workflow：流程细则
 
-> 按需阅读：开工先看会话仪式，提交时看 Git 节，收尾时看验收节。文档规则见 `../doc-map.md`。
-> 本文件随文档重构从根目录迁至 `process/`；本次整理消除了与根 `AGENTS.md` 的重复内容、迁出了 packages/core 专属的代码风格节。测试相关的详细策略见 `../testing-strategy.md`，本文件的 DoD 第 4 条与之对应。
+> 按需阅读：开工看会话仪式，设计/范围变化看专题规则，提交时看 DoD 与 Git。文档归属见 `../doc-map.md`。
 
 ## 会话仪式
 
-开工/收工的基本动作见根 `AGENTS.md`「会话仪式」；本节只补充两条细则：
+- 开工：按根 `AGENTS.md` 读取规则和 `plan.md` 当前工作。
+- 收工：更新当前状态与下一步第一个具体动作；提交前默认运行 `pnpm verify`。
+- “下一步”必须可直接执行，例如“确认生产 OAuth 回调 URL”，不能写“继续开发”。
 
-- "下一步"必须具体到可直接执行，例如"给 RoomManager 补超时代打测试"，不能写"继续开发 XX 模块"这类模糊描述。
-- 收工提交前默认执行 `pnpm verify`。
+## 专题与 slice
 
-## 阶段开场
-
-- 输出本阶段实施顺序 + 开放问题清单；开放问题清零前不动核心接口
-- plan 产物优先是可编译骨架/状态图/竖切，而非文档
-- 阶段 1 特例：先出"类型 + RuleSet 接口签名 + 空实现 + 一个红的 happy-path 测试"供人审接口形状，认可后再填实现
-- 复杂到需要独立文档规划的阶段，写成 `docs/process/<phase 简称>.md`，在 `plan.md` 对应阶段小节链接过去，不直接大段塞进 `plan.md`；阶段收尾时按 `doc-map.md` §5/§6 把耐久内容分流吸收后删除该文件——它是过程性文档，不是永久规格
+- 专题表达一个用户/系统目标；slice 是一个可独立演示、可验收的平级交付切片。计划最多展示“专题 → slice”两层，不再嵌套子计划。
+- 开场只写：目标、首个 slice 的验收、不可违反约束、已知未知项及最早验证方式。先产出可编译骨架、状态图或竖切，不以长计划替代验证。
+- 发现复杂度显著超出估算时，暂停**旧实现路径**而非废弃已完成代码：记录发现、保留可复用资产、把使能工具/架构变更提升为平级 slice；后续产品 slice 负责最终用户验收。
+- 判断工具是否独立成 slice：若它改变正式运行时产物、数据模型、验证方式，或会被后续多个 slice 复用，则是使能能力；若只是一次性辅助，留在当前 slice。
+- 使能 slice 先做最小可行验证（例如手写一个产物、正式消费者读取它、验证一个典型场景），通过后才扩展编辑器/自动化能力。若涉及契约或架构，先更新对应 docs 再写代码。
+- 临时 brief 可放在 `docs/process/<topic>.md`，限一页；专题收尾后把耐久结论分流，删除 brief，不保留实现日记。
 
 ## 完成的定义（DoD）
 
 任务宣称完成前全绿并**贴出运行结果**（不得凭记忆断言）：
 
-1. `pnpm typecheck`（全仓 tsc strict）
-2. `pnpm lint`（ESLint + Prettier 从简配置；core 包含 no-restricted-globals/imports 禁 Date/Math.random/setTimeout/IO；dependency-cruiser 锁包依赖方向）
-3. `pnpm test`（受影响包全部测试）
-4. core 改动：fuzz 冒烟 ≥1000 局；阶段收尾跑全量 ≥1 万局（随机 config）；分层测试策略见 `../testing-strategy.md`
+1. `pnpm typecheck`
+2. `pnpm lint`
+3. `pnpm test`（受影响包）
+4. core 改动：fuzz 冒烟 ≥1000 局；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md`
 
-- 测试与实现同 commit；修 bug 先写复现用例（红→绿）
-- fuzz 失败：seed + action log 先固化为回归用例，再修复
-- 不追覆盖率指标；追不变量全时校验 + 胡牌/番型用例表全绿
+- 测试与实现同一 commit；修 bug 先写复现用例（红→绿）。
+- fuzz 失败：先固化 seed + action log 为回归用例，再修复。
+- 不追覆盖率指标；追不变量全时校验和规则/番型 fixture。
 
-## 依赖维护
+## 依赖、测试与检查
 
-- 新增或刷新依赖时优先使用 npm registry 的最新稳定版，不使用 prerelease。
-- 若最新版本违反现有工具链的 peer 约束，使用最新兼容稳定版，并在提交说明或计划中记录原因。
-- 依赖变更必须同步 `package.json` 与 `pnpm-lock.yaml`，并通过 typecheck、lint、test 后提交。
+- 新增或刷新依赖优先最新稳定版；若被 peer 约束，采用最新兼容稳定版并记录原因。同步 `package.json` 与 lockfile。
+- pnpm 是唯一包管理器；各 package 依生态选 runner，跨包测试由根脚本调度。core/protocol/ai 优先 Vitest，server 用 Jest，web 用 Vitest + Playwright；mobile 立项时确定。
+- 每个 workspace 提供 `typecheck`、`lint`、`test`、`verify`；有运行时产物的 workspace 提供 `build` 并声明 Turbo 输出。根 `pnpm verify` 还包括 `format:check`。
+- `pnpm format` 写入格式，`pnpm format:check` 只校验；format 不能代替 lint/typecheck。
 
-## 测试工具边界
+## Git 与专题收尾
 
-- 保持 pnpm 为唯一包管理器；测试运行时按包的生态选择，不要求全仓库使用同一个 runner。
-- `packages/core`、`packages/protocol`、`packages/ai` 优先使用 Vitest，便于 TypeScript、参数化用例和 fuzz 测试。
-- `apps/server` 使用 NestJS 时采用 Jest，遵循 NestJS 官方测试生态；server 测试不得因此把 Jest 依赖引入 core。
-- `apps/web` 用 Vitest 做单元测试、Playwright 做 e2e（`test/*.e2e-spec.ts`，与 `apps/server` 的 e2e 命名一致；`playwright.config.ts` 自动拉起独立于开发者手动 `pnpm dev` 的一套 web+server 进程，端口隔离细节见 `apps/web/AGENTS.md`）；mobile 待阶段 7 立项时再定。跨包测试从根脚本统一调度。
-
-## 检查与格式化边界
-
-- 每个 workspace package/app 都应提供 `typecheck`、`lint` 和 `test` 脚本，便于局部开发与任务缓存。
-- 有运行时产物的 package 应提供 `build`，并将 `dist/**` 声明为 Turbo 输出；依赖 package 的检查由 Turbo 的 `^build` 依赖先构建上游产物。构建工具统一放在根 devDependencies，package 只保留自己的入口/输出配置。
-- 每个 workspace package/app 都应提供 `verify`，串行执行本 package 的 `typecheck`、`lint`、`test`；根目录 `pnpm verify` 另包含全局 `format:check`。
-- 根目录 `pnpm lint:fix` 支持 ESLint 自动修复（可追加文件路径）；TypeScript 类型错误没有自动修复手段，仍需人工处理。
-- 根目录同名脚本通过 Turbo 聚合所有 workspace；CI、阶段验收和提交前检查一律从根目录运行。
-- 格式化使用 Prettier：`pnpm format` 写入格式，`pnpm format:check` 仅校验；提交前不得以 `format` 代替 lint 或 typecheck。
-
-## Git（单人从简，可回溯）
-
-- trunk-based：日常直接提 main；仅预期失败的实验或接口调整（阶段 1.5）开短命分支
-- main 始终全绿（DoD 1–3 过才提交）；坏提交 revert，不 force push
-- commit = 一个可独立描述的变更；conventional 消息（feat/fix/test/refactor/docs + 范围）
-- docs/ 变更与对应代码**同一 commit**；每阶段完成打 tag（phase-1、phase-1.5…）
-- 秘密只进 .env（.gitignore），提供 .env.example
-
-## 阶段验收
-
-可运行产物跑通 + 全量 fuzz 绿 + `../doc-map.md` §6 吸纳仪式完成 = 阶段完成，打 tag。
-
-- 阶段 1：CLI 打完整局；阶段 2：socket.io-client 模拟 4 客户端整局；阶段 3：浏览器真人对局竖切
+- 单人 trunk-based：日常直接 main；仅预期失败的实验或接口探索开短命分支。main 提交前满足 DoD；坏提交 revert，不 force push。
+- commit 是可独立描述的变更，使用 conventional message；代码与对应 docs 同 commit；秘密只进 `.env`，提供 `.env.example`。
+- 专题完成：可运行产物 + 所需验证 + 文档分流完成。收尾时压缩 `plan.md` 完成摘要、更新下一步、审计 docs/代码漂移，并复审 `variant-boundary.md`（若玩法边界有变化）。

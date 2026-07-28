@@ -457,6 +457,6 @@ export const createJunkGame = (
   return { state, events };
 };
 
-// docs/rules-junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
+// docs/variants/junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
 export const computeNextJunkDealer = (_finished: JunkState, currentDealer: SeatId): SeatId =>
   ((currentDealer + 1) % 4) as SeatId;

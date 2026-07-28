@@ -606,7 +606,7 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
   });
 });
 
-// Phase 3 leftover (table-ux-plan.md item 4): targeted regressions for the
+// Targeted regressions for the
 // single-timer bot scheduler crossing paths with game end, leave, disconnect
 // takeover, and the independent claim-window timer.
 describe("RoomService — bot auto-play timer interplay (phase 3 regression)", () => {
