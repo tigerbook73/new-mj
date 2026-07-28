@@ -114,7 +114,12 @@ const main = (): void => {
       run("pnpm", ["dev"], root, envFor(readConfig(root)));
       return;
     case "test-e2e":
-      run("pnpm", ["exec", "turbo", "run", "test:e2e", ...args], root, envFor(readConfig(root)));
+      run(
+        "pnpm",
+        ["exec", "turbo", "run", "test:e2e", ...(args[0] === "--" ? args.slice(1) : args)],
+        root,
+        envFor(readConfig(root)),
+      );
       return;
     default:
       throw new Error("usage: worktree.ts <create|status|dev|test-e2e>");
