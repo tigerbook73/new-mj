@@ -15,10 +15,10 @@ import { useSessionStore } from "@/shared/store/session";
 import { LoginView } from "@/features/auth/LoginView";
 import { AuthCallbackView } from "@/features/auth/AuthCallbackView";
 import { SessionBlockedView } from "@/features/auth/SessionBlockedView";
-import { GamePickerView } from "@/views/GamePickerView";
-import { LobbyView } from "@/views/LobbyView";
+import { GamePickerView } from "@/app/views/GamePickerView";
+import { LobbyView } from "@/app/views/LobbyView";
 import { TableView } from "@/features/mahjong/TableView";
-import { ReplayView } from "@/views/ReplayView";
+import { ReplayView } from "@/app/views/ReplayView";
 import { TableLayoutLabView } from "@/features/layout-sketch/TableLayoutLabView";
 
 /**

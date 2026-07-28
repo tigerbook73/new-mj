@@ -2,7 +2,7 @@ import type { Preview } from "@storybook/react-vite";
 import { withThemeByClassName } from "@storybook/addon-themes";
 import type { TileTheme } from "../src/features/mahjong/lib/mahjongTiles";
 import { useTableLayoutStore } from "../src/features/mahjong/tableLayout.store";
-import "../src/index.css";
+import "../src/app/index.css";
 
 const preview: Preview = {
   decorators: [

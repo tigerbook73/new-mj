@@ -1,8 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "@/App";
+import { App } from "@/app/App";
 import { applyTheme, getInitialTheme } from "@/shared/lib/theme";
-import "@/index.css";
+import "@/app/index.css";
 
 // Applied before the first paint (not inside a component effect) so a
 // dark-preference visitor never sees a flash of the light theme.
