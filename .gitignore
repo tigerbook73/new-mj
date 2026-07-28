@@ -4,6 +4,7 @@ dist/
 coverage/
 *.tsbuildinfo
 .env.*
+.worktree.env
 !.env.example
 !.env.test
 test-results/

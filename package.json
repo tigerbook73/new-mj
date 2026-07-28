@@ -20,7 +20,11 @@
     "sb:start": "supabase start",
     "sb:stop": "supabase stop",
     "sb:restart": "supabase stop && supabase start",
-    "sb:status": "supabase status"
+    "sb:status": "supabase status",
+    "worktree:new": "node tools/worktree.ts create",
+    "worktree:status": "node tools/worktree.ts status",
+    "dev:isolated": "node tools/worktree.ts dev",
+    "test:e2e:isolated": "node tools/worktree.ts test-e2e"
   },
   "devDependencies": {
     "@swc/cli": "^0.7.10",

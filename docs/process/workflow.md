@@ -37,6 +37,14 @@
 - 每个 workspace 提供 `typecheck`、`lint`、`test`、`verify`；有运行时产物的 workspace 提供 `build` 并声明 Turbo 输出。根 `pnpm verify` 还包括 `format:check`。
 - `pnpm format` 写入格式，`pnpm format:check` 只校验；format 不能代替 lint/typecheck。
 
+## 并行 worktree
+
+- 每个并行 feature 使用独立 Git worktree 与分支；创建器只从明确的已提交 ref 建立，绝不带入另一个 worktree 的未提交改动。
+- `tools/worktree.ts` 读取本机忽略的 `.worktree.env`。该文件只记录 slot；端口由 slot 推导，脚本、模板和推导规则进入 Git，具体 slot/私有环境不进入 Git。
+- `pnpm worktree:new <name> [slot]` 创建 `feat/<name>`、写入本地 slot 配置、链接同级主 worktree 的 `.env.development.local`（存在时）、安装依赖并构建 shared package。基础 `.env` 仍由仓库管理。
+- 在 worktree 中使用 `pnpm dev:isolated` 与 `pnpm test:e2e:isolated`，不要手写端口。slot 0 使用现有默认端口；其他 slot 使用独立的 dev/e2e web+server 端口对。
+- 同一份本地 Supabase 可供普通开发共享；`prisma migrate`、Supabase 配置变更或破坏性数据操作必须独占，或使用明确隔离的实例。
+
 ## Git 与专题收尾
 
 - 单人 trunk-based：日常直接 main；仅预期失败的实验或接口探索开短命分支。main 提交前满足 DoD；坏提交 revert，不 force push。

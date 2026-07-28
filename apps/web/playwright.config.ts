@@ -5,8 +5,17 @@ import { defineConfig, devices } from "@playwright/test";
  * server 3000) so a running `pnpm dev` isn't disturbed by e2e runs and
  * vice versa — Playwright boots its own web + server pair here.
  */
-const WEB_PORT = 5274;
-const SERVER_PORT = 3100;
+function readPort(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535)
+    throw new Error(`${name} must be an integer TCP port; received ${raw}`);
+  return port;
+}
+
+const WEB_PORT = readPort("E2E_WEB_PORT", 5274);
+const SERVER_PORT = readPort("E2E_SERVER_PORT", 3100);
 
 export default defineConfig({
   testDir: "./test",
@@ -51,7 +60,7 @@ export default defineConfig({
       stdout: "ignore",
       stderr: "pipe",
       timeout: 60_000,
-      wait: { stdout: /Local:\s+http:\/\/localhost:5274/ },
+      wait: { stdout: new RegExp(`Local:\\s+http:\\/\\/localhost:${WEB_PORT}`) },
     },
   ],
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
