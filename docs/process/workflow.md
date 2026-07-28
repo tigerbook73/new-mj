@@ -42,7 +42,7 @@
 - 每个并行 feature 使用独立 Git worktree 与分支；创建器只从明确的已提交 ref 建立，绝不带入另一个 worktree 的未提交改动。
 - `tools/worktree.ts` 读取本机忽略的 `.worktree.env`。该文件只记录 slot；端口由 slot 推导，脚本、模板和推导规则进入 Git，具体 slot/私有环境不进入 Git。
 - `pnpm worktree:new <name> [slot]` 创建 `feat/<name>`、写入本地 slot 配置、链接同级主 worktree 的 `.env.development.local`（存在时）、安装依赖并构建 shared package。基础 `.env` 仍由仓库管理。
-- `pnpm dev` 与 `pnpm test:e2e` 自动读取当前 worktree 的 slot，不要手写端口或使用特殊后缀。slot 0 使用现有默认端口；其他 slot 使用独立的 dev/e2e web+server 端口对。后者默认每个 worktree 一个 Playwright worker，保证并发时稳定；`pnpm verify` 因此也会自动使用隔离 E2E。
+- `worktree.ts run <command> [...args]` 负责向任意命令注入当前 slot 的环境；`pnpm dev` 与 `pnpm test:e2e` 已通过它自动读取 slot。不要手写端口或使用特殊后缀。slot 0 使用现有默认端口；其他 slot 使用独立的 dev/e2e web+server 端口对。后者默认每个 worktree 一个 Playwright worker，保证并发时稳定；`pnpm verify` 因此也会自动使用隔离 E2E。
 - 同一份本地 Supabase 可供普通开发共享；`prisma migrate`、Supabase 配置变更或破坏性数据操作必须独占，或使用明确隔离的实例。
 
 ## Git 与专题收尾

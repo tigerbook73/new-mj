@@ -101,6 +101,20 @@ const create = (root: string, name: string | undefined, slotRaw: string | undefi
   printStatus(target);
 };
 
+const runWithWorktreeEnv = (root: string, args: readonly string[]): void => {
+  const [command, ...commandArgs] = args;
+  if (!command) throw new Error("usage: worktree.ts run <command> [...args]");
+
+  // `pnpm <script> -- <flag>` preserves the separator in Node's argv. It is
+  // a package-manager boundary, not an argument for the wrapped command.
+  const separator = commandArgs.indexOf("--");
+  const normalizedArgs =
+    separator === -1
+      ? commandArgs
+      : [...commandArgs.slice(0, separator), ...commandArgs.slice(separator + 1)];
+  run(command, normalizedArgs, root, envFor(readConfig(root)));
+};
+
 const main = (): void => {
   const [command, ...args] = process.argv.slice(2);
   const root = repoRoot();
@@ -111,19 +125,11 @@ const main = (): void => {
     case "status":
       printStatus(root);
       return;
-    case "dev":
-      run("pnpm", ["exec", "turbo", "run", "dev"], root, envFor(readConfig(root)));
-      return;
-    case "test-e2e":
-      run(
-        "pnpm",
-        ["exec", "turbo", "run", "test:e2e", ...(args[0] === "--" ? args.slice(1) : args)],
-        root,
-        envFor(readConfig(root)),
-      );
+    case "run":
+      runWithWorktreeEnv(root, args);
       return;
     default:
-      throw new Error("usage: worktree.ts <create|status|dev|test-e2e>");
+      throw new Error("usage: worktree.ts <create|status|run>");
   }
 };
 

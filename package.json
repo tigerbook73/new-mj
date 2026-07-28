@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.33.3",
   "scripts": {
-    "dev": "node tools/worktree.ts dev",
+    "dev": "node tools/worktree.ts run turbo run dev",
     "build": "turbo run build",
     "format": "git ls-files -z | xargs -0 prettier --ignore-unknown --write",
     "format:check": "git ls-files -z | xargs -0 prettier --ignore-unknown --check",
@@ -12,7 +12,7 @@
     "lint": "turbo run lint && eslint tools",
     "lint:fix": "eslint --fix .",
     "test": "turbo run test && node --test tools/*.test.ts",
-    "test:e2e": "node tools/worktree.ts test-e2e",
+    "test:e2e": "node tools/worktree.ts run turbo run test:e2e",
     "verify": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test && pnpm test:e2e",
     "check:deps": "node tools/check-deps.ts",
     "cli:play": "node packages/core/src/cli.ts play",
