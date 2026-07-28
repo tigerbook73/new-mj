@@ -1,8 +1,8 @@
 import { Tooltip } from "@base-ui/react/tooltip";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
-import { Button } from "@/components/ui/button";
-import { useSessionStore } from "@/store/session";
+import { Button } from "@/shared/ui/button";
+import { useSessionStore } from "@/shared/store/session";
 
 export function SignOutButton() {
   const navigate = useNavigate();

@@ -4,7 +4,7 @@ import type { SessionIdentity } from "@new-mj/protocol";
 import { clearDevSession, readDevSession } from "@/features/auth/devAuth";
 import { ack, connect } from "./socket";
 import { supabase } from "./supabase";
-import { useSessionStore } from "@/store/session";
+import { useSessionStore } from "@/shared/store/session";
 
 /**
  * Acks session:identity, wires session:kicked/disconnect exactly once per

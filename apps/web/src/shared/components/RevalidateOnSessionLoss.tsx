@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useRevalidator } from "react-router";
-import { useSessionStore } from "@/store/session";
+import { useSessionStore } from "@/shared/store/session";
 
 /**
  * Bridges the imperative socket lifecycle (session:kicked/disconnect

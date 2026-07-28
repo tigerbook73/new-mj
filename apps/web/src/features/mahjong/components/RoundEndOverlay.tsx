@@ -1,6 +1,6 @@
 import type { RoomInfo } from "@new-mj/protocol";
 import { motion } from "motion/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 
 /**
  * junk's `JunkGameResult` shape (packages/core/src/rulesets/junk/types.ts),

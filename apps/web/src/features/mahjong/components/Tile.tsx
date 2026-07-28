@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "motion/react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { tileBackImageSrc, tileImageSrc } from "@/features/mahjong/lib/mahjongTiles";
 import { useTableLayoutStore } from "@/features/mahjong/tableLayout.store";
 

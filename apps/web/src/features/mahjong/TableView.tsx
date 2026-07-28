@@ -10,16 +10,16 @@ import type {
   RoomReadyChangedEvent,
   SessionResult,
 } from "@new-mj/protocol";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import { ActionDock } from "@/features/mahjong/components/ActionDock";
 import { CenterStatus } from "@/features/mahjong/components/CenterStatus";
 import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
 import { TableBoard } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud } from "@/features/mahjong/components/TableHud";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { ack } from "@/lib/socket";
-import { useSessionStore } from "@/store/session";
+import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
+import { ack } from "@/shared/lib/socket";
+import { useSessionStore } from "@/shared/store/session";
 import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
 import { useTablePresentation } from "./useTablePresentation";
 

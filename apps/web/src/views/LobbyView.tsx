@@ -9,9 +9,9 @@ import type {
   RoomPlayerJoinedEvent,
   RoomReadyChangedEvent,
 } from "@new-mj/protocol";
-import { Button } from "@/components/ui/button";
-import { ack, unwrapRoomEnterAck } from "@/lib/socket";
-import { useSessionStore } from "@/store/session";
+import { Button } from "@/shared/ui/button";
+import { ack, unwrapRoomEnterAck } from "@/shared/lib/socket";
+import { useSessionStore } from "@/shared/store/session";
 
 const initials = (nickname: string): string =>
   nickname.replace(/\s/g, "").slice(0, 2).toUpperCase();

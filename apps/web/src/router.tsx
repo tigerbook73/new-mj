@@ -1,17 +1,17 @@
 import { createBrowserRouter, Navigate, redirect, type LoaderFunctionArgs } from "react-router";
 import type { RoomEnterResponse, RoomInfo } from "@new-mj/protocol";
-import { ProtectedLayout } from "@/components/ProtectedLayout";
-import { RootLayout } from "@/components/RootLayout";
-import { RouteHydrateFallback } from "@/components/RouteHydrateFallback";
+import { ProtectedLayout } from "@/shared/components/ProtectedLayout";
+import { RootLayout } from "@/shared/components/RootLayout";
+import { RouteHydrateFallback } from "@/shared/components/RouteHydrateFallback";
 import {
   ack,
   connectWithTakeoverPrompt,
   describeConnectError,
   unwrapRoomEnterAck,
-} from "@/lib/socket";
-import { ensureConnected, establishSession } from "@/lib/sessionBootstrap";
-import { supabase } from "@/lib/supabase";
-import { useSessionStore } from "@/store/session";
+} from "@/shared/lib/socket";
+import { ensureConnected, establishSession } from "@/shared/lib/sessionBootstrap";
+import { supabase } from "@/shared/lib/supabase";
+import { useSessionStore } from "@/shared/store/session";
 import { LoginView } from "@/features/auth/LoginView";
 import { AuthCallbackView } from "@/features/auth/AuthCallbackView";
 import { SessionBlockedView } from "@/features/auth/SessionBlockedView";

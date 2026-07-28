@@ -3,11 +3,11 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Plus, RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import type { RoomInfo, RoomSummary } from "@new-mj/protocol";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ack } from "@/lib/socket";
-import { useSessionStore } from "@/store/session";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { ack } from "@/shared/lib/socket";
+import { useSessionStore } from "@/shared/store/session";
 
 const RULESETS = [
   { id: "junk", label: "Junk Hu" },

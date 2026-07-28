@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AnimatePresence } from "motion/react";
 import type { RoomInfo } from "@new-mj/protocol";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import { RoundEndOverlay } from "./RoundEndOverlay";
 
 const meta = {

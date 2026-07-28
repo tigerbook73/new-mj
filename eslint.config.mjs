@@ -44,7 +44,7 @@ export default [
     // shadcn/ui generated components (e.g. button.tsx exporting both the
     // component and its cva variants) are a codegen convention we don't
     // hand-edit; react-refresh's single-component-export rule doesn't apply.
-    files: ["**/components/ui/**/*.tsx"],
+    files: ["**/shared/ui/**/*.tsx"],
     rules: {
       "react-refresh/only-export-components": "off",
     },

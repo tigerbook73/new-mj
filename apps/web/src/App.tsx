@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { RouterProvider } from "react-router";
-import { applyTheme } from "@/lib/theme";
+import { applyTheme } from "@/shared/lib/theme";
 import { router } from "@/router";
 
 export function App() {

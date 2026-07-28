@@ -1,6 +1,6 @@
 import { Outlet, useNavigation } from "react-router";
-import { RevalidateOnSessionLoss } from "@/components/RevalidateOnSessionLoss";
-import { Toaster } from "@/components/ui/sonner";
+import { RevalidateOnSessionLoss } from "@/shared/components/RevalidateOnSessionLoss";
+import { Toaster } from "@/shared/ui/sonner";
 
 /**
  * Wraps every route (including /login, /auth/callback, /session-blocked).

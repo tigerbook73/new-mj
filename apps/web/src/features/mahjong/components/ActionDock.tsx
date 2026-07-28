@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/shared/ui/button";
 import { desktopTableLayoutConfig } from "@/features/mahjong/desktop.table-config";
 import { sortTilesForDisplay, tileKindOf } from "@/features/mahjong/lib/mahjongTiles";
-import { cn } from "@/lib/utils";
+import { cn } from "@/shared/lib/utils";
 import { ActionLabel } from "./ActionLabel";
 import { DeadlineCountdown } from "./DeadlineCountdown";
 import { Tile } from "./Tile";

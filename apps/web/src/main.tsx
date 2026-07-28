@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "@/App";
-import { applyTheme, getInitialTheme } from "@/lib/theme";
+import { applyTheme, getInitialTheme } from "@/shared/lib/theme";
 import "@/index.css";
 
 // Applied before the first paint (not inside a component effect) so a

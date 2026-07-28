@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import type { DebugOmniscientView, ReplayGetResponse } from "@new-mj/protocol";
-import { Button } from "@/components/ui/button";
-import { ack } from "@/lib/socket";
-import { useSessionStore } from "@/store/session";
+import { Button } from "@/shared/ui/button";
+import { ack } from "@/shared/lib/socket";
+import { useSessionStore } from "@/shared/store/session";
 
 /**
  * MVP step-through player (phase 4.5 step 4): no real tile-face

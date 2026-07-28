@@ -2,11 +2,11 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { LoginForm } from "@/features/auth/login-form";
 import { SocialLoginForm } from "@/features/auth/social-login-form";
-import { connectWithTakeoverPrompt, describeConnectError } from "@/lib/socket";
+import { connectWithTakeoverPrompt, describeConnectError } from "@/shared/lib/socket";
 import { clearDevSession, deriveUserId, signDevToken, writeDevSession } from "@/features/auth/devAuth";
-import { establishSession } from "@/lib/sessionBootstrap";
-import { supabase } from "@/lib/supabase";
-import { useSessionStore } from "@/store/session";
+import { establishSession } from "@/shared/lib/sessionBootstrap";
+import { supabase } from "@/shared/lib/supabase";
+import { useSessionStore } from "@/shared/store/session";
 
 export function LoginView() {
   const navigate = useNavigate();
