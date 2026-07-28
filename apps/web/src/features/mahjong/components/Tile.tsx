@@ -2,8 +2,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { tileBackImageSrc, tileImageSrc } from "@/lib/mahjongTiles";
-import { useTableLayoutStore } from "@/store/tableLayout";
+import { tileBackImageSrc, tileImageSrc } from "@/features/mahjong/lib/mahjongTiles";
+import { useTableLayoutStore } from "@/features/mahjong/tableLayout.store";
 
 const tileVariants = cva(
   "relative inline-block shrink-0 select-none overflow-hidden rounded-[15%] border border-border bg-[#e8d4b0] shadow-md",

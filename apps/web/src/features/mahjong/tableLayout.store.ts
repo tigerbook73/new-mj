@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TileTheme } from "@/lib/mahjongTiles";
+import type { TileTheme } from "@/features/mahjong/lib/mahjongTiles";
 
 /**
  * Pure display state for the mahjong table, kept separate from

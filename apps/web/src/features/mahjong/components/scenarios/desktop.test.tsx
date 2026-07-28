@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertLayoutPreset } from "@/lib/layoutPreset";
+import { assertLayoutPreset } from "@/shared/lib/layoutPreset";
 import { DESKTOP_TABLE_SCENARIO } from "./desktop";
 
 const zoneIds = (zone: (typeof DESKTOP_TABLE_SCENARIO)["preset"]["root"]): string[] => [

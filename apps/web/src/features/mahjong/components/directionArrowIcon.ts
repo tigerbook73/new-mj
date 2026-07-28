@@ -5,7 +5,7 @@ import {
   ArrowBigUp,
   type LucideIcon,
 } from "lucide-react";
-import type { SeatDirection } from "@/lib/seatLayout";
+import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 
 /** Points toward the seat that sits at each direction — shared by TableBoard's turn indicator and DiscardPile's claim badge. */
 export const DIRECTION_ARROW_ICON: Record<SeatDirection, LucideIcon> = {

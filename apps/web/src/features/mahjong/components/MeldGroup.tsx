@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import type { SeatDirection } from "@/lib/seatLayout";
-import type { TableLayoutConfig } from "@/lib/tableLayoutLab";
+import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { ClaimFlipGhost } from "./ClaimFlipGhost";
 import { TileClaimSlot } from "./TileClaimSlot";
 

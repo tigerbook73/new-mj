@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { desktopTableLayout } from "../layouts/desktop.table-config";
-import type { Zone } from "./layoutPreset";
+import { desktopTableLayout } from "@/features/mahjong/desktop.table-config";
+import type { Zone } from "@/shared/lib/layoutPreset";
 import {
   addChild,
   applyGridTemplate,

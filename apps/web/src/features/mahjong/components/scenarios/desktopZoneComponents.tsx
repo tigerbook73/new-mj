@@ -1,5 +1,5 @@
-import { desktopTableLayoutConfig } from "@/layouts/desktop.table-config";
-import { type SeatDirection } from "@/lib/seatLayout";
+import { desktopTableLayoutConfig } from "@/features/mahjong/desktop.table-config";
+import { type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { ActionLabel } from "../ActionLabel";
 import { DIRECTION_ARROW_ICON } from "../directionArrowIcon";
 import { DiscardPile, type DiscardEntry } from "../DiscardPile";

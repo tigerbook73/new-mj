@@ -1,4 +1,4 @@
-import { SEAT_ROTATION, type SeatDirection } from "@/lib/seatLayout";
+import { SEAT_ROTATION, type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
 import { Tile, type TileProps } from "./Tile";
 

@@ -1,4 +1,4 @@
-import type { RotationDeg, Zone } from "./layoutPreset";
+import type { RotationDeg, Zone } from "@/shared/lib/layoutPreset";
 
 /** Affine matrix `[a, b, c, d, e, f]`, mapping `(x, y)` to `(ax + cy + e, bx + dy + f)`. */
 export type AffineMatrix = readonly [number, number, number, number, number, number];

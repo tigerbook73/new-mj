@@ -27,7 +27,7 @@ import {
   type SketchPercentage,
   type SketchNode,
 } from "@/lib/layoutSketch";
-import { type RotationDeg } from "@/lib/layoutPreset";
+import { type RotationDeg } from "@/shared/lib/layoutPreset";
 import {
   listLayoutFiles,
   readLayoutFile,

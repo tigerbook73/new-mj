@@ -1,5 +1,5 @@
 import { useRef, type RefObject } from "react";
-import { type RotationDeg } from "@/lib/layoutPreset";
+import { type RotationDeg } from "@/shared/lib/layoutPreset";
 import { roundRatio, type SketchNode, type SketchPercentage } from "@/lib/layoutSketch";
 import { useVariableAutocomplete } from "@/hooks/useVariableAutocomplete";
 import { AutocompleteDropdown, PercentageField } from "./SketchFields";

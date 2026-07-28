@@ -1,9 +1,9 @@
 import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
-import type { DiscardEntry } from "@/components/mahjong/DiscardPile";
-import type { Meld } from "@/components/mahjong/MeldGroup";
-import type { SeatContent } from "@/components/mahjong/TableBoard";
-import { sortTilesForDisplay } from "@/lib/mahjongTiles";
-import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/lib/seatLayout";
+import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
+import type { Meld } from "@/features/mahjong/components/MeldGroup";
+import type { SeatContent } from "@/features/mahjong/components/TableBoard";
+import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
+import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 
 type JunkSeatExtra = {
   handCount: number;

@@ -1,4 +1,4 @@
-import type { LayoutPreset, RotationDeg, Zone } from "./layoutPreset";
+import type { LayoutPreset, RotationDeg, Zone } from "@/shared/lib/layoutPreset";
 
 export const LAYOUT_SKETCH_STORAGE_KEY = "new-mj:layout-sketches:v1";
 export const SKETCH_BACKGROUND_COLORS = [

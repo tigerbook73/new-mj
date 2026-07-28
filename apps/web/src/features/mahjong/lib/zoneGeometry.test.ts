@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Zone } from "./layoutPreset";
+import type { Zone } from "@/shared/lib/layoutPreset";
 import { applyMatrix, visualBounds, worldToParentPoint, zoneToWorldMatrix } from "./zoneGeometry";
 
 const zone = (patch: Partial<Zone> = {}): Zone => ({

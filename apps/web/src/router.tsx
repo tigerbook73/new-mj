@@ -17,7 +17,7 @@ import { AuthCallbackView } from "@/views/AuthCallbackView";
 import { SessionBlockedView } from "@/views/SessionBlockedView";
 import { GamePickerView } from "@/views/GamePickerView";
 import { LobbyView } from "@/views/LobbyView";
-import { TableView } from "@/views/TableView";
+import { TableView } from "@/features/mahjong/TableView";
 import { ReplayView } from "@/views/ReplayView";
 import { TableLayoutLabView } from "@/views/TableLayoutLabView";
 

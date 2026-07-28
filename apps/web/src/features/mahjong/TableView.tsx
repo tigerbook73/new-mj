@@ -11,12 +11,12 @@ import type {
   SessionResult,
 } from "@new-mj/protocol";
 import { Button } from "@/components/ui/button";
-import { ActionDock } from "@/components/mahjong/ActionDock";
-import { CenterStatus } from "@/components/mahjong/CenterStatus";
-import { RoundEndOverlay } from "@/components/mahjong/RoundEndOverlay";
-import { TableBoard } from "@/components/mahjong/TableBoard";
-import { DESKTOP_TABLE_SCENARIO } from "@/components/mahjong/scenarios/desktop";
-import { TableHud } from "@/components/mahjong/TableHud";
+import { ActionDock } from "@/features/mahjong/components/ActionDock";
+import { CenterStatus } from "@/features/mahjong/components/CenterStatus";
+import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
+import { TableBoard } from "@/features/mahjong/components/TableBoard";
+import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
+import { TableHud } from "@/features/mahjong/components/TableHud";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { ack } from "@/lib/socket";
 import { useSessionStore } from "@/store/session";

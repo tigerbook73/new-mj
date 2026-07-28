@@ -1,5 +1,5 @@
-import { desktopTableLayout } from "@/layouts/desktop.table-config";
-import { SEAT_DIRECTIONS } from "@/lib/seatLayout";
+import { desktopTableLayout } from "@/features/mahjong/desktop.table-config";
+import { SEAT_DIRECTIONS } from "@/features/mahjong/lib/seatLayout";
 import type { TableScenario, TableZoneComponent } from "../TableBoard";
 import {
   DiscardTrack,
