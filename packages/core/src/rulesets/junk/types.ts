@@ -16,7 +16,8 @@ export type JunkAction =
   | { type: "peng" }
   | { type: "minGang" }
   | { type: "hu" }
-  | { type: "pass" };
+  | { type: "pass" }
+  | { type: "draw" };
 
 export type JunkClaimAction = Extract<JunkAction, { type: "chi" | "peng" | "minGang" | "hu" }>;
 
@@ -59,6 +60,8 @@ export type JunkState = {
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };
   pendingClaims?: JunkPendingClaims;
+  /** Set while phase is "awaiting-draw"; tells applyDrawAction where to draw from. */
+  pendingDraw?: { seat: SeatId; replacement: boolean };
   seq: number;
   prng: PrngState;
   result?: JunkGameResult;

@@ -5,7 +5,7 @@
 
 ## 1. 事件溯源 + seed 可复现
 
-洗牌用 state 内可序列化 PRNG；任何一局 = seed + action 序列，可重放调试。事件带 seq 与可见性（public/seat），事件日志天然支持任意玩家视角与上帝视角回放。摸牌是引擎自动转移，非玩家动作。
+洗牌用 state 内可序列化 PRNG；任何一局 = seed + action 序列，可重放调试。事件带 seq 与可见性（public/seat），事件日志天然支持任意玩家视角与上帝视角回放。摸牌是 core 显式 gate 的 `{type:"draw"}` 动作（与超时代 pass 同构：`getLegalActions` 门控 + `applyAction` 二次校验），谁/何时提交该动作是 server 编排层职责，不属于 core 关心的范围（见 `contracts/session-mechanics.md`）。
 
 ## 2. 可见性模型
 

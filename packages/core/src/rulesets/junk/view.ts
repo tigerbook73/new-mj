@@ -144,6 +144,14 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
       case "ClaimWindowResolved":
         delete view.myClaimOptions;
         delete view.myClaimResponse;
+        // The "unclaimed" result is the only claim-resolution outcome with no
+        // follow-up meld event, so it's the only branch that needs to advance
+        // phase/currentSeat itself — chi/peng finish via TurnStarted, gang claims
+        // via the GangMade case below.
+        if (payload.result === "unclaimed") {
+          view.phase = "awaiting-draw";
+          view.currentSeat = payload.seat as SeatId;
+        }
         break;
       case "ChiMade":
       case "PengMade":
@@ -210,6 +218,14 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
             (entry) => entry.tile === discardedTile && entry.claimedBy === undefined,
           );
           if (discard) discard.claimedBy = meldSeat;
+        }
+        // Unlike chi/peng (which finish immediately via TurnStarted), every gang
+        // path — self-gang or claimed minGang — is followed by a draw, so it always
+        // lands in "awaiting-draw" here (redundant but harmless if ClaimWindowResolved
+        // already set it for the claimed-minGang case).
+        if (payload.type === "GangMade") {
+          view.phase = "awaiting-draw";
+          view.currentSeat = meldSeat;
         }
         break;
       }

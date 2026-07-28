@@ -8,6 +8,7 @@ export const BLOODBATTLE_PHASES = [
   "choosing-lack",
   "playing",
   "awaiting-claims",
+  "awaiting-draw",
   "finished",
 ] as const;
 export const BLOODBATTLE_STATUSES = ["active", "won"] as const;

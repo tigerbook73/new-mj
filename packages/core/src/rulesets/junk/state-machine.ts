@@ -142,23 +142,17 @@ export const claimOptions = (state: JunkState, seat: SeatId): JunkClaimOption[] 
   return options;
 };
 
+/** Performs the actual wall-shift + hand-push for a pending draw. Callers must have
+ * already verified the wall is non-empty (see beginTurn) — no other action can run
+ * between entering "awaiting-draw" and this being invoked, so the wall can't have
+ * changed in between. */
 export const emitDraw = (
   state: JunkState,
   events: GameEvent[],
   seat: SeatId,
   replacement: boolean,
-): boolean => {
-  const drawn = replacement ? drawFromTail(state.wall) : drawFromHead(state.wall);
-  if (!drawn) {
-    state.phase = "finished";
-    state.result = { type: "draw", scoreDeltas: [0, 0, 0, 0] };
-    appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.wallExhausted });
-    appendEvent(state, events, publicVisibility, {
-      type: EVENT_TYPES.gameEnded,
-      result: state.result,
-    });
-    return false;
-  }
+): void => {
+  const drawn = (replacement ? drawFromTail(state.wall) : drawFromHead(state.wall))!;
   state.wall = drawn.wall;
   state.seats[seat]!.hand.push(drawn.tile);
   state.justDrawn = { seat, tile: drawn.tile };
@@ -171,9 +165,16 @@ export const emitDraw = (
     seat,
     tile: drawn.tile,
   });
-  return true;
 };
 
+/**
+ * Advances control to `seat`. When `draw` is false (chi/peng claims never draw), the
+ * turn starts immediately. When `draw` is true, this only *schedules* the draw —
+ * phase becomes "awaiting-draw" and the actual tile move happens in a later, explicit
+ * `applyAction(seat, {type:"draw"})` call (see applyDrawAction below), so the server
+ * can pace when that draw becomes visible. Ends the game immediately, as before, if
+ * the wall is already empty (no "awaiting-draw" for a game that's ending).
+ */
 export const beginTurn = (
   state: JunkState,
   events: GameEvent[],
@@ -182,9 +183,39 @@ export const beginTurn = (
   replacement = false,
 ): void => {
   state.currentSeat = seat;
+  if (!draw) {
+    state.phase = "playing";
+    appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.turnStarted, seat });
+    return;
+  }
+  if (state.wall.length === 0) {
+    state.phase = "finished";
+    state.result = { type: "draw", scoreDeltas: [0, 0, 0, 0] };
+    appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.wallExhausted });
+    appendEvent(state, events, publicVisibility, {
+      type: EVENT_TYPES.gameEnded,
+      result: state.result,
+    });
+    return;
+  }
+  state.phase = "awaiting-draw";
+  state.pendingDraw = { seat, replacement };
+};
+
+/** Explicit `{type:"draw"}` action: completes a draw scheduled by beginTurn. */
+export const applyDrawAction = (
+  state: JunkState,
+  seat: SeatId,
+  events: GameEvent[],
+): JunkApplyResult => {
+  if (state.phase !== "awaiting-draw" || state.currentSeat !== seat || !state.pendingDraw)
+    return fail("DRAW_NOT_AVAILABLE");
+  const { replacement } = state.pendingDraw;
+  delete state.pendingDraw;
+  emitDraw(state, events, seat, replacement);
   state.phase = "playing";
-  if (draw && !emitDraw(state, events, seat, replacement)) return;
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.turnStarted, seat });
+  return { state, events };
 };
 
 export const settleWins = (
@@ -279,6 +310,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void =>
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
       result: "unclaimed",
+      seat,
     });
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.gangMade,
@@ -291,11 +323,13 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void =>
   }
   const discardedBy = state.pendingClaims!.discard.seat;
   delete state.pendingClaims;
+  const next = nextSeat(discardedBy);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.claimWindowResolved,
     result: "unclaimed",
+    seat: next,
   });
-  beginTurn(state, events, nextSeat(discardedBy), true);
+  beginTurn(state, events, next, true);
 };
 
 export const applyDiscard = (

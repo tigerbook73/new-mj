@@ -157,8 +157,8 @@ test("justDrawn: own view sees the tile, other seats only see a boolean flag", (
   }
 
   // Acting on the drawn tile clears it — everyone stops seeing that seat as
-  // "just drew" (a subsequent draw, e.g. the next seat's turn starting in the
-  // same applyAction call, is a separate justDrawn and not asserted here).
+  // "just drew" (a subsequent draw, e.g. the next seat's turn starting via its
+  // own later {type:"draw"} action, is a separate justDrawn and not asserted here).
   const nextActions = junkRuleSet.getLegalActions(state, drawn.seat);
   state = unwrap(junkRuleSet.applyAction(state, drawn.seat, nextActions[0]!));
   for (const viewer of [0, 1, 2, 3] as const) {
@@ -188,13 +188,17 @@ test("public draw and concealed-gang events never contain a TileId", () => {
   }
 });
 
-test("action logs replay a complete game and fuzz reports no failure", () => {
-  const played = playJunkGame(31);
-  if ("error" in played) throw new Error(played.error);
-  const replayed = playJunkGame(31, {}, played.actions);
-  expect(replayed).toEqual(played);
-  expect(fuzzJunkGames(100, 41)).toBeUndefined();
-});
+test(
+  "action logs replay a complete game and fuzz reports no failure",
+  () => {
+    const played = playJunkGame(31);
+    if ("error" in played) throw new Error(played.error);
+    const replayed = playJunkGame(31, {}, played.actions);
+    expect(replayed).toEqual(played);
+    expect(fuzzJunkGames(1000, 41)).toBeUndefined();
+  },
+  60_000,
+);
 
 test("illegal actions do not mutate state or consume event sequence", () => {
   const started = createJunkGame(13, 0);

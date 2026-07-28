@@ -151,6 +151,13 @@ export const applyDiscard = (
   );
   return { state, events };
 };
+/**
+ * Advances control toward the next active seat's draw. Only *schedules* it — phase
+ * becomes "awaiting-draw" and the actual wall shift happens in a later, explicit
+ * `applyAction(seat, {type:"draw"})` call (see applyDrawAction below), so the server
+ * can pace when the draw becomes visible. Ends the hand immediately, as before, if
+ * there's no active seat left or the wall is already empty.
+ */
 const drawNext = (
   state: BloodbattleState,
   events: GameEvent[],
@@ -161,37 +168,58 @@ const drawNext = (
     settleBloodbattleDraw(state, events);
     return { state, events };
   }
-  const tile = state.wall.shift()!;
-  state.seats[seat]!.hand.push(tile);
   state.currentSeat = seat;
-  state.phase = "playing";
-  append(state, events, { type: "public" }, { type: EVENT_TYPES.tileDrawn, seat });
+  state.phase = "awaiting-draw";
+  state.pendingDraw = { seat, replacement: false };
+  // Unlike junk, this "nobody claimed the discard" path had no event of its own —
+  // rebuildPlayerView needs one to learn who's about to draw next.
   append(
     state,
     events,
-    { type: "seat", seats: [seat] },
-    { type: EVENT_TYPES.tileDrawnPrivate, seat, tile },
+    { type: "public" },
+    { type: EVENT_TYPES.claimWindowResolved, result: "unclaimed", seat },
   );
-  append(state, events, { type: "public" }, { type: EVENT_TYPES.turnStarted, seat });
   return { state, events };
 };
+/** Same scheduling as drawNext, for a same-seat replacement draw after a gang. */
 const drawReplacement = (state: BloodbattleState, events: GameEvent[], seat: SeatId): void => {
   if (state.wall.length === 0) {
     settleBloodbattleDraw(state, events);
     return;
   }
+  state.currentSeat = seat;
+  state.phase = "awaiting-draw";
+  state.pendingDraw = { seat, replacement: true };
+};
+/** Explicit `{type:"draw"}` action: completes a draw scheduled by drawNext/drawReplacement. */
+export const applyDrawAction = (
+  state: BloodbattleState,
+  seat: SeatId,
+  events: GameEvent[],
+): BloodbattleApplyResult => {
+  if (state.phase !== "awaiting-draw" || state.currentSeat !== seat || !state.pendingDraw)
+    return fail("DRAW_NOT_AVAILABLE");
+  const { replacement } = state.pendingDraw;
+  delete state.pendingDraw;
+  // drawNext/drawReplacement already verified the wall was non-empty before entering
+  // "awaiting-draw"; no other action can run in between, so it can't have changed.
   const tile = state.wall.shift()!;
   state.seats[seat]!.hand.push(tile);
-  state.currentSeat = seat;
-  state.phase = "playing";
-  append(state, events, { type: "public" }, { type: EVENT_TYPES.gangReplacementDrawn, seat });
+  append(
+    state,
+    events,
+    { type: "public" },
+    { type: replacement ? EVENT_TYPES.gangReplacementDrawn : EVENT_TYPES.tileDrawn, seat },
+  );
   append(
     state,
     events,
     { type: "seat", seats: [seat] },
     { type: EVENT_TYPES.tileDrawnPrivate, seat, tile },
   );
+  state.phase = "playing";
   append(state, events, { type: "public" }, { type: EVENT_TYPES.turnStarted, seat });
+  return { state, events };
 };
 const settleGang = (
   state: BloodbattleState,
@@ -512,6 +540,7 @@ export const applyAction = (
   if (action.type === "discard") return checked(applyDiscard(state, seat, action.tile, events));
   if (action.type === "anGang") return checked(applyAnGang(state, seat, action.kind, events));
   if (action.type === "buGang") return checked(applyBuGang(state, seat, action.tile, events));
+  if (action.type === "draw") return checked(applyDrawAction(state, seat, events));
   if (state.phase === "awaiting-claims") {
     if (!state.pendingClaims?.options[seat] || state.pendingClaims.responses[seat])
       return fail("CLAIM_NOT_AVAILABLE");
@@ -584,6 +613,9 @@ export const getLegalActions = (
     )
       return options.filter((option) => option.action.type === "hu").map((option) => option.action);
     return [...options.map((option) => option.action), { type: "pass" }];
+  }
+  if (state.phase === "awaiting-draw") {
+    return state.currentSeat === seat ? [{ type: "draw" }] : [];
   }
   if (state.phase !== "playing" || state.currentSeat !== seat || state.status[seat] !== "active")
     return [];

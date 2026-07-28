@@ -41,7 +41,8 @@ export type BloodbattleAction =
   | { type: "minGang" }
   | { type: "hu" }
   | { type: "zimo" }
-  | { type: "pass" };
+  | { type: "pass" }
+  | { type: "draw" };
 
 export type BloodbattleClaimAction = Extract<
   BloodbattleAction,
@@ -118,6 +119,8 @@ export type BloodbattleState = {
   wins?: Partial<Record<SeatId, BloodbattleWinSnapshot>>;
   lastDiscard?: { seat: SeatId; tile: TileId };
   pendingClaims?: BloodbattlePendingClaims;
+  /** Set while phase is "awaiting-draw"; tells applyDrawAction which event type to emit. */
+  pendingDraw?: { seat: SeatId; replacement: boolean };
   gangPayments: BloodbattleGangPayment[];
   lastGangEventId?: number;
   result?: BloodbattleGameResult;

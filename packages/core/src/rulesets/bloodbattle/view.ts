@@ -217,6 +217,15 @@ export const rebuildPlayerView = (
             BloodbattlePlayerView["myClaimResponse"]
           >;
         break;
+      case "ClaimWindowResolved":
+        // Only ever emitted for the "nobody claimed" result (see drawNext) — a
+        // claimed peng/minGang/hu has its own PengMade/GangMade/HuDeclared event to
+        // carry this signal instead, so there's no other branch to handle here.
+        if (payload.result === "unclaimed") {
+          view.phase = "awaiting-draw";
+          view.currentSeat = payload.seat as SeatId;
+        }
+        break;
       case "PengMade": {
         const meldSeat = payload.seat as SeatId;
         const tiles = (payload.tiles as number[]) ?? [];
@@ -259,6 +268,10 @@ export const rebuildPlayerView = (
           markClaimed(view, payload.from as SeatId, tileKind, meldSeat);
         delete view.myClaimOptions;
         delete view.myClaimResponse;
+        // Every gang — self-gang or claimed minGang — is followed by a draw (never
+        // an immediate turn, unlike peng), so it always lands in "awaiting-draw" here.
+        view.phase = "awaiting-draw";
+        view.currentSeat = meldSeat;
         break;
       }
       case "HuDeclared": {

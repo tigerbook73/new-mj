@@ -4,22 +4,23 @@
 
 ## 当前工作
 
-**专题：生产部署与 OAuth 验收**
+**专题：摸牌（draw）从自动转场副作用变为 RuleSet 显式动作**
 
-- 结果：部署 Supabase 与应用，配置生产 OAuth 回调并完成一次真实登录验收。
-- 下一步第一个具体动作：确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单。
+- 结果：junk + bloodbattle 的摸牌变成 core 显式 gate 的 `{type:"draw"}` 动作，由 server 按可配置延时自动代提交，为 UI 让出可感知的摸牌停顿窗口；零协议 schema 改动。详细设计与 slice 划分见 `docs/process/draw-action.md`。
+- Slice 1（使能，已完成）：packages/core 两个玩法新增 `awaiting-draw` 相位与 `draw` 动作；`cross-ruleset-invariants.test.ts`、junk fuzz 1000 局、bloodbattle fuzz 10000 局、`pnpm --filter @new-mj/core verify` 均绿。**注意**：在 Slice 2 落地前，真实对局（apps/server）进入 `awaiting-draw` 后没有任何调用方提交 `{type:"draw"}`，会卡住不动——这是预期的过渡态，不是 bug。
+- 下一步第一个具体动作：Slice 2——`apps/server` 加 `drawRevealDelayMs` 配置与 `scheduleDrawReveal` 定时器（改 `src/config/config.service.ts`、`src/rooms/room.service.ts`），细节见 `docs/process/draw-action.md`。
 
 ## 当前风险 / 开放问题
 
-- 尚未选择并配置生产部署环境；不能把本地 Supabase 的 OAuth 验收视为生产验收。
+- 尚未选择并配置生产部署环境；不能把本地 Supabase 的 OAuth 验收视为生产验收（专题已暂停，见 Backlog）。
 
 ## Backlog
 
+- 生产部署与 OAuth 验收（暂停）：部署 Supabase 与应用，配置生产 OAuth 回调并完成一次真实登录验收；下一步是确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`。
 - 可选沉浸体验：音效、音量与静音设置。
-- 架构待决：把摸牌（PICK）从服务端自动转场的副作用独立成 RuleSet 显式动作/状态，以便 UI 插入可控延时；须先和 Claude Project 对齐接口与协议语义。
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
 
 ## 已完成摘要

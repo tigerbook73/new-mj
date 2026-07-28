@@ -13,7 +13,7 @@
 
 ## 2. 行牌规则
 
-- 摸牌：按逆时针轮转，从牌墙头部摸（引擎自动执行，非玩家 action）
+- 摸牌：按逆时针轮转，从牌墙头部摸；core 层是显式 `{type:"draw"}` 动作（见 §5 `awaiting-draw` 相位），不是内联副作用——谁/何时提交该动作是 server 编排层职责，不属于本文件范围
 - 出牌后进入声明窗口，**优先级：胡 > 杠 > 碰 > 吃**
   - 吃：仅出牌者的下家可吃（即只能吃上家打出的牌）
   - 碰/明杠：任意他家
@@ -36,12 +36,13 @@
 
 ## 5. Phase 与 Action（私有类型）
 
-- `JunkPhase`：`dealing → playing ⇄ awaiting-claims → finished`
+- `JunkPhase`：`dealing → playing ⇄ awaiting-claims ⇄ awaiting-draw → finished`
   - `dealing`：发牌（引擎内部瞬时完成）
   - `playing`：当前家行动（打牌/暗杠/补杠/自摸）
   - `awaiting-claims`：声明窗口
+  - `awaiting-draw`：出牌无人应下 / 声明窗口裁决无人胡 / 自杠或被杠后，轮到的座位已确定但还未摸牌——`currentSeat` 已指向该座位，`myActionOptions` 精确为 `[{type:"draw"}]`；提交该动作后转回 `playing`
   - `finished`：有人胡或流局
-- `JunkAction`（`packages/core/src/rulesets/junk/types.ts`）：discard/anGang/buGang/zimo/chi/peng/minGang/hu/pass
+- `JunkAction`（`packages/core/src/rulesets/junk/types.ts`）：discard/anGang/buGang/zimo/chi/peng/minGang/hu/pass/draw
 - `JunkState`/`JunkPendingClaims` 见 `packages/core/src/rulesets/junk/types.ts`；不存在跨玩法共享的全局 `GameState`
 
 `source='robKong'` 仅在 `robKong=true` 时出现：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸；若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
@@ -59,7 +60,7 @@
 | 5   | TileDiscarded        | public                                       | seat, tile                                       |
 | 6   | ClaimWindowOpened    | seat（仅有权响应者）                         | 自己的 ClaimOption[]                             |
 | 7   | ClaimResponded       | seat（仅本人）                               | 本人的响应                                       |
-| 8   | ClaimWindowResolved  | public                                       | 裁决结果                                         |
+| 8   | ClaimWindowResolved  | public                                       | 裁决结果；`result:"unclaimed"` 时额外带 `seat`（下一位即将摸牌的座位，供事件重建判断） |
 | 9   | ChiMade              | public                                       | seat, tiles, from                                |
 | 10  | PengMade             | public                                       | seat, tile, from                                 |
 | 11  | GangMade             | public（暗杠不露牌面，双版本）               | seat, type, tile?, from?                         |
