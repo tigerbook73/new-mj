@@ -54,6 +54,15 @@ const newRoomService = () =>
 const isPassAction = (action: unknown): boolean =>
   typeof action === "object" && action !== null && "type" in action && action.type === "pass";
 
+// playJunkGame's recorded action log now includes explicit {type:"draw"}
+// steps (core requires them since the draw-explicit redesign). The server
+// auto-submits those itself via scheduleDrawReveal (drawRevealDelayMs is 0
+// under NODE_ENV=test, so it fires synchronously) — replaying a recorded
+// "draw" through applyPlayerAction after the server already completed it
+// would fail with DRAW_NOT_AVAILABLE, so replay loops skip them.
+const isDrawAction = (action: unknown): boolean =>
+  typeof action === "object" && action !== null && "type" in action && action.type === "draw";
+
 describe("RoomService — pure helpers", () => {
   it("accumulateScores adds deltas seat-wise across multiple calls", () => {
     const service = newRoomService();
@@ -484,6 +493,7 @@ describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)"
       if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
       for (const { seat, action } of played.actions) {
         if (room.phase !== "in-game") break;
+        if (isDrawAction(action)) continue;
         service.applyPlayerAction(room.id, seat, action);
       }
       // Round ended but the session continues — every real seat must confirm
@@ -890,40 +900,201 @@ describe("RoomService — bot auto-play timer interplay (phase 3 regression)", (
   });
 });
 
+// Fake core that models a two-seat "resolve, then someone must draw" cycle:
+// seat 0 acts, landing seat 1 in the single-legal-action "draw" state; seat 1
+// submitting {type:"draw"} returns control to seat 0. Mirrors the real
+// awaiting-draw phase (packages/core, see docs/process/draw-action.md)
+// closely enough to exercise scheduleDrawReveal without depending on junk's
+// actual rules.
+describe("RoomService — draw reveal (server-paced awaiting-draw auto-submit)", () => {
+  type FakeDrawState = { turn: 0 | 1; awaitingDraw: boolean; seq: number };
+  const fakeDrawGameService = (calls: Array<{ seat: number; action: unknown }>): GameService =>
+    ({
+      createGame: () => ({ state: { turn: 0, awaitingDraw: false, seq: 0 }, events: [] }),
+      applyAction: (state: FakeDrawState, seat: number, action: { type: string }) => {
+        calls.push({ seat, action });
+        const seq = state.seq + 1;
+        if (action.type === "draw") {
+          return {
+            state: { ...state, awaitingDraw: false, seq },
+            events: [{ seq, visibility: { type: "public" }, payload: { type: "TileDrawn", seat } }],
+          };
+        }
+        const nextTurn = seat === 0 ? 1 : 0;
+        return {
+          state: { turn: nextTurn, awaitingDraw: true, seq },
+          events: [{ seq, visibility: { type: "public" }, payload: { type: "TestAction" } }],
+        };
+      },
+      getLegalActions: (state: FakeDrawState, seat: number) => {
+        if (seat !== state.turn) return [];
+        return state.awaitingDraw ? [{ type: "draw" }] : [{ type: "open" }];
+      },
+      getPlayerView: (_state: FakeDrawState, seat: 0 | 1 | 2 | 3) => ({
+        seat,
+        hand: [],
+        seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+        wallCount: 0,
+        currentSeat: 0,
+      }),
+      computeNextDealer: () => 0,
+    }) as unknown as GameService;
+
+  it("auto-submits {type:'draw'} for a human seat after the configured delay, not before", () => {
+    jest.useFakeTimers();
+    try {
+      const calls: Array<{ seat: number; action: unknown }> = [];
+      const config = new ConfigService();
+      Object.defineProperty(config, "drawRevealDelayMs", { value: 500 });
+      const service = new RoomService(
+        fakeDrawGameService(calls),
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      // All four seats are real players — no bot/autopilot involved, so any
+      // auto-submitted draw can only have come from scheduleDrawReveal.
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+      for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+      service.start(room.id);
+
+      service.applyPlayerAction(room.id, 0, { type: "open" });
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+
+      jest.advanceTimersByTime(499);
+      expect(calls).toHaveLength(1);
+      jest.advanceTimersByTime(1);
+      expect(calls).toEqual([
+        { seat: 0, action: { type: "open" } },
+        { seat: 1, action: { type: "draw" } },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("paces a bot seat's draw by drawRevealDelayMs, not botActionDelayRangeMs", () => {
+    jest.useFakeTimers();
+    try {
+      const calls: Array<{ seat: number; action: unknown }> = [];
+      const config = new ConfigService();
+      Object.defineProperty(config, "drawRevealDelayMs", { value: 500 });
+      Object.defineProperty(config, "botActionDelayRangeMs", { value: [100, 100] });
+      const service = new RoomService(
+        fakeDrawGameService(calls),
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      service.addBot(room.id, "host"); // seat 1: the one that will land in awaiting-draw
+      service.addBot(room.id, "host");
+      service.addBot(room.id, "host");
+      service.ready(room.id, "host", true);
+      service.start(room.id);
+
+      service.applyPlayerAction(room.id, 0, { type: "open" });
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+
+      // If nextBotAction hadn't been taught to skip a draw-only seat, autoPlayBots
+      // would have fired this already at the 100ms bot-delay mark.
+      jest.advanceTimersByTime(100);
+      expect(calls).toHaveLength(1);
+      jest.advanceTimersByTime(400);
+      expect(calls).toEqual([
+        { seat: 0, action: { type: "open" } },
+        { seat: 1, action: { type: "draw" } },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("clears the pending reveal timer when the room closes before it fires", () => {
+    jest.useFakeTimers();
+    try {
+      const calls: Array<{ seat: number; action: unknown }> = [];
+      const config = new ConfigService();
+      // Longer than the default 60s disconnect grace, so the room closes
+      // (clearing the reveal timer) well before the reveal would otherwise fire.
+      Object.defineProperty(config, "drawRevealDelayMs", { value: 100_000 });
+      const service = new RoomService(
+        fakeDrawGameService(calls),
+        new EventBus(),
+        fakePersistenceService(),
+        config,
+      );
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      service.addBot(room.id, "host");
+      service.addBot(room.id, "host");
+      service.addBot(room.id, "host");
+      service.ready(room.id, "host", true);
+      service.start(room.id);
+
+      service.applyPlayerAction(room.id, 0, { type: "open" });
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+
+      // Only seat 0 is a real player; disconnecting it with nobody left to
+      // play for closes the room outright (see the handleDisconnect suite)
+      // after the 60s disconnect grace — well before the 100s reveal delay.
+      service.handleDisconnect(room.id, "host");
+      jest.advanceTimersByTime(60_000);
+      expect(room.phase).toBe("finished");
+      expect(room.status).toBe("closed");
+
+      // Advance well past when the (now-cleared) reveal timer would have
+      // fired — it must not have submitted a stale runAction against the
+      // closed room.
+      jest.advanceTimersByTime(60_000);
+      expect(calls).toEqual([{ seat: 0, action: { type: "open" } }]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe("RoomService — authoritative action snapshots", () => {
   it("emits action events before one authoritative snapshot for every seat", () => {
-    const eventBus = new EventBus();
-    const service = new RoomService(
-      new GameService(),
-      eventBus,
-      fakePersistenceService(),
-      new ConfigService(),
-    );
-    const gameService = new GameService();
-    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
-    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
-    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
-    service.start(room.id);
+    jest.useFakeTimers();
+    try {
+      const eventBus = new EventBus();
+      // A non-zero drawRevealDelayMs (with the timer never advanced) keeps
+      // this test's single submitted action from cascading into a second,
+      // server-auto-submitted {type:"draw"} round — this test is about the
+      // ordering guarantee for one action's own broadcast, not the draw
+      // reveal itself (see the "draw reveal" describe block below for that).
+      const config = new ConfigService();
+      Object.defineProperty(config, "drawRevealDelayMs", { value: 10_000 });
+      const service = new RoomService(new GameService(), eventBus, fakePersistenceService(), config);
+      const gameService = new GameService();
+      const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+      for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+      for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+      service.start(room.id);
 
-    const emitted: Array<{ type: "event" | "snapshot"; seat?: number; seq: number }> = [];
-    eventBus.on("game:event", ({ event }) => emitted.push({ type: "event", seq: event.seq }));
-    eventBus.on("game:snapshot", ({ seat, seq }) => emitted.push({ type: "snapshot", seat, seq }));
+      const emitted: Array<{ type: "event" | "snapshot"; seat?: number; seq: number }> = [];
+      eventBus.on("game:event", ({ event }) => emitted.push({ type: "event", seq: event.seq }));
+      eventBus.on("game:snapshot", ({ seat, seq }) => emitted.push({ type: "snapshot", seat, seq }));
 
-    const seat = ([0, 1, 2, 3] as const).find(
-      (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
-    );
-    expect(seat).toBeDefined();
-    const action = gameService.getLegalActions(room.gameState, seat!)[0];
-    expect(action).toBeDefined();
-    service.applyPlayerAction(room.id, seat!, action);
+      const seat = ([0, 1, 2, 3] as const).find(
+        (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+      );
+      expect(seat).toBeDefined();
+      const action = gameService.getLegalActions(room.gameState, seat!)[0];
+      expect(action).toBeDefined();
+      service.applyPlayerAction(room.id, seat!, action);
 
-    const firstSnapshot = emitted.findIndex(({ type }) => type === "snapshot");
-    expect(firstSnapshot).toBeGreaterThan(0);
-    expect(emitted.slice(0, firstSnapshot).every(({ type }) => type === "event")).toBe(true);
-    const snapshots = emitted.slice(firstSnapshot);
-    expect(snapshots).toHaveLength(4);
-    expect(snapshots.map(({ seat: snapshotSeat }) => snapshotSeat)).toEqual([0, 1, 2, 3]);
-    expect(new Set(snapshots.map(({ seq }) => seq))).toEqual(new Set([room.lastEventSeq]));
+      const firstSnapshot = emitted.findIndex(({ type }) => type === "snapshot");
+      expect(firstSnapshot).toBeGreaterThan(0);
+      expect(emitted.slice(0, firstSnapshot).every(({ type }) => type === "event")).toBe(true);
+      const snapshots = emitted.slice(firstSnapshot);
+      expect(snapshots).toHaveLength(4);
+      expect(snapshots.map(({ seat: snapshotSeat }) => snapshotSeat)).toEqual([0, 1, 2, 3]);
+      expect(new Set(snapshots.map(({ seq }) => seq))).toEqual(new Set([room.lastEventSeq]));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -1011,6 +1182,7 @@ describe("RoomService — claim timeout", () => {
 
     let responders: readonly number[] = [];
     for (const { seat, action } of played.actions) {
+      if (isDrawAction(action)) continue;
       service.applyPlayerAction(room.id, seat, action);
       responders = ([0, 1, 2, 3] as const).filter((candidate) =>
         gameService.getLegalActions(room.gameState, candidate).some((legal) => isPassAction(legal)),
@@ -1369,6 +1541,7 @@ describe("RoomService — full 4-round session (real junk engine)", () => {
 
       for (const { seat, action } of played.actions) {
         if (room.phase !== "in-game") break;
+        if (isDrawAction(action)) continue;
         service.applyPlayerAction(room.id, seat, action);
       }
       // Round ended but the session continues — every real seat must confirm

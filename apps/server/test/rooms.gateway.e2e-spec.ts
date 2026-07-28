@@ -38,6 +38,12 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
 
     const configService = app.get(ConfigService);
+    // Keep the draw-reveal timer from auto-submitting {type:"draw"} within
+    // this file's synchronous once()-per-action assertions (it would still
+    // fire eventually, just not before the test's own await resolves) — the
+    // loop below submits "draw" itself like any other legal action once it
+    // becomes the only one available, exercising that path explicitly instead.
+    Object.defineProperty(configService, "drawRevealDelayMs", { value: 10_000 });
     const jwtService = app.get(JwtService);
     protocolVersion = configService.protocolVersion;
     makeToken = (userId: string) =>

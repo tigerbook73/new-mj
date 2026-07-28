@@ -7,8 +7,9 @@
 **专题：摸牌（draw）从自动转场副作用变为 RuleSet 显式动作**
 
 - 结果：junk + bloodbattle 的摸牌变成 core 显式 gate 的 `{type:"draw"}` 动作，由 server 按可配置延时自动代提交，为 UI 让出可感知的摸牌停顿窗口；零协议 schema 改动。详细设计与 slice 划分见 `docs/process/draw-action.md`。
-- Slice 1（使能，已完成）：packages/core 两个玩法新增 `awaiting-draw` 相位与 `draw` 动作；`cross-ruleset-invariants.test.ts`、junk fuzz 1000 局、bloodbattle fuzz 10000 局、`pnpm --filter @new-mj/core verify` 均绿。**注意**：在 Slice 2 落地前，真实对局（apps/server）进入 `awaiting-draw` 后没有任何调用方提交 `{type:"draw"}`，会卡住不动——这是预期的过渡态，不是 bug。
-- 下一步第一个具体动作：Slice 2——`apps/server` 加 `drawRevealDelayMs` 配置与 `scheduleDrawReveal` 定时器（改 `src/config/config.service.ts`、`src/rooms/room.service.ts`），细节见 `docs/process/draw-action.md`。
+- Slice 1（使能，已完成）：packages/core 两个玩法新增 `awaiting-draw` 相位与 `draw` 动作；`cross-ruleset-invariants.test.ts`、junk fuzz 1000 局、bloodbattle fuzz 10000 局、`pnpm --filter @new-mj/core verify` 均绿。
+- Slice 2（已完成）：apps/server 加 `drawRevealDelayMs` 配置与 `scheduleDrawReveal` 定时器，对人类/bot/托管座位一视同仁自动代提交摸牌；`pnpm --filter @new-mj/server verify`（含 e2e）全绿。
+- 下一步第一个具体动作：Slice 3——`apps/web` 的 `useTablePresentation.ts` 里 `hasDockActions` 排除 `"draw"`（否则短暂的 `awaiting-draw` 窗口会在动作栏闪出一个没有中文标签的按钮），补单测，再用 `run` 技能在浏览器里实跑一局确认摸牌前后有可感知停顿。细节见 `docs/process/draw-action.md`。
 
 ## 当前风险 / 开放问题
 
