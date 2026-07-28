@@ -56,18 +56,15 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
   for (const page of players) await page.context().close();
 });
 
-test("host can name a room and fill specifically selected seats with bots", async ({ browser }) => {
+test("host ready fills empty waiting seats with bots and starts", async ({ browser }) => {
   const page = await loginAs(browser, "solo-host");
   await openVariant(page, "Junk Hu");
   await createRoom(page, "Solo table");
   await expect(page).toHaveURL(/\/lobby\//);
   await expect(page.getByText(/Owner:/)).toBeVisible();
 
-  await page.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
-  await page.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
-  await page.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
-  await expect(page.getByText("BOT")).toHaveCount(3);
   await page.getByRole("checkbox", { name: "Ready" }).check();
+  await expect(page.getByText("BOT")).toHaveCount(3);
   await page.getByRole("button", { name: "Start game" }).click();
   await expect(page).toHaveURL(/\/room\//, { timeout: 10_000 });
   await page.context().close();

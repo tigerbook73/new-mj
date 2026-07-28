@@ -195,6 +195,22 @@ export function LobbyView() {
     if (!result.ok) setError(result.code);
   };
   const toggleReady = async (ready: boolean) => {
+    setError(null);
+    // Keep this convenience flow in the client: the existing room:addBot
+    // command remains the server authority for each seat and emits the
+    // normal room updates before the host's own ready command is sent.
+    if (ready && isHost && shownRoom?.phase === "waiting") {
+      const emptySeats = shownRoom.players
+        .map((player, seat) => (player === null ? (seat as 0 | 1 | 2 | 3) : null))
+        .filter((seat): seat is 0 | 1 | 2 | 3 => seat !== null);
+      for (const seat of emptySeats) {
+        const botResult = await ack<object>(socket, "room:addBot", { seat });
+        if (!botResult.ok) {
+          setError(botResult.code);
+          return;
+        }
+      }
+    }
     setReadyOverride(ready);
     const result = await ack(socket, "room:ready", { ready });
     if (!result.ok) setError(result.code);
