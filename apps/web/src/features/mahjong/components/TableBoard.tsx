@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
-import { assertLayoutPreset, ZoneRenderer, type LayoutPreset, type Zone } from "@/shared/lib/layoutPreset";
+import {
+  assertLayoutPreset,
+  ZoneRenderer,
+  type LayoutPreset,
+  type Zone,
+} from "@/shared/lib/layoutPreset";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { DiscardEntry } from "./DiscardPile";
 import type { Meld } from "./MeldGroup";

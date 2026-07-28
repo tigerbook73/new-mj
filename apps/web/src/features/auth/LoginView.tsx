@@ -3,7 +3,12 @@ import { useNavigate } from "react-router";
 import { LoginForm } from "@/features/auth/login-form";
 import { SocialLoginForm } from "@/features/auth/social-login-form";
 import { connectWithTakeoverPrompt, describeConnectError } from "@/shared/lib/socket";
-import { clearDevSession, deriveUserId, signDevToken, writeDevSession } from "@/features/auth/devAuth";
+import {
+  clearDevSession,
+  deriveUserId,
+  signDevToken,
+  writeDevSession,
+} from "@/features/auth/devAuth";
 import { establishSession } from "@/shared/lib/sessionBootstrap";
 import { supabase } from "@/shared/lib/supabase";
 import { useSessionStore } from "@/shared/store/session";

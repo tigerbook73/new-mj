@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { findNode, findParentNode, exportSketchDraft, type SketchNode } from "@/features/layout-sketch/lib/layoutSketch";
+import {
+  findNode,
+  findParentNode,
+  exportSketchDraft,
+  type SketchNode,
+} from "@/features/layout-sketch/lib/layoutSketch";
 import { SketchCanvas } from "@/features/layout-sketch/components/SketchCanvas";
 import { SketchHeader } from "@/features/layout-sketch/components/SketchHeader";
 import { VIEWPORT_PRESETS } from "@/features/layout-sketch/components/viewportPresets";
 import { SketchProperties } from "@/features/layout-sketch/components/SketchProperties";
 import { SketchTreePanel } from "@/features/layout-sketch/components/SketchTree";
 import { SketchVariables } from "@/features/layout-sketch/components/SketchVariables";
-import { useSketchEditor, defaultLayoutFilename } from "@/features/layout-sketch/hooks/useSketchEditor";
+import {
+  useSketchEditor,
+  defaultLayoutFilename,
+} from "@/features/layout-sketch/hooks/useSketchEditor";
 
 const findSketchPath = (root: SketchNode, name: string): SketchNode[] | undefined => {
   if (root.name === name) return [root];
