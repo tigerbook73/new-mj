@@ -112,7 +112,7 @@ const main = (): void => {
       printStatus(root);
       return;
     case "dev":
-      run("pnpm", ["dev"], root, envFor(readConfig(root)));
+      run("pnpm", ["exec", "turbo", "run", "dev"], root, envFor(readConfig(root)));
       return;
     case "test-e2e":
       run(
