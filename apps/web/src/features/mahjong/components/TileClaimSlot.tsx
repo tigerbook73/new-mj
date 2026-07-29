@@ -6,7 +6,7 @@ import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "./tileMotionTiming";
 
 const BADGE_ENTER_TRANSITION = { duration: TILE_ENTRY_DURATION, ease: TILE_MOTION_EASE } as const;
 
-interface TileClaimSlotProps extends Omit<TileProps, "widthPx" | "heightPx"> {
+interface TileClaimSlotProps extends Omit<TileProps, "width" | "height"> {
   /** This slot's own on-screen seat direction — the badge counter-rotates against the ambient Zone rotation for this direction so its arrow always points the true on-screen way, regardless of how this slot's own Zone is rotated. */
   direction: SeatDirection;
   /** Direction the claim came from; omit to render the tile with no badge at all. */
@@ -34,7 +34,7 @@ export function TileClaimSlot({
   const ClaimIcon = claimFromDirection ? DIRECTION_ARROW_ICON[claimFromDirection] : undefined;
   return (
     <div className="relative h-full" style={{ aspectRatio: `1 / ${aspectRatio}` }}>
-      <Tile {...tileProps} entering={entering} heightPx="100%" />
+      <Tile {...tileProps} entering={entering} height="100%" />
       {ClaimIcon && (
         // Fades in alongside the tile's own entry instead of popping in
         // instantly underneath it — same `entering`-gated `initial`/`animate`

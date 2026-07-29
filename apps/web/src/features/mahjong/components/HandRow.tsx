@@ -31,7 +31,7 @@ interface HandRowProps {
    * element left to measure — see DiscardFlipGhost.tsx.
    */
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
-  tileHeightPct: number;
+  tileHeight: number;
   tileGapPx: number;
   /** See SeatContent.drawnSlotKey / drawnSlotEntering (components/mahjong/TableBoard.tsx). */
   drawnSlotKey: string;
@@ -51,7 +51,7 @@ export function HandRow({
   revealed,
   interactive,
   onDiscard,
-  tileHeightPct,
+  tileHeight: tileHeight,
   tileGapPx,
   drawnSlotKey,
   drawnSlotEntering,
@@ -76,7 +76,7 @@ export function HandRow({
               revealed={revealed}
               interactive={interactive}
               onDiscard={onDiscard}
-              tileHeightPct={tileHeightPct}
+              tileHeight={tileHeight}
               entering={drawnSlotEntering}
             />
           );
@@ -97,7 +97,7 @@ export function HandRow({
             key={key}
             tileId={tileId}
             back={!revealed && !isPlaceholder}
-            heightPx={`${tileHeightPct}%`}
+            height={`${tileHeight}%`}
             clickable={interactive && isReal}
             // Lets the remaining hand tiles glide into their new positions
             // when one is discarded and unmounts (tileId-keyed above), or
@@ -146,7 +146,7 @@ function DrawnSlotTile({
   revealed,
   interactive,
   onDiscard,
-  tileHeightPct,
+  tileHeight,
   entering,
 }: {
   direction: SeatDirection;
@@ -155,7 +155,7 @@ function DrawnSlotTile({
   revealed: boolean;
   interactive?: boolean | undefined;
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
-  tileHeightPct: number;
+  tileHeight: number;
   entering: boolean;
 }) {
   const [shouldGhost] = useState(entering);
@@ -166,7 +166,7 @@ function DrawnSlotTile({
     <>
       {/*
        * `items-center`, matching the row's own cross-axis alignment: the Tile
-       * inside is only `tileHeightPct`% tall (not 100%, unlike DiscardPile/
+       * inside is only `tileHeight`% tall (not 100%, unlike DiscardPile/
        * MeldGroup's TileClaimSlot wrappers, which are always 100% all the way
        * down) — without re-centering here, a shorter-than-full-height child
        * sits at the wrapper's top edge instead of centered, so this slot's
@@ -178,11 +178,11 @@ function DrawnSlotTile({
        * for its entire flight.
        */}
       <div className="flex h-full items-center">
-        <div ref={toRef} style={{ height: `${tileHeightPct}%`, aspectRatio: "1 / 1.333" }}>
+        <div ref={toRef} style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}>
           <Tile
             tileId={tileId}
             back={!revealed && !isPlaceholder}
-            heightPx="100%"
+            height="100%"
             clickable={interactive && isReal}
             entering={entering}
             // DrawFlipGhost already flies in and sells the arrival's physical

@@ -107,7 +107,7 @@ function ActionCandidate({
             <Tile
               key={`${String(tile)}-${index}`}
               tileId={Number(tile)}
-              heightPx={CANDIDATE_TILE_HEIGHT_PCT}
+              height={CANDIDATE_TILE_HEIGHT_PCT}
               justDiscarded={isTarget}
               {...(isTarget ? { testId: "action-target-tile" } : {})}
             />

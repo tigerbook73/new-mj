@@ -61,7 +61,7 @@ export function ClaimFlipGhost({ tileId, fromSelector, toRef }: ClaimFlipGhostPr
       transition={GHOST_TRANSITION}
       onAnimationComplete={clear}
     >
-      <Tile tileId={tileId} heightPx="100%" />
+      <Tile tileId={tileId} height="100%" />
     </motion.div>,
     document.body,
   );

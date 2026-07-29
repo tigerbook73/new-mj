@@ -77,7 +77,7 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
             const entry = discards[rowIndex * columns + columnIndex];
             if (!entry) {
               return (
-                <Tile key={columnIndex} testId="discard-slot-empty" tileId={-1} heightPx="100%" />
+                <Tile key={columnIndex} testId="discard-slot-empty" tileId={-1} height="100%" />
               );
             }
             return (

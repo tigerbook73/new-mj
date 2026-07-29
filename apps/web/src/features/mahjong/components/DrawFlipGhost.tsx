@@ -57,7 +57,7 @@ export function DrawFlipGhost({ tileId, toRef }: DrawFlipGhostProps) {
       transition={GHOST_TRANSITION}
       onAnimationComplete={clear}
     >
-      <Tile {...(tileId !== undefined ? { tileId } : {})} heightPx="100%" />
+      <Tile {...(tileId !== undefined ? { tileId } : {})} height="100%" />
     </motion.div>,
     document.body,
   );

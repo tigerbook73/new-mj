@@ -20,7 +20,10 @@ export interface FlightRects {
 export function useFlightGhost(
   resolveFrom: () => DOMRect | null | undefined,
   toRef: RefObject<HTMLElement | null>,
-): [FlightRects | null, /** Call from `motion.div`'s `onAnimationComplete` to unmount the ghost. */ () => void] {
+): [
+  FlightRects | null,
+  /** Call from `motion.div`'s `onAnimationComplete` to unmount the ghost. */ () => void,
+] {
   const [flight, setFlight] = useState<FlightRects | null>(null);
 
   useLayoutEffect(() => {

@@ -106,12 +106,12 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
   /**
    * Pixel (or CSS percentage) box for this tile. Give both for an exact box
    * (what MeldGroup's measured pixel sizing does); give only one — hand and
-   * discard tiles pass only `heightPx`, as a CSS percentage — and the other
+   * discard tiles pass only `height`, as a CSS percentage — and the other
    * is derived by the browser via CSS `aspect-ratio` instead of the caller
    * having to compute it.
    */
-  widthPx?: number | string;
-  heightPx?: number | string;
+  width?: number | string;
+  height?: number | string;
   /** Plays the one-shot arrival animation on mount — see TILE_ENTER_* above. */
   entering?: boolean | undefined;
   /**
@@ -162,8 +162,8 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
 export function Tile({
   tileId,
   back = false,
-  widthPx,
-  heightPx,
+  width,
+  height,
   clickable,
   selected,
   dimmed,
@@ -185,8 +185,8 @@ export function Tile({
   const [wasEntering] = useState(entering);
   const isPlaceholder = tileId !== undefined && tileId < 0;
   if (isPlaceholder) {
-    const hasWidth = widthPx !== undefined;
-    const hasHeight = heightPx !== undefined;
+    const hasWidth = width !== undefined;
+    const hasHeight = height !== undefined;
     return (
       <div
         data-testid={testId}
@@ -194,8 +194,8 @@ export function Tile({
         aria-hidden="true"
         className={cn("shrink-0", className)}
         style={{
-          width: widthPx,
-          height: heightPx,
+          width: width,
+          height: height,
           aspectRatio: hasWidth === hasHeight ? undefined : `1 / ${DEFAULT_TILE_ASPECT_RATIO}`,
         }}
       />
@@ -204,8 +204,8 @@ export function Tile({
   const isBack = back || tileId === undefined;
   const isClickable = (clickable ?? Boolean(onClick)) && !isBack;
   const src = isBack ? tileBackImageSrc(tileTheme) : tileImageSrc(tileId!, tileTheme);
-  const hasWidth = widthPx !== undefined;
-  const hasHeight = heightPx !== undefined;
+  const hasWidth = width !== undefined;
+  const hasHeight = height !== undefined;
   const restingScale = enlarged ? ENLARGED_SCALE : 1;
 
   return (
@@ -218,8 +218,8 @@ export function Tile({
         className,
       )}
       style={{
-        width: hasWidth ? widthPx : !hasHeight ? 44 : undefined,
-        height: hasHeight ? heightPx : !hasWidth ? 59 : undefined,
+        width: hasWidth ? width : !hasHeight ? 44 : undefined,
+        height: hasHeight ? height : !hasWidth ? 59 : undefined,
         // Only relevant when exactly one side was omitted — that's what lets
         // the browser derive it. Both given (the real board's usual case) or
         // neither given (bare defaults above) both fully determine the box

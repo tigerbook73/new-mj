@@ -37,7 +37,7 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
         revealed={seat.revealed}
         interactive={seat.interactive}
         onDiscard={seat.onDiscard}
-        tileHeightPct={desktopTableLayoutConfig.handZone.tileHeight}
+        tileHeight={desktopTableLayoutConfig.handZone.tileHeight}
         tileGapPx={desktopTableLayoutConfig.shared.tileGapPx}
         drawnSlotKey={seat.drawnSlotKey}
         drawnSlotEntering={seat.drawnSlotEntering}
@@ -47,8 +47,7 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
 }
 
 export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: SeatContent }) {
-  const { meldHeight: meldHeightPct, meldTileHeight: meldTileHeightPct } =
-    desktopTableLayoutConfig.meldZone;
+  const { meldHeight, meldTileHeight: meldTileHeight } = desktopTableLayoutConfig.meldZone;
   return (
     <div
       data-testid={`meld-track-${direction}`}
@@ -56,12 +55,12 @@ export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: 
     >
       <div
         className="flex items-center"
-        style={{ height: `${meldHeightPct}%`, boxSizing: "border-box" }}
+        style={{ height: `${meldHeight}%`, boxSizing: "border-box" }}
       >
         <MeldGroup
           direction={direction}
           melds={seat.melds}
-          tileHeightPct={(meldTileHeightPct / meldHeightPct) * 100}
+          tileHeight={(meldTileHeight / meldHeight) * 100}
           config={desktopTableLayoutConfig}
           entering={seat.meldEntering}
         />

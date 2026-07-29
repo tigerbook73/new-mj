@@ -12,7 +12,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Matches desktopTableLayoutConfig.shared.aspectRatio (height / width) — see layouts/desktop.table-config.ts. */
 const ASPECT_RATIO = 1.333;
-const dims = (widthPx: number) => ({ widthPx, heightPx: Math.round(widthPx * ASPECT_RATIO) });
+const dims = (width: number) => ({ width: width, height: Math.round(width * ASPECT_RATIO) });
 
 export const AllFaces: Story = {
   name: "All 34 faces",

@@ -21,13 +21,13 @@ interface MeldGroupProps {
    * Percent of MeldGroup's own height every meld row (and thus every tile)
    * should be — precomputed by MeldSlot (see
    * components/mahjong/scenarios/desktopZoneComponents.tsx) from
-   * meldTileHeightPct/meldHeightPct so nesting inside the meld row's own
+   * meldTileHeight/meldHeight so nesting inside the meld row's own
    * percentage box still lands at the same absolute size. Every row gets the
    * same fixed percentage regardless of how many melds wrap onto their own
    * row, so extra rows simply add height rather than shrinking existing
    * ones — overflow-hidden above clips whatever doesn't fit instead.
    */
-  tileHeightPct: number;
+  tileHeight: number;
   config: TableLayoutConfig;
   /** See SeatContent.meldEntering (components/mahjong/TableBoard.tsx). */
   entering: boolean;
@@ -38,7 +38,7 @@ interface MeldGroupProps {
  * shrinking — tile size is a fixed percentage of the shared shell's own
  * height, never squeezed by a fixed column count.
  */
-export function MeldGroup({ direction, melds, tileHeightPct, config, entering }: MeldGroupProps) {
+export function MeldGroup({ direction, melds, tileHeight, config, entering }: MeldGroupProps) {
   if (melds.length === 0) return null;
 
   return (
@@ -62,7 +62,7 @@ export function MeldGroup({ direction, melds, tileHeightPct, config, entering }:
           <div
             key={meldIndex}
             className="flex"
-            style={{ height: `${tileHeightPct}%`, gap: `${config.shared.tileGapPx}px` }}
+            style={{ height: `${tileHeight}%`, gap: `${config.shared.tileGapPx}px` }}
           >
             {sortedTiles.map((tile) => {
               const isFromClaim = tile === fromTileId;
