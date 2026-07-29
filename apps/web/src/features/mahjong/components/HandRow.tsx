@@ -170,31 +170,39 @@ function DrawnSlotTile({
        * MeldGroup's TileClaimSlot wrappers, which are always 100% all the way
        * down) — without re-centering here, a shorter-than-full-height child
        * sits at the wrapper's top edge instead of centered, so this slot's
-       * tile no longer lines up with the rest of the hand row.
+       * tile no longer lines up with the rest of the hand row. `toRef` sits
+       * on the inner, tile-sized box (not this outer full-height one) —
+       * DrawFlipGhost measures it via `getBoundingClientRect()` to size
+       * itself, and measuring the taller centering wrapper instead made the
+       * ghost render visibly oversized (full row height, not the tile's own)
+       * for its entire flight.
        */}
-      <div ref={toRef} className="flex h-full items-center">
-        <Tile
-          tileId={tileId}
-          back={!revealed && !isPlaceholder}
-          heightPx={`${tileHeightPct}%`}
-          clickable={interactive && isReal}
-          entering={entering}
-          // DrawFlipGhost already sells the arrival at full size (deliberately
-          // no scale animation of its own — see its docs); this real tile
-          // popping 0.75→1 again underneath it once the ghost lands would
-          // read as a redundant second scale beat, so it skips just the
-          // scale part of the entry and keeps the fade/rise.
-          noEnterScale
-          // See the `reflow={revealed}` comment above — same scoping applies
-          // here too, though this slot always remounts fresh on a new draw
-          // (keyed by `drawnSlotKey`), so `layout` never actually has a prior
-          // instance to FLIP from either way; kept consistent for clarity.
-          reflow={revealed}
-          testId={`hand-track-drawn-${direction}`}
-          {...(interactive && isReal
-            ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
-            : {})}
-        />
+      <div className="flex h-full items-center">
+        <div ref={toRef} style={{ height: `${tileHeightPct}%`, aspectRatio: "1 / 1.333" }}>
+          <Tile
+            tileId={tileId}
+            back={!revealed && !isPlaceholder}
+            heightPx="100%"
+            clickable={interactive && isReal}
+            entering={entering}
+            // DrawFlipGhost already flies in and sells the arrival's physical
+            // motion on its own path (from the table's center); this real tile
+            // independently rising from below at its destination — let alone
+            // popping 0.75→1 too — would visibly clash with that flight rather
+            // than read as one motion, so it skips scale and rise, keeping only
+            // the fade.
+            noEnterMotion
+            // See the `reflow={revealed}` comment above — same scoping applies
+            // here too, though this slot always remounts fresh on a new draw
+            // (keyed by `drawnSlotKey`), so `layout` never actually has a prior
+            // instance to FLIP from either way; kept consistent for clarity.
+            reflow={revealed}
+            testId={`hand-track-drawn-${direction}`}
+            {...(interactive && isReal
+              ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
+              : {})}
+          />
+        </div>
       </div>
       {shouldGhost && <DrawFlipGhost {...(isReal ? { tileId } : {})} toRef={toRef} />}
     </>

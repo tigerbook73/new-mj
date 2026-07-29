@@ -115,13 +115,16 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
   /** Plays the one-shot arrival animation on mount — see TILE_ENTER_* above. */
   entering?: boolean | undefined;
   /**
-   * Only meaningful when `entering` is true: skips just the scale part of the
-   * entry (keeps the fade/rise), for when a separate flying ghost already
-   * sold the arrival at full size — see HandRow.tsx's DrawnSlotTile, the
-   * only caller, for why the real tile popping 0.75→1 again underneath
-   * DrawFlipGhost once it lands would read as a redundant second scale beat.
+   * Only meaningful when `entering` is true: skips the scale *and* rise
+   * keyframes, leaving only opacity — for when a separate flying ghost
+   * already sells the arrival's physical motion. Without this, the real
+   * tile plays its own independent rise-from-below (and scale, pre-
+   * `enlarged`/pre-restingScale) at its *destination*, which visibly clashes
+   * with a ghost still travelling in from a different direction/point (e.g.
+   * DrawFlipGhost flying in from the table's center) — see
+   * HandRow.tsx's DrawnSlotTile, the only caller.
    */
-  noEnterScale?: boolean | undefined;
+  noEnterMotion?: boolean | undefined;
   /** Fades toward 40% opacity via motion's `animate` — see TILE_ENTER_* above for why this isn't a CSS class. */
   dimmed?: boolean | undefined;
   /**
@@ -167,7 +170,7 @@ export function Tile({
   justDiscarded,
   enlarged,
   entering,
-  noEnterScale,
+  noEnterMotion,
   reflow,
   onClick,
   className,
@@ -225,22 +228,23 @@ export function Tile({
       }}
       data-entering={wasEntering || undefined}
       {...(reflow ? { layout: true } : {})}
-      // `enlarged`/`noEnterScale` both override the entry's own scale
-      // keyframe (not just the end state), just for opposite reasons:
-      // `enlarged` so a freshly-discarded tile mounts already at its
-      // enlarged size — no separate "grow bigger" beat layered onto the
-      // fade/rise — and `noEnterScale` so DrawnSlotTile's real tile doesn't
-      // repeat DrawFlipGhost's own arrival pop. Either way the entry's
-      // fade/rise still plays; shrinking back later (`enlarged` flips false
-      // on an already-mounted tile once it's superseded) still animates
-      // smoothly, since `initial` only ever governs the mount frame and
-      // `animate` alone drives every later change.
+      // `enlarged` overrides just the entry's scale keyframe (not the end
+      // state) so a freshly-discarded tile mounts already at its enlarged
+      // size — no separate "grow bigger" beat layered onto the fade/rise.
+      // `noEnterMotion` goes further and drops scale *and* rise entirely,
+      // leaving pure opacity — see its own doc for why (a paired flying
+      // ghost, e.g. DrawFlipGhost, already sells the physical motion; this
+      // real tile playing its own independent rise/scale at the destination
+      // would visibly clash with a ghost still travelling in from elsewhere).
+      // Either way, shrinking back later (`enlarged` flips false on an
+      // already-mounted tile once it's superseded) still animates smoothly,
+      // since `initial` only ever governs the mount frame and `animate`
+      // alone drives every later change.
       initial={
         entering
-          ? {
-              ...TILE_ENTER_INITIAL,
-              scale: noEnterScale || enlarged ? restingScale : TILE_ENTER_INITIAL.scale,
-            }
+          ? noEnterMotion
+            ? { opacity: 0, scale: restingScale, y: 0 }
+            : { ...TILE_ENTER_INITIAL, scale: enlarged ? restingScale : TILE_ENTER_INITIAL.scale }
           : false
       }
       animate={{
