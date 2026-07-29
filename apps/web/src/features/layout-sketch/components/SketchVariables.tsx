@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowUpDown, GripVertical, Plus, Search, Trash2 } from "lucide-react";
 import { type SketchVariable } from "@/features/layout-sketch/lib/layoutSketch";
+import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { useDragSort } from "@/features/layout-sketch/hooks/useDragSort";
 import { useVariableAutocomplete } from "@/features/layout-sketch/hooks/useVariableAutocomplete";
 import { AutocompleteDropdown } from "./SketchFields";
+import { SketchConfig } from "./SketchConfig";
 
 const SORT_GROUP = "variables";
 
@@ -147,6 +149,8 @@ export function SketchVariables({
   onReorder,
   isUsed,
   variableNames,
+  tableConfig,
+  onUpdateTableConfig,
 }: {
   variables: SketchVariable[];
   onAdd: () => void;
@@ -155,6 +159,8 @@ export function SketchVariables({
   onReorder: (name: string, newIndex: number) => void;
   isUsed: (name: string) => boolean;
   variableNames: readonly string[];
+  tableConfig: TableLayoutConfig;
+  onUpdateTableConfig: (config: TableLayoutConfig) => void;
 }) {
   const [query, setQuery] = useState("");
   // Which variable's name field is in edit mode, keyed by its name at the
@@ -265,6 +271,7 @@ export function SketchVariables({
       {variables.length > 0 && filtered.length === 0 && (
         <p className="text-sm text-slate-400">No variables match &ldquo;{query}&rdquo;.</p>
       )}
+      <SketchConfig config={tableConfig} onUpdate={onUpdateTableConfig} />
     </aside>
   );
 }

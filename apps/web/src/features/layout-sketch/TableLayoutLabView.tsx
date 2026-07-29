@@ -11,6 +11,7 @@ import { VIEWPORT_PRESETS } from "@/features/layout-sketch/components/viewportPr
 import { SketchProperties } from "@/features/layout-sketch/components/SketchProperties";
 import { SketchTreePanel } from "@/features/layout-sketch/components/SketchTree";
 import { SketchVariables } from "@/features/layout-sketch/components/SketchVariables";
+import { LayoutPreview } from "@/features/layout-sketch/components/LayoutPreview";
 import {
   useSketchEditor,
   defaultLayoutFilename,
@@ -30,6 +31,8 @@ export function TableLayoutLabView() {
   const [hoveredName, setHoveredName] = useState<string>();
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string }>();
   const [coordinateView, setCoordinateView] = useState<"world" | "parent" | "zone">("world");
+  const [contentView, setContentView] = useState<"canvas" | "preview">("canvas");
+  const [previewCase, setPreviewCase] = useState<"baseline" | "dense" | "claims">("baseline");
   const nameInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLElement>(null);
   const treePanelRef = useRef<HTMLElement>(null);
@@ -223,6 +226,8 @@ export function TableLayoutLabView() {
         coordinateView={coordinateView}
         onCoordinateView={setCoordinateView}
         viewInfo={viewInfo}
+        contentView={contentView}
+        onContentView={setContentView}
       />
       {toast && (
         <div
@@ -275,24 +280,32 @@ export function TableLayoutLabView() {
             resizeSidebar("left", event.clientX);
         }}
       />
-      <SketchCanvas
-        root={coordinateView === "world" ? editor.draft.root : (focusNode ?? editor.draft.root)}
-        style={canvasStyle}
-        selected={editor.selected.name}
-        hovered={hoveredName}
-        showBoundaries={editor.showBoundaries}
-        onSelect={editor.select}
-        onHover={setHoveredName}
-        coordinateView={coordinateView}
-        referenceName={
-          coordinateView === "parent"
-            ? selectedParentName
-            : coordinateView === "zone"
-              ? editor.selected.name
-              : undefined
-        }
-        unrotatedNames={coordinateView === "parent" ? parentLocalUnrotatedNames : undefined}
-      />
+      {contentView === "canvas" ? (
+        <SketchCanvas
+          root={coordinateView === "world" ? editor.draft.root : (focusNode ?? editor.draft.root)}
+          style={canvasStyle}
+          selected={editor.selected.name}
+          hovered={hoveredName}
+          showBoundaries={editor.showBoundaries}
+          onSelect={editor.select}
+          onHover={setHoveredName}
+          coordinateView={coordinateView}
+          referenceName={
+            coordinateView === "parent"
+              ? selectedParentName
+              : coordinateView === "zone"
+                ? editor.selected.name
+                : undefined
+          }
+          unrotatedNames={coordinateView === "parent" ? parentLocalUnrotatedNames : undefined}
+        />
+      ) : (
+        <LayoutPreview
+          draft={editor.draft}
+          previewCase={previewCase}
+          onPreviewCase={setPreviewCase}
+        />
+      )}
       <SketchProperties
         selected={editor.selected}
         nameInputRef={nameInputRef}
@@ -316,6 +329,8 @@ export function TableLayoutLabView() {
         onReorder={editor.reorderVariable}
         isUsed={editor.isVariableUsed}
         variableNames={variableNames}
+        tableConfig={editor.draft.tableConfig}
+        onUpdateTableConfig={editor.updateTableConfig}
       />
       <div
         role="separator"

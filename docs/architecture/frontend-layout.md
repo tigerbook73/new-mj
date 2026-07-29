@@ -20,11 +20,11 @@
 
 `Zone` 使用父级未旋转的局部坐标；`rotationDeg` 只允许 `0 | 90 | 180 | -90`。父子结构保留旋转和层叠上下文，避免把每个子项拍平后重复计算坐标。
 
-- 几何文件：`src/features/mahjong/layouts/desktop.table-layout.json`，可由 Layout Sketch 读写。
-- 展示参数：`src/features/mahjong/desktop.table-config.ts`，包含牌尺寸、间距、弃牌行列等；其类型在 `lib/tableLayoutConfig.ts`。它与几何文件同主题配对，但不属于 `LayoutPreset`。
-- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。
+- 桌面布局文档：`src/features/mahjong/layouts/desktop.table-layout.json` 同时保存 `LayoutPreset` 几何和桌面展示 Config；可由 Layout Sketch 读写。
+- 展示参数：`src/features/mahjong/desktop.table-config.ts` 只从布局文档导入并以 `TableLayoutConfig` 校验后导出，避免与 JSON 形成双真源。Config 只供真实桌面组件消费，不属于通用 `LayoutPreset` 几何契约。
+- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。Variables 仅服务几何表达式；Config Panel 只编辑真实组件的展示参数，两者不互相引用。
 
-该分离使新布局可以替换几何，而不把牌桌业务参数或编辑器元数据耦合进通用 schema。
+文档内仍将通用 Zone 几何与桌面展示 Config 分层：新布局可替换几何，而不把牌桌业务参数或编辑器元数据耦合进通用 schema。
 
 ## 4. 座位与区域组合
 

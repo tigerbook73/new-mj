@@ -28,6 +28,7 @@ import {
   type SketchNode,
 } from "@/features/layout-sketch/lib/layoutSketch";
 import { type RotationDeg } from "@/shared/lib/layoutPreset";
+import { type TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import {
   listLayoutFiles,
   readLayoutFile,
@@ -207,6 +208,7 @@ export function useSketchEditor() {
   const select = (selectedName: string) => patchDocument({ selectedName });
   const resolveExpression = (raw: string, minimum: number) =>
     resolveVariablePercentage(raw, draft.variables, minimum);
+  const updateTableConfig = (tableConfig: TableLayoutConfig) => patchDraft({ tableConfig });
   const addVariable = () => {
     let index = draft.variables.length + 1;
     while (draft.variables.some((variable) => variable.name === `var${index}`)) index += 1;
@@ -385,6 +387,7 @@ export function useSketchEditor() {
           viewport: { w: 16, h: 9 },
           root: defaultSketchDocument().drafts[0]!.root,
           variables: [],
+          tableConfig: defaultSketchDocument().drafts[0]!.tableConfig,
         },
       ],
       activeDraft: name,
@@ -407,6 +410,7 @@ export function useSketchEditor() {
           viewport: draft.viewport,
           root: cloneNode(draft.root),
           variables: [...draft.variables],
+          tableConfig: draft.tableConfig,
         },
       ],
       activeDraft: name,
@@ -494,6 +498,7 @@ export function useSketchEditor() {
           root: imported.root,
           viewport: imported.viewport,
           variables: imported.variables,
+          tableConfig: imported.tableConfig,
           ...(entry ? { sourceMtimeMs: entry.mtimeMs } : {}),
         };
         return { ...next, savedSnapshot: JSON.stringify(exportSketchDraft(next)) };
@@ -568,6 +573,7 @@ export function useSketchEditor() {
     setViewportMode,
     patchDocument,
     patchDraft,
+    updateTableConfig,
     resolveExpression,
     addVariable,
     reorderVariable,

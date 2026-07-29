@@ -288,6 +288,7 @@ export function TableView() {
                     : undefined
                 }
                 justDrawn={extras.justDrawn}
+                config={DESKTOP_TABLE_SCENARIO.config}
                 onAction={(action) => void sendAction(action)}
               />
             ) : undefined

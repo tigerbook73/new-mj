@@ -43,6 +43,22 @@ test("the desktop preset file auto-opens as a draft on cold start", async ({ pag
   await expect(page.getByLabel("Name", { exact: true })).toHaveValue("hand-bottom");
 });
 
+test("real preview uses the current draft config and exposes deterministic samples", async ({
+  page,
+}) => {
+  await page.goto("/dev/table-layout");
+  await page.getByLabel("Active draft").selectOption("desktop");
+  const gap = page.getByLabel("Tile gap px");
+  await expect(gap).toHaveValue("1.9");
+  await gap.fill("4");
+  await expect(gap).toHaveValue("4");
+  await page.getByRole("button", { name: "Real preview" }).click();
+  await expect(page.getByTestId("layout-real-preview")).toBeVisible();
+  await expect(page.getByTestId("table-core")).toBeVisible();
+  await page.getByLabel("Preview sample").selectOption("dense");
+  await expect(page.getByLabel("Preview sample")).toHaveValue("dense");
+});
+
 // Regression: clicking a node whose hit-test button is rotated 90°/270° must
 // select that node, not some unrelated sibling or nothing at all. The old
 // hit-test (nodesAtPoint) recomputed each node's box from its unrotated x/y/
