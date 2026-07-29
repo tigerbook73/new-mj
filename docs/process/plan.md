@@ -15,6 +15,7 @@
 
 ## Backlog
 
+- Web 牌桌动画重构（Tile 三层拆分 Slot/Motion/Face + 全桌动画调度架构，含分阶段落地方案）：详见 `process/table-animation-refactor.md`，尚未开始实施。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`。
