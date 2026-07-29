@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { desktopTableLayout } from "@/features/mahjong/desktop.table-config";
+import {
+  desktopTableLayout,
+  desktopTableLayoutConfig,
+} from "@/features/mahjong/desktop.table-config";
 import { DEFAULT_TABLE_LAYOUT_CONFIG } from "@/features/mahjong/lib/tableLayoutConfig";
 import type { Zone } from "@/shared/lib/layoutPreset";
 import {
@@ -45,7 +48,7 @@ describe("layout sketch document", () => {
     expect(imported.name).toBe(desktopTableLayout.name);
     expect(imported.referenceCanvas).toEqual(desktopTableLayout.referenceCanvas);
     expectZonesToMatch(imported.root, desktopTableLayout.root);
-    expect(imported.tableConfig).toEqual(DEFAULT_TABLE_LAYOUT_CONFIG);
+    expect(imported.tableConfig).toEqual(desktopTableLayoutConfig);
   });
   it("round-trips presentation config with the same layout document", () => {
     const draft = defaultSketchDocument().drafts[0]!;

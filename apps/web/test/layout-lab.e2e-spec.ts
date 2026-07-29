@@ -393,6 +393,22 @@ test("sidebars have draggable width separators", async ({ page }) => {
   expect((await variables.boundingBox())?.width).toBeGreaterThan(variablesBefore.width + 40);
 });
 
+test("Config panel has a resizable, independently scrollable height", async ({ page }) => {
+  await page.goto("/dev/table-layout");
+  const config = page.getByTestId("layout-config-panel");
+  const separator = page.getByTestId("config-panel-resizer");
+  const before = await config.boundingBox();
+  const handle = await separator.boundingBox();
+  expect(before).not.toBeNull();
+  expect(handle).not.toBeNull();
+  if (!before || !handle) return;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y - 80);
+  await page.mouse.up();
+  expect((await config.boundingBox())?.height).toBeGreaterThan(before.height + 60);
+});
+
 test("the variables sidebar is anchored at the top", async ({ page }) => {
   await page.goto("/dev/table-layout");
   const pageBounds = await page.getByTestId("layout-lab-page").boundingBox();

@@ -11,7 +11,9 @@ import { VIEWPORT_PRESETS } from "@/features/layout-sketch/components/viewportPr
 import { SketchProperties } from "@/features/layout-sketch/components/SketchProperties";
 import { SketchTreePanel } from "@/features/layout-sketch/components/SketchTree";
 import { SketchVariables } from "@/features/layout-sketch/components/SketchVariables";
+import { SketchConfig } from "@/features/layout-sketch/components/SketchConfig";
 import { LayoutPreview } from "@/features/layout-sketch/components/LayoutPreview";
+import { HorizontalPanelResizer } from "@/features/layout-sketch/components/PanelResizer";
 import {
   useSketchEditor,
   defaultLayoutFilename,
@@ -36,6 +38,7 @@ export function TableLayoutLabView() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLElement>(null);
   const treePanelRef = useRef<HTMLElement>(null);
+  const rightPanelRef = useRef<HTMLElement>(null);
   const detectedMode =
     VIEWPORT_PRESETS.find(
       (preset) => preset.w === editor.draft.viewport.w && preset.h === editor.draft.viewport.h,
@@ -122,6 +125,16 @@ export function TableLayoutLabView() {
         Math.min(Math.max(proposed, side === "left" ? 160 : 180), max),
       ),
     });
+  };
+  const resizeConfigPanel = (clientY: number) => {
+    const panel = rightPanelRef.current;
+    if (!panel) return;
+    const bounds = panel.getBoundingClientRect();
+    const next = Math.min(
+      Math.max(bounds.bottom - clientY, 180),
+      Math.max(180, bounds.height - 120),
+    );
+    editor.patchDocument({ rightConfigHeight: Math.round(next) });
   };
   const modeChange = (mode: string) => {
     editor.setViewportMode({ draft: editor.draft.name, mode });
@@ -251,19 +264,11 @@ export function TableLayoutLabView() {
         onSetAllHidden={editor.setAllItemsHidden}
         onReorder={editor.reorder}
       />
-      <div
-        role="separator"
-        aria-label="Resize Tree and Properties"
-        aria-orientation="horizontal"
-        data-testid="tree-properties-resizer"
-        className="col-start-1 row-start-1 z-20 -mb-1 h-2 w-full self-end cursor-row-resize touch-none bg-transparent hover:bg-amber-400/40"
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          resizeTree(event.clientY);
-        }}
-        onPointerMove={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) resizeTree(event.clientY);
-        }}
+      <HorizontalPanelResizer
+        label="Resize Tree and Properties"
+        testId="tree-properties-resizer"
+        onResize={resizeTree}
+        className="col-start-1 row-start-1 z-20 -mb-1 w-full self-end"
       />
       <div
         role="separator"
@@ -321,17 +326,31 @@ export function TableLayoutLabView() {
         resolveExpression={editor.resolveExpression}
         variableNames={variableNames}
       />
-      <SketchVariables
-        variables={editor.draft.variables}
-        onAdd={editor.addVariable}
-        onUpdate={editor.updateVariable}
-        onRemove={editor.removeVariable}
-        onReorder={editor.reorderVariable}
-        isUsed={editor.isVariableUsed}
-        variableNames={variableNames}
-        tableConfig={editor.draft.tableConfig}
-        onUpdateTableConfig={editor.updateTableConfig}
-      />
+      <aside
+        ref={rightPanelRef}
+        className="col-start-3 row-start-1 row-span-2 flex min-h-0 flex-col overflow-hidden border-l border-slate-700 bg-slate-900"
+      >
+        <SketchVariables
+          variables={editor.draft.variables}
+          onAdd={editor.addVariable}
+          onUpdate={editor.updateVariable}
+          onRemove={editor.removeVariable}
+          onReorder={editor.reorderVariable}
+          isUsed={editor.isVariableUsed}
+          variableNames={variableNames}
+        />
+        <HorizontalPanelResizer
+          label="Resize Config panel"
+          testId="config-panel-resizer"
+          onResize={resizeConfigPanel}
+          className="z-20 -my-1 w-full shrink-0 bg-slate-700/70 hover:bg-amber-400/60"
+        />
+        <SketchConfig
+          config={editor.draft.tableConfig}
+          onUpdate={editor.updateTableConfig}
+          style={{ height: editor.document.rightConfigHeight }}
+        />
+      </aside>
       <div
         role="separator"
         aria-label="Resize right sidebar"

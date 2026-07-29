@@ -1,5 +1,6 @@
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { parseTableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
+import type { CSSProperties } from "react";
 
 type NumberField = {
   label: string;
@@ -17,7 +18,10 @@ const FIELDS: { title: string; fields: NumberField[] }[] = [
       { label: "Tile gap px", path: "shared.tileGapPx", min: 0, max: 8, step: 0.1 },
     ],
   },
-  { title: "Hand", fields: [{ label: "Tile height %", path: "handZone.tileHeight", min: 5, max: 80 }] },
+  {
+    title: "Hand",
+    fields: [{ label: "Tile height %", path: "handZone.tileHeight", min: 5, max: 80 }],
+  },
   {
     title: "Meld",
     fields: [
@@ -38,7 +42,13 @@ const FIELDS: { title: string; fields: NumberField[] }[] = [
     fields: [
       { label: "Actions height %", path: "actionDockZone.actionsHeight", min: 20, max: 60 },
       { label: "Button height %", path: "actionDockZone.actionButtonHeight", min: 30, max: 90 },
-      { label: "Wide label ratio", path: "actionDockZone.wideLabelWidthRatio", min: 1, max: 2, step: 0.1 },
+      {
+        label: "Wide label ratio",
+        path: "actionDockZone.wideLabelWidthRatio",
+        min: 1,
+        max: 2,
+        step: 0.1,
+      },
       { label: "Candidate height %", path: "actionDockZone.candidateHeight", min: 30, max: 90 },
     ],
   },
@@ -58,9 +68,11 @@ const withValue = (config: TableLayoutConfig, path: string, value: number): Tabl
 export function SketchConfig({
   config,
   onUpdate,
+  style,
 }: {
   config: TableLayoutConfig;
   onUpdate: (config: TableLayoutConfig) => void;
+  style?: CSSProperties | undefined;
 }) {
   const update = (field: NumberField, raw: string, input: HTMLInputElement) => {
     const value = Number(raw);
@@ -71,7 +83,11 @@ export function SketchConfig({
     }
   };
   return (
-    <section data-testid="layout-config-panel" className="border-t border-slate-700 px-3 py-4">
+    <section
+      data-testid="layout-config-panel"
+      className="layout-lab-scrollbar min-h-0 shrink-0 overflow-x-auto overflow-y-scroll border-t border-slate-700 px-3 py-4 scrollbar-gutter-stable"
+      style={style}
+    >
       <h2 className="mb-3 font-semibold">Config</h2>
       <div className="grid gap-4">
         {FIELDS.map((group) => (
@@ -80,7 +96,10 @@ export function SketchConfig({
               {group.title}
             </legend>
             {group.fields.map((field) => (
-              <label key={field.path} className="grid grid-cols-[1fr_5.5rem] items-center gap-2 text-sm">
+              <label
+                key={field.path}
+                className="grid grid-cols-[1fr_5.5rem] items-center gap-2 text-sm"
+              >
                 <span>{field.label}</span>
                 <input
                   aria-label={field.label}
@@ -90,7 +109,9 @@ export function SketchConfig({
                   max={field.max}
                   step={field.step ?? 1}
                   value={valueAt(config, field.path) as number}
-                  onChange={(event) => update(field, event.currentTarget.value, event.currentTarget)}
+                  onChange={(event) =>
+                    update(field, event.currentTarget.value, event.currentTarget)
+                  }
                 />
               </label>
             ))}
@@ -102,7 +123,9 @@ export function SketchConfig({
             aria-label="Show zone guides"
             type="checkbox"
             checked={config.debug.showRegions}
-            onChange={(event) => onUpdate({ ...config, debug: { showRegions: event.currentTarget.checked } })}
+            onChange={(event) =>
+              onUpdate({ ...config, debug: { showRegions: event.currentTarget.checked } })
+            }
           />
         </label>
       </div>

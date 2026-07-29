@@ -33,13 +33,19 @@ const seatsFor = (kind: PreviewCase): Record<SeatDirection, SeatContent> => ({
     [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52],
     kind === "claims" ? [{ type: "peng", tiles: [56, 57, 58], fromDirection: "left" }] : [],
   ),
-  right: makeSeat("East", Array.from({ length: 13 }, (_, index) => 60 + index)),
+  right: makeSeat(
+    "East",
+    Array.from({ length: 13 }, (_, index) => 60 + index),
+  ),
   top: makeSeat(
     "South",
     Array.from({ length: 13 }, (_, index) => 76 + index),
     kind === "claims" ? [{ type: "chi", tiles: [92, 96, 100], fromDirection: "right" }] : [],
   ),
-  left: makeSeat("West", Array.from({ length: 13 }, (_, index) => 108 + index)),
+  left: makeSeat(
+    "West",
+    Array.from({ length: 13 }, (_, index) => 108 + index),
+  ),
 });
 
 const discardsFor = (kind: PreviewCase): Record<SeatDirection, DiscardEntry[]> => {
@@ -67,7 +73,8 @@ export function LayoutPreview({
   );
   const seats = useMemo(() => seatsFor(previewCase), [previewCase]);
   const discards = useMemo(() => discardsFor(previewCase), [previewCase]);
-  const actions = previewCase === "claims" ? [{ type: "peng", tile: 56 }, { type: "pass" }] : [{ type: "pass" }];
+  const actions =
+    previewCase === "claims" ? [{ type: "peng", tile: 56 }, { type: "pass" }] : [{ type: "pass" }];
   return (
     <section
       data-testid="layout-real-preview"

@@ -63,6 +63,8 @@ export type SketchDocument = {
   leftWidth: number;
   leftTreeHeight: number;
   rightWidth: number;
+  /** Height in pixels reserved for the independently scrollable Config panel. */
+  rightConfigHeight: number;
 };
 
 const sketchPercentage = (resolved: number): SketchPercentage => ({
@@ -277,6 +279,7 @@ export const defaultSketchDocument = (): SketchDocument => ({
   leftWidth: 240,
   leftTreeHeight: 280,
   rightWidth: 280,
+  rightConfigHeight: 420,
 });
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -434,6 +437,7 @@ export function readSketchDocument(
       leftWidth: number(parsed.leftWidth, 240, 160, 480),
       leftTreeHeight: number(parsed.leftTreeHeight, 280, 120, 1200),
       rightWidth: number(parsed.rightWidth, 280, 180, 520),
+      rightConfigHeight: number(parsed.rightConfigHeight, 420, 180, 1400),
     };
   } catch {
     return defaultSketchDocument();
