@@ -196,6 +196,16 @@ export function LobbyView() {
   };
   const toggleReady = async (ready: boolean) => {
     setError(null);
+    // Set the checkbox's own optimistic state up front, before any of the
+    // async work below — the checkbox is a controlled input, so its `checked`
+    // DOM property only ever updates on the next React render, and that
+    // render only happens once this state changes. Deferring it until after
+    // the bot-filling loop (each `room:addBot` ack a real network round trip)
+    // left the checkbox visibly un-checked for that whole stretch: a
+    // synchronous `.check()` (Playwright, or a real fast click-and-look user)
+    // sees the click apparently do nothing and retries, racing a second
+    // `toggleReady` call against the first's still-in-flight one.
+    setReadyOverride(ready);
     // Keep this convenience flow in the client: the existing room:addBot
     // command remains the server authority for each seat and emits the
     // normal room updates before the host's own ready command is sent.
@@ -211,7 +221,6 @@ export function LobbyView() {
         }
       }
     }
-    setReadyOverride(ready);
     const result = await ack(socket, "room:ready", { ready });
     if (!result.ok) setError(result.code);
   };
