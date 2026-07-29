@@ -110,22 +110,6 @@ export function SketchHeader({
   };
   return (
     <header className="absolute inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-700 bg-slate-900 px-4">
-      <div className="flex rounded border border-slate-600 text-sm">
-        <button
-          aria-pressed={contentView === "canvas"}
-          className={`px-2 py-1 ${contentView === "canvas" ? "bg-amber-400 text-slate-950" : "text-slate-200"}`}
-          onClick={() => onContentView("canvas")}
-        >
-          Canvas
-        </button>
-        <button
-          aria-pressed={contentView === "preview"}
-          className={`border-l border-slate-600 px-2 py-1 ${contentView === "preview" ? "bg-amber-400 text-slate-950" : "text-slate-200"}`}
-          onClick={() => onContentView("preview")}
-        >
-          Real preview
-        </button>
-      </div>
       <select
         aria-label="Active draft"
         className="w-36 rounded border border-slate-600 bg-slate-800 p-1 text-slate-100"
@@ -236,7 +220,23 @@ export function SketchHeader({
         <option value="zone">Zone View</option>
       </select>
       {viewInfo && <span className="text-xs text-amber-300">{viewInfo}</span>}
-      <span className="ml-auto text-xs text-slate-400">Viewport</span>
+      <div className="ml-auto flex rounded border border-slate-600 text-sm">
+        <button
+          aria-pressed={contentView === "canvas"}
+          className={`px-2 py-1 ${contentView === "canvas" ? "bg-amber-400 text-slate-950" : "text-slate-200"}`}
+          onClick={() => onContentView("canvas")}
+        >
+          Canvas
+        </button>
+        <button
+          aria-pressed={contentView === "preview"}
+          className={`border-l border-slate-600 px-2 py-1 ${contentView === "preview" ? "bg-amber-400 text-slate-950" : "text-slate-200"}`}
+          onClick={() => onContentView("preview")}
+        >
+          Real preview
+        </button>
+      </div>
+      <span className="text-xs text-slate-400">Viewport</span>
       <select
         aria-label="Viewport preset"
         className="rounded border border-slate-600 bg-slate-800 p-1 text-slate-100"
