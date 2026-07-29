@@ -4,9 +4,15 @@ import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
 import { tileBackImageSrc, tileImageSrc } from "@/features/mahjong/lib/mahjongTiles";
 import { useTableLayoutStore } from "@/features/mahjong/tableLayout.store";
+import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "./tileMotionTiming";
 
 const tileVariants = cva(
-  "relative inline-block shrink-0 select-none overflow-hidden rounded-[15%] border border-border bg-[#e8d4b0] shadow-md",
+  // transition-[box-shadow] here (not just on the `clickable` hover variant
+  // below) so `justDiscarded`'s ring/shadow — the one highlight in this file
+  // that toggles on a tile that's usually NOT clickable (a discard-pile
+  // tombstone) — fades in/out like every other table animation instead of
+  // being the sole hard cut.
+  "relative inline-block shrink-0 select-none overflow-hidden rounded-[15%] border border-border bg-[#e8d4b0] shadow-md transition-[box-shadow]",
   {
     variants: {
       clickable: {
@@ -26,9 +32,17 @@ const tileVariants = cva(
       // inline-style-vs-CSS-class conflict as the old hover scale did: fold
       // it into TILE_ENTER_ANIMATE's `y` target instead of a CSS class.
       selected: { true: "ring-2 ring-primary", false: "" },
-      /** The single most recent discard on the table (view.lastDiscard) — see DiscardPile. */
+      /**
+       * The single most recent discard on the table (view.lastDiscard) — see
+       * DiscardPile — or, in ActionDock, a claim's target tile among its
+       * candidate row. `z-10` so DiscardPile's accompanying scale-up (see
+       * `enlarged`/ENLARGED_SCALE) renders on top of its grid
+       * neighbors instead of being clipped underneath them, same reasoning
+       * as `clickable`'s `hover:z-10` — a harmless no-op for ActionDock's
+       * unscaled usage.
+       */
       justDiscarded: {
-        true: "ring-2 ring-amber-400 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)]",
+        true: "z-10 ring-2 ring-red-500 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)]",
         false: "",
       },
     },
@@ -71,8 +85,10 @@ const tileVariants = cva(
  * before motion's own opacity overwrote it right back to 1.
  */
 const TILE_ENTER_INITIAL = { opacity: 0, scale: 0.75, y: 24 };
-const TILE_ENTER_TRANSITION = { duration: 0.3, ease: "easeOut" } as const;
+const TILE_ENTER_TRANSITION = { duration: TILE_ENTRY_DURATION, ease: TILE_MOTION_EASE } as const;
 const TILE_HOVER_SCALE = { scale: 1.2 };
+/** `enlarged`'s resting size — a persistent, pointer-independent enlargement, tuned independently of TILE_HOVER_SCALE. */
+const ENLARGED_SCALE = 1.4;
 
 /** Height / width of a real mahjong tile face — mirrors layouts/desktop.table-config.ts's `shared.aspectRatio`. */
 const DEFAULT_TILE_ASPECT_RATIO = 1.333;
@@ -98,8 +114,26 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
   heightPx?: number | string;
   /** Plays the one-shot arrival animation on mount — see TILE_ENTER_* above. */
   entering?: boolean | undefined;
+  /**
+   * Only meaningful when `entering` is true: skips just the scale part of the
+   * entry (keeps the fade/rise), for when a separate flying ghost already
+   * sold the arrival at full size — see HandRow.tsx's DrawnSlotTile, the
+   * only caller, for why the real tile popping 0.75→1 again underneath
+   * DrawFlipGhost once it lands would read as a redundant second scale beat.
+   */
+  noEnterScale?: boolean | undefined;
   /** Fades toward 40% opacity via motion's `animate` — see TILE_ENTER_* above for why this isn't a CSS class. */
   dimmed?: boolean | undefined;
+  /**
+   * Persistent larger resting size via motion's `animate` — see
+   * ENLARGED_SCALE. Deliberately a separate
+   * prop from `justDiscarded`: DiscardPile drives both together for the most
+   * recent discard, but ActionDock also reuses `justDiscarded`'s ring/glow to
+   * highlight a claim's target tile among a cramped candidate row, where a
+   * scale bump would fight the row's own tight layout — see ActionDock.tsx's
+   * `isTarget`.
+   */
+  enlarged?: boolean | undefined;
   /**
    * Smoothly animates this tile's own position/size whenever it changes as a
    * side effect of siblings mounting/unmounting — motion's `layout` (a
@@ -131,7 +165,9 @@ export function Tile({
   selected,
   dimmed,
   justDiscarded,
+  enlarged,
   entering,
+  noEnterScale,
   reflow,
   onClick,
   className,
@@ -167,6 +203,7 @@ export function Tile({
   const src = isBack ? tileBackImageSrc(tileTheme) : tileImageSrc(tileId!, tileTheme);
   const hasWidth = widthPx !== undefined;
   const hasHeight = heightPx !== undefined;
+  const restingScale = enlarged ? ENLARGED_SCALE : 1;
 
   return (
     <motion.div
@@ -188,8 +225,29 @@ export function Tile({
       }}
       data-entering={wasEntering || undefined}
       {...(reflow ? { layout: true } : {})}
-      initial={entering ? TILE_ENTER_INITIAL : false}
-      animate={{ opacity: dimmed ? 0.4 : 1, scale: 1, y: 0 }}
+      // `enlarged`/`noEnterScale` both override the entry's own scale
+      // keyframe (not just the end state), just for opposite reasons:
+      // `enlarged` so a freshly-discarded tile mounts already at its
+      // enlarged size — no separate "grow bigger" beat layered onto the
+      // fade/rise — and `noEnterScale` so DrawnSlotTile's real tile doesn't
+      // repeat DrawFlipGhost's own arrival pop. Either way the entry's
+      // fade/rise still plays; shrinking back later (`enlarged` flips false
+      // on an already-mounted tile once it's superseded) still animates
+      // smoothly, since `initial` only ever governs the mount frame and
+      // `animate` alone drives every later change.
+      initial={
+        entering
+          ? {
+              ...TILE_ENTER_INITIAL,
+              scale: noEnterScale || enlarged ? restingScale : TILE_ENTER_INITIAL.scale,
+            }
+          : false
+      }
+      animate={{
+        opacity: dimmed ? 0.4 : 1,
+        scale: restingScale,
+        y: 0,
+      }}
       transition={TILE_ENTER_TRANSITION}
       {...(isClickable ? { whileHover: TILE_HOVER_SCALE } : {})}
       onClick={isClickable ? onClick : undefined}

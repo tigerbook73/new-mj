@@ -1,7 +1,9 @@
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { Tile } from "./Tile";
+import { CLAIM_FLIGHT_DURATION, TILE_MOTION_EASE } from "./tileMotionTiming";
+import { useFlightGhost } from "./useFlightGhost";
 
 interface ClaimFlipGhostProps {
   tileId: number;
@@ -11,7 +13,7 @@ interface ClaimFlipGhostProps {
   toRef: RefObject<HTMLElement | null>;
 }
 
-const GHOST_TRANSITION = { duration: 0.3, ease: "easeOut" } as const;
+const GHOST_TRANSITION = { duration: CLAIM_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
 
 /**
  * A self-contained, temporary clone that performs the claimed-discard-to-
@@ -21,31 +23,19 @@ const GHOST_TRANSITION = { duration: 0.3, ease: "easeOut" } as const;
  * `layoutId` between the permanent tombstone and the new meld tile made
  * motion treat the tombstone as exiting, fighting its own `dimmed` target).
  *
- * Measures both rects exactly once, in a `useLayoutEffect` that fires right
- * after this render's DOM has settled — the real meld tile has already
- * mounted by then, in the same commit, since both come from the same
- * snapshot-driven render. Renders a `position: fixed` portal clone animating
- * from the discard rect to the meld rect, then permanently stops rendering
- * anything once the transition completes (`onAnimationComplete`). Neither
- * the tombstone's nor the real meld tile's own animation state is ever
- * touched by any of this.
+ * Measures both rects exactly once via useFlightGhost, right after this
+ * render's DOM has settled — the real meld tile has already mounted by then,
+ * in the same commit, since both come from the same snapshot-driven render.
+ * Renders a `position: fixed` portal clone animating from the discard rect
+ * to the meld rect, then permanently stops rendering anything once the
+ * transition completes (`onAnimationComplete`). Neither the tombstone's nor
+ * the real meld tile's own animation state is ever touched by any of this.
  */
 export function ClaimFlipGhost({ tileId, fromSelector, toRef }: ClaimFlipGhostProps) {
-  const [flight, setFlight] = useState<{ from: DOMRect; to: DOMRect } | null>(null);
-
-  useLayoutEffect(() => {
-    const fromEl = document.querySelector(fromSelector);
-    const toEl = toRef.current;
-    if (fromEl && toEl) {
-      setFlight({ from: fromEl.getBoundingClientRect(), to: toEl.getBoundingClientRect() });
-    }
-    // Deliberately once-only (empty deps): this component is mounted exactly
-    // once per genuine claim (see MeldGroup.tsx's `shouldGhost`, captured at
-    // mount) and must never re-measure on a later re-render — the discard
-    // tile never moves, but re-measuring mid-flight could pick up a stale
-    // "to" rect and restart the animation from the wrong place.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [flight, clear] = useFlightGhost(
+    () => document.querySelector(fromSelector)?.getBoundingClientRect(),
+    toRef,
+  );
 
   if (!flight) return null;
   const { from, to } = flight;
@@ -69,7 +59,7 @@ export function ClaimFlipGhost({ tileId, fromSelector, toRef }: ClaimFlipGhostPr
       initial={{ x: dx, y: dy, scaleX, scaleY }}
       animate={{ x: 0, y: 0, scaleX: 1, scaleY: 1 }}
       transition={GHOST_TRANSITION}
-      onAnimationComplete={() => setFlight(null)}
+      onAnimationComplete={clear}
     >
       <Tile tileId={tileId} heightPx="100%" />
     </motion.div>,

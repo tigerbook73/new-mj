@@ -47,8 +47,12 @@ const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [], justD
 
 /**
  * Converts the ruleset-private PlayerView fields into the presentation props used by TableBoard.
- * It deliberately reads only the server-provided view; it neither derives legal actions nor
- * mutates state from command acknowledgements.
+ * For game state it deliberately reads only the server-provided view; it neither derives legal
+ * actions nor mutates state from command acknowledgements. It does also thread through a couple
+ * of purely local, non-game-state inputs the caller already holds — `canAnimateEntries` and
+ * `pendingDiscardOrigin`'s click-time geometry (see TableView.tsx) — onto the matching seat/
+ * discard entry, since presentation is exactly where server view and local UI-only signal are
+ * meant to merge; neither ever influences what's derived from `view` itself.
  */
 export function useTablePresentation({
   view,

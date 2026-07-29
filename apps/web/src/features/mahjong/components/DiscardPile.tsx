@@ -18,9 +18,20 @@ export type DiscardEntry = {
    * This tile's own hand-side rect, captured at click time (see HandRow.tsx's
    * `captureTileRect`) — only ever present for my own discards, and only for
    * the single render where this entry is genuinely new. Drives
-   * DiscardFlipGhost below; absent (e.g. an opponent's discard, or a page
-   * reload) just means this entry gets the plain grow-in entry animation with
-   * no flight.
+   * DiscardFlipGhost below; absent (a page reload, or — deliberately — an
+   * opponent's discard) just means this entry gets the plain grow-in entry
+   * animation with no flight.
+   *
+   * Opponents' concealed tiles have no on-screen position to fly from in the
+   * first place (architecture iron rule 2: public events can't reveal which
+   * concealed tile it was), so any flight there could only ever be a rough
+   * approximation. An earlier attempt tried exactly that — pick a
+   * pseudo-random visible hand-back tile as the flight's origin, then reflow
+   * the rest of the row to close the gap — and it added real complexity
+   * (DOM position tracking, a second reflow-duration knob, a regression in
+   * the "claim shrinks a hand" no-slide guarantee) for a visual that still
+   * didn't read well in practice. Reverted 2026-07-29; not worth reattempting
+   * without a materially simpler mechanism.
    */
   flightOrigin?: DOMRect;
 };
@@ -120,6 +131,13 @@ function DiscardTileSlot({
           tileId={entry.tile}
           dimmed={entry.claimedBy !== undefined}
           justDiscarded={entry.justDiscarded}
+          // `justDiscarded` alone (view.lastDiscard) stays true until the
+          // *next* discard event — it never updates on a claim — so once
+          // this tile is claimed, shrink it back immediately instead of
+          // waiting for someone else's next discard to supersede it. Same
+          // condition `dimmed` above already reacts to on the very same
+          // render, so the shrink and the dim-to-tombstone land together.
+          enlarged={entry.justDiscarded && entry.claimedBy === undefined}
           entering={entry.enterAnimation}
         />
       </div>

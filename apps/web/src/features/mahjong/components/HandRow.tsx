@@ -179,6 +179,12 @@ function DrawnSlotTile({
           heightPx={`${tileHeightPct}%`}
           clickable={interactive && isReal}
           entering={entering}
+          // DrawFlipGhost already sells the arrival at full size (deliberately
+          // no scale animation of its own — see its docs); this real tile
+          // popping 0.75→1 again underneath it once the ghost lands would
+          // read as a redundant second scale beat, so it skips just the
+          // scale part of the entry and keeps the fade/rise.
+          noEnterScale
           // See the `reflow={revealed}` comment above — same scoping applies
           // here too, though this slot always remounts fresh on a new draw
           // (keyed by `drawnSlotKey`), so `layout` never actually has a prior

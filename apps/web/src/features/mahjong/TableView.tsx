@@ -51,6 +51,10 @@ export function TableView() {
   // DiscardFlipGhost.tsx / HandRow.tsx's captureTileRect) — never read as
   // game state, only handed to useTablePresentation to attach onto the
   // matching DiscardEntry once the server's own snapshot actually lands.
+  // Only ever set from my own hand's click handler below (`onDiscard`) — an
+  // opponent's discard never populates this, on purpose; see DiscardEntry's
+  // `flightOrigin` doc (DiscardPile.tsx) for why a flight there isn't worth
+  // it.
   // Deliberately never explicitly cleared: a TileId never repeats within a
   // round (architecture iron rule 4), and DiscardPile's per-entry slot
   // (DiscardTileSlot) only ever reads this once, at the single render where
