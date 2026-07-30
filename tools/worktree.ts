@@ -56,9 +56,10 @@ const worktrees = (root: string): Worktree[] => {
     const rootLine = lines.find((line) => line.startsWith("worktree "));
     if (!rootLine) throw new Error(`invalid git worktree record: ${record}`);
     const branchLine = lines.find((line) => line.startsWith("branch "));
+    const branch = branchLine?.slice("branch ".length);
     return {
       root: rootLine.slice("worktree ".length),
-      branch: branchLine?.slice("branch ".length),
+      ...(branch === undefined ? {} : { branch }),
     };
   });
 };
