@@ -19,10 +19,10 @@ test("layout sketch creates a selected child and persists numeric edits", async 
 });
 
 test("layout sketch copies the exported LayoutPreset JSON", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: "http://localhost:5274",
-  });
   await page.goto("/dev/table-layout");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(page.url()).origin,
+  });
   await page.getByLabel("Copy JSON").click();
   await expect(page.getByRole("status")).toHaveText("LayoutPreset JSON copied");
   await expect
@@ -331,10 +331,10 @@ test("items can be hidden/shown individually and in bulk, without affecting the 
   page,
   context,
 }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-    origin: "http://localhost:5274",
-  });
   await page.goto("/dev/table-layout");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: new URL(page.url()).origin,
+  });
   const canvasL1A = page.getByLabel("Select L1A", { exact: true });
   await expect(canvasL1A).toBeVisible();
 

@@ -4,15 +4,15 @@
   "type": "module",
   "packageManager": "pnpm@10.33.3",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "worktree-cli run turbo run dev",
     "build": "turbo run build",
     "format": "git ls-files -z | xargs -0 prettier --ignore-unknown --write",
     "format:check": "git ls-files -z | xargs -0 prettier --ignore-unknown --check",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "turbo run typecheck && tsc -p tools/tsconfig.json",
     "lint": "turbo run lint && eslint tools",
     "lint:fix": "eslint --fix .",
     "test": "turbo run test && node --test tools/*.test.ts",
-    "test:e2e": "turbo run test:e2e",
+    "test:e2e": "worktree-cli run turbo run test:e2e",
     "verify": "pnpm format && pnpm typecheck && pnpm lint && pnpm build && pnpm test && pnpm test:e2e",
     "check:deps": "node tools/check-deps.ts",
     "cli:play": "node packages/core/src/cli.ts play",
@@ -20,9 +20,13 @@
     "sb:start": "supabase start",
     "sb:stop": "supabase stop",
     "sb:restart": "supabase stop && supabase start",
-    "sb:status": "supabase status"
+    "sb:status": "supabase status",
+    "worktree:new": "worktree-cli create",
+    "worktree:status": "worktree-cli status",
+    "worktree:doctor": "worktree-cli doctor"
   },
   "devDependencies": {
+    "@new-mj/devtools": "workspace:*",
     "@swc/cli": "^0.7.10",
     "@swc/core": "^1.15.46",
     "@types/node": "^26.1.1",

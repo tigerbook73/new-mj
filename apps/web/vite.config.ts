@@ -1,8 +1,11 @@
 import { fileURLToPath } from "node:url";
+import { viteWorktreeServer } from "@new-mj/devtools";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { layoutFilesPlugin } from "./dev/layoutFilesPlugin";
+
+const server = viteWorktreeServer() ?? { port: 5173 };
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), layoutFilesPlugin()],
@@ -16,4 +19,5 @@ export default defineConfig({
   // exposes VITE_-prefixed keys to client code either way, so this doesn't
   // leak server-only secrets (SUPABASE_SERVICE_KEY, DATABASE_URL, etc.).
   envDir: fileURLToPath(new URL("../..", import.meta.url)),
+  server,
 });

@@ -8,14 +8,17 @@
     },
     "dev": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "env": ["PORT", "VITE_PORT", "VITE_SERVER_URL"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
     },
     "lint": {},
     "test": {},
-    "test:e2e": {},
+    "test:e2e": {
+      "env": ["E2E_SERVER_PORT", "E2E_WEB_PORT", "E2E_WORKERS"]
+    },
     "format": {},
     "format:check": {}
   }
