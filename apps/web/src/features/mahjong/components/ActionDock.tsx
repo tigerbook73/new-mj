@@ -118,14 +118,7 @@ function ActionCandidate({
     );
   }
   const label = action.kind === undefined ? actionLabel(String(action.type)) : String(action.kind);
-  return (
-    <span
-      className="flex items-center"
-      style={{ height: `${metrics.candidateHeight}%`, aspectRatio: label.length >= 2 ? 1.4 : 1 }}
-    >
-      <ActionLabel text={label} />
-    </span>
-  );
+  return <ActionLabel text={label} style={{ height: `${metrics.candidateHeight}%` }} />;
 }
 
 export function ActionDock({
@@ -195,17 +188,13 @@ export function ActionDock({
           // active group, same as a candidate looks "picked" when selected.
           const isActive = type === String(activeGroup?.[0]?.type);
           const label = actionLabel(type);
-          const isWideLabel = label.length >= 2;
           return (
             <Button
               key={type}
               aria-label={label}
               variant={isActive ? "default" : "outline"}
               className={cn("p-0", !isActive && "bg-background/80 text-foreground")}
-              style={{
-                height: `${metrics.actionButtonHeight}%`,
-                aspectRatio: isWideLabel ? metrics.wideLabelWidthRatio : 1,
-              }}
+              style={{ height: `${metrics.actionButtonHeight}%` }}
               onMouseEnter={() => activate(group)}
               onFocus={() => activate(group)}
               onClick={() => {
@@ -213,7 +202,7 @@ export function ActionDock({
                 else onAction(group[0]!);
               }}
             >
-              <ActionLabel className="size-full" text={label} />
+              <ActionLabel text={label} />
             </Button>
           );
         })}

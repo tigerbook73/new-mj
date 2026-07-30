@@ -42,13 +42,6 @@ const FIELDS: { title: string; fields: NumberField[] }[] = [
     fields: [
       { label: "Actions height %", path: "actionDockZone.actionsHeight", min: 20, max: 60 },
       { label: "Button height %", path: "actionDockZone.actionButtonHeight", min: 30, max: 90 },
-      {
-        label: "Wide label ratio",
-        path: "actionDockZone.wideLabelWidthRatio",
-        min: 1,
-        max: 2,
-        step: 0.1,
-      },
       { label: "Candidate height %", path: "actionDockZone.candidateHeight", min: 30, max: 90 },
     ],
   },

@@ -282,7 +282,6 @@
     "actionDockZone": {
       "actionsHeight": 40,
       "actionButtonHeight": 70,
-      "wideLabelWidthRatio": 1.4,
       "candidateHeight": 70
     },
     "debug": {

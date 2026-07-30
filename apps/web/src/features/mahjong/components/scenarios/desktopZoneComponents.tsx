@@ -1,9 +1,9 @@
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { type SeatDirection } from "@/features/mahjong/lib/seatLayout";
-import { ActionLabel } from "../ActionLabel";
 import { DIRECTION_ARROW_ICON } from "../directionArrowIcon";
 import { DiscardPile, type DiscardEntry } from "../DiscardPile";
 import { HandRow } from "../HandRow";
+import { InfoLabel } from "../InfoLabel";
 import { MeldGroup } from "../MeldGroup";
 import type { SeatContent } from "../TableBoard";
 
@@ -98,9 +98,8 @@ export function InfoSlot({
     <div
       data-testid={`player-info-${direction}`}
       className={`h-full w-full border-2 border-dashed ${config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
-      style={{ containerType: "size" }}
     >
-      <ActionLabel text={seat.info} className="text-white w-[40%] h-[40%]" />
+      <InfoLabel text={seat.info} className="text-white" />
     </div>
   );
 }

@@ -41,8 +41,6 @@ export type TableLayoutConfig = {
     actionsHeight: number;
     /** Action button height % of the Actions row. Range: [30, 90]. */
     actionButtonHeight: number;
-    /** Two-character label button width = height × ratio (one-character buttons stay square). Range: [1.0, 2.0]. */
-    wideLabelWidthRatio: number;
     /** Candidate tile height % of the Options row. Range: [30, 90]. */
     candidateHeight: number;
   };
@@ -58,7 +56,6 @@ export const DEFAULT_TABLE_LAYOUT_CONFIG: TableLayoutConfig = {
   actionDockZone: {
     actionsHeight: 40,
     actionButtonHeight: 70,
-    wideLabelWidthRatio: 1.4,
     candidateHeight: 70,
   },
   debug: { showRegions: false },
@@ -107,12 +104,6 @@ export function parseTableLayoutConfig(value: unknown): TableLayoutConfig {
         "actionDockZone.actionButtonHeight",
         30,
         90,
-      ),
-      wideLabelWidthRatio: number(
-        actionDockZone.wideLabelWidthRatio,
-        "actionDockZone.wideLabelWidthRatio",
-        1,
-        2,
       ),
       candidateHeight: number(
         actionDockZone.candidateHeight,
