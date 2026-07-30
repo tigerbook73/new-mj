@@ -208,7 +208,7 @@ export function TableView() {
     const mySeat = room?.players.find((player) => player?.userId === userId);
     if (mySeat?.isAutoPiloted) {
       return (
-        <div className="flex h-[100dvh] w-full flex-col items-center justify-center gap-3 overflow-hidden p-6 text-center">
+        <div className="flex h-dvh w-full flex-col items-center justify-center gap-3 overflow-hidden p-6 text-center">
           <p>This seat has been taken over by AI — you're spectating, not playing.</p>
           <Link to="/games" className="text-sm underline">
             Back to games
@@ -288,6 +288,7 @@ export function TableView() {
                     : undefined
                 }
                 justDrawn={extras.justDrawn}
+                config={DESKTOP_TABLE_SCENARIO.config}
                 onAction={(action) => void sendAction(action)}
               />
             ) : undefined

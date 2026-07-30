@@ -1,4 +1,4 @@
-import { desktopTableLayoutConfig } from "@/features/mahjong/desktop.table-config";
+import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { ActionLabel } from "../ActionLabel";
 import { DIRECTION_ARROW_ICON } from "../directionArrowIcon";
@@ -28,7 +28,15 @@ export function TurnIndicator({ direction }: { direction: SeatDirection }) {
   );
 }
 
-export function HandSeatRow({ direction, seat }: { direction: SeatDirection; seat: SeatContent }) {
+export function HandSeatRow({
+  direction,
+  seat,
+  config,
+}: {
+  direction: SeatDirection;
+  seat: SeatContent;
+  config: TableLayoutConfig;
+}) {
   return (
     <div data-testid={`player-track-${direction}`} className="relative h-full w-full">
       <HandRow
@@ -37,8 +45,8 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
         revealed={seat.revealed}
         interactive={seat.interactive}
         onDiscard={seat.onDiscard}
-        tileHeight={desktopTableLayoutConfig.handZone.tileHeight}
-        tileGapPx={desktopTableLayoutConfig.shared.tileGapPx}
+        tileHeight={config.handZone.tileHeight}
+        tileGapPx={config.shared.tileGapPx}
         drawnSlotKey={seat.drawnSlotKey}
         drawnSlotEntering={seat.drawnSlotEntering}
       />
@@ -46,12 +54,20 @@ export function HandSeatRow({ direction, seat }: { direction: SeatDirection; sea
   );
 }
 
-export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: SeatContent }) {
-  const { meldHeight, meldTileHeight: meldTileHeight } = desktopTableLayoutConfig.meldZone;
+export function MeldSlot({
+  direction,
+  seat,
+  config,
+}: {
+  direction: SeatDirection;
+  seat: SeatContent;
+  config: TableLayoutConfig;
+}) {
+  const { meldHeight, meldTileHeight: meldTileHeight } = config.meldZone;
   return (
     <div
       data-testid={`meld-track-${direction}`}
-      className={`flex h-full w-full flex-col justify-end border-2 border-dashed ${desktopTableLayoutConfig.debug.showRegions ? "border-orange-300 bg-orange-300/10" : "border-transparent"}`}
+      className={`flex h-full w-full flex-col justify-end border-2 border-dashed ${config.debug.showRegions ? "border-orange-300 bg-orange-300/10" : "border-transparent"}`}
     >
       <div
         className="flex items-center"
@@ -61,7 +77,7 @@ export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: 
           direction={direction}
           melds={seat.melds}
           tileHeight={(meldTileHeight / meldHeight) * 100}
-          config={desktopTableLayoutConfig}
+          config={config}
           entering={seat.meldEntering}
         />
       </div>
@@ -69,11 +85,19 @@ export function MeldSlot({ direction, seat }: { direction: SeatDirection; seat: 
   );
 }
 
-export function InfoSlot({ direction, seat }: { direction: SeatDirection; seat: SeatContent }) {
+export function InfoSlot({
+  direction,
+  seat,
+  config,
+}: {
+  direction: SeatDirection;
+  seat: SeatContent;
+  config: TableLayoutConfig;
+}) {
   return (
     <div
       data-testid={`player-info-${direction}`}
-      className={`h-full w-full border-2 border-dashed ${desktopTableLayoutConfig.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
+      className={`h-full w-full border-2 border-dashed ${config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
       style={{ containerType: "size" }}
     >
       <ActionLabel text={seat.info} className="text-white w-[40%] h-[40%]" />
@@ -84,16 +108,47 @@ export function InfoSlot({ direction, seat }: { direction: SeatDirection; seat: 
 export function DiscardTrack({
   direction,
   discards,
+  config,
 }: {
   direction: SeatDirection;
   discards: DiscardEntry[];
+  config: TableLayoutConfig;
 }) {
   return (
     <div
       data-testid={`table-area-${direction}`}
       className="pointer-events-none grid h-full w-full place-items-center"
     >
-      <DiscardPile direction={direction} discards={discards} metrics={desktopTableLayoutConfig} />
+      <DiscardPile direction={direction} discards={discards} metrics={config} />
     </div>
   );
 }
+
+/** Desktop-only center surface; keeps the turn marker above the supplied center content. */
+export function DesktopCenterSlot({
+  center,
+  currentDirection,
+}: {
+  center: ReactNode;
+  currentDirection: SeatDirection | undefined;
+}) {
+  return (
+    <div className="relative grid h-full w-full place-items-center overflow-hidden rounded-md bg-green-950/50 dark:bg-black/50">
+      {center}
+      {currentDirection && <TurnIndicator direction={currentDirection} />}
+    </div>
+  );
+}
+
+/** Desktop-only surface around the optional action panel. */
+export function DesktopActionDockSlot({ actionDock }: { actionDock: ReactNode | undefined }) {
+  return actionDock ? (
+    <section
+      data-testid="action-dock-surface"
+      className="h-full w-full rounded-xl border border-white/25 bg-slate-950/70 p-3 shadow-2xl"
+    >
+      {actionDock}
+    </section>
+  ) : null;
+}
+import type { ReactNode } from "react";

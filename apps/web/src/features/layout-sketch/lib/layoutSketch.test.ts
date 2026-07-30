@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { desktopTableLayout } from "@/features/mahjong/desktop.table-config";
+import {
+  desktopTableLayout,
+  desktopTableLayoutConfig,
+} from "@/features/mahjong/desktop.table-config";
+import { DEFAULT_TABLE_LAYOUT_CONFIG } from "@/features/mahjong/lib/tableLayoutConfig";
 import type { Zone } from "@/shared/lib/layoutPreset";
 import {
   addChild,
@@ -44,6 +48,16 @@ describe("layout sketch document", () => {
     expect(imported.name).toBe(desktopTableLayout.name);
     expect(imported.referenceCanvas).toEqual(desktopTableLayout.referenceCanvas);
     expectZonesToMatch(imported.root, desktopTableLayout.root);
+    expect(imported.tableConfig).toEqual(desktopTableLayoutConfig);
+  });
+  it("round-trips presentation config with the same layout document", () => {
+    const draft = defaultSketchDocument().drafts[0]!;
+    const tableConfig = {
+      ...draft.tableConfig,
+      shared: { ...draft.tableConfig.shared, tileGapPx: 4 },
+    };
+    const exported = exportSketchDraft({ ...draft, tableConfig });
+    expect(parseLayoutPresetJson(JSON.stringify(exported)).tableConfig.shared.tileGapPx).toBe(4);
   });
 
   it("validates imported LayoutPreset JSON before creating a draft", () => {
@@ -574,16 +588,16 @@ describe("layout sketch document", () => {
     expect(JSON.stringify(preset.editor)).toContain("L1A-r1c2");
   });
 
-  it("never exports the hidden flag into the production LayoutPreset root", () => {
+  it("always exports production Zones as visible while retaining Lab visibility metadata", () => {
     const draft = defaultSketchDocument().drafts[0]!;
     const hiddenChild = { ...draft.root.children[0]!, hidden: true };
     const preset = exportSketchDraft({
       ...draft,
       root: { ...draft.root, children: [hiddenChild] },
     });
-    // Canvas-only: the hidden item still exports (visibility isn't
-    // omission — see shouldExportZone), just without a "hidden" key.
+    // The production root keeps the Zone and explicitly stays visible.
     expect(JSON.stringify(preset.root)).not.toContain("hidden");
+    expect(preset.root.children?.[0]?.visible).toBe(true);
     // The editor round-trip payload is allowed to carry it (it's how the
     // Lab restores its own editing state, not production data).
     expect(JSON.stringify(preset.editor)).toContain('"hidden":true');
