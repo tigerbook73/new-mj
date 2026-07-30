@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "new-mj-worktree": "./src/worktree-cli.ts"
+    "worktree-cli": "./src/worktree-cli.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
