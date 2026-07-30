@@ -189,10 +189,10 @@ export function SketchVariables({
     : variables;
 
   return (
-    <aside
+    <section
       ref={panelRef}
       data-testid="layout-variables-panel"
-      className="layout-lab-scrollbar col-start-3 row-start-1 row-span-2 overflow-x-auto overflow-y-scroll border-l border-slate-700 bg-slate-900 p-3 scrollbar-gutter-stable"
+      className="layout-lab-scrollbar min-h-0 flex-1 overflow-x-auto overflow-y-scroll p-3 scrollbar-gutter-stable"
     >
       <div className="mb-2 flex items-center justify-between">
         <h2 className="font-semibold">Variables</h2>
@@ -265,6 +265,6 @@ export function SketchVariables({
       {variables.length > 0 && filtered.length === 0 && (
         <p className="text-sm text-slate-400">No variables match &ldquo;{query}&rdquo;.</p>
       )}
-    </aside>
+    </section>
   );
 }

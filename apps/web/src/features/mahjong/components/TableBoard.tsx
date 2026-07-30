@@ -8,6 +8,7 @@ import {
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { DiscardEntry } from "./DiscardPile";
 import type { Meld } from "./MeldGroup";
+import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 
 export interface SeatContent {
   melds: Meld[];
@@ -66,6 +67,7 @@ export interface TableZoneContext {
   center: ReactNode;
   actionDock?: ReactNode | undefined;
   currentDirection?: SeatDirection | undefined;
+  config: TableLayoutConfig;
 }
 
 export type TableZoneComponent = (ctx: TableZoneContext) => ReactNode;
@@ -73,6 +75,7 @@ export type TableZoneComponent = (ctx: TableZoneContext) => ReactNode;
 /** A LayoutPreset bundled with the zone components that render into it — the atomic unit a screen scenario swaps. */
 export interface TableScenario {
   preset: LayoutPreset;
+  config: TableLayoutConfig;
   components: Readonly<Record<string, TableZoneComponent>>;
 }
 
@@ -117,6 +120,7 @@ export function TableBoard({
             center,
             actionDock,
             currentDirection,
+            config: scenario.config,
           }) ?? null
         }
       />

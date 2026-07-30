@@ -49,6 +49,16 @@ describe("ZoneRenderer", () => {
     expect(markup.match(/data-zone="leaf"/g) ?? []).toHaveLength(1);
   });
 
+  it("does not render an invisible Zone or its descendants", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ZoneRenderer, {
+        zone: { ...root, children: [{ ...root.children![0]!, visible: false }] },
+      }),
+    );
+    expect(markup).toContain('data-zone="root"');
+    expect(markup).not.toContain('data-zone="leaf"');
+  });
+
   it("rejects duplicate and missing required Zone ids before rendering", () => {
     expect(() =>
       assertLayoutPreset({

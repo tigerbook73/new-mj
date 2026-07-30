@@ -1,4 +1,9 @@
 import type { LayoutPreset, RotationDeg, Zone } from "@/shared/lib/layoutPreset";
+import {
+  DEFAULT_TABLE_LAYOUT_CONFIG,
+  parseTableLayoutConfig,
+  type TableLayoutConfig,
+} from "@/features/mahjong/lib/tableLayoutConfig";
 
 export const LAYOUT_SKETCH_STORAGE_KEY = "new-mj:layout-sketches:v1";
 export const SKETCH_BACKGROUND_COLORS = [
@@ -39,6 +44,8 @@ export type SketchDraft = {
   viewport: { w: number; h: number };
   root: SketchNode;
   variables: SketchVariable[];
+  /** Presentation parameters consumed by the real desktop TableBoard preview. */
+  tableConfig: TableLayoutConfig;
   /** Filename this draft is bound to under apps/web/src/layouts/, if it's been opened from or saved to disk. */
   sourceFile?: string;
   /** Disk mtime as of the last successful Save/Load, used to detect external edits. */
@@ -46,6 +53,8 @@ export type SketchDraft = {
   /** exportSketchDraft(draft) JSON as of the last successful Save/Load, used to detect local edits. */
   savedSnapshot?: string;
 };
+/** Checked-in desktop document: generic Zone geometry plus desktop-only presentation data. */
+export type TableLayoutDocument = LayoutPreset & { tableConfig: TableLayoutConfig };
 export type SketchDocument = {
   version: 4;
   drafts: SketchDraft[];
@@ -54,6 +63,8 @@ export type SketchDocument = {
   leftWidth: number;
   leftTreeHeight: number;
   rightWidth: number;
+  /** Height in pixels reserved for the independently scrollable Config panel. */
+  rightConfigHeight: number;
 };
 
 const sketchPercentage = (resolved: number): SketchPercentage => ({
@@ -84,6 +95,7 @@ const importZone = (zone: Zone): SketchNode => ({
   h: sketchPercentage(zone.localSize.h / 100),
   kind: "element",
   shadow: false,
+  hidden: zone.visible === false,
   rotationDeg: zone.rotationDeg,
   backgroundColor: colorForName(zone.id),
   children: zone.children?.map(importZone) ?? [],
@@ -108,11 +120,14 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
   const anchorCenter = objectRecord(item.anchorCenter);
   const localSize = objectRecord(item.localSize);
   const rotationDeg = item.rotationDeg;
+  const visible = item.visible;
   if (rotationDeg !== 0 && rotationDeg !== 90 && rotationDeg !== 180 && rotationDeg !== -90)
     throw new Error(`${path}.rotationDeg must be 0, 90, 180, or -90`);
   const children = item.children;
   if (children !== undefined && !Array.isArray(children))
     throw new Error(`${path}.children must be an array`);
+  if (visible !== undefined && typeof visible !== "boolean")
+    throw new Error(`${path}.visible must be a boolean`);
   return {
     id,
     anchorCenter: {
@@ -124,6 +139,7 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
       h: importNumber(localSize.h, `${path}.localSize.h`, 0.1, 100),
     },
     rotationDeg,
+    ...(visible === undefined ? {} : { visible }),
     ...(Array.isArray(children)
       ? {
           children: children.map((child, index) =>
@@ -134,7 +150,7 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
   };
 }
 
-export function parseLayoutPresetJson(source: string): LayoutPreset {
+export function parseLayoutPresetJson(source: string): TableLayoutDocument {
   let value: unknown;
   try {
     value = JSON.parse(source);
@@ -154,6 +170,12 @@ export function parseLayoutPresetJson(source: string): LayoutPreset {
       h: importNumber(referenceCanvas.h, "referenceCanvas.h", 0.1, 100_000),
     },
     root: parseImportedZone(item.root, "root", names),
+    // Older checked-in presets contain only geometry. They remain editable;
+    // the next save writes the explicit default config into the document.
+    tableConfig:
+      item.tableConfig === undefined
+        ? DEFAULT_TABLE_LAYOUT_CONFIG
+        : parseTableLayoutConfig(item.tableConfig),
     ...(editor.version === 2 && editor.root !== undefined && Array.isArray(editor.variables)
       ? {
           editor: {
@@ -167,7 +189,11 @@ export function parseLayoutPresetJson(source: string): LayoutPreset {
 }
 
 /** Imports Zone geometry and rotation; arrangement remains editor metadata for now. */
-export const importLayoutPreset = (preset: LayoutPreset, sourceFile?: string): SketchDraft => {
+export const importLayoutPreset = (
+  preset: LayoutPreset | TableLayoutDocument,
+  sourceFile?: string,
+): SketchDraft => {
+  const tableConfig = "tableConfig" in preset ? preset.tableConfig : DEFAULT_TABLE_LAYOUT_CONFIG;
   const draft: SketchDraft = preset.editor
     ? readSketchDocument({
         getItem: () =>
@@ -179,6 +205,7 @@ export const importLayoutPreset = (preset: LayoutPreset, sourceFile?: string): S
                 viewport: preset.referenceCanvas,
                 root: preset.editor!.root,
                 variables: preset.editor!.variables,
+                tableConfig,
               },
             ],
             activeDraft: preset.name,
@@ -205,6 +232,7 @@ export const importLayoutPreset = (preset: LayoutPreset, sourceFile?: string): S
             children: preset.root.children?.map(importZone) ?? [],
           },
           variables: [],
+          tableConfig,
         };
       })();
   return sourceFile ? { ...draft, sourceFile } : draft;
@@ -242,12 +270,21 @@ const root = (): SketchNode => ({
 });
 export const defaultSketchDocument = (): SketchDocument => ({
   version: 4,
-  drafts: [{ name: "draft1", viewport: { w: 16, h: 9 }, root: root(), variables: [] }],
+  drafts: [
+    {
+      name: "draft1",
+      viewport: { w: 16, h: 9 },
+      root: root(),
+      variables: [],
+      tableConfig: DEFAULT_TABLE_LAYOUT_CONFIG,
+    },
+  ],
   activeDraft: "draft1",
   selectedName: "L1A",
   leftWidth: 240,
   leftTreeHeight: 280,
   rightWidth: 280,
+  rightConfigHeight: 420,
 });
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -373,6 +410,13 @@ export function readSketchDocument(
         },
         root: node(item.root, fallback.root),
         variables: parseVariables(item.variables),
+        tableConfig: (() => {
+          try {
+            return parseTableLayoutConfig(item.tableConfig);
+          } catch {
+            return DEFAULT_TABLE_LAYOUT_CONFIG;
+          }
+        })(),
         ...(typeof item.sourceFile === "string" ? { sourceFile: item.sourceFile } : {}),
         ...(typeof item.sourceMtimeMs === "number" && Number.isFinite(item.sourceMtimeMs)
           ? { sourceMtimeMs: item.sourceMtimeMs }
@@ -398,6 +442,7 @@ export function readSketchDocument(
       leftWidth: number(parsed.leftWidth, 240, 160, 480),
       leftTreeHeight: number(parsed.leftTreeHeight, 280, 120, 1200),
       rightWidth: number(parsed.rightWidth, 280, 180, 520),
+      rightConfigHeight: number(parsed.rightConfigHeight, 420, 180, 1400),
     };
   } catch {
     return defaultSketchDocument();
@@ -821,12 +866,34 @@ const exportZone = (node: SketchNode): Zone => {
       h: roundExportedPercentage(node.h.resolved * 100),
     },
     rotationDeg: node.rotationDeg ?? 0,
+    visible: true,
+    ...(children.length > 0 ? { children } : {}),
+  };
+};
+
+/** Preview-only export: editor visibility becomes the Zone visibility contract. */
+const exportVisibleZone = (node: SketchNode): Zone => {
+  const children = node.children.filter(shouldExportZone).map(exportVisibleZone);
+  const centerX = node.centerX?.resolved ?? node.x.resolved + node.w.resolved / 2;
+  const centerY = node.centerY?.resolved ?? node.y.resolved + node.h.resolved / 2;
+  return {
+    id: node.name,
+    anchorCenter: {
+      x: roundExportedPercentage(centerX * 100),
+      y: roundExportedPercentage(centerY * 100),
+    },
+    localSize: {
+      w: roundExportedPercentage(node.w.resolved * 100),
+      h: roundExportedPercentage(node.h.resolved * 100),
+    },
+    rotationDeg: node.rotationDeg ?? 0,
+    visible: !node.hidden,
     ...(children.length > 0 ? { children } : {}),
   };
 };
 
 /** Exports resolved geometry only; empty Grid-cell placeholders are omitted. */
-export const exportSketchDraft = (draft: SketchDraft): LayoutPreset => ({
+export const exportSketchDraft = (draft: SketchDraft): TableLayoutDocument => ({
   name: draft.name,
   referenceCanvas: { ...draft.viewport },
   root: {
@@ -836,5 +903,20 @@ export const exportSketchDraft = (draft: SketchDraft): LayoutPreset => ({
     rotationDeg: 0,
     ...(exportChildren(draft.root).length > 0 ? { children: exportChildren(draft.root) } : {}),
   },
+  tableConfig: draft.tableConfig,
   editor: { version: 2, root: draft.root, variables: draft.variables },
+});
+
+/** Keeps the saved production preset intact while applying editor visibility in the Lab preview. */
+export const exportSketchPreviewDraft = (draft: SketchDraft): TableLayoutDocument => ({
+  ...exportSketchDraft(draft),
+  root: {
+    id: draft.root.name,
+    anchorCenter: { x: 50, y: 50 },
+    localSize: { w: 100, h: 100 },
+    rotationDeg: 0,
+    ...(draft.root.children.filter(shouldExportZone).length > 0
+      ? { children: draft.root.children.filter(shouldExportZone).map(exportVisibleZone) }
+      : {}),
+  },
 });

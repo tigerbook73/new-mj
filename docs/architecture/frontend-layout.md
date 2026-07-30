@@ -10,7 +10,7 @@
 
 ## 2. 当前三层
 
-- **几何数据**：`src/shared/lib/layoutPreset.ts` 定义并校验 `LayoutPreset`/`Zone`。Zone 只描述中心锚点、本地尺寸、四分之一旋转和父子关系，不携带业务数据或 React 组件。
+- **几何数据**：`src/shared/lib/layoutPreset.ts` 定义并校验 `LayoutPreset`/`Zone`。Zone 描述中心锚点、本地尺寸、四分之一旋转、可见性和父子关系，不携带业务数据或 React 组件。
 - **场景渲染**：`ZoneRenderer` 递归把 Zone 转成定位容器。`features/mahjong/components/TableBoard.tsx` 将 preset 与按稳定 `zone.id` 绑定的场景组件打包为 `TableScenario`；桌面场景在 `components/scenarios/desktop.tsx`。业务组件可包裹 `children`，但不得重建子 Zone 的定位层。
 - **展示逻辑**：`features/mahjong/TableView.tsx` 和 `useTablePresentation.ts` 从权威 `PlayerView` 派生可渲染数据；展示组件只接收数据和回调，不重新判断玩法规则或直接调用协议。
 
@@ -18,13 +18,13 @@
 
 ## 3. Zone 模型与布局文件
 
-`Zone` 使用父级未旋转的局部坐标；`rotationDeg` 只允许 `0 | 90 | 180 | -90`。父子结构保留旋转和层叠上下文，避免把每个子项拍平后重复计算坐标。
+`Zone` 使用父级未旋转的局部坐标；`rotationDeg` 只允许 `0 | 90 | 180 | -90`，`visible` 缺省为 `true`。父子结构保留旋转和层叠上下文，避免把每个子项拍平后重复计算坐标。
 
-- 几何文件：`src/features/mahjong/layouts/desktop.table-layout.json`，可由 Layout Sketch 读写。
-- 展示参数：`src/features/mahjong/desktop.table-config.ts`，包含牌尺寸、间距、弃牌行列等；其类型在 `lib/tableLayoutConfig.ts`。它与几何文件同主题配对，但不属于 `LayoutPreset`。
-- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。
+- 桌面布局文档：`src/features/mahjong/layouts/desktop.table-layout.json` 同时保存 `LayoutPreset` 几何和桌面展示 Config；可由 Layout Sketch 读写。
+- 展示参数：`src/features/mahjong/desktop.table-config.ts` 只从布局文档导入并以 `TableLayoutConfig` 校验后导出，避免与 JSON 形成双真源。Config 只供真实桌面组件消费，不属于通用 `LayoutPreset` 几何契约。
+- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。Variables 仅服务几何表达式；Config Panel 只编辑真实组件的展示参数，两者不互相引用。Lab 的可见性设置保存于 editor metadata，Preview 将其映射到 Zone；生产 root 导出始终为 `visible: true`。
 
-该分离使新布局可以替换几何，而不把牌桌业务参数或编辑器元数据耦合进通用 schema。
+文档内仍将通用 Zone 几何与桌面展示 Config 分层：新布局可替换几何，而不把牌桌业务参数或编辑器元数据耦合进通用 schema。
 
 ## 4. 座位与区域组合
 
@@ -47,3 +47,4 @@ Tile、ActionButton 等展示原子可跨场景复用；不同屏幕下“怎样
 - 手机横屏/竖屏应先建立一个最小场景：手写 preset、由正式 `TableBoard` 消费、验证一个典型对局；通过后再扩展编辑器能力。
 - 若布局编辑工具未来改变正式产物或被多个场景复用，应作为独立的使能 slice，按 `process/workflow.md` 的重估规则推进，而不是嵌入某个 UI slice。
 - 设备运行中切换方向、牌面是否正读，均为尚未决定的产品问题；决定后再补相应视觉/e2e 验收。
+- `TableBoard`/`TableZoneContext` 的 `center`/`actionDock` 是具名 `ReactNode` prop，不像 `seats`/`discards` 那样按 `zone.id` 泛化：它们装的是 `TableView` 自己的会话状态（phase、actions、`onAction` 等），本就不该塞进跨场景稳定的 `TableZoneContext` 契约。代价是每新增一个单实例展示 zone（如未来的计分板、剩余牌数徽章）都要再加一个具名字段，直接改 `TableBoard.tsx` 的两处接口和函数体，而不是像其他 zone 一样纯靠 `desktop.tsx` 注册表加一行搞定。目前只有这两个 slot，都稳定在用，暂不因此改造；等真的出现第三个单实例 zone 时，再新增一个 `extraSlots?: Record<string, ReactNode>` 承接（不动 `center`/`actionDock` 已有字段），由场景注册表按 `zone.id` 取用。

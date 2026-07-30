@@ -41,10 +41,77 @@ export type TableLayoutConfig = {
     actionsHeight: number;
     /** Action button height % of the Actions row. Range: [30, 90]. */
     actionButtonHeight: number;
-    /** Two-character label button width = height × ratio (one-character buttons stay square). Range: [1.0, 2.0]. */
-    wideLabelWidthRatio: number;
     /** Candidate tile height % of the Options row. Range: [30, 90]. */
     candidateHeight: number;
   };
   debug: { showRegions: boolean };
 };
+
+/** Default for new Lab drafts and legacy layout files that predate Config Panel. */
+export const DEFAULT_TABLE_LAYOUT_CONFIG: TableLayoutConfig = {
+  shared: { aspectRatio: 1.333, tileGapPx: 1.9 },
+  handZone: { tileHeight: 65 },
+  meldZone: { meldHeight: 100, meldTileHeight: 80 },
+  discardZone: { columns: 8, rows: 3, discardShort: 26 },
+  actionDockZone: {
+    actionsHeight: 40,
+    actionButtonHeight: 70,
+    candidateHeight: 70,
+  },
+  debug: { showRegions: false },
+};
+
+const object = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+const number = (value: unknown, name: string, min: number, max: number) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max)
+    throw new Error(`${name} must be a number from ${min} to ${max}`);
+  return value;
+};
+
+/** Runtime boundary for JSON authored by Layout Lab. */
+export function parseTableLayoutConfig(value: unknown): TableLayoutConfig {
+  const config = object(value);
+  const shared = object(config.shared);
+  const handZone = object(config.handZone);
+  const meldZone = object(config.meldZone);
+  const discardZone = object(config.discardZone);
+  const actionDockZone = object(config.actionDockZone);
+  const debug = object(config.debug);
+  if (typeof debug.showRegions !== "boolean")
+    throw new Error("debug.showRegions must be a boolean");
+  return {
+    shared: {
+      aspectRatio: number(shared.aspectRatio, "shared.aspectRatio", 1.2, 1.8),
+      tileGapPx: number(shared.tileGapPx, "shared.tileGapPx", 0, 8),
+    },
+    handZone: { tileHeight: number(handZone.tileHeight, "handZone.tileHeight", 5, 80) },
+    meldZone: {
+      meldHeight: number(meldZone.meldHeight, "meldZone.meldHeight", 10, 100),
+      meldTileHeight: number(meldZone.meldTileHeight, "meldZone.meldTileHeight", 5, 80),
+    },
+    discardZone: {
+      columns: number(discardZone.columns, "discardZone.columns", 4, 14),
+      rows: number(discardZone.rows, "discardZone.rows", 2, 4),
+      discardShort: number(discardZone.discardShort, "discardZone.discardShort", 5, 80),
+    },
+    actionDockZone: {
+      actionsHeight: number(actionDockZone.actionsHeight, "actionDockZone.actionsHeight", 20, 60),
+      actionButtonHeight: number(
+        actionDockZone.actionButtonHeight,
+        "actionDockZone.actionButtonHeight",
+        30,
+        90,
+      ),
+      candidateHeight: number(
+        actionDockZone.candidateHeight,
+        "actionDockZone.candidateHeight",
+        30,
+        90,
+      ),
+    },
+    debug: { showRegions: debug.showRegions },
+  };
+}
