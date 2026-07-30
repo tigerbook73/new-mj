@@ -5,6 +5,19 @@ test("root redirects to /login", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
+// router.tsx's protectedLoader(kind) is the single gate behind /games,
+// /lobby/:roomId, /room/:roomId (and /replay) — ensureConnected() throws
+// redirect("/login") the same way regardless of kind when there's no token
+// at all, so a bogus room id here never gets far enough to matter.
+test("unauthenticated deep links to protected routes redirect to /login", async ({ page }) => {
+  await page.goto("/games");
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto("/lobby/00000000-0000-0000-0000-000000000000");
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto("/room/00000000-0000-0000-0000-000000000000");
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 // Phase 5 smoke test: only checks the OAuth entry points render — actually
 // clicking through needs a real Supabase project + Google/GitHub OAuth
 // client secrets this sandbox doesn't have.
@@ -71,6 +84,33 @@ test("opening /login with a saved dev session restores directly to /games", asyn
   await page.goto("/login");
 
   await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+});
+
+// devAuth.ts's readDevSession() only returns a session when the stored value
+// is valid JSON with a `token` field — a garbage string, or a syntactically-
+// fine JWT that server-side verification rejects, both end up going through
+// doConnect()'s `if (!result.ok) throw redirect("/login")` fallback. Neither
+// path clears the bad value from localStorage (that only happens on a
+// *successful* connect or an explicit sign-out) — the point of this test is
+// that landing on /login afterward still renders a normal, usable form
+// rather than a stuck loader or a blank page, even with that stale value
+// still sitting there.
+test("a corrupted session token in localStorage falls back to the login form, not a stuck or blank page", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "new-mj:dev-session",
+      JSON.stringify({ token: "not-a-real-jwt", nickname: "Ghost Player" }),
+    );
+  });
+
+  await page.goto("/games");
+
+  await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Enter game" })).toBeVisible();
+  await expect(page.getByPlaceholder("Enter nickname")).toBeEditable();
 });
 
 // server-truth restore (session:identity's activeRoom + the /games loader,
@@ -167,5 +207,39 @@ test("a different browser is prompted; declining keeps the form usable with a cr
   await expect(other).toHaveURL(/\/login$/);
   await expect(other.getByText(/signed in on a different browser/i)).toBeVisible();
   await expect(other.getByRole("button", { name: "Enter game" })).toBeVisible();
+  await otherContext.close();
+});
+
+// Accepting the takeover prompt is the other half of connectWithTakeoverPrompt
+// (shared/lib/socket.ts): the second connect attempt sets `takeover: true`,
+// which auth.middleware.ts's registerSession() honors by emitting
+// `session:kicked` to the *original* socket and force-disconnecting it, then
+// registering the new one. The original tab doesn't navigate itself on
+// `session:kicked` (sessionBootstrap.ts deliberately just resets store state
+// and sets `kicked: true`, see its own docs) — RevalidateOnSessionLoss.tsx
+// picks up the socket going from present to absent and revalidates the
+// current route's loader, whose ensureConnected() then throws
+// `redirect("/login")` because `kicked` is set. That's why this needs a
+// generous timeout on the original tab: it's a real round trip (disconnect →
+// revalidate → loader rerun), not an instant client-side redirect.
+test("accepting the takeover prompt logs the new browser in and kicks the original to /login with a takeover notice", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter nickname").fill("Takeover Player");
+  await page.getByRole("button", { name: "Enter game" }).click();
+  await expect(page).toHaveURL(/\/games$/, { timeout: 10_000 });
+
+  const otherContext = await browser.newContext();
+  const other = await otherContext.newPage();
+  other.on("dialog", (dialog) => void dialog.accept());
+  await other.goto("/login");
+  await other.getByPlaceholder("Enter nickname").fill("Takeover Player");
+  await other.getByRole("button", { name: "Enter game" }).click();
+
+  await expect(other).toHaveURL(/\/games$/, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
+  await expect(page.getByText(/taken over by another connection/i)).toBeVisible();
   await otherContext.close();
 });

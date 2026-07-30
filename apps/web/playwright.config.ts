@@ -13,6 +13,10 @@ export default defineConfig({
   testMatch: "**/*.e2e-spec.ts",
   fullyParallel: true,
   reporter: "list",
+  // Tried raising workers above Playwright's own default (cpus/2) to
+  // parallelize more of this suite's network/timer-bound waiting — both
+  // cpus/1 and cpus-1 introduced resource-contention flakes under this
+  // sandbox's CPU limit with no net wall-clock improvement, so left at default.
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: "on-first-retry",

@@ -21,6 +21,20 @@ async function createRoom(page: Page, name: string) {
   await page.getByRole("button", { name: "Create room" }).click();
 }
 
+// Shared by every test below where a second person finds an already-created
+// room from the lobby list and opens its preview — refresh is needed because
+// the list doesn't live-update on room creation. Doesn't sit down; call
+// `sitAt` afterward for tests that need an occupied seat.
+async function openRoomAsGuest(guest: Page, roomName: string) {
+  await openVariant(guest, "Junk Hu");
+  await guest.getByRole("button", { name: "Refresh" }).click();
+  await guest.getByRole("button", { name: roomName }).click();
+}
+
+async function sitAt(page: Page, seat: 1 | 2 | 3 | 4) {
+  await page.locator(`[data-seat="${seat}"]`).getByRole("button", { name: "Sit" }).click();
+}
+
 test("four players find a room, choose seats, ready up, and start", async ({ browser }) => {
   const [host, p2, p3, p4] = await Promise.all([
     loginAs(browser, "start-host"),
@@ -85,10 +99,8 @@ test("a guest can leave a waiting room and return to the lobby", async ({ browse
   ]);
   await openVariant(host, "Junk Hu");
   await createRoom(host, "Guest leaves");
-  await openVariant(guest, "Junk Hu");
-  await guest.getByRole("button", { name: "Refresh" }).click();
-  await guest.getByRole("button", { name: "Guest leaves" }).click();
-  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
+  await openRoomAsGuest(guest, "Guest leaves");
+  await sitAt(guest, 2);
   await guest.getByRole("button", { name: "Leave room" }).click();
   await expect(guest).toHaveURL(/\/games$/);
   await expect(host.locator('[data-seat="2"]').getByRole("button", { name: "Sit" })).toBeVisible();
@@ -103,9 +115,7 @@ test("a visitor can leave a room preview without taking a seat", async ({ browse
   ]);
   await openVariant(host, "Junk Hu");
   await createRoom(host, "Preview only");
-  await openVariant(visitor, "Junk Hu");
-  await visitor.getByRole("button", { name: "Refresh" }).click();
-  await visitor.getByRole("button", { name: "Preview only" }).click();
+  await openRoomAsGuest(visitor, "Preview only");
   await expect(
     visitor.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }),
   ).toBeVisible();
@@ -146,10 +156,8 @@ test("the host can remove another player from a waiting room", async ({ browser 
   ]);
   await openVariant(host, "Junk Hu");
   await createRoom(host, "Remove player");
-  await openVariant(guest, "Junk Hu");
-  await guest.getByRole("button", { name: "Refresh" }).click();
-  await guest.getByRole("button", { name: "Remove player" }).click();
-  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
+  await openRoomAsGuest(guest, "Remove player");
+  await sitAt(guest, 2);
   await host.locator('[data-seat="2"]').getByRole("button", { name: "Remove" }).click();
   await expect(guest).toHaveURL(/\/games$/);
   await expect(guest.getByText("You were removed by the host.")).toBeVisible();
@@ -164,10 +172,8 @@ test("the host leaving a waiting room closes it for everyone", async ({ browser 
   ]);
   await openVariant(host, "Junk Hu");
   await createRoom(host, "Host leaves");
-  await openVariant(guest, "Junk Hu");
-  await guest.getByRole("button", { name: "Refresh" }).click();
-  await guest.getByRole("button", { name: "Host leaves" }).click();
-  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
+  await openRoomAsGuest(guest, "Host leaves");
+  await sitAt(guest, 2);
   await host.getByRole("button", { name: "Leave room" }).click();
   await host.getByRole("dialog").getByRole("button", { name: "Leave room" }).click();
   await expect(host).toHaveURL(/\/games$/);
@@ -175,6 +181,69 @@ test("the host leaving a waiting room closes it for everyone", async ({ browser 
   await expect(guest.getByText("The host closed this room.")).toBeVisible();
   await host.context().close();
   await guest.context().close();
+});
+
+// LobbyView.tsx only renders a seat's "Sit" button when `!player` — an
+// occupied seat (bot or human) never shows one at all, so a full room has no
+// error message to surface, just zero "Sit" buttons anywhere a fifth visitor
+// looks.
+test("a room with all four seats filled shows no sittable seat to a later visitor", async ({
+  browser,
+}) => {
+  const [host, visitor] = await Promise.all([
+    loginAs(browser, "full-host"),
+    loginAs(browser, "full-visitor"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await createRoom(host, "Full room");
+  await host.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
+  await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
+  await host.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
+  await expect(host.getByText("BOT")).toHaveCount(3);
+
+  await openRoomAsGuest(visitor, "Full room");
+  await expect(visitor.getByRole("button", { name: "Sit" })).toHaveCount(0);
+  await host.context().close();
+  await visitor.context().close();
+});
+
+// canStart (LobbyView.tsx) is `players.every(isReady)` recomputed on every
+// room update — unchecking Ready must disable Start game again immediately,
+// not just leave it enabled from an earlier all-ready moment.
+test("unchecking ready disables Start game again", async ({ browser }) => {
+  const page = await loginAs(browser, "unready-host");
+  await openVariant(page, "Junk Hu");
+  await createRoom(page, "Unready room");
+
+  const readyBox = page.getByRole("checkbox", { name: "Ready" });
+  const startButton = page.getByRole("button", { name: "Start game" });
+  await expect(startButton).toBeDisabled();
+
+  await readyBox.check();
+  await expect(page.getByText("BOT")).toHaveCount(3);
+  await expect(startButton).toBeEnabled();
+
+  await readyBox.uncheck();
+  await expect(startButton).toBeDisabled();
+  await page.context().close();
+});
+
+// junk has a real playable table; bloodbattle only has the shared public
+// skeleton so far (apps/web/AGENTS.md) — this only smoke-tests that the
+// bloodbattle room lifecycle itself (create/ready/start) works end to end,
+// not any bloodbattle-specific table content.
+test("a bloodbattle room can be created, readied, and started", async ({ browser }) => {
+  const page = await loginAs(browser, "bloodbattle-host");
+  await openVariant(page, "Bloodbattle");
+  await createRoom(page, "Bloodbattle smoke");
+  await expect(page).toHaveURL(/\/lobby\//);
+
+  await page.getByRole("checkbox", { name: "Ready" }).check();
+  await expect(page.getByText("BOT")).toHaveCount(3);
+  await page.getByRole("button", { name: "Start game" }).click();
+  await expect(page).toHaveURL(/\/room\//, { timeout: 10_000 });
+  await expect(page.getByTestId("table-hud")).toBeVisible({ timeout: 10_000 });
+  await page.context().close();
 });
 
 test("leaving an in-game room keeps the other human in the match", async ({ browser }) => {
@@ -186,10 +255,8 @@ test("leaving an in-game room keeps the other human in the match", async ({ brow
   await createRoom(host, "Game leaves");
   await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
   await host.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
-  await openVariant(guest, "Junk Hu");
-  await guest.getByRole("button", { name: "Refresh" }).click();
-  await guest.getByRole("button", { name: "Game leaves" }).click();
-  await guest.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
+  await openRoomAsGuest(guest, "Game leaves");
+  await sitAt(guest, 2);
   await host.getByRole("checkbox", { name: "Ready" }).check();
   await guest.getByRole("checkbox", { name: "Ready" }).check();
   await host.getByRole("button", { name: "Start game" }).click();

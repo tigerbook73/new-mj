@@ -10,7 +10,9 @@
     "lint": "eslint src",
     "test": "jest --passWithNoTests",
     "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests",
+    "test:e2e:full": "jest --config ./test/jest-e2e.json --passWithNoTests",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build",
+    "verify:full": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e:full && pnpm build",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev"
   },

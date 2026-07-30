@@ -15,6 +15,9 @@
 - Zustand 按域拆分：`shared/store/session.ts` 是会话/房间/对局，`features/mahjong/tableLayout.store.ts` 只存展示偏好。
 - `router.tsx` 的 loader 负责鉴权和恢复；e2e 的常规路由跳转用点击，不用 `page.goto()`，避免整页刷新清空内存 session。故意测试冷启动恢复时例外。
 - Playwright 自启 web(5274)+server(3100)，与 `pnpm dev` 隔离；使用 `wait.stdout` 判定就绪，不新增 `port`/`url` 探测。
+- `pnpm test:e2e` 只跑未标 `@slow`/`@lab` 的用例（日常提交用）；`pnpm test:e2e:full` 跑全部（合并到 main 前用），策略见 `docs/process/workflow.md`。给低边际/慢速用例打 `{ tag: "@slow" }` 时判断依据是"是否已被同文件内更快的用例覆盖同一机制"，不是单纯按耗时。
+- `test/layout-lab-*.e2e-spec.ts`（按编辑面/Tree/Grid+变量/视图与面板/预设与文件分成 5 个文件，每个文件顶层 `test.describe(..., { tag: "@lab" }, ...)` 包裹）只测 `features/layout-sketch`（仅 DEV 工具，不接 socket/core），日常提交不跑；改这个 feature 时手动跑 `pnpm test:e2e:lab`，合并到 main 前的 `test:e2e:full` 仍会跑到。新增 layout-sketch 专属用例按主题归入既有文件，或新开 `layout-lab-*.e2e-spec.ts` 文件并同样打 `@lab`。
+- 本 workspace 下用 pnpm 10.33.3 通过 `--` 给脚本透传参数会被静默吞掉（如 `pnpm test:e2e -- test/foo.e2e-spec.ts` 实际仍跑全量套件）；直接不带 `--` 传参（`pnpm test:e2e test/foo.e2e-spec.ts`）或用 `pnpm exec playwright test test/foo.e2e-spec.ts`。
 
 ## 代码地图
 

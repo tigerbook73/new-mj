@@ -12,8 +12,11 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src dev",
     "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build && pnpm build-storybook"
+    "test:e2e": "playwright test --grep-invert \"@slow|@lab\"",
+    "test:e2e:full": "playwright test",
+    "test:e2e:lab": "playwright test --grep @lab",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e && pnpm build && pnpm build-storybook",
+    "verify:full": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:e2e:full && pnpm build && pnpm build-storybook"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
