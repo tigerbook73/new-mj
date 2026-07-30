@@ -41,7 +41,7 @@
 
 - 每个并行 feature 使用独立 Git worktree 与分支；创建器只从明确的已提交 ref 建立，绝不带入另一个 worktree 的未提交改动。
 - 私有 workspace 包 `@new-mj/devtools` 是 worktree CLI、slot 推导和 Vite/Playwright 适配的唯一来源；它以 `worktree-cli` bin 提供 CLI，根脚本只调用该稳定命令。使用其库 API 的 app 以 `workspace:*` devDependency 引入。`.worktree.env` 只记录本机 slot，端口由 slot 推导，具体 slot/私有环境不进入 Git。
-- `pnpm worktree:new <name> [slot]` 创建 `feat/<name>`、写入本地 slot 配置、安装依赖并构建。省略 slot 时自动选择最小空闲值；显式 slot 已被其他已登记 worktree 使用时失败。主 worktree 没有配置时视为 slot 0。
+- `pnpm worktree:new [name] [slot]` 创建 `feat/<name>`、写入本地 slot 配置、安装依赖并构建。交互终端省略 name 时会提示输入 kebab-case 名称；非交互调用必须传入 name。省略 slot 时自动选择最小空闲值；显式 slot 已被其他已登记 worktree 使用时失败。主 worktree 没有配置时视为 slot 0。
 - 创建器从 Git 列表中的主 worktree 链接根目录中所有被 Git 忽略的 `.env.*` 文件；仓库跟踪的 `.env`、`.env.example`、`.env.test` 不链接。目标已有同名本地文件时保留并提示，绝不覆盖秘密。
 - `worktree-cli.ts run <command> [...args]` 负责向任意命令注入当前 slot 的环境；`pnpm dev` 与 `pnpm test:e2e` 已通过它自动读取 slot。不要手写端口或使用特殊后缀。slot 0 使用现有默认端口；其他 slot 使用独立的 dev/e2e web+server 端口对。后者默认每个 worktree 一个 Playwright worker，保证并发时稳定；`pnpm verify` 因此也会自动使用隔离 E2E。`pnpm worktree:status` 列出所有登记项，`pnpm worktree:doctor` 检查重复 slot 与失效环境链接。
 - 同一份本地 Supabase 可供普通开发共享；`prisma migrate`、Supabase 配置变更或破坏性数据操作必须独占，或使用明确隔离的实例。

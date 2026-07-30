@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, relative } from "node:path";
+import { createInterface } from "node:readline/promises";
 import {
   environmentLinkNames,
   firstAvailableWorktreeSlot,
@@ -167,21 +168,37 @@ const doctor = (root: string): void => {
 
 const validName = (name: string): boolean => /^[a-z0-9][a-z0-9-]*$/.test(name);
 
-const create = (root: string, name: string | undefined, slotRaw: string | undefined): void => {
-  if (!name || !validName(name))
-    throw new Error("usage: pnpm worktree:new <lowercase-kebab-name> [slot]");
+const promptForName = async (): Promise<string | undefined> => {
+  if (!process.stdin.isTTY) return undefined;
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const name = (await readline.question("Worktree name (lowercase-kebab-name): ")).trim();
+    return name || undefined;
+  } finally {
+    readline.close();
+  }
+};
+
+const create = async (
+  root: string,
+  name: string | undefined,
+  slotRaw: string | undefined,
+): Promise<void> => {
+  const requestedName = name ?? (await promptForName());
+  if (!requestedName || !validName(requestedName))
+    throw new Error("usage: pnpm worktree:new [lowercase-kebab-name] [slot]");
   const assignments = slotAssignments(root);
   const claimedSlots = assignments.map(({ config }) => config.slot);
   const slot =
     slotRaw === undefined ? firstAvailableWorktreeSlot(claimedSlots) : parseWorktreeSlot(slotRaw);
   if (claimedSlots.includes(slot)) throw new Error(`worktree slot ${slot} is already in use`);
-  const target = join(dirname(root), `new-mj-${name}`);
+  const target = join(dirname(root), `new-mj-${requestedName}`);
   if (existsSync(target)) throw new Error(`target already exists: ${target}`);
   const primary = assignments[0];
   if (!primary)
     throw new Error("cannot find the primary worktree to use as the environment source");
 
-  run("git", ["worktree", "add", "-b", `feat/${name}`, target, "main"], root);
+  run("git", ["worktree", "add", "-b", `feat/${requestedName}`, target, "main"], root);
   writeConfig(target, worktreeConfigFor(slot));
   const preserved = linkEnvironmentFiles(primary.root, target);
   if (preserved.length)
@@ -202,12 +219,12 @@ const runWithWorktreeEnv = (root: string, args: readonly string[]): void => {
   run(command, normalizedArgs, root, worktreeEnvironment(readConfig(root)));
 };
 
-const main = (): void => {
+const main = async (): Promise<void> => {
   const [command, ...args] = process.argv.slice(2);
   const root = repoRoot();
   switch (command) {
     case "create":
-      create(root, args[0], args[1]);
+      await create(root, args[0], args[1]);
       return;
     case "status":
       printStatus(root);
@@ -223,4 +240,4 @@ const main = (): void => {
   }
 };
 
-main();
+await main();
