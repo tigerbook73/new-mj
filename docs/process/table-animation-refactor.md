@@ -15,6 +15,8 @@
 
 ## 一、Tile 组件三层拆分：Slot / Motion / Face
 
+**已完成**（`pnpm --filter @new-mj/web verify` 全绿，含 88 个 e2e）。落地细节、和计划的实际偏差见下方"需要改动的文件"。
+
 ### 目标架构
 
 ```
@@ -45,10 +47,10 @@ Tile.tsx（对外 API 不变：tileId/back/width/height/entering/dimmed/enlarged
 
 ### 需要改动的文件
 
-- 新增：`TileSlot.tsx`、`TileMotion.tsx`（含 `resolveTileMotion` 纯函数）、`TileFace.tsx`（均在 `apps/web/src/features/mahjong/components/`）
+- 新增：`TileSlot.tsx`、`TileMotion.tsx`、`resolveTileMotion.ts`（纯函数单独成文件——与 `TileMotion` 组件放同一个文件会触发 `react-refresh/only-export-components`）、`TileFace.tsx`（均在 `apps/web/src/features/mahjong/components/`）
 - 修改：`Tile.tsx` —— 缩减为组合三层的公开入口，props/行为对外不变
 - 修改：`HandRow.tsx` 的 `DrawnSlotTile` —— `entering`/`noEnterMotion` 合并传参
-- 修改：`apps/web/test/table.e2e-spec.ts` 第238行左右的 `[data-testid="player-track-right"] > div > div:first-child` —— Tile 内部多了一层嵌套，选择器要多钻一层，**以实际渲染 DOM 为准核对**，不要照抄字符串（对手手牌是否带 `data-tile-id` 涉及隐私边界，可能影响能不能换成属性选择器）
+- 修改：`apps/web/test/table.e2e-spec.ts` —— 实际改动比原计划的"一处选择器"更广：Tile 内部多了一层嵌套后，凡是"定位靠 `data-testid`/`[data-tile-id]`（落在 TileMotion 上），断言 CSS 视觉效果（cursor/opacity，落在 TileFace 上）"的用例都要多钻一层子节点（`tile.firstElementChild`），第238行左右的结构选择器同理多一层；另外 `hover:scale-*` 从 motion 的 `whileHover` 换成 Tailwind 的 `scale`（CSS 独立 transform 属性，不是 `transform` 本身）后，用 `getComputedStyle(...).transform` 判断"是否已缩放"的断言需要改读 `.scale`；`DrawnSlotTile` 合并 `entering`/`noEnterMotion` 后，摸牌槽的 `data-entering` 从 `"true"` 变成字符串 `"opacityOnly"`，对应断言一并更新。全部在 `pnpm --filter @new-mj/web verify`（含 88 个 e2e）跑绿后确认。
 - 不需要改动：`DiscardPile.tsx`、`ActionDock.tsx`、`MeldGroup.tsx`、`TileClaimSlot.tsx`、三个 `*FlipGhost.tsx`、`Tile.stories.tsx`、`tileMotionTiming.ts`
 
 ---

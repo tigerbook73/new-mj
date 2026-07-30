@@ -119,18 +119,28 @@ test("junk desktop table fits both target viewports and a discard succeeds", asy
   await expectDesktopTableFits(host, { width: 1366, height: 768 });
   // The structural child zones are transparent to input; the actual Tile must
   // receive hover so its clickable border feedback is visible before a discard.
+  // `hand-tile`'s testid sits on TileMotion (Tile.tsx's middle layer — see its
+  // own docs for why); `cursor-pointer`/`hover:scale-*` are TileFace's own
+  // plain CSS, one layer further in, so these read the first child instead of
+  // the located node itself.
   await handTiles.first().hover();
   await expect
-    .poll(() => handTiles.first().evaluate((tile) => getComputedStyle(tile).cursor))
+    .poll(() =>
+      handTiles.first().evaluate((tile) => getComputedStyle(tile.firstElementChild!).cursor),
+    )
     .toBe("pointer");
-  // Regression: motion.div's entry animation (Tile.tsx's `initial`/`animate`)
-  // writes `transform` as a permanent inline style once mounted, which used
-  // to silently beat the CSS `hover:scale-*` utility outright (inline always
-  // wins over any stylesheet rule) — the enlargement moved to motion's own
-  // `whileHover` prop specifically so this keeps working.
+  // Regression: `hover:scale-*` is plain CSS on TileFace (not motion) — see
+  // its own docs for why splitting Tile.tsx into layers let this move back
+  // off motion's `whileHover` without the old inline-style-vs-CSS-class
+  // conflict. Tailwind's `scale` utility writes the modern standalone CSS
+  // `scale` property (not the legacy `transform` property they visually
+  // compose with) — `getComputedStyle(...).transform` would read "none"
+  // even while genuinely scaled, so this checks `scale` instead.
   await expect
-    .poll(() => handTiles.first().evaluate((tile) => getComputedStyle(tile).transform))
-    .not.toBe("none");
+    .poll(() =>
+      handTiles.first().evaluate((tile) => getComputedStyle(tile.firstElementChild!).scale),
+    )
+    .not.toBe("1");
   const tileCountBefore = await handTiles.count();
   const displayedTileIds = (await handTiles.evaluateAll((tiles) =>
     tiles.map((tile) => Number(tile.getAttribute("data-tile-id"))),
@@ -234,8 +244,15 @@ test("an opponent's hand does not visibly slide when a claim shrinks it", async 
         const values: string[] = [];
         const start = performance.now();
         function tick() {
+          // Tile.tsx is now three nested layers (TileSlot > TileMotion >
+          // TileFace) — `layout` (and thus any transform this test watches
+          // for) lives on the middle one, so this needs one more hop in than
+          // before the split. Opponent filler tiles carry neither
+          // `data-testid` nor `data-tile-id` (architecture iron rule 2 — no
+          // concealed-hand identity may leak), so this stays a purely
+          // structural selector rather than an attribute one.
           const firstFiller = document.querySelector(
-            '[data-testid="player-track-right"] > div > div:first-child',
+            '[data-testid="player-track-right"] > div > div:first-child > div:first-child',
           );
           if (firstFiller) values.push(getComputedStyle(firstFiller).transform);
           if (performance.now() - start < 2000) requestAnimationFrame(tick);
@@ -412,13 +429,19 @@ test("draw entry animation plays live but not after a reload mid-game", async ({
     await host.getByTestId("player-track-bottom").locator('[data-tile-id="4"]').click();
     await passAllClaims([claimant, secondClaimant]);
 
+    // The drawn slot's DrawnSlotTile always passes entering as "opacityOnly"
+    // (never plain `true`) — DrawFlipGhost already sells the arrival's
+    // physical motion, so the real tile skips scale/rise (see Tile.tsx's
+    // `entering` docs and HandRow.tsx's DrawnSlotTile).
     const ownDrawnTile = claimant.getByTestId("hand-track-drawn-bottom");
-    await expect(ownDrawnTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
+    await expect(ownDrawnTile).toHaveAttribute("data-entering", "opacityOnly", { timeout: 10_000 });
     // Host sees the same draw from the opponent side — SeatContent's
     // "opp-{seat}-{handCount}" keying branch, distinct from the own-seat
     // "own-{tileId}" branch the assertion above exercises.
     const opponentDrawnTile = host.getByTestId("hand-track-drawn-right");
-    await expect(opponentDrawnTile).toHaveAttribute("data-entering", "true", { timeout: 10_000 });
+    await expect(opponentDrawnTile).toHaveAttribute("data-entering", "opacityOnly", {
+      timeout: 10_000,
+    });
 
     await claimant.reload();
     const ownDrawnTileAfterReload = claimant.getByTestId("hand-track-drawn-bottom");
@@ -472,8 +495,10 @@ test("a drawn tile flies in from the center via a ghost clone", async ({ browser
 
     // The real pinned-slot tile must have settled correctly — the whole
     // point of the ghost is that it never touched the real tile's own state.
+    // "opacityOnly" (not plain `true`) — see the draw-entry-animation test's
+    // own note on why the drawn slot always uses it.
     const ownDrawnTile = claimant.getByTestId("hand-track-drawn-bottom");
-    await expect(ownDrawnTile).toHaveAttribute("data-entering", "true");
+    await expect(ownDrawnTile).toHaveAttribute("data-entering", "opacityOnly");
   } finally {
     for (const page of players) await page.context().close();
   }
@@ -498,12 +523,12 @@ test("the draw flip ghost is suppressed under prefers-reduced-motion", async ({ 
 
 // Regression: a claimed discard's tombstone must visibly dim (architecture
 // iron rule 4 — the claimed tile moves into a meld but leaves a dimmed
-// tombstone in the river, it isn't removed). Tile.tsx used to drive this via
-// a static `opacity-40` CSS class; once entry animation switched to motion,
-// motion's own `animate` target permanently wrote `opacity: 1` as an inline
-// style every render (inline always beats a stylesheet class), silently
-// undimming every tombstone. Fixed by folding `dimmed` into the same
-// `animate` target motion already owns instead of fighting it with CSS.
+// tombstone in the river, it isn't removed). `dimmed` is plain CSS
+// (`style.opacity`) on TileFace — the innermost of Tile.tsx's three layers —
+// so it composes freely with the middle TileMotion layer's own motion
+// `animate` without either fighting the other for the last write (see
+// TileFace.tsx's docs). `[data-tile-id]` sits on TileMotion, one layer out
+// from where `dimmed` actually applies, hence reading its first child below.
 test("a claimed discard's tombstone visibly dims", async ({ browser }) => {
   // Short prefix on purpose — see the deriveUserId 20-char-truncation note above passAllClaims.
   const { players } = await createAndStartRoom(browser, "junk", "junk-dim");
@@ -528,7 +553,9 @@ test("a claimed discard's tombstone visibly dims", async ({ browser }) => {
     const tombstone = host.getByTestId("table-area-bottom").locator('[data-tile-id="4"]');
     await expect(tombstone).toBeVisible({ timeout: 10_000 });
     await expect
-      .poll(() => tombstone.evaluate((tile) => getComputedStyle(tile).opacity))
+      .poll(() =>
+        tombstone.evaluate((tile) => getComputedStyle(tile.firstElementChild!).opacity),
+      )
       .toBe("0.4");
     await expect(host.getByTestId("discard-claim-icon")).toHaveCount(1);
   } finally {
@@ -647,12 +674,14 @@ test("a claimed tile FLIPs from the discard pile into the meld via a ghost clone
     // animation state was ever touched by the flight.
     const meldTile = claimant.getByTestId("meld-track-bottom").locator('[data-tile-id="4"]');
     await expect(meldTile).toHaveAttribute("data-entering", "true");
+    // `dimmed` lives on TileFace, one layer in from `[data-tile-id]`'s
+    // TileMotion — see "a claimed discard's tombstone visibly dims"' own note.
     await expect
       .poll(() =>
         host
           .getByTestId("table-area-bottom")
           .locator('[data-tile-id="4"]')
-          .evaluate((tile) => getComputedStyle(tile).opacity),
+          .evaluate((tile) => getComputedStyle(tile.firstElementChild!).opacity),
       )
       .toBe("0.4");
   } finally {

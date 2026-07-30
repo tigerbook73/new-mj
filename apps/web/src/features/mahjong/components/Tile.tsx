@@ -1,99 +1,8 @@
-import { cva, type VariantProps } from "class-variance-authority";
-import { motion } from "motion/react";
-import { useState } from "react";
-import { cn } from "@/shared/lib/utils";
-import { tileBackImageSrc, tileImageSrc } from "@/features/mahjong/lib/mahjongTiles";
-import { useTableLayoutStore } from "@/features/mahjong/tableLayout.store";
-import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "./tileMotionTiming";
+import { TileFace } from "./TileFace";
+import { TileMotion } from "./TileMotion";
+import { TileSlot } from "./TileSlot";
 
-const tileVariants = cva(
-  // transition-[box-shadow] here (not just on the `clickable` hover variant
-  // below) so `justDiscarded`'s ring/shadow — the one highlight in this file
-  // that toggles on a tile that's usually NOT clickable (a discard-pile
-  // tombstone) — fades in/out like every other table animation instead of
-  // being the sole hard cut.
-  "relative inline-block shrink-0 select-none overflow-hidden rounded-[15%] border border-border bg-[#e8d4b0] shadow-md transition-[box-shadow]",
-  {
-    variants: {
-      clickable: {
-        // The scale part of the old hover enlargement moved to motion's
-        // `whileHover` (see call site) — motion writes `transform` as a
-        // permanent inline style once mounted (it owns `y`/`scale` for the
-        // entry animation, see TILE_HOVER_SCALE/TILE_ENTER_INITIAL below),
-        // which silently wins over any CSS `hover:scale-*` utility class
-        // since inline styles always beat stylesheet rules. Non-transform
-        // hover feedback (border/ring/shadow) has no such conflict and stays
-        // plain CSS.
-        true: "origin-bottom cursor-pointer transition-[border-color,box-shadow] hover:z-10 hover:border-cyan-400 hover:ring-2 hover:ring-cyan-300 hover:shadow-lg",
-        false: "",
-      },
-      // NOTE: if this ever gets wired up (currently unused — no caller
-      // passes `selected`), `-translate-y-2` has the exact same
-      // inline-style-vs-CSS-class conflict as the old hover scale did: fold
-      // it into TILE_ENTER_ANIMATE's `y` target instead of a CSS class.
-      selected: { true: "ring-2 ring-primary", false: "" },
-      /**
-       * The single most recent discard on the table (view.lastDiscard) — see
-       * DiscardPile — or, in ActionDock, a claim's target tile among its
-       * candidate row. `z-10` so DiscardPile's accompanying scale-up (see
-       * `enlarged`/ENLARGED_SCALE) renders on top of its grid
-       * neighbors instead of being clipped underneath them, same reasoning
-       * as `clickable`'s `hover:z-10` — a harmless no-op for ActionDock's
-       * unscaled usage.
-       */
-      justDiscarded: {
-        true: "z-10 ring-2 ring-red-500 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)]",
-        false: "",
-      },
-    },
-    defaultVariants: {
-      clickable: false,
-      selected: false,
-      justDiscarded: false,
-    },
-  },
-);
-
-/**
- * One-shot arrival animation for a tile that just entered the table (e.g. a
- * fresh discard) — driven by motion's `initial`/`animate` instead of a CSS
- * class (Phase 5a originally used tw-animate-css; switched to motion so
- * later phases — a round-end overlay fading out — get exit animations for
- * free instead of hand-rolled delayed-unmount. The claimed-discard-to-meld
- * flight (Phase 5c follow-up) does NOT use motion's `layoutId` shared-layout
- * system, despite that looking like the obvious fit: sharing a `layoutId`
- * between the permanent discard tombstone and the new meld tile made motion
- * treat the tombstone as if it were exiting (auto-fading it to opacity 0 +
- * `pointer-events:none`) the instant the meld tile claimed the id — an
- * undocumented side effect of the AnimatePresence-style crossfade the
- * shared-layout system assumes, which fought the tombstone's own `dimmed`
- * target and couldn't be turned off via `layout="position"`. See
- * ClaimFlipGhost.tsx for the actual implementation: a separate, self-
- * contained clone element does the flying, so the tombstone and the real
- * meld tile never have their own animation state touched by it at all.
- *
- * `initial={false}` (see call site) makes non-entering tiles render directly
- * at this same end state with no transition at all, matching the old
- * `entering: false` CSS variant's empty string.
- *
- * `opacity` is computed per-render from `dimmed` (see call site) rather than
- * fixed at 1 here — motion writes whatever `animate` resolves to as a
- * permanent inline style, which always wins over a CSS class (that's also
- * why the old `hover:scale-*` utility got dropped in favor of `whileHover`
- * below: an inline `transform` beats any stylesheet rule, hover pseudo-class
- * included). A `dimmed` CVA class here would only ever apply for one instant
- * before motion's own opacity overwrote it right back to 1.
- */
-const TILE_ENTER_INITIAL = { opacity: 0, scale: 0.75, y: 24 };
-const TILE_ENTER_TRANSITION = { duration: TILE_ENTRY_DURATION, ease: TILE_MOTION_EASE } as const;
-const TILE_HOVER_SCALE = { scale: 1.2 };
-/** `enlarged`'s resting size — a persistent, pointer-independent enlargement, tuned independently of TILE_HOVER_SCALE. */
-const ENLARGED_SCALE = 1.4;
-
-/** Height / width of a real mahjong tile face — mirrors layouts/desktop.table-config.ts's `shared.aspectRatio`. */
-const DEFAULT_TILE_ASPECT_RATIO = 1.333;
-
-export interface TileProps extends VariantProps<typeof tileVariants> {
+export interface TileProps {
   /**
    * Omit (or set `back`) to render a face-down tile. Any negative value is a
    * layout-only placeholder — real TileIds are never negative (see
@@ -112,36 +21,39 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
    */
   width?: number | string;
   height?: number | string;
-  /** Plays the one-shot arrival animation on mount — see TILE_ENTER_* above. */
-  entering?: boolean | undefined;
+  clickable?: boolean | undefined;
+  selected?: boolean | undefined;
   /**
-   * Only meaningful when `entering` is true: skips the scale *and* rise
-   * keyframes, leaving only opacity — for when a separate flying ghost
-   * already sells the arrival's physical motion. Without this, the real
-   * tile plays its own independent rise-from-below (and scale, pre-
-   * `enlarged`/pre-restingScale) at its *destination*, which visibly clashes
-   * with a ghost still travelling in from a different direction/point (e.g.
-   * DrawFlipGhost flying in from the table's center) — see
-   * HandRow.tsx's DrawnSlotTile, the only caller.
+   * The single most recent discard on the table (view.lastDiscard) — see
+   * DiscardPile — or, in ActionDock, a claim's target tile among its
+   * candidate row.
    */
-  noEnterMotion?: boolean | undefined;
-  /** Fades toward 40% opacity via motion's `animate` — see TILE_ENTER_* above for why this isn't a CSS class. */
+  justDiscarded?: boolean | undefined;
+  /**
+   * Plays the one-shot arrival animation on mount — see TileMotion's
+   * `resolveTileMotion`. `"opacityOnly"` skips the scale/rise keyframes,
+   * leaving only opacity, for when a separate flying ghost already sells
+   * the arrival's physical motion (e.g. DrawFlipGhost flying in from the
+   * table's center) — see HandRow.tsx's DrawnSlotTile, the only caller that
+   * ever passes it.
+   */
+  entering?: boolean | "opacityOnly" | undefined;
+  /** Fades toward 40% opacity — plain CSS on TileFace, see its own docs. */
   dimmed?: boolean | undefined;
   /**
-   * Persistent larger resting size via motion's `animate` — see
-   * ENLARGED_SCALE. Deliberately a separate
-   * prop from `justDiscarded`: DiscardPile drives both together for the most
-   * recent discard, but ActionDock also reuses `justDiscarded`'s ring/glow to
-   * highlight a claim's target tile among a cramped candidate row, where a
-   * scale bump would fight the row's own tight layout — see ActionDock.tsx's
-   * `isTarget`.
+   * Persistent larger resting size — plain CSS on TileFace. Deliberately a
+   * separate prop from `justDiscarded`: DiscardPile drives both together for
+   * the most recent discard, but ActionDock also reuses `justDiscarded`'s
+   * ring/glow to highlight a claim's target tile among a cramped candidate
+   * row, where a scale bump would fight the row's own tight layout — see
+   * ActionDock.tsx's `isTarget`.
    */
   enlarged?: boolean | undefined;
   /**
    * Smoothly animates this tile's own position/size whenever it changes as a
    * side effect of siblings mounting/unmounting — motion's `layout` (a
-   * boolean, unrelated to `layoutId`/shared-layout — see the ClaimFlipGhost
-   * docs above for why that's a different, riskier tool). Used by HandRow so
+   * boolean, unrelated to `layoutId`/shared-layout — see ClaimFlipGhost.tsx's
+   * docs for why that's a different, riskier tool). Used by HandRow so
    * discarding a tile (unmounting it — see HandRow's tileId-keyed rest-of-
    * hand slots) makes the remaining tiles glide into their closed-up
    * positions instead of snapping. Not used elsewhere; leave off by default
@@ -154,6 +66,15 @@ export interface TileProps extends VariantProps<typeof tileVariants> {
 }
 
 /**
+ * Three layers, composed here and nowhere else — TileSlot (constant sizing),
+ * TileMotion (the animated shell, carries the e2e-visible data attributes),
+ * TileFace (image + click styling, all plain CSS). Splitting these apart
+ * means `dimmed`/`enlarged` can be ordinary CSS on TileFace instead of
+ * fighting motion's inline styles for the win (see TileFace's own docs) —
+ * this file's public API is otherwise unchanged from the single-node
+ * version, so every existing call site needs no changes except HandRow.tsx's
+ * DrawnSlotTile (see `entering`'s `"opacityOnly"` above).
+ *
  * Always rendered upright, in local (unrotated) coordinates. Any per-seat
  * visual rotation comes from the ancestor Zone's own `rotationDeg` (applied
  * once by ZoneRenderer's `zoneStyle()`, see lib/layoutPreset.ts) to the whole
@@ -166,104 +87,45 @@ export function Tile({
   height,
   clickable,
   selected,
-  dimmed,
   justDiscarded,
-  enlarged,
+  dimmed,
   entering,
-  noEnterMotion,
+  enlarged,
   reflow,
   onClick,
   className,
   testId,
 }: TileProps) {
-  const tileTheme = useTableLayoutStore((state) => state.tileTheme);
-  // Captured once at mount: motion's own inline style converges to the same
-  // final opacity/transform whether or not this instance played the entry
-  // transition, so nothing about the settled DOM reveals it after the fact
-  // (unlike the old CSS-class approach). This is the only remaining
-  // deterministic signal for e2e coverage of "did this tile enter animated."
-  const [wasEntering] = useState(entering);
   const isPlaceholder = tileId !== undefined && tileId < 0;
   if (isPlaceholder) {
-    const hasWidth = width !== undefined;
-    const hasHeight = height !== undefined;
     return (
-      <div
-        data-testid={testId}
-        data-empty
-        aria-hidden="true"
-        className={cn("shrink-0", className)}
-        style={{
-          width: width,
-          height: height,
-          aspectRatio: hasWidth === hasHeight ? undefined : `1 / ${DEFAULT_TILE_ASPECT_RATIO}`,
-        }}
-      />
+      <TileSlot isPlaceholder width={width} height={height} className={className} testId={testId} />
     );
   }
+
   const isBack = back || tileId === undefined;
   const isClickable = (clickable ?? Boolean(onClick)) && !isBack;
-  const src = isBack ? tileBackImageSrc(tileTheme) : tileImageSrc(tileId!, tileTheme);
-  const hasWidth = width !== undefined;
-  const hasHeight = height !== undefined;
-  const restingScale = enlarged ? ENLARGED_SCALE : 1;
 
   return (
-    <motion.div
-      data-testid={testId}
-      data-tile-id={isBack ? undefined : tileId}
-      className={cn(
-        tileVariants({ clickable: isClickable, selected, justDiscarded }),
-        tileTheme === "Black" && "border-neutral-700 bg-neutral-950",
-        className,
-      )}
-      style={{
-        width: hasWidth ? width : !hasHeight ? 44 : undefined,
-        height: hasHeight ? height : !hasWidth ? 59 : undefined,
-        // Only relevant when exactly one side was omitted — that's what lets
-        // the browser derive it. Both given (the real board's usual case) or
-        // neither given (bare defaults above) both fully determine the box
-        // already, so aspect-ratio has nothing left to do.
-        aspectRatio: hasWidth === hasHeight ? undefined : `1 / ${DEFAULT_TILE_ASPECT_RATIO}`,
-      }}
-      data-entering={wasEntering || undefined}
-      {...(reflow ? { layout: true } : {})}
-      // `enlarged` overrides just the entry's scale keyframe (not the end
-      // state) so a freshly-discarded tile mounts already at its enlarged
-      // size — no separate "grow bigger" beat layered onto the fade/rise.
-      // `noEnterMotion` goes further and drops scale *and* rise entirely,
-      // leaving pure opacity — see its own doc for why (a paired flying
-      // ghost, e.g. DrawFlipGhost, already sells the physical motion; this
-      // real tile playing its own independent rise/scale at the destination
-      // would visibly clash with a ghost still travelling in from elsewhere).
-      // Either way, shrinking back later (`enlarged` flips false on an
-      // already-mounted tile once it's superseded) still animates smoothly,
-      // since `initial` only ever governs the mount frame and `animate`
-      // alone drives every later change.
-      initial={
-        entering
-          ? noEnterMotion
-            ? { opacity: 0, scale: restingScale, y: 0 }
-            : { ...TILE_ENTER_INITIAL, scale: enlarged ? restingScale : TILE_ENTER_INITIAL.scale }
-          : false
-      }
-      animate={{
-        opacity: dimmed ? 0.4 : 1,
-        scale: restingScale,
-        y: 0,
-      }}
-      transition={TILE_ENTER_TRANSITION}
-      {...(isClickable ? { whileHover: TILE_HOVER_SCALE } : {})}
-      onClick={isClickable ? onClick : undefined}
-      role={isClickable ? "button" : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-    >
-      <img
-        src={src}
-        alt={isBack ? "" : String(tileId)}
-        draggable={false}
-        className="absolute inset-0 h-full w-full object-fill"
-      />
-    </motion.div>
+    <TileSlot isPlaceholder={false} width={width} height={height} className={className}>
+      <TileMotion
+        entering={entering}
+        reflow={reflow}
+        testId={testId}
+        isBack={isBack}
+        tileId={tileId}
+      >
+        <TileFace
+          tileId={tileId}
+          isBack={isBack}
+          clickable={isClickable}
+          selected={selected}
+          justDiscarded={justDiscarded}
+          enlarged={enlarged}
+          dimmed={dimmed}
+          onClick={onClick}
+        />
+      </TileMotion>
+    </TileSlot>
   );
 }

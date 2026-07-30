@@ -182,14 +182,13 @@ function DrawnSlotTile({
             back={!revealed && !isPlaceholder}
             height="100%"
             clickable={interactive && isReal}
-            entering={entering}
             // DrawFlipGhost already flies in and sells the arrival's physical
             // motion on its own path (from the table's center); this real tile
             // independently rising from below at its destination — let alone
             // popping 0.75→1 too — would visibly clash with that flight rather
             // than read as one motion, so it skips scale and rise, keeping only
-            // the fade.
-            noEnterMotion
+            // the fade ("opacityOnly" — see Tile.tsx's `entering` docs).
+            entering={entering ? "opacityOnly" : false}
             // See the `reflow={revealed}` comment above — same scoping applies
             // here too, though this slot always remounts fresh on a new draw
             // (keyed by `drawnSlotKey`), so `layout` never actually has a prior
