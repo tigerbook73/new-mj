@@ -15,7 +15,7 @@ import {
   worktreeConfigFor,
   worktreeEnvironment,
   type WorktreeConfig,
-} from "@new-mj/devtools";
+} from "./index.ts";
 
 type Worktree = { root: string; branch?: string };
 
