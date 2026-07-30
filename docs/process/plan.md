@@ -32,4 +32,5 @@
 - 摸牌显式化：junk/bloodbattle 的摸牌从 core 内联副作用变成显式 `{type:"draw"}` 动作，server 按 `drawRevealDelayMs` 自动代提交，为 UI 留出真实的摸牌停顿窗口；零协议改动，三个 slice（core/server/web）均已验证并合入 main。
 - Web 牌桌动画重构：Tile 三层拆分（Slot/Motion/Face）+ 全桌动画调度架构（`diffPlayerView`/`animationLedger`/`useSlotEntering`，含对手弃牌飞行 ghost）已完成并合入本分支，`pnpm --filter @new-mj/web verify` 全绿；耐久结论已分流到 `architecture/frontend-layout.md` §5，专题 brief 已删除。
 - 文档体系：已取消独立 decisions 文档；架构取舍归入 architecture/contracts，局部实现理由归代码注释或 package AGENTS。
+- 开发流程：slot 化 worktree 现由私有 `@new-mj/devtools` 统一供根创建器、Vite 与 Playwright 使用；创建时自动分配空闲 slot、链接主 worktree 中全部被忽略的根 `.env.*`，并提供 status/doctor。标准 `pnpm dev`、`pnpm test:e2e` 与 `pnpm verify` 自动使用当前 slot，E2E 每 worktree 单 worker。
 - 最近一次根目录 `pnpm verify`：2026-07-30 全绿（含 format、typecheck、lint、build、unit、e2e；core junk 1000 局与 bloodbattle 10000 局 fuzz）。

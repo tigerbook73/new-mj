@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@new-mj/devtools':
+        specifier: workspace:*
+        version: link:packages/devtools
       '@swc/cli':
         specifier: ^0.7.10
         version: 0.7.10(@swc/core@1.15.46)(chokidar@4.0.3)
@@ -196,6 +199,9 @@ importers:
         specifier: ^5.0.14
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
+      '@new-mj/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
@@ -243,6 +249,8 @@ importers:
         version: link:../core
 
   packages/core: {}
+
+  packages/devtools: {}
 
   packages/protocol:
     dependencies:

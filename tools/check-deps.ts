@@ -5,8 +5,9 @@ const rules: Record<string, readonly string[]> = {
   "@new-mj/core": [],
   "@new-mj/protocol": [],
   "@new-mj/ai": ["@new-mj/core"],
+  "@new-mj/devtools": [],
   "@new-mj/server": ["@new-mj/core", "@new-mj/protocol", "@new-mj/ai"],
-  "@new-mj/web": ["@new-mj/protocol"],
+  "@new-mj/web": ["@new-mj/protocol", "@new-mj/devtools"],
   "@new-mj/mobile": ["@new-mj/protocol"],
 };
 

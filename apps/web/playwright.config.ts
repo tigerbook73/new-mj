@@ -1,24 +1,26 @@
 import { defineConfig, devices } from "@playwright/test";
+import { playwrightWorktreeOverrides } from "@new-mj/devtools";
 
 /**
  * Dedicated e2e ports, distinct from the dev-mode defaults (web 5173,
  * server 3000) so a running `pnpm dev` isn't disturbed by e2e runs and
  * vice versa — Playwright boots its own web + server pair here.
  */
-const WEB_PORT = 5274;
-const SERVER_PORT = 3100;
+const { webPort = 5274, serverPort = 3100, workers } = playwrightWorktreeOverrides() ?? {};
+const baseURL = `http://localhost:${webPort}`;
 
 export default defineConfig({
   testDir: "./test",
   testMatch: "**/*.e2e-spec.ts",
   fullyParallel: true,
+  ...(workers === undefined ? {} : { workers }),
   reporter: "list",
   // Tried raising workers above Playwright's own default (cpus/2) to
   // parallelize more of this suite's network/timer-bound waiting — both
   // cpus/1 and cpus-1 introduced resource-contention flakes under this
   // sandbox's CPU limit with no net wall-clock improvement, so left at default.
   use: {
-    baseURL: `http://localhost:${WEB_PORT}`,
+    baseURL,
     trace: "on-first-retry",
   },
   webServer: [
@@ -42,20 +44,20 @@ export default defineConfig({
       // so an actual crash is still visible.
       command: "pnpm --filter @new-mj/server start",
       // NODE_ENV=test makes dotenv-flow load .env.test (blanks Supabase/DB vars) and skip .env.development.local.
-      env: { PORT: String(SERVER_PORT), NODE_ENV: "test", TEST_GAME_SEED: "121" },
+      env: { PORT: String(serverPort), NODE_ENV: "test", TEST_GAME_SEED: "121" },
       stdout: "ignore",
       stderr: "pipe",
       timeout: 180_000,
       wait: { stdout: /Nest application successfully started/ },
     },
     {
-      command: `pnpm exec vite --port ${WEB_PORT} --strictPort --mode test`,
+      command: `pnpm exec vite --port ${webPort} --strictPort --mode test`,
       // JWT_SECRET intentionally not set (shared dev-only fallback, D16); --mode test loads .env.test the same way as the server entry above.
-      env: { VITE_SERVER_URL: `http://localhost:${SERVER_PORT}` },
+      env: { VITE_SERVER_URL: `http://localhost:${serverPort}` },
       stdout: "ignore",
       stderr: "pipe",
       timeout: 60_000,
-      wait: { stdout: /Local:\s+http:\/\/localhost:5274/ },
+      wait: { stdout: new RegExp(`Local:\\s+http:\\/\\/localhost:${webPort}`) },
     },
   ],
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

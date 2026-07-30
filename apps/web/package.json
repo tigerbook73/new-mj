@@ -42,6 +42,7 @@
     "@storybook/addon-a11y": "10.5.2",
     "@storybook/addon-themes": "10.5.2",
     "@storybook/react-vite": "10.5.2",
+    "@new-mj/devtools": "workspace:*",
     "@tailwindcss/vite": "^4.3.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

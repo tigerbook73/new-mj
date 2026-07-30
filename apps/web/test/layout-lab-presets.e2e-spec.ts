@@ -7,10 +7,10 @@ const LAYOUTS_DIR = fileURLToPath(new URL("../src/features/mahjong/layouts/", im
 
 test.describe("Layout Sketch Lab — presets & files", { tag: "@lab" }, () => {
   test("layout sketch copies the exported LayoutPreset JSON", async ({ page, context }) => {
-    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-      origin: "http://localhost:5274",
-    });
     await page.goto("/dev/table-layout");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: new URL(page.url()).origin,
+    });
     await page.getByLabel("Copy JSON").click();
     await expect(page.getByRole("status")).toHaveText("LayoutPreset JSON copied");
     await expect

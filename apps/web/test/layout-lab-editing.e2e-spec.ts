@@ -97,10 +97,10 @@ test.describe("Layout Sketch Lab — editing", { tag: "@lab" }, () => {
     page,
     context,
   }) => {
-    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
-      origin: "http://localhost:5274",
-    });
     await page.goto("/dev/table-layout");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: new URL(page.url()).origin,
+    });
     const canvasL1A = page.getByLabel("Select L1A", { exact: true });
     await expect(canvasL1A).toBeVisible();
 
