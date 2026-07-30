@@ -61,6 +61,12 @@ export function registerSnapshotDiff(
         resolutions.set(key, "flight");
         drawLaneBusy.set(seat, key);
       }
+    } else if (event.key.startsWith("discard:")) {
+      // Every discard is flight-eligible now (stage 5): mine flies from its
+      // click/timeout-captured hand rect (DiscardFlipGhost); an opponent's
+      // flies from their whole hand zone (OpponentDiscardFlipGhost) — see
+      // DiscardPile.tsx's DiscardTileSlot for which ghost actually mounts.
+      resolutions.set(key, "flight");
     } else {
       resolutions.set(key, event.critical ? "flight" : "appear");
     }

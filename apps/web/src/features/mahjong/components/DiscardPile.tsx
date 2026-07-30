@@ -3,6 +3,7 @@ import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { DiscardFlipGhost } from "./DiscardFlipGhost";
+import { OpponentDiscardFlipGhost } from "./OpponentDiscardFlipGhost";
 import { Tile } from "./Tile";
 import { TileClaimSlot } from "./TileClaimSlot";
 
@@ -149,6 +150,17 @@ function DiscardTileSlot({
         <DiscardFlipGhost
           tileId={entry.tile}
           fromRect={ghostOrigin}
+          toRef={toRef}
+          onAnimationComplete={onGhostComplete}
+        />
+      )}
+      {/* Stage 5 (exploratory): an opponent's discard has no click/timeout-
+          captured rect to fly from (only my own does), so it flies from
+          their whole hand zone instead — see OpponentDiscardFlipGhost. */}
+      {ghost && direction !== "bottom" && !ghostOrigin && (
+        <OpponentDiscardFlipGhost
+          tileId={entry.tile}
+          fromDirection={direction}
           toRef={toRef}
           onAnimationComplete={onGhostComplete}
         />

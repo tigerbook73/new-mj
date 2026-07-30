@@ -19,3 +19,11 @@ export const CLAIM_FLIGHT_DURATION = 0.3;
  * visual distance and reads better with a little more time.
  */
 export const DRAW_FLIGHT_DURATION = 0.35;
+
+/**
+ * OpponentDiscardFlipGhost (stage 5, exploratory) — flies from an entire
+ * seat's hand zone rather than a specific tile, and includes a back→face
+ * crossfade plus a rotation tween; a little slower still than DrawFlipGhost
+ * so the flip has room to read clearly mid-flight.
+ */
+export const OPPONENT_DISCARD_FLIGHT_DURATION = 0.4;

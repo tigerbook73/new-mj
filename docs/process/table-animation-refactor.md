@@ -165,7 +165,7 @@ const onSnapshot = (event: GameSnapshot) => {
 - **阶段 2（弃牌墙）**：`DiscardPile.tsx` 迁移，去掉 `enterAnimation`。顺带落地"注册期测量手牌 rect"，让超时代打的弃牌也有飞行起点。
 - **阶段 3（副露）**：`MeldGroup.tsx` 迁移，去掉 `meldEntering`。
 - **阶段 4（收尾）**：`useTablePresentation.ts` 删掉 `canAnimateEntries` 参数；`TableView.tsx` 精简 `onSnapshot`；`useTablePresentation.test.ts` 同步更新。
-- **阶段 5（可选增强，不阻塞前四阶段验收）**：对手打牌飞行 ghost——从该座位手牌区 rect 起飞、背面翻转为正面、旋转角从源座位朝向补间到 0，key 沿用座位+下标；仍是 portal 到 body 的独立 ghost，不做盲牌替换（见关键决策 7）。
+- **阶段 5（可选增强，不阻塞前四阶段验收）——已完成**：新增 `OpponentDiscardFlipGhost.tsx`，从该座位手牌区 rect（`[data-testid="player-track-${direction}"]`）整体起飞，旋转角从 `SEAT_ROTATION[direction]` 补间到 0，背面→正面用两张 `<img>` 叠加做透明度交叉淡出/淡入（后半程），不是字面 3D `rotateY` 翻面——项目里没有 3D flip 先例，其余三个 ghost 也都没有花哨效果，交叉淡出足够表达"翻开"且风格一致。`animationLedger.ts` 的 `discard:` 类事件解析改为恒为 `"flight"`（不再区分 critical），`DiscardPile.tsx` 的 `DiscardTileSlot` 按 `direction === "bottom"` 分流到 `DiscardFlipGhost`（我自己，需要 `flightOrigin`）或 `OpponentDiscardFlipGhost`（对手，无需捕获几何，直接用整个手牌区）。`pnpm --filter @new-mj/web verify`（含 86 个 e2e）全绿，未回归任何既有断言。
 
 每阶段独立可合并、独立验收。
 

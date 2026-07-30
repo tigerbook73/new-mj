@@ -45,7 +45,24 @@ describe("animationLedger", () => {
     expect(resolveSlot("g1:discard:0:0")).toBe("flight");
   });
 
-  it("resolves a non-critical decorative event to appear, never skip", () => {
+  it("resolves a non-critical meld (claimed from a third seat, not mine) to appear, never skip", () => {
+    registerSnapshotDiff(
+      junkView(),
+      junkView({
+        seats: [
+          emptySeat,
+          { ...emptySeat, melds: [{ type: "peng", tiles: [1, 2, 3], from: 2 }] },
+          emptySeat,
+          emptySeat,
+        ],
+      }),
+      0,
+      1,
+    );
+    expect(resolveSlot("g1:meld:1:0:3")).toBe("appear");
+  });
+
+  it("[stage 5, exploratory] resolves every discard to flight, mine or an opponent's", () => {
     registerSnapshotDiff(
       junkView(),
       junkView({
@@ -54,7 +71,7 @@ describe("animationLedger", () => {
       0,
       1,
     );
-    expect(resolveSlot("g1:discard:1:0")).toBe("appear");
+    expect(resolveSlot("g1:discard:1:0")).toBe("flight");
   });
 
   it("downgrades a second same-seat draw to skip while a first is still unresolved, and settles the old lane", () => {
