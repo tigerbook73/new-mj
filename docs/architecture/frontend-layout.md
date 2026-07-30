@@ -34,13 +34,11 @@ Tile、ActionButton 等展示原子可跨场景复用；不同屏幕下“怎样
 
 ## 5. 动画边界
 
-动画只影响观感，最终状态始终以 `game:snapshot` 为准。当前实现：
+动画只影响观感，最终状态始终以 `game:snapshot` 为准；任何新动画都不能读取/修改规则状态，也不能以 `game:event` 重建视图（`game:event` 只作诊断日志，snapshot 是唯一视图权威来源）。
 
-- 手牌/新条目使用 Motion 的局部入场或 reflow 动画；`prefers-reduced-motion` 会禁用它们。
-- 摸牌、出牌、认领的跨区域运动由 `DrawFlipGhost`、`DiscardFlipGhost`、`ClaimFlipGhost` 创建独立临时克隆并测量两端 rect；不让真实业务节点承担跨容器动画。
-- 不使用 `layoutId` 在牌河墓碑与副露之间共享布局：墓碑不卸载，隐式共享布局会产生错误退场语义。
-
-任何新动画都不能读取/修改规则状态，也不能以 `game:event` 重建视图；事件目前只作为诊断日志，snapshot 是唯一视图权威来源。
+- **Tile 三层拆分**：`components/Tile.tsx` 组合 `TileSlot`（恒定尺寸+占位格分支）→ `TileMotion`（动画壳，携带 e2e 依赖的 `data-testid`/`data-tile-id`/`data-entering`，`prefers-reduced-motion` 时降级为纯 `div`）→ `TileFace`（图片/点击/`dimmed`/`enlarged`，全部纯 CSS）。`dimmed`/`enlarged` 必须落在非 motion 节点：挂在 motion 节点上会被它每次渲染写回的内联 transform/opacity 覆盖，CSS class 天生打不过。
+- **动画调度**：`lib/diffPlayerView.ts`（纯函数，diff 两份 `PlayerView` 产出摸牌/弃牌/副露的槽位事件；key 统一用"局号+座位+数组下标"、不用牌值——两个 ruleset 的 discards/melds 数组都只增不减，下标身份稳定，也避免对手动效的 key 携带可反查牌面的 TileId，铁律2）→ `lib/animationLedger.ts`（模块级单例，把槽位解析为 `flight`/`appear`/`skip`；同座位摸牌槽是唯一的结构性冲突降级点，弃牌/副露不设积压阈值）→ `lib/useSlotEntering.ts`（消费侧 hook，只在组件挂载时读一次解析结果，之后不再读）。写入必须在 `TableView.tsx` 的 `game:snapshot` 处理器里、`applyGameSnapshot` 换 `view` 之前同步执行。
+- **跨区域飞行**：摸牌/出牌/认领统一走独立临时 ghost（`components/useFlightGhost.ts`：测量一次 rect → portal 到 `document.body` → 播完自毁），从不让真实业务节点（牌河墓碑、副露牌、待摸槽位）承担跨容器动画或被这层触碰。不用 `layoutId` 共享布局——墓碑永不卸载，隐式共享布局会把它当成正在退场，和自身的 `dimmed` 目标打架（具体机制见 `ClaimFlipGhost.tsx`）。对手弃牌的飞行（`OpponentDiscardFlipGhost.tsx`）从其整个手牌区起飞，不追踪某张具体手牌——对手手牌背面不携带可用于溯源的身份，铁律2同样适用。
 
 ## 6. 未来工作与验证方式
 

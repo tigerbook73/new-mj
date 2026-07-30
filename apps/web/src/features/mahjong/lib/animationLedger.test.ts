@@ -62,7 +62,7 @@ describe("animationLedger", () => {
     expect(resolveSlot("g1:meld:1:0:3")).toBe("appear");
   });
 
-  it("[stage 5, exploratory] resolves every discard to flight, mine or an opponent's", () => {
+  it("resolves every discard to flight, mine or an opponent's", () => {
     registerSnapshotDiff(
       junkView(),
       junkView({

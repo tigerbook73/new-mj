@@ -38,9 +38,9 @@ export function TileClaimSlot({
       {ClaimIcon && (
         // Fades in alongside the tile's own entry instead of popping in
         // instantly underneath it — same `entering`-gated `initial`/`animate`
-        // convention as Tile.tsx (motion only honors `initial` at mount, so
+        // convention as TileMotion (motion only honors `initial` at mount, so
         // reading `entering` live here is safe: it can't restart the fade on
-        // a later re-render — see Tile.tsx's own docs).
+        // a later re-render).
         <motion.div
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
           style={{ transform: `rotate(${-SEAT_ROTATION[direction]}deg)` }}

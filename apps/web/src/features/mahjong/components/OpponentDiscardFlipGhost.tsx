@@ -8,7 +8,7 @@ import { OPPONENT_DISCARD_FLIGHT_DURATION, TILE_MOTION_EASE } from "./tileMotion
 import { useFlightGhost } from "./useFlightGhost";
 
 interface OpponentDiscardFlipGhostProps {
-  /** The now-public discarded TileId — a discard is public the instant it lands, so this is never a concealed-hand privacy concern (architecture iron rule 2 doesn't apply once it's in the river). */
+  /** The now-public discarded TileId — a discard is public the instant it lands, so this is never a concealed-hand privacy concern once it's in the river. */
   tileId: number;
   /** The discarding seat's own on-screen direction — both the flight's origin zone and its starting rotation angle. */
   fromDirection: SeatDirection;
@@ -30,14 +30,13 @@ const FLIP_TRANSITION = {
 } as const;
 
 /**
- * Stage 5 (exploratory, not one of the four required stages): an opponent's
- * discard flies from their *whole hand zone* — never a specific tracked
- * tile, since a concealed hand has no per-tile identity a public event may
- * reveal (architecture iron rule 2) — to the discard pile, rotating from
- * their seat's own on-screen angle down to upright while crossfading from a
- * back image to the (now-public) real face partway through. Same measure-
- * once/portal/self-remove isolation as the other three ghosts
- * (useFlightGhost); the real discard tombstone is never touched.
+ * An opponent's discard flies from their *whole hand zone* — never a
+ * specific tracked tile, since a concealed hand has no per-tile identity a
+ * public event may reveal (see docs/architecture/frontend-layout.md §5) —
+ * to the discard pile, rotating from their seat's own on-screen angle down
+ * to upright while crossfading from a back image to the (now-public) real
+ * face partway through. See useFlightGhost.ts for the shared isolation
+ * principle.
  *
  * Deliberately not a literal 3D flip (no `rotateY`/`backface-visibility`) —
  * this project has no such precedent, and every other ghost here stays
@@ -53,7 +52,9 @@ export function OpponentDiscardFlipGhost({
   const tileTheme = useTableLayoutStore((state) => state.tileTheme);
   const [flight, clear] = useFlightGhost(
     () =>
-      document.querySelector(`[data-testid="player-track-${fromDirection}"]`)?.getBoundingClientRect(),
+      document
+        .querySelector(`[data-testid="player-track-${fromDirection}"]`)
+        ?.getBoundingClientRect(),
     toRef,
   );
 

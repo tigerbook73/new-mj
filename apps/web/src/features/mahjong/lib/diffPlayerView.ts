@@ -34,10 +34,10 @@ const SEATS: readonly SeatId[] = [0, 1, 2, 3];
 /**
  * Diffs two consecutive PlayerView snapshots into the set of slots that
  * changed since `prev` — draws, discards, melds — keyed by seat + array
- * index (never by tile value, so it can't leak a concealed TileId and stays
- * collision-free across rulesets that reuse TileKind instead of TileId).
- * Purely a diff: it never reads or produces anything that gates what data
- * renders, only what decorative animation, if any, plays alongside it.
+ * index, never by tile value (see docs/architecture/frontend-layout.md §5
+ * for why). Purely a diff: it never reads or produces anything that gates
+ * what data renders, only what decorative animation, if any, plays
+ * alongside it.
  */
 export function diffPlayerView(
   prev: PlayerViewBase | null,

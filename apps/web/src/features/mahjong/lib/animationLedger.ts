@@ -62,7 +62,7 @@ export function registerSnapshotDiff(
         drawLaneBusy.set(seat, key);
       }
     } else if (event.key.startsWith("discard:")) {
-      // Every discard is flight-eligible now (stage 5): mine flies from its
+      // Every discard is flight-eligible: mine flies from its
       // click/timeout-captured hand rect (DiscardFlipGhost); an opponent's
       // flies from their whole hand zone (OpponentDiscardFlipGhost) — see
       // DiscardPile.tsx's DiscardTileSlot for which ghost actually mounts.
@@ -98,8 +98,8 @@ export function laneSeatFromKey(key: string): SeatId | undefined {
  * calling registerSnapshotDiff: strictly greater than the current `gameSeq`
  * (a same-seq resend must not re-diff and double-occupy a lane), and only
  * once `gameSeq !== null` (the first snapshot of a new epoch never diffs
- * against a stale, prior-game `view` — see docs/process/table-animation-
- * refactor.md's TableView.tsx sample).
+ * against a stale, prior-game `view` — see docs/architecture/
+ * frontend-layout.md §5).
  */
 export function shouldRegisterSnapshotDiff(gameSeq: number | null, eventSeq: number): boolean {
   return gameSeq !== null && eventSeq > gameSeq;

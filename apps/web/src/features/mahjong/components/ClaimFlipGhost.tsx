@@ -18,20 +18,17 @@ interface ClaimFlipGhostProps {
 const GHOST_TRANSITION = { duration: CLAIM_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
 
 /**
- * A self-contained, temporary clone that performs the claimed-discard-to-
- * meld flight independently of the real discard tombstone and the real meld
- * tile — see Tile.tsx's docs for why motion's `layoutId` shared-layout
- * system isn't used for this despite looking like the obvious fit (sharing a
- * `layoutId` between the permanent tombstone and the new meld tile made
- * motion treat the tombstone as exiting, fighting its own `dimmed` target).
- *
- * Measures both rects exactly once via useFlightGhost, right after this
- * render's DOM has settled — the real meld tile has already mounted by then,
- * in the same commit, since both come from the same snapshot-driven render.
- * Renders a `position: fixed` portal clone animating from the discard rect
- * to the meld rect, then permanently stops rendering anything once the
- * transition completes (`onAnimationComplete`). Neither the tombstone's nor
- * the real meld tile's own animation state is ever touched by any of this.
+ * Performs the claimed-discard-to-meld flight — see useFlightGhost.ts for
+ * the shared isolation principle. This is why motion's `layoutId`
+ * shared-layout system isn't used here despite looking like the obvious
+ * fit: an earlier version shared a `layoutId` between the permanent discard
+ * tombstone and the new meld tile, and motion treated the tombstone as
+ * exiting the instant the meld tile claimed the id, fighting its own
+ * `dimmed` target with an undocumented crossfade neither `layout="position"`
+ * nor anything else could turn off. Both rects are measured exactly once
+ * right after this render's DOM has settled — the real meld tile has
+ * already mounted by then, in the same commit, since both come from the
+ * same snapshot-driven render.
  */
 export function ClaimFlipGhost({
   tileId,

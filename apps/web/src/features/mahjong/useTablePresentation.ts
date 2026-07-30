@@ -109,10 +109,10 @@ export function useTablePresentation({
               -1,
               drawnVisible ? 0 : -1,
             ];
-      // A real TileId is globally unique (architecture iron rule 4), so keying my
-      // own drawn slot by it already changes on every new draw. Opponents never
-      // expose a real TileId here (public events can't reveal concealed hands —
-      // architecture iron rule 2); their handCount toggles between two values
+      // A real TileId is globally unique (see docs/architecture/frontend-
+      // layout.md §5), so keying my own drawn slot by it already changes on
+      // every new draw. Opponents never expose a real TileId here (public
+      // events can't reveal concealed hands); their handCount toggles between two values
       // across a draw/discard cycle, which is enough to tell "this draw" from
       // "last draw" apart across the one render transition that matters, even
       // though the same numeric value recurs turn after turn.

@@ -17,19 +17,17 @@ interface DrawFlipGhostProps {
 const GHOST_TRANSITION = { duration: DRAW_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
 
 /**
- * A self-contained, temporary clone that flies a freshly-drawn tile in from
- * the table's center — same isolation principle as ClaimFlipGhost.tsx
- * (measures once via useFlightGhost, portals a clone, self-removes; never
- * touches the real pinned-slot tile's own animation state). Unlike the claim
- * flight, the "from" side here is never a real per-tile element (tiles in the
- * wall have no individual visual representation at all — see
- * docs/architecture), so this flies from `CenterStatus`'s on-screen center
- * point rather than a specific tile's rect — hence aligning by center point
- * below instead of useFlightGhost's other callers' top-left corner. Stays at
- * its normal size throughout — no scale animation at all — per user testing
- * feedback; earlier versions tried both an overshoot past normal size
- * mid-flight and a plain "grow from smaller", and both read as an unwanted
- * "pop"/resize rather than a deliberate beat.
+ * Flies a freshly-drawn tile in from the table's center — see
+ * useFlightGhost.ts for the isolation principle every ghost here shares.
+ * Unlike the claim flight, the "from" side here is never a real per-tile
+ * element (tiles in the wall have no individual visual representation at
+ * all), so this flies from `CenterStatus`'s on-screen center point rather
+ * than a specific tile's rect — hence aligning by center point below instead
+ * of useFlightGhost's other callers' top-left corner. Stays at its normal
+ * size throughout — no scale animation at all — per user testing feedback;
+ * earlier versions tried both an overshoot past normal size mid-flight and a
+ * plain "grow from smaller", and both read as an unwanted "pop"/resize
+ * rather than a deliberate beat.
  */
 export function DrawFlipGhost({ tileId, toRef, onAnimationComplete }: DrawFlipGhostProps) {
   const [flight, clear] = useFlightGhost(

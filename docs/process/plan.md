@@ -15,7 +15,6 @@
 
 ## Backlog
 
-- Web 牌桌动画重构：Tile 三层拆分（Slot/Motion/Face）+ 全桌动画调度架构（阶段 0-5，含对手弃牌飞行 ghost）均已实施完成并合入本分支，`pnpm --filter @new-mj/web verify` 全绿；专题收尾（分流结论到 `architecture/frontend-layout.md`、删除 brief）尚未做，详见 `process/table-animation-refactor.md`。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`。
@@ -29,5 +28,6 @@
 - Junk Table UX 与 Layout Sketch：桌面 Zone/LayoutPreset、操作 Dock、CSS 布局、事件/跨区域动画、布局编辑与保存读取均已完成并经 e2e/Storybook 验收；bloodbattle 仍只有公共桌面骨架。
 - Layout Lab 真实 Preview：`desktop.table-layout.json` 已统一 Zone 几何与展示 Config，Config Panel 可保存草稿；正式桌面与多样例 Preview 复用同一渲染场景，`pnpm verify` 全绿。
 - 摸牌显式化：junk/bloodbattle 的摸牌从 core 内联副作用变成显式 `{type:"draw"}` 动作，server 按 `drawRevealDelayMs` 自动代提交，为 UI 留出真实的摸牌停顿窗口；零协议改动，三个 slice（core/server/web）均已验证并合入 main。
+- Web 牌桌动画重构：Tile 三层拆分（Slot/Motion/Face）+ 全桌动画调度架构（`diffPlayerView`/`animationLedger`/`useSlotEntering`，含对手弃牌飞行 ghost）已完成并合入本分支，`pnpm --filter @new-mj/web verify` 全绿；耐久结论已分流到 `architecture/frontend-layout.md` §5，专题 brief 已删除。
 - 文档体系：已取消独立 decisions 文档；架构取舍归入 architecture/contracts，局部实现理由归代码注释或 package AGENTS。
 - 最近一次根目录 `pnpm verify`：2026-07-30 全绿（含 format、typecheck、lint、build、unit、e2e；core junk 1000 局与 bloodbattle 10000 局 fuzz）。

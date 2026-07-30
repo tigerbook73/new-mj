@@ -11,13 +11,12 @@ export type SlotEntering = {
 };
 
 /**
- * Reads animationLedger's resolution for `key` exactly once, at mount — the
- * ledger's write side (registerSnapshotDiff) always runs synchronously in
- * TableView's socket handler, before the render that mounts this hook, so
- * the value read here is final for this slot's one-shot lifetime; nothing
- * here ever reads the ledger again afterward. The unmount cleanup calls
- * completeSlot defensively (idempotent — see animationLedger.ts) to cover a
- * slot that unmounts before its ghost, if any, ever got to call back.
+ * Reads animationLedger's resolution for `key` exactly once, at mount, and
+ * never again — safe because the ledger's write side always runs before the
+ * render that mounts this hook (see animationLedger.ts's registerSnapshotDiff
+ * doc). The unmount cleanup calls completeSlot defensively (idempotent — see
+ * animationLedger.ts) to cover a slot that unmounts before its ghost, if
+ * any, ever got to call back.
  */
 export function useSlotEntering(key: string): SlotEntering {
   const [resolution] = useState(() => resolveSlot(key));

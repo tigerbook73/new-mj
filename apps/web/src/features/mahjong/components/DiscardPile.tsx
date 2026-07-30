@@ -20,20 +20,23 @@ export type DiscardEntry = {
    * This tile's own hand-side rect, captured at click time (see HandRow.tsx's
    * `captureTileRect`) — only ever present for my own discards, and only for
    * the single render where this entry is genuinely new. Drives
-   * DiscardFlipGhost below; absent (a page reload, or — deliberately — an
-   * opponent's discard) just means this entry gets the plain grow-in entry
-   * animation with no flight.
+   * DiscardFlipGhost below; absent (a page reload, or a timeout auto-discard)
+   * just means this entry gets the plain grow-in entry animation with no
+   * flight.
    *
-   * Opponents' concealed tiles have no on-screen position to fly from in the
-   * first place (architecture iron rule 2: public events can't reveal which
-   * concealed tile it was), so any flight there could only ever be a rough
-   * approximation. An earlier attempt tried exactly that — pick a
-   * pseudo-random visible hand-back tile as the flight's origin, then reflow
-   * the rest of the row to close the gap — and it added real complexity
-   * (DOM position tracking, a second reflow-duration knob, a regression in
-   * the "claim shrinks a hand" no-slide guarantee) for a visual that still
-   * didn't read well in practice. Reverted 2026-07-29; not worth reattempting
-   * without a materially simpler mechanism.
+   * Deliberately never populated for an opponent's discard: opponents'
+   * concealed tiles have no on-screen position to fly *from* in the first
+   * place (see docs/architecture/frontend-layout.md §5), so tracking one
+   * specific tile the way this field does for my own hand isn't an option.
+   * An earlier attempt tried exactly that anyway — pick a pseudo-random
+   * visible hand-back tile as the flight's origin, then reflow the rest of
+   * the row to close the gap — and it added real complexity (DOM position
+   * tracking, a second reflow-duration knob, a regression in the "claim
+   * shrinks a hand" no-slide guarantee) for a visual that still didn't read
+   * well in practice. Reverted 2026-07-29. `OpponentDiscardFlipGhost` below
+   * is the materially simpler mechanism that made a second attempt worth
+   * it: it flies from the whole hand zone instead of a tracked tile, so it
+   * never needs this field at all.
    */
   flightOrigin?: DOMRect;
 };
@@ -99,16 +102,15 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
 
 /**
  * Owns the per-entry hook state a plain `.map()` callback can't (rules of
- * hooks) — specifically, whether to mount a `DiscardFlipGhost` alongside this
- * slot's real tile. `useSlotEntering` reads animationLedger's resolution for
- * `entry.discardLedgerKey` exactly once at mount. `ghostOrigin` is then
- * captured once more via `useState` (not read live from `entry.flightOrigin`
- * on every render), same reasoning as MeldGroup.tsx's `MeldClaimTile`:
- * TableView clears its own pending-origin state once the next snapshot
- * arrives (see TableView.tsx), which would flip `entry.flightOrigin` back to
- * `undefined` on the very next render — reading it live here would yank the
- * ghost off mid-flight for a reason that has nothing to do with the flight
- * itself actually finishing.
+ * hooks) — specifically, whether to mount a ghost alongside this slot's real
+ * tile, via `useSlotEntering` (see its own docs for why this is safe against
+ * unrelated re-renders). `ghostOrigin` is captured once more via `useState`
+ * (not read live from `entry.flightOrigin` on every render): TableView clears
+ * its own pending-origin state once the next snapshot arrives (see
+ * TableView.tsx), which would flip `entry.flightOrigin` back to `undefined`
+ * on the very next render — reading it live here would yank the ghost off
+ * mid-flight for a reason that has nothing to do with the flight itself
+ * actually finishing.
  */
 function DiscardTileSlot({
   direction,
@@ -154,9 +156,9 @@ function DiscardTileSlot({
           onAnimationComplete={onGhostComplete}
         />
       )}
-      {/* Stage 5 (exploratory): an opponent's discard has no click/timeout-
-          captured rect to fly from (only my own does), so it flies from
-          their whole hand zone instead — see OpponentDiscardFlipGhost. */}
+      {/* An opponent's discard has no click/timeout-captured rect to fly
+          from (only my own does — see DiscardEntry.flightOrigin), so it
+          flies from their whole hand zone instead. */}
       {ghost && direction !== "bottom" && !ghostOrigin && (
         <OpponentDiscardFlipGhost
           tileId={entry.tile}

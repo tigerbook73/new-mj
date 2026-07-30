@@ -283,7 +283,7 @@ test("an opponent's hand does not visibly slide when a claim shrinks it", async 
   }
 });
 
-// Phase 5a: the discard that just landed plays a one-shot motion entry
+// The discard that just landed plays a one-shot motion entry
 // animation (Tile.tsx's `entering` prop, motion's initial/animate) only for
 // a live, in-place update — not for the first snapshot after a reload, which
 // resumes mid-game exactly like a reconnect and must never replay animations
@@ -553,9 +553,7 @@ test("a claimed discard's tombstone visibly dims", async ({ browser }) => {
     const tombstone = host.getByTestId("table-area-bottom").locator('[data-tile-id="4"]');
     await expect(tombstone).toBeVisible({ timeout: 10_000 });
     await expect
-      .poll(() =>
-        tombstone.evaluate((tile) => getComputedStyle(tile.firstElementChild!).opacity),
-      )
+      .poll(() => tombstone.evaluate((tile) => getComputedStyle(tile.firstElementChild!).opacity))
       .toBe("0.4");
     await expect(host.getByTestId("discard-claim-icon")).toHaveCount(1);
   } finally {
@@ -563,9 +561,9 @@ test("a claimed discard's tombstone visibly dims", async ({ browser }) => {
   }
 });
 
-// Phase 5c: a newly formed meld's tiles play the same one-shot entry
-// animation as a discard/draw — no per-tile targeting needed, since a brand
-// new meld is a genuinely new `melds` array entry (see SeatContent.meldEntering).
+// A newly formed meld's tiles play the same one-shot entry animation as a
+// discard/draw — no per-tile targeting needed, since a brand new meld is a
+// genuinely new `melds` array entry (see MeldGroup.tsx's `meldLedgerKey`).
 test("meld entry animation plays live but not after a reload mid-game", async ({ browser }) => {
   const { players } = await createAndStartRoom(browser, "junk", "junk-meld-anim");
   const [host, claimant, secondClaimant] = players;
@@ -629,16 +627,14 @@ test("meld entry animation is suppressed under prefers-reduced-motion", async ({
   }
 });
 
-// Phase 5c follow-up: the claimed tile flies from the discard pile into the
-// meld via a temporary clone (ClaimFlipGhost.tsx, `data-testid="claim-flip-
-// ghost"`), not motion's `layoutId` shared-layout system — that was tried
-// first and reverted (see Tile.tsx's docs): sharing a `layoutId` between the
-// permanent discard tombstone and the new meld tile made motion treat the
-// tombstone as exiting, silently overriding its `dimmed` target. The ghost
-// is fully decoupled — it measures both rects once, animates a portal clone
-// between them, then removes itself; neither the tombstone nor the real
-// meld tile's own animation state is ever touched. Verified by hand first
-// (a raw transform trace on the ghost element showing it appear with a
+// The claimed tile flies from the discard pile into the meld via a
+// temporary clone (ClaimFlipGhost.tsx, `data-testid="claim-flip-ghost"`),
+// not motion's `layoutId` shared-layout system — see ClaimFlipGhost.tsx's
+// own docs for why that was tried first and reverted. The ghost is fully
+// decoupled — it measures both rects once, animates a portal clone between
+// them, then removes itself; neither the tombstone nor the real meld tile's
+// own animation state is ever touched. Verified by hand first (a raw
+// transform trace on the ghost element showing it appear with a
 // non-identity transform, decay to `none` over ~300ms, then disappear)
 // before encoding the same signal as an automated check.
 test("a claimed tile FLIPs from the discard pile into the meld via a ghost clone", async ({

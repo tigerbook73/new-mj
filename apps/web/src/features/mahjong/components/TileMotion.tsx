@@ -20,12 +20,10 @@ export interface TileMotionProps {
  * w-full`, filling whatever box TileSlot gave it. Carries `data-testid`/
  * `data-tile-id`/`data-entering` because this is the node motion actually
  * writes transforms to, satisfying e2e's expectation of "the same node."
- * Falls back to a plain `div` under `prefers-reduced-motion` — closing a gap
- * this component used to leave to its callers (see docs/architecture/
- * frontend-layout.md and TableView.tsx's own `usePrefersReducedMotion`
- * call): previously only the *callers* gated `entering` on it, so a caller
- * that forgot would still animate. Reused from shared/hooks, not
- * reimplemented.
+ * Falls back to a plain `div` under `prefers-reduced-motion`: previously
+ * only *callers* gated `entering` on this preference (see
+ * docs/architecture/frontend-layout.md §5), so a caller that forgot would
+ * still animate; reused from shared/hooks, not reimplemented.
  */
 export function TileMotion({
   entering,

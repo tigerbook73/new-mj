@@ -1,16 +1,23 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
 
 /**
- * Shared measure-once-then-self-clear plumbing behind DrawFlipGhost/
- * DiscardFlipGhost/ClaimFlipGhost: all three mount a temporary portal clone
- * that flies from a `from` rect to a `to` rect, measured exactly once in a
- * `useLayoutEffect` right after the real destination element has mounted (see
- * each ghost's own docs for why this must never re-measure on a later
- * render). Only the *geometry lookup* is shared here — `resolveFrom` lets
- * each caller keep its own way of finding the source (a fixed selector, an
+ * Shared measure-once-then-self-clear plumbing behind every `*FlipGhost`
+ * component (Draw/Discard/Claim/OpponentDiscard): each mounts a temporary
+ * portal clone that flies from a `from` rect to a `to` rect, measured
+ * exactly once in a `useLayoutEffect` right after the real destination
+ * element has mounted (see each ghost's own docs for why this must never
+ * re-measure on a later render), then self-removes once its transition
+ * completes. This is the isolation principle every ghost relies on: the
+ * clone is the only thing that ever animates a cross-container flight —
+ * the real business node it flies to or from (a hand tile, a discard
+ * tombstone, a meld tile) never has its own animation state touched.
+ *
+ * Only the *geometry lookup* is shared here — `resolveFrom` lets each caller
+ * keep its own way of finding the source (a fixed selector, an
  * already-captured click-time rect, a center-point comparison, ...), and the
- * actual motion/JSX (translate-only vs translate+scale, fade vs no fade)
- * stays in each ghost component, since those genuinely differ.
+ * actual motion/JSX (translate-only vs translate+scale, fade vs no fade,
+ * rotate, crossfade) stays in each ghost component, since those genuinely
+ * differ.
  */
 export interface FlightRects {
   from: DOMRect;

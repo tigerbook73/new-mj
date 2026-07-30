@@ -65,7 +65,7 @@ export function TableView() {
   // populates this either way, on purpose; see DiscardEntry's `flightOrigin`
   // doc (DiscardPile.tsx) for why a flight there isn't worth it.
   // Deliberately never explicitly cleared: a TileId never repeats within a
-  // round (architecture iron rule 4), and DiscardPile's per-entry slot
+  // round (see docs/architecture/frontend-layout.md §5), and DiscardPile's per-entry slot
   // (DiscardTileSlot) only ever reads this once, at the single render where
   // it mounts — so a stale value just sits unread forever until a later
   // click overwrites it; no correctness or leak concern worth a clearing

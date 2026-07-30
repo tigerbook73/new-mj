@@ -18,17 +18,15 @@ interface DiscardFlipGhostProps {
 const GHOST_TRANSITION = { duration: DISCARD_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
 
 /**
- * A self-contained, temporary clone that flies a just-discarded tile straight
- * from its hand position to the discard pile — same isolation principle (and
- * the same plain rect-to-rect FLIP math, via useFlightGhost) as
- * ClaimFlipGhost.tsx, just with a different source: a discarded tile
+ * Flies a just-discarded tile straight from its hand position to the
+ * discard pile — see useFlightGhost.ts for the shared isolation principle
+ * and FLIP math. Different source than ClaimFlipGhost's: a discarded tile
  * genuinely leaves the hand array (unlike a claim's permanent tombstone), so
  * by the time a later snapshot-driven render mounts this ghost, the source
  * element is already gone. `fromRect` is measured eagerly at click time
  * instead (see HandRow.tsx's captureTileRect) and handed down as a plain
- * geometry value — never game state, so this never touches architecture iron
- * rule 5 (no state update is ever driven by this measurement or by the
- * command ack).
+ * geometry value — never game state, no state update is ever driven by this
+ * measurement or by the command ack.
  */
 export function DiscardFlipGhost({
   tileId,

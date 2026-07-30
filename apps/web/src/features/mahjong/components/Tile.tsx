@@ -23,31 +23,13 @@ export interface TileProps {
   height?: number | string;
   clickable?: boolean | undefined;
   selected?: boolean | undefined;
-  /**
-   * The single most recent discard on the table (view.lastDiscard) — see
-   * DiscardPile — or, in ActionDock, a claim's target tile among its
-   * candidate row.
-   */
+  /** See TileFace's `justDiscarded` variant for what this drives and why it's a separate prop from `enlarged`. */
   justDiscarded?: boolean | undefined;
-  /**
-   * Plays the one-shot arrival animation on mount — see TileMotion's
-   * `resolveTileMotion`. `"opacityOnly"` skips the scale/rise keyframes,
-   * leaving only opacity, for when a separate flying ghost already sells
-   * the arrival's physical motion (e.g. DrawFlipGhost flying in from the
-   * table's center) — see HandRow.tsx's DrawnSlotTile, the only caller that
-   * ever passes it.
-   */
+  /** Plays the one-shot arrival animation on mount — see `resolveTileMotion` for what each value does. */
   entering?: boolean | "opacityOnly" | undefined;
   /** Fades toward 40% opacity — plain CSS on TileFace, see its own docs. */
   dimmed?: boolean | undefined;
-  /**
-   * Persistent larger resting size — plain CSS on TileFace. Deliberately a
-   * separate prop from `justDiscarded`: DiscardPile drives both together for
-   * the most recent discard, but ActionDock also reuses `justDiscarded`'s
-   * ring/glow to highlight a claim's target tile among a cramped candidate
-   * row, where a scale bump would fight the row's own tight layout — see
-   * ActionDock.tsx's `isTarget`.
-   */
+  /** Persistent larger resting size — see TileFace's `enlarged` variant. */
   enlarged?: boolean | undefined;
   /**
    * Smoothly animates this tile's own position/size whenever it changes as a
