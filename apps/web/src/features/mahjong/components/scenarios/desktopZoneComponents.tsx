@@ -123,3 +123,32 @@ export function DiscardTrack({
     </div>
   );
 }
+
+/** Desktop-only center surface; keeps the turn marker above the supplied center content. */
+export function DesktopCenterSlot({
+  center,
+  currentDirection,
+}: {
+  center: ReactNode;
+  currentDirection: SeatDirection | undefined;
+}) {
+  return (
+    <div className="relative grid h-full w-full place-items-center overflow-hidden rounded-md bg-green-950/50 dark:bg-black/50">
+      {center}
+      {currentDirection && <TurnIndicator direction={currentDirection} />}
+    </div>
+  );
+}
+
+/** Desktop-only surface around the optional action panel. */
+export function DesktopActionDockSlot({ actionDock }: { actionDock: ReactNode | undefined }) {
+  return actionDock ? (
+    <section
+      data-testid="action-dock-surface"
+      className="h-full w-full rounded-xl border border-white/25 bg-slate-950/70 p-3 shadow-2xl"
+    >
+      {actionDock}
+    </section>
+  ) : null;
+}
+import type { ReactNode } from "react";
