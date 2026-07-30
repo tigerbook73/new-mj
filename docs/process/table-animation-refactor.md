@@ -73,6 +73,8 @@ Tile.tsx（对外 API 不变：tileId/back/width/height/entering/dimmed/enlarged
 4. **积压判断用计数，不用耗时**——非关键动效的"是否超过阈值"是一个活跃计数器（`activeDecorativeCount < N`），不读 `Date.now()`/不设 `setTimeout`，避免违反"时间只在 server"这条铁律。
 5. **不用新的 zustand store，用模块级单例**——调度器的"读"只发生在组件挂载时 `useState(() => resolve(key))` 一次，之后永远不再读；"写"只来自动效播完的命令式回调。完全用不到 zustand 的响应式订阅（订阅了也不该触发重渲染）。如果团队更看重"新状态都进 zustand"的一致性，可以等价地用 `create()` 包一层，行为不变。
 6. **diff 放在 `TableView.tsx` 的 socket `onSnapshot` 回调里（`applyGameSnapshot` 之前），不放渲染层**——避开 `useIsIncrementalSnapshot.ts` 文档里提到的 StrictMode 双调用坑，JS 单线程保证背靠背到达的快照不会被 React 批处理漏看。
+7. **飞行动画统一用 ghost 载体（portal 到 body），不引入 `layoutId` shared layout**——座位旋转是 `zoneStyle()` 写的普通 CSS `rotate`，motion 的 layout 动画不支持非它控制的祖先 transform（±90°/180° 下飞行方向与缩放错乱）；且牌河墓碑永不卸载，`layoutId` 交接必然复现 `Tile.tsx` 注释记录过的 crossfade 冲突。"真牌从对手手里飞出"之类的视觉走 ghost 增强（翻面/旋转角补间），不做盲牌替换。
+8. **同一槽位"飞行"与"入场动画"互斥，由调度器统一裁决**——判为飞行的槽位挂 ghost、真牌只淡入（今天 `noEnterMotion` 的约定升级为调度器的正式语义）；判为入场的槽位只播 entering，两者不叠加。
 
 ### 具体设计
 
@@ -96,7 +98,7 @@ export function diffPlayerView(
 **新文件 `apps/web/src/features/mahjong/lib/animationQueue.ts`**（模块单例）：
 
 ```ts
-type Resolution = "play" | "skip";
+type Resolution = "flight" | "appear" | "skip";
 const MAX_CONCURRENT_DECORATIVE = 2;
 const resolutions = new Map<string, Resolution>();
 const drawLaneBusy = new Map<SeatId, string>();
@@ -106,8 +108,8 @@ let activeDecorativeCount = 0;
 export function registerSnapshotDiff(prev, next, mySeat): void { /* 见下方逻辑 */ }
 
 /** 纯读取，幂等——可能被 StrictMode 的 useState 惰性初始化调用两次，不能有副作用。 */
-export function resolveSlot(key: string): boolean {
-  return resolutions.get(key) === "play";
+export function resolveSlot(key: string): Resolution {
+  return resolutions.get(key) ?? "skip";
 }
 
 /** 由 onEnterComplete/ghost onAnimationComplete 调用，命令式，不触发重渲染。 */
@@ -117,7 +119,7 @@ export function completeSlot(key: string, seat?: SeatId): void { /* ... */ }
 export function resetAnimationQueue(): void { /* ... */ }
 ```
 
-`registerSnapshotDiff` 内部：摸牌事件按 `drawLaneBusy.has(seat)` 判断能不能播（忙则 skip，不管 critical——这是唯一的"结构性冲突降级"）；装饰性事件按 `event.critical || activeDecorativeCount < MAX_CONCURRENT_DECORATIVE` 判断。**"判断忙不忙/超没超阈值"必须在 `registerSnapshotDiff` 里一次性定案，`resolveSlot` 只做只读查表**——如果把判断逻辑挪进 `resolveSlot`（会被 StrictMode 惰性初始化调用两次），会产生错误的双重占用。
+`registerSnapshotDiff` 内部：摸牌事件按 `drawLaneBusy.has(seat)` 判断能不能播（忙则 skip，不管 critical——这是唯一的"结构性冲突降级"）；装饰性事件按 `event.critical || activeDecorativeCount < MAX_CONCURRENT_DECORATIVE` 判断。通过判定的槽位再按"是否有配套飞行"定为 `"flight"`（挂 ghost，真牌只淡入）或 `"appear"`（只播 entering），对应关键决策 8 的互斥语义。**"判断忙不忙/超没超阈值"必须在 `registerSnapshotDiff` 里一次性定案，`resolveSlot` 只做只读查表**——如果把判断逻辑挪进 `resolveSlot`（会被 StrictMode 惰性初始化调用两次），会产生错误的双重占用。
 
 **`TableView.tsx` 改动**：
 
@@ -132,11 +134,13 @@ const onSnapshot = (event: GameSnapshot) => {
 
 复用已有的 `prefersReducedMotion`（不新建检测）。`isIncrementalSnapshot` 保留但职责收窄为只服务 `RoundEndOverlay`（第306行附近），和这次改造无关，不动。换局重置时调用 `resetAnimationQueue()`。
 
+`registerSnapshotDiff` 运行在 `applyGameSnapshot` 之前、旧 DOM 仍在，可顺带同步测量即将卸载的手牌元素 rect 存入调度器——补上超时代打（没有点击时捕获的 `fromRect`）时 `DiscardFlipGhost` 缺失的起点，纯几何值、不构成状态更新。
+
 **`useTablePresentation.ts` 职责拆分（不是整体替换）**：
 - 保留：`drawnSlotKey`、`justDiscarded`、`claimedByDirection` 等"数据身份"推导，和入场调度正交。
 - 删除：`canAnimateEntries` 入参，以及派生的 `drawnSlotEntering`/`meldEntering`/`enterAnimation` 三个字段——职责整体搬到新增的 `useSlotEntering(key)` hook，由消费组件挂载时直接向 `animationQueue.ts` 要答案。
 
-**消费组件改法**（新增 `useSlotEntering` hook，紧邻 `animationQueue.ts`）：
+**消费组件改法**（新增 `useSlotEntering` hook，紧邻 `animationQueue.ts`；hook 内部把 `Resolution` 映射为消费组件需要的形状——`"flight"` → 挂 ghost + `entering: "opacityOnly"`，`"appear"` → `entering: true`，`"skip"` → 不播）：
 - `HandRow.tsx` 的 `DrawnSlotTile`：`useState(entering)` → `useSlotEntering(drawKey)`。
 - `DiscardPile.tsx` 的 `DiscardTileSlot`：`entry.enterAnimation` 依赖 → `useSlotEntering(discardKey)`（`useTablePresentation.ts` 顺带把 `seat`/`index` 传下来）。
 - `MeldGroup.tsx` 的 `MeldClaimTile`：同理换成 `useSlotEntering(meldKey)`。
@@ -148,9 +152,10 @@ const onSnapshot = (event: GameSnapshot) => {
 
 - **阶段 0（纯基础设施，零可见行为变化）**：`diffPlayerView.ts` + `animationQueue.ts` 及各自单测（覆盖 junk 摸/打/吃碰杠、bloodbattle 无 justDrawn 时空产出、bloodbattle 同点数不同座位 key 不冲突、摸牌槽忙时第二次注册为 skip、非关键计数超阈值为 skip）。`Tile.tsx` 加 `onEnterComplete`，暂不接调用方。验收：新单测通过，现有 e2e 原样绿。
 - **阶段 1（摸牌槽，收益最高，唯一有真实 bug 修复价值）**：`TableView.tsx` 接 `registerSnapshotDiff`；`HandRow.tsx` 迁移；`useTablePresentation.ts` 去掉 `drawnSlotEntering`。验收：现有摸牌相关 e2e 断言不变、原样绿；新增"同座位连续两次摸牌不会强制中断/报错"的 e2e。
-- **阶段 2（弃牌墙）**：`DiscardPile.tsx` 迁移，去掉 `enterAnimation`；新增阈值场景的单测。
+- **阶段 2（弃牌墙）**：`DiscardPile.tsx` 迁移，去掉 `enterAnimation`；新增阈值场景的单测。顺带落地"注册期测量手牌 rect"，让超时代打的弃牌也有飞行起点。
 - **阶段 3（副露）**：`MeldGroup.tsx` 迁移，去掉 `meldEntering`。
 - **阶段 4（收尾）**：`useTablePresentation.ts` 删掉 `canAnimateEntries` 参数；`TableView.tsx` 精简 `onSnapshot`；`useTablePresentation.test.ts` 同步更新。
+- **阶段 5（可选增强，不阻塞前四阶段验收）**：对手打牌飞行 ghost——从该座位手牌区 rect 起飞、背面翻转为正面、旋转角从源座位朝向补间到 0，key 沿用座位+下标；仍是 portal 到 body 的独立 ghost，不做盲牌替换（见关键决策 7）。
 
 每阶段独立可合并、独立验收。
 
