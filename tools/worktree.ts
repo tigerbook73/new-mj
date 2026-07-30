@@ -1,14 +1,23 @@
-import { existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
+import { dirname, join, relative } from "node:path";
+import {
+  environmentLinkNames,
+  firstAvailableWorktreeSlot,
+  parseWorktreeSlot,
+  worktreeConfigFor,
+  worktreeEnvironment,
+  type WorktreeConfig,
+} from "@new-mj/devtools";
 
-type WorktreeConfig = {
-  slot: number;
-  devServerPort: number;
-  devWebPort: number;
-  e2eServerPort: number;
-  e2eWebPort: number;
-};
+type Worktree = { root: string; branch?: string };
 
 const run = (command: string, args: readonly string[], cwd: string, env = process.env): void => {
   const result = spawnSync(command, args, { cwd, env, stdio: "inherit" });
@@ -25,58 +34,132 @@ const output = (command: string, args: readonly string[], cwd: string): string =
 };
 
 const repoRoot = (): string => output("git", ["rev-parse", "--show-toplevel"], process.cwd());
-
-const parseSlot = (raw: string | undefined): number => {
-  const slot = raw ? Number(raw) : 0;
-  if (!Number.isInteger(slot) || slot < 0 || slot > 99)
-    throw new Error(`worktree slot must be an integer from 0 to 99; received ${raw}`);
-  return slot;
-};
-
-const configFor = (slot: number): WorktreeConfig => ({
-  slot,
-  devServerPort: 3000 + slot,
-  devWebPort: 5173 + slot,
-  e2eServerPort: 3100 + slot,
-  e2eWebPort: 5274 + slot,
-});
-
 const configPath = (root: string): string => join(root, ".worktree.env");
 
 const readConfig = (root: string): WorktreeConfig => {
   const path = configPath(root);
-  if (!existsSync(path)) return configFor(0);
+  if (!existsSync(path)) return worktreeConfigFor(0);
   const line = readFileSync(path, "utf8")
     .split("\n")
     .find((candidate) => candidate.startsWith("WORKTREE_SLOT="));
-  return configFor(parseSlot(line?.slice("WORKTREE_SLOT=".length)));
+  return worktreeConfigFor(parseWorktreeSlot(line?.slice("WORKTREE_SLOT=".length)));
 };
 
 const writeConfig = (root: string, config: WorktreeConfig): void => {
   writeFileSync(configPath(root), `WORKTREE_SLOT=${config.slot}\n`, "utf8");
 };
 
-const envFor = (config: WorktreeConfig): NodeJS.ProcessEnv => ({
-  ...process.env,
-  PORT: String(config.devServerPort),
-  VITE_PORT: String(config.devWebPort),
-  VITE_SERVER_URL: `http://localhost:${config.devServerPort}`,
-  E2E_SERVER_PORT: String(config.e2eServerPort),
-  E2E_WEB_PORT: String(config.e2eWebPort),
-  E2E_WORKERS: "1",
-});
+const worktrees = (root: string): Worktree[] => {
+  const records = output("git", ["worktree", "list", "--porcelain"], root).split("\n\n");
+  return records.map((record) => {
+    const lines = record.split("\n");
+    const rootLine = lines.find((line) => line.startsWith("worktree "));
+    if (!rootLine) throw new Error(`invalid git worktree record: ${record}`);
+    const branchLine = lines.find((line) => line.startsWith("branch "));
+    return {
+      root: rootLine.slice("worktree ".length),
+      branch: branchLine?.slice("branch ".length),
+    };
+  });
+};
+
+const slotAssignments = (root: string) =>
+  worktrees(root).map((worktree) => ({ ...worktree, config: readConfig(worktree.root) }));
+
+const isGitIgnored = (root: string, name: string): boolean =>
+  spawnSync("git", ["check-ignore", "--quiet", "--", name], { cwd: root }).status === 0;
+
+const ignoredEnvironmentNames = (root: string): string[] =>
+  environmentLinkNames(
+    readdirSync(root, { withFileTypes: true }).map((entry) => ({
+      name: entry.name,
+      isLinkable: entry.isFile() || entry.isSymbolicLink(),
+    })),
+    (name) => isGitIgnored(root, name),
+  );
+
+const linkEnvironmentFiles = (sourceRoot: string, targetRoot: string): string[] => {
+  const preserved: string[] = [];
+  for (const name of ignoredEnvironmentNames(sourceRoot)) {
+    const target = join(targetRoot, name);
+    if (
+      existsSync(target) ||
+      (() => {
+        try {
+          lstatSync(target);
+          return true;
+        } catch {
+          return false;
+        }
+      })()
+    ) {
+      preserved.push(name);
+      continue;
+    }
+    symlinkSync(relative(targetRoot, join(sourceRoot, name)), target);
+  }
+  return preserved;
+};
 
 const printStatus = (root: string): void => {
-  const config = readConfig(root);
+  const assignments = slotAssignments(root);
   process.stdout.write(
-    [
-      `worktree: ${root}`,
-      `slot: ${config.slot}`,
-      `dev:  http://localhost:${config.devWebPort} -> http://localhost:${config.devServerPort}`,
-      `e2e:  http://localhost:${config.e2eWebPort} -> http://localhost:${config.e2eServerPort}`,
-      "",
-    ].join("\n"),
+    assignments
+      .map(({ root: worktreeRoot, branch, config }) => {
+        const environment = ignoredEnvironmentNames(worktreeRoot)
+          .map((name) => {
+            try {
+              return lstatSync(join(worktreeRoot, name)).isSymbolicLink()
+                ? name
+                : `${name} (local)`;
+            } catch {
+              return `${name} (missing)`;
+            }
+          })
+          .join(", ");
+        return [
+          `worktree: ${worktreeRoot}`,
+          `branch: ${branch ?? "detached"}`,
+          `slot: ${config.slot}`,
+          `dev:  http://localhost:${config.devWebPort} -> http://localhost:${config.devServerPort}`,
+          `e2e:  http://localhost:${config.e2eWebPort} -> http://localhost:${config.e2eServerPort}`,
+          `env:  ${environment || "none"}`,
+        ].join("\n");
+      })
+      .join("\n\n") + "\n",
   );
+};
+
+const doctor = (root: string): void => {
+  const assignments = slotAssignments(root);
+  const bySlot = new Map<number, string[]>();
+  for (const assignment of assignments) {
+    const roots = bySlot.get(assignment.config.slot) ?? [];
+    roots.push(assignment.root);
+    bySlot.set(assignment.config.slot, roots);
+  }
+  const duplicateSlots = [...bySlot.entries()].filter(([, roots]) => roots.length > 1);
+  const brokenLinks = assignments.flatMap(({ root: worktreeRoot }) =>
+    readdirSync(worktreeRoot, { withFileTypes: true })
+      .filter((entry) => entry.name.startsWith(".env.") && entry.isSymbolicLink())
+      .flatMap((entry) => {
+        try {
+          return existsSync(join(worktreeRoot, entry.name))
+            ? []
+            : [`${worktreeRoot}/${entry.name}`];
+        } catch {
+          return [`${worktreeRoot}/${entry.name}`];
+        }
+      }),
+  );
+  if (duplicateSlots.length || brokenLinks.length) {
+    const details = [
+      ...duplicateSlots.map(([slot, roots]) => `slot ${slot} is shared by ${roots.join(", ")}`),
+      ...brokenLinks.map((path) => `broken environment link: ${path}`),
+    ];
+    throw new Error(`worktree doctor failed:\n${details.join("\n")}`);
+  }
+  process.stdout.write("worktree doctor: ok\n");
 };
 
 const validName = (name: string): boolean => /^[a-z0-9][a-z0-9-]*$/.test(name);
@@ -84,35 +167,36 @@ const validName = (name: string): boolean => /^[a-z0-9][a-z0-9-]*$/.test(name);
 const create = (root: string, name: string | undefined, slotRaw: string | undefined): void => {
   if (!name || !validName(name))
     throw new Error("usage: pnpm worktree:new <lowercase-kebab-name> [slot]");
-  const config = configFor(parseSlot(slotRaw));
+  const assignments = slotAssignments(root);
+  const claimedSlots = assignments.map(({ config }) => config.slot);
+  const slot =
+    slotRaw === undefined ? firstAvailableWorktreeSlot(claimedSlots) : parseWorktreeSlot(slotRaw);
+  if (claimedSlots.includes(slot)) throw new Error(`worktree slot ${slot} is already in use`);
   const target = join(dirname(root), `new-mj-${name}`);
   if (existsSync(target)) throw new Error(`target already exists: ${target}`);
+  const primary = assignments[0];
+  if (!primary)
+    throw new Error("cannot find the primary worktree to use as the environment source");
 
   run("git", ["worktree", "add", "-b", `feat/${name}`, target, "main"], root);
-  writeConfig(target, config);
-
-  const sourceEnv = join(root, ".env.development.local");
-  const targetEnv = join(target, ".env.development.local");
-  if (existsSync(sourceEnv) && !existsSync(targetEnv))
-    symlinkSync(relative(target, sourceEnv), targetEnv);
-
+  writeConfig(target, worktreeConfigFor(slot));
+  const preserved = linkEnvironmentFiles(primary.root, target);
+  if (preserved.length)
+    process.stdout.write(`preserved existing environment files: ${preserved.join(", ")}\n`);
   run("pnpm", ["install", "--frozen-lockfile"], target);
   run("pnpm", ["build"], target);
-  printStatus(target);
+  printStatus(root);
 };
 
 const runWithWorktreeEnv = (root: string, args: readonly string[]): void => {
   const [command, ...commandArgs] = args;
   if (!command) throw new Error("usage: worktree.ts run <command> [...args]");
-
-  // `pnpm <script> -- <flag>` preserves the separator in Node's argv. It is
-  // a package-manager boundary, not an argument for the wrapped command.
   const separator = commandArgs.indexOf("--");
   const normalizedArgs =
     separator === -1
       ? commandArgs
       : [...commandArgs.slice(0, separator), ...commandArgs.slice(separator + 1)];
-  run(command, normalizedArgs, root, envFor(readConfig(root)));
+  run(command, normalizedArgs, root, worktreeEnvironment(readConfig(root)));
 };
 
 const main = (): void => {
@@ -125,11 +209,14 @@ const main = (): void => {
     case "status":
       printStatus(root);
       return;
+    case "doctor":
+      doctor(root);
+      return;
     case "run":
       runWithWorktreeEnv(root, args);
       return;
     default:
-      throw new Error("usage: worktree.ts <create|status|run>");
+      throw new Error("usage: worktree.ts <create|status|doctor|run>");
   }
 };
 

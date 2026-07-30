@@ -1,40 +1,21 @@
 import { defineConfig, devices } from "@playwright/test";
+import { playwrightWorktreeRuntime } from "@new-mj/devtools";
 
 /**
  * Dedicated e2e ports, distinct from the dev-mode defaults (web 5173,
  * server 3000) so a running `pnpm dev` isn't disturbed by e2e runs and
  * vice versa — Playwright boots its own web + server pair here.
  */
-function readPort(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const port = Number(raw);
-  if (!Number.isInteger(port) || port < 1 || port > 65_535)
-    throw new Error(`${name} must be an integer TCP port; received ${raw}`);
-  return port;
-}
-
-function readWorkers(): number | undefined {
-  const raw = process.env["E2E_WORKERS"];
-  if (!raw) return undefined;
-  const workers = Number(raw);
-  if (!Number.isInteger(workers) || workers < 1)
-    throw new Error(`E2E_WORKERS must be a positive integer; received ${raw}`);
-  return workers;
-}
-
-const WEB_PORT = readPort("E2E_WEB_PORT", 5274);
-const SERVER_PORT = readPort("E2E_SERVER_PORT", 3100);
-const WORKERS = readWorkers();
+const { webPort, serverPort, workers, baseURL } = playwrightWorktreeRuntime();
 
 export default defineConfig({
   testDir: "./test",
   testMatch: "**/*.e2e-spec.ts",
   fullyParallel: true,
-  workers: WORKERS,
+  workers,
   reporter: "list",
   use: {
-    baseURL: `http://localhost:${WEB_PORT}`,
+    baseURL,
     trace: "on-first-retry",
   },
   webServer: [
@@ -58,20 +39,20 @@ export default defineConfig({
       // so an actual crash is still visible.
       command: "pnpm --filter @new-mj/server start",
       // NODE_ENV=test makes dotenv-flow load .env.test (blanks Supabase/DB vars) and skip .env.development.local.
-      env: { PORT: String(SERVER_PORT), NODE_ENV: "test", TEST_GAME_SEED: "121" },
+      env: { PORT: String(serverPort), NODE_ENV: "test", TEST_GAME_SEED: "121" },
       stdout: "ignore",
       stderr: "pipe",
       timeout: 180_000,
       wait: { stdout: /Nest application successfully started/ },
     },
     {
-      command: `pnpm exec vite --port ${WEB_PORT} --strictPort --mode test`,
+      command: `pnpm exec vite --port ${webPort} --strictPort --mode test`,
       // JWT_SECRET intentionally not set (shared dev-only fallback, D16); --mode test loads .env.test the same way as the server entry above.
-      env: { VITE_SERVER_URL: `http://localhost:${SERVER_PORT}` },
+      env: { VITE_SERVER_URL: `http://localhost:${serverPort}` },
       stdout: "ignore",
       stderr: "pipe",
       timeout: 60_000,
-      wait: { stdout: new RegExp(`Local:\\s+http:\\/\\/localhost:${WEB_PORT}`) },
+      wait: { stdout: new RegExp(`Local:\\s+http:\\/\\/localhost:${webPort}`) },
     },
   ],
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

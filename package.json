@@ -22,9 +22,11 @@
     "sb:restart": "supabase stop && supabase start",
     "sb:status": "supabase status",
     "worktree:new": "node tools/worktree.ts create",
-    "worktree:status": "node tools/worktree.ts status"
+    "worktree:status": "node tools/worktree.ts status",
+    "worktree:doctor": "node tools/worktree.ts doctor"
   },
   "devDependencies": {
+    "@new-mj/devtools": "workspace:*",
     "@swc/cli": "^0.7.10",
     "@swc/core": "^1.15.46",
     "@types/node": "^26.1.1",
