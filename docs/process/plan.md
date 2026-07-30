@@ -20,6 +20,8 @@
 - 日麻立项时复审 `architecture/variant-boundary.md`。
 - 可选沉浸体验：音效、音量与静音设置。
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
+- Bot 功能增强：提升 AI 补位/断线托管的出牌质量。
+- 配置功能：允许垃圾胡（junk）开启不同规则变种。
 
 ## 已完成摘要
 
