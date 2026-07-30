@@ -239,7 +239,6 @@ export function TableView() {
       if (originRect) setPendingDiscardOrigin({ tile, rect: originRect });
       void sendAction({ type: "discard", tile });
     },
-    canAnimateEntries: isIncrementalSnapshot && !prefersReducedMotion,
     pendingDiscardOrigin,
     gameNumber: room?.gameNumber ?? 1,
   });

@@ -48,25 +48,22 @@ const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [], justD
 /**
  * Converts the ruleset-private PlayerView fields into the presentation props used by TableBoard.
  * For game state it deliberately reads only the server-provided view; it neither derives legal
- * actions nor mutates state from command acknowledgements. It does also thread through a couple
- * of purely local, non-game-state inputs the caller already holds — `canAnimateEntries` and
- * `pendingDiscardOrigin`'s click-time geometry (see TableView.tsx) — onto the matching seat/
- * discard entry, since presentation is exactly where server view and local UI-only signal are
- * meant to merge; neither ever influences what's derived from `view` itself.
+ * actions nor mutates state from command acknowledgements. It does also thread through
+ * `pendingDiscardOrigin`'s click-time geometry (see TableView.tsx) onto the matching discard
+ * entry, since presentation is exactly where server view and local UI-only signal are meant to
+ * merge; it never influences what's derived from `view` itself. Whether any slot actually plays
+ * an entry animation is decided by animationLedger, not here — see the *LedgerKey fields below.
  */
 export function useTablePresentation({
   view,
   players,
   onDiscard,
-  canAnimateEntries = false,
   pendingDiscardOrigin,
   gameNumber = 1,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
   onDiscard: (tile: number, originRect?: DOMRect) => void;
-  /** Gates one-shot entry animations (e.g. a freshly discarded tile sliding into the pile) — see useIsIncrementalSnapshot and usePrefersReducedMotion. */
-  canAnimateEntries?: boolean;
   /** See TableView.tsx — a click-time rect capture for the discard-flying-out ghost, matched against the newly-landed discard entry by TileId. */
   pendingDiscardOrigin?: { tile: number; rect: DOMRect } | null;
   /** RoomInfo.gameNumber — prefixes drawnSlotLedgerKey so it lines up with animationLedger's game-scoped keys. */

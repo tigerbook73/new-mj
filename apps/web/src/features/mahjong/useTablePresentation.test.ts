@@ -123,7 +123,6 @@ describe("useTablePresentation", () => {
       view,
       players: [{ nickname: "Me" }, null, null, null],
       onDiscard: vi.fn(),
-      canAnimateEntries: true,
       gameNumber: 3,
     });
     if (!presentation) throw new Error("missing presentation");
@@ -159,7 +158,6 @@ describe("useTablePresentation", () => {
       view,
       players: [{ nickname: "Me" }, null, null, null],
       onDiscard: vi.fn(),
-      canAnimateEntries: true,
     });
     if (!presentation) throw new Error("missing presentation");
 
