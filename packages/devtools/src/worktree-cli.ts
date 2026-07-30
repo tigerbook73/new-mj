@@ -22,6 +22,24 @@ import {
 
 type Worktree = { root: string; branch?: string };
 
+const usage = `Usage:
+  worktree-cli create [lowercase-kebab-name] [slot]
+  worktree-cli status
+  worktree-cli doctor
+  worktree-cli run <command> [...args]
+
+Commands:
+  create  Create a feature worktree; prompts for a name in an interactive terminal.
+  status  List worktrees, slots, ports, and environment links.
+  doctor  Report duplicate slots and broken environment links.
+  run     Run a command with the current worktree's environment.`;
+
+class CliUsageError extends Error {}
+
+const printUsage = (stream: NodeJS.WriteStream): void => {
+  stream.write(`${usage}\n`);
+};
+
 const run = (command: string, args: readonly string[], cwd: string, env = process.env): void => {
   const result = spawnSync(command, args, { cwd, env, stdio: "inherit" });
   if (result.error) throw result.error;
@@ -186,7 +204,7 @@ const create = async (
 ): Promise<void> => {
   const requestedName = name ?? (await promptForName());
   if (!requestedName || !validName(requestedName))
-    throw new Error("usage: pnpm worktree:new [lowercase-kebab-name] [slot]");
+    throw new CliUsageError("worktree name must be lowercase kebab-case");
   const assignments = slotAssignments(root);
   const claimedSlots = assignments.map(({ config }) => config.slot);
   const slot =
@@ -210,7 +228,7 @@ const create = async (
 
 const runWithWorktreeEnv = (root: string, args: readonly string[]): void => {
   const [command, ...commandArgs] = args;
-  if (!command) throw new Error("usage: worktree.ts run <command> [...args]");
+  if (!command) throw new CliUsageError("run requires a command");
   const separator = commandArgs.indexOf("--");
   const normalizedArgs =
     separator === -1
@@ -221,6 +239,10 @@ const runWithWorktreeEnv = (root: string, args: readonly string[]): void => {
 
 const main = async (): Promise<void> => {
   const [command, ...args] = process.argv.slice(2);
+  if (!command || command === "help" || command === "--help" || command === "-h") {
+    printUsage(process.stdout);
+    return;
+  }
   const root = repoRoot();
   switch (command) {
     case "create":
@@ -236,8 +258,15 @@ const main = async (): Promise<void> => {
       runWithWorktreeEnv(root, args);
       return;
     default:
-      throw new Error("usage: worktree.ts <create|status|doctor|run>");
+      throw new CliUsageError(`unknown command: ${command}`);
   }
 };
 
-await main();
+try {
+  await main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`error: ${message}\n`);
+  if (error instanceof CliUsageError) printUsage(process.stderr);
+  process.exitCode = 1;
+}
