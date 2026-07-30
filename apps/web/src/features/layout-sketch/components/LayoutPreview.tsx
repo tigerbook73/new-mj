@@ -21,7 +21,7 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
   info,
   handTiles,
   melds,
-  revealed: info === "You",
+  revealed: info === "Tigerbook73",
   drawnSlotKey: `${info}-drawn`,
   drawnSlotEntering: false,
   meldEntering: false,
@@ -29,7 +29,7 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
 
 const seatsFor = (kind: PreviewCase): Record<SeatDirection, SeatContent> => ({
   bottom: makeSeat(
-    "You",
+    "Tigerbook73",
     [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52],
     kind === "claims" ? [{ type: "peng", tiles: [56, 57, 58], fromDirection: "left" }] : [],
   ),

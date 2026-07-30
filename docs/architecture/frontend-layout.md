@@ -47,3 +47,4 @@ Tile、ActionButton 等展示原子可跨场景复用；不同屏幕下“怎样
 - 手机横屏/竖屏应先建立一个最小场景：手写 preset、由正式 `TableBoard` 消费、验证一个典型对局；通过后再扩展编辑器能力。
 - 若布局编辑工具未来改变正式产物或被多个场景复用，应作为独立的使能 slice，按 `process/workflow.md` 的重估规则推进，而不是嵌入某个 UI slice。
 - 设备运行中切换方向、牌面是否正读，均为尚未决定的产品问题；决定后再补相应视觉/e2e 验收。
+- `TableBoard`/`TableZoneContext` 的 `center`/`actionDock` 是具名 `ReactNode` prop，不像 `seats`/`discards` 那样按 `zone.id` 泛化：它们装的是 `TableView` 自己的会话状态（phase、actions、`onAction` 等），本就不该塞进跨场景稳定的 `TableZoneContext` 契约。代价是每新增一个单实例展示 zone（如未来的计分板、剩余牌数徽章）都要再加一个具名字段，直接改 `TableBoard.tsx` 的两处接口和函数体，而不是像其他 zone 一样纯靠 `desktop.tsx` 注册表加一行搞定。目前只有这两个 slot，都稳定在用，暂不因此改造；等真的出现第三个单实例 zone 时，再新增一个 `extraSlots?: Record<string, ReactNode>` 承接（不动 `center`/`actionDock` 已有字段），由场景注册表按 `zone.id` 取用。
