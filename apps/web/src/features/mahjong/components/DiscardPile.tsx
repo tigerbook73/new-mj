@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { DiscardFlipGhost } from "./DiscardFlipGhost";
+import { OpponentDiscardFlipGhost } from "./OpponentDiscardFlipGhost";
 import { Tile } from "./Tile";
 import { TileClaimSlot } from "./TileClaimSlot";
 
@@ -12,15 +14,29 @@ export type DiscardEntry = {
   claimedByDirection?: SeatDirection;
   /** True for the single most recent discard on the table (view.lastDiscard). */
   justDiscarded?: boolean;
-  /** True when justDiscarded should also play its one-shot entry animation — see useIsIncrementalSnapshot. */
-  enterAnimation?: boolean;
+  /** animationLedger key for this exact entry — see useSlotEntering, and useTablePresentation.ts's discardLedgerKey. */
+  discardLedgerKey: string;
   /**
    * This tile's own hand-side rect, captured at click time (see HandRow.tsx's
    * `captureTileRect`) — only ever present for my own discards, and only for
    * the single render where this entry is genuinely new. Drives
-   * DiscardFlipGhost below; absent (e.g. an opponent's discard, or a page
-   * reload) just means this entry gets the plain grow-in entry animation with
-   * no flight.
+   * DiscardFlipGhost below; absent (a page reload, or a timeout auto-discard)
+   * just means this entry gets the plain grow-in entry animation with no
+   * flight.
+   *
+   * Deliberately never populated for an opponent's discard: opponents'
+   * concealed tiles have no on-screen position to fly *from* in the first
+   * place (see docs/architecture/frontend-layout.md §5), so tracking one
+   * specific tile the way this field does for my own hand isn't an option.
+   * An earlier attempt tried exactly that anyway — pick a pseudo-random
+   * visible hand-back tile as the flight's origin, then reflow the rest of
+   * the row to close the gap — and it added real complexity (DOM position
+   * tracking, a second reflow-duration knob, a regression in the "claim
+   * shrinks a hand" no-slide guarantee) for a visual that still didn't read
+   * well in practice. Reverted 2026-07-29. `OpponentDiscardFlipGhost` below
+   * is the materially simpler mechanism that made a second attempt worth
+   * it: it flies from the whole hand zone instead of a tracked tile, so it
+   * never needs this field at all.
    */
   flightOrigin?: DOMRect;
 };
@@ -66,7 +82,7 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
             const entry = discards[rowIndex * columns + columnIndex];
             if (!entry) {
               return (
-                <Tile key={columnIndex} testId="discard-slot-empty" tileId={-1} heightPx="100%" />
+                <Tile key={columnIndex} testId="discard-slot-empty" tileId={-1} height="100%" />
               );
             }
             return (
@@ -86,14 +102,15 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
 
 /**
  * Owns the per-entry hook state a plain `.map()` callback can't (rules of
- * hooks) — specifically, whether to mount a `DiscardFlipGhost` alongside this
- * slot's real tile. `ghostOrigin` is captured once via `useState` (not read
- * live from `entry.flightOrigin` on every render), same reasoning as
- * MeldGroup.tsx's `MeldClaimTile`: TableView clears its own pending-origin
- * state once the next snapshot arrives (see TableView.tsx), which would flip
- * `entry.flightOrigin` back to `undefined` on the very next render — reading
- * it live here would yank the ghost off mid-flight for a reason that has
- * nothing to do with the flight itself actually finishing.
+ * hooks) — specifically, whether to mount a ghost alongside this slot's real
+ * tile, via `useSlotEntering` (see its own docs for why this is safe against
+ * unrelated re-renders). `ghostOrigin` is captured once more via `useState`
+ * (not read live from `entry.flightOrigin` on every render): TableView clears
+ * its own pending-origin state once the next snapshot arrives (see
+ * TableView.tsx), which would flip `entry.flightOrigin` back to `undefined`
+ * on the very next render — reading it live here would yank the ghost off
+ * mid-flight for a reason that has nothing to do with the flight itself
+ * actually finishing.
  */
 function DiscardTileSlot({
   direction,
@@ -104,8 +121,9 @@ function DiscardTileSlot({
   entry: DiscardEntry;
   aspectRatio: number;
 }) {
+  const { entering, ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
   const [ghostOrigin] = useState<DOMRect | null>(() =>
-    entry.enterAnimation && entry.flightOrigin ? entry.flightOrigin : null,
+    ghost && entry.flightOrigin ? entry.flightOrigin : null,
   );
   const toRef = useRef<HTMLDivElement>(null);
 
@@ -120,10 +138,35 @@ function DiscardTileSlot({
           tileId={entry.tile}
           dimmed={entry.claimedBy !== undefined}
           justDiscarded={entry.justDiscarded}
-          entering={entry.enterAnimation}
+          // `justDiscarded` alone (view.lastDiscard) stays true until the
+          // *next* discard event — it never updates on a claim — so once
+          // this tile is claimed, shrink it back immediately instead of
+          // waiting for someone else's next discard to supersede it. Same
+          // condition `dimmed` above already reacts to on the very same
+          // render, so the shrink and the dim-to-tombstone land together.
+          enlarged={entry.justDiscarded && entry.claimedBy === undefined}
+          entering={entering}
         />
       </div>
-      {ghostOrigin && <DiscardFlipGhost tileId={entry.tile} fromRect={ghostOrigin} toRef={toRef} />}
+      {ghostOrigin && (
+        <DiscardFlipGhost
+          tileId={entry.tile}
+          fromRect={ghostOrigin}
+          toRef={toRef}
+          onAnimationComplete={onGhostComplete}
+        />
+      )}
+      {/* An opponent's discard has no click/timeout-captured rect to fly
+          from (only my own does — see DiscardEntry.flightOrigin), so it
+          flies from their whole hand zone instead. */}
+      {ghost && direction !== "bottom" && !ghostOrigin && (
+        <OpponentDiscardFlipGhost
+          tileId={entry.tile}
+          fromDirection={direction}
+          toRef={toRef}
+          onAnimationComplete={onGhostComplete}
+        />
+      )}
     </>
   );
 }

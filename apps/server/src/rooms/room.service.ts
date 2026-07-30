@@ -42,6 +42,10 @@ interface BotActionTimer {
   timer: NodeJS.Timeout;
 }
 
+interface DrawRevealTimer {
+  timer: NodeJS.Timeout;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
@@ -57,6 +61,7 @@ export class RoomService {
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
   private readonly claimTimers = new Map<string, ClaimTimer>();
   private readonly botActionTimers = new Map<string, BotActionTimer>();
+  private readonly drawRevealTimers = new Map<string, DrawRevealTimer>();
   /**
    * userId → roomId, server-truth source for client restore (session:identity's
    * activeRoom, see docs/contracts/session-mechanics.md §12). Only tracks real
@@ -363,7 +368,9 @@ export class RoomService {
    * Applies a single seat's action and its side effects (score/event
    * broadcast/game-end handling); shared by real player actions and bot
    * actions driven from autoPlayBots. Does not itself trigger bot follow-up
-   * — callers (applyPlayerAction/autoPlayBots) own that loop.
+   * — callers (applyPlayerAction/autoPlayBots) own that loop. Does schedule
+   * the draw-reveal timer itself (scheduleDrawReveal), since every caller
+   * needs that check after every action, not just the top-level ones.
    */
   private runAction(room: Room, seat: SeatId, action: unknown): ApplyResult<unknown> {
     if (room.phase !== "in-game") {
@@ -388,8 +395,54 @@ export class RoomService {
     if (result.events.some((event) => isGameEndedPayload(event.payload))) {
       this.handleGameEnd(room);
     }
+    this.scheduleDrawReveal(room);
 
     return result;
+  }
+
+  /**
+   * Server-paced reveal of a draw scheduled by core's "awaiting-draw" phase
+   * (docs/contracts/session-mechanics.md "摸牌延时代提交") — mirrors the
+   * claim-timeout/bot-delay pattern: a server-only timer, invisible to
+   * core/PlayerView/protocol, that auto-submits {type:"draw"} through the
+   * same runAction path as any other action. Unlike autoPlayBots, this fires
+   * for every seat control type (human/bot/autopiloted) — drawing is the
+   * only way out of this phase, not a decision any seat gets to make.
+   */
+  private scheduleDrawReveal(room: Room): void {
+    if (room.phase !== "in-game" || this.drawRevealTimers.has(room.id)) return;
+    if (this.seatAwaitingDraw(room) === undefined) return;
+    const delayMs = this.configService.drawRevealDelayMs;
+    if (delayMs === 0) {
+      const seat = this.seatAwaitingDraw(room);
+      if (seat === undefined) return;
+      this.runAction(room, seat, { type: "draw" });
+      this.autoPlayBots(room);
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.drawRevealTimers.delete(room.id);
+      const current = this.rooms.get(room.id);
+      if (!current || current.phase !== "in-game") return;
+      // Re-read after the wait: a room close or game end may have changed
+      // control while this timer was pending.
+      const seat = this.seatAwaitingDraw(current);
+      if (seat === undefined) return;
+      this.runAction(current, seat, { type: "draw" });
+      this.autoPlayBots(current);
+    }, delayMs);
+    timer.unref();
+    this.drawRevealTimers.set(room.id, { timer });
+  }
+
+  /** The one seat (if any) whose only legal action is {type:"draw"}. */
+  private seatAwaitingDraw(room: Room): SeatId | undefined {
+    for (let seat = 0; seat < ROOM_SIZE; seat += 1) {
+      const legalActions = this.gameService.getLegalActions(room.gameState, seat as SeatId);
+      if (legalActions.length === 1 && isRecord(legalActions[0]) && legalActions[0].type === "draw")
+        return seat as SeatId;
+    }
+    return undefined;
   }
 
   /** Schedules at most one server-owned bot/autopilot action for this room. */
@@ -425,6 +478,11 @@ export class RoomService {
       const player = room.players[seat];
       if (!player?.isBot && !player?.isAutoPiloted) continue;
       const legalActions = this.gameService.getLegalActions(room.gameState, seat as SeatId);
+      // A draw reveal is server-paced for every seat type via
+      // scheduleDrawReveal, not a bot decision — skip so the two timers never
+      // race to auto-submit the same transition.
+      if (legalActions.length === 1 && isRecord(legalActions[0]) && legalActions[0].type === "draw")
+        continue;
       if (legalActions.length > 0) {
         return { seat: seat as SeatId, action: chooseAction(legalActions) };
       }
@@ -540,6 +598,7 @@ export class RoomService {
   private closeAbandonedRoom(room: Room): void {
     this.clearBotActionTimer(room.id);
     this.clearRoomClaimTimers(room.id);
+    this.clearDrawRevealTimer(room.id);
     room.phase = "finished";
     room.status = "closed";
     room.finishedAt = Date.now();
@@ -685,6 +744,7 @@ export class RoomService {
   private beginGame(room: Room, emitInitialSnapshots = true): void {
     this.clearBotActionTimer(room.id);
     this.clearRoomClaimTimers(room.id);
+    this.clearDrawRevealTimer(room.id);
     room.gameNumber += 1;
     room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
     const result = this.gameService.createGame(room.config, room.seed, room.dealer);
@@ -728,6 +788,7 @@ export class RoomService {
   private handleGameEnd(room: Room): void {
     this.clearBotActionTimer(room.id);
     this.clearRoomClaimTimers(room.id);
+    this.clearDrawRevealTimer(room.id);
     const gameLog: FinishedGameLog = {
       gameNumber: room.gameNumber,
       seatUserIds: room.currentGameSeatUserIds,
@@ -885,6 +946,12 @@ export class RoomService {
     const entry = this.botActionTimers.get(roomId);
     if (entry) clearTimeout(entry.timer);
     this.botActionTimers.delete(roomId);
+  }
+
+  private clearDrawRevealTimer(roomId: string): void {
+    const entry = this.drawRevealTimers.get(roomId);
+    if (entry) clearTimeout(entry.timer);
+    this.drawRevealTimers.delete(roomId);
   }
 
   private extractScoreDeltas(events: readonly GameEvent[]): [number, number, number, number] {

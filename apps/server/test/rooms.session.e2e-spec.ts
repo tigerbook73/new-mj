@@ -112,6 +112,13 @@ describe("RoomsGateway (e2e) — full 4-round session over real sockets", () => 
       for (const { seat, action } of played.actions) {
         const currentRoom = roomService.get(roomId);
         if (!currentRoom || currentRoom.phase !== "in-game") break;
+        // playJunkGame's recorded log now includes explicit {type:"draw"}
+        // steps (core requires them since the draw-explicit redesign). The
+        // server auto-submits those itself via scheduleDrawReveal
+        // (drawRevealDelayMs is 0 under NODE_ENV=test, so it fires
+        // synchronously) — resubmitting a recorded "draw" after the server
+        // already completed it would fail with DRAW_NOT_AVAILABLE.
+        if ((action as { type?: string }).type === "draw") continue;
         // seatSockets has exactly 4 entries (0-3), matching SeatId's range.
         const socket = seatSockets[seat as SeatId]!;
         const result = await ack<object>(socket, "game:action", { action });

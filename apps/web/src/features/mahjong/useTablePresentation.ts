@@ -3,7 +3,12 @@ import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
 import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
-import { directionOf, seatAt, SEAT_DIRECTIONS, type SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import {
+  directionOf,
+  seatAt,
+  SEAT_DIRECTIONS,
+  type SeatDirection,
+} from "@/features/mahjong/lib/seatLayout";
 
 type JunkSeatExtra = {
   handCount: number;
@@ -42,23 +47,27 @@ const EMPTY_SEAT: JunkSeatExtra = { handCount: 0, melds: [], discards: [], justD
 
 /**
  * Converts the ruleset-private PlayerView fields into the presentation props used by TableBoard.
- * It deliberately reads only the server-provided view; it neither derives legal actions nor
- * mutates state from command acknowledgements.
+ * For game state it deliberately reads only the server-provided view; it neither derives legal
+ * actions nor mutates state from command acknowledgements. It does also thread through
+ * `pendingDiscardOrigin`'s click-time geometry (see TableView.tsx) onto the matching discard
+ * entry, since presentation is exactly where server view and local UI-only signal are meant to
+ * merge; it never influences what's derived from `view` itself. Whether any slot actually plays
+ * an entry animation is decided by animationLedger, not here — see the *LedgerKey fields below.
  */
 export function useTablePresentation({
   view,
   players,
   onDiscard,
-  canAnimateEntries = false,
   pendingDiscardOrigin,
+  gameNumber = 1,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
   onDiscard: (tile: number, originRect?: DOMRect) => void;
-  /** Gates one-shot entry animations (e.g. a freshly discarded tile sliding into the pile) — see useIsIncrementalSnapshot and usePrefersReducedMotion. */
-  canAnimateEntries?: boolean;
   /** See TableView.tsx — a click-time rect capture for the discard-flying-out ghost, matched against the newly-landed discard entry by TileId. */
   pendingDiscardOrigin?: { tile: number; rect: DOMRect } | null;
+  /** RoomInfo.gameNumber — prefixes drawnSlotLedgerKey so it lines up with animationLedger's game-scoped keys. */
+  gameNumber?: number;
 }) {
   if (!view) {
     return undefined;
@@ -66,7 +75,11 @@ export function useTablePresentation({
   const extras = view as unknown as TableViewExtras;
   const isMyTurn = view.currentSeat === view.seat && extras.phase === "playing";
   const actionOptions = extras.myActionOptions ?? [];
-  const hasDockActions = actionOptions.some((action) => action.type !== "discard");
+  // "draw" is core-gated but server-auto-submitted (docs/contracts/session-mechanics.md
+  // "摸牌延时代提交") — it must never render as a clickable dock affordance.
+  const hasDockActions = actionOptions.some(
+    (action) => action.type !== "discard" && action.type !== "draw",
+  );
   const seatData = (seat: SeatId): JunkSeatExtra => extras.seats?.[seat] ?? EMPTY_SEAT;
 
   const seats = Object.fromEntries(
@@ -96,10 +109,10 @@ export function useTablePresentation({
               -1,
               drawnVisible ? 0 : -1,
             ];
-      // A real TileId is globally unique (architecture iron rule 4), so keying my
-      // own drawn slot by it already changes on every new draw. Opponents never
-      // expose a real TileId here (public events can't reveal concealed hands —
-      // architecture iron rule 2); their handCount toggles between two values
+      // A real TileId is globally unique (see docs/architecture/frontend-
+      // layout.md §5), so keying my own drawn slot by it already changes on
+      // every new draw. Opponents never expose a real TileId here (public
+      // events can't reveal concealed hands); their handCount toggles between two values
       // across a draw/discard cycle, which is enough to tell "this draw" from
       // "last draw" apart across the one render transition that matters, even
       // though the same numeric value recurs turn after turn.
@@ -111,19 +124,29 @@ export function useTablePresentation({
           : drawnVisible
             ? `opp-${seat}-${data.handCount}`
             : "none";
+      // animationLedger's key for this seat's draw lane — unlike drawnSlotKey
+      // (a React key that must change on every new draw so the slot remounts),
+      // this stays fixed per seat: only one draw can be "in flight" per seat
+      // at a time (the lane), so reusing the same ledger key across successive
+      // draws is exactly what lets a structural conflict resolve to skip — see
+      // animationLedger.ts.
+      const drawnSlotLedgerKey = `g${gameNumber}:draw:${direction === "bottom" ? "own" : "opp"}:${seat}`;
       const content: SeatContent = {
-        melds: data.melds.map((meld) => ({
+        melds: data.melds.map((meld, meldIndex) => ({
           ...meld,
           ...(meld.from !== undefined
             ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
             : {}),
+          // Must match diffPlayerView's meld:<seat>:<index>:<tileCount> key
+          // exactly — the trailing tile count disambiguates buGang's
+          // in-place growth of an existing meldIndex from a brand-new one.
+          meldLedgerKey: `g${gameNumber}:meld:${seat}:${meldIndex}:${meld.tiles.length}`,
         })),
         handTiles,
         revealed: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
         drawnSlotKey,
-        drawnSlotEntering: drawnVisible && canAnimateEntries,
-        meldEntering: canAnimateEntries,
+        drawnSlotLedgerKey,
         ...(direction === "bottom" ? { interactive: isMyTurn, onDiscard } : {}),
       };
       return [direction, content];
@@ -133,7 +156,7 @@ export function useTablePresentation({
   const discards = Object.fromEntries(
     SEAT_DIRECTIONS.map((direction) => {
       const seat = seatAt(view.seat, direction);
-      const entries = seatData(seat).discards.map((entry) => {
+      const entries = seatData(seat).discards.map((entry, index) => {
         const justDiscarded =
           extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile;
         return {
@@ -143,7 +166,9 @@ export function useTablePresentation({
               ? directionOf(view.seat, entry.claimedBy as SeatId)
               : undefined,
           justDiscarded,
-          enterAnimation: justDiscarded && canAnimateEntries,
+          // animationLedger key for this exact discard entry — see
+          // diffPlayerView.ts's discard:<seat>:<index> key scheme.
+          discardLedgerKey: `g${gameNumber}:discard:${seat}:${index}`,
           flightOrigin:
             pendingDiscardOrigin?.tile === entry.tile ? pendingDiscardOrigin.rect : undefined,
         };

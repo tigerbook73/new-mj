@@ -17,6 +17,12 @@ import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
 import { TableBoard } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud } from "@/features/mahjong/components/TableHud";
+import {
+  registerSnapshotDiff,
+  resetAnimationLedger,
+  shouldRegisterSnapshotDiff,
+} from "@/features/mahjong/lib/animationLedger";
+import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
 import { useSessionStore } from "@/shared/store/session";
@@ -41,18 +47,25 @@ export function TableView() {
   const snapshotRevision = useSessionStore((state) => state.snapshotRevision);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
-  // Pure click-time geometry for the discard-flying-out ghost (see
-  // DiscardFlipGhost.tsx / HandRow.tsx's captureTileRect) — never read as
-  // game state, only handed to useTablePresentation to attach onto the
-  // matching DiscardEntry once the server's own snapshot actually lands.
+  // Pure geometry for the discard-flying-out ghost (see DiscardFlipGhost.tsx
+  // / HandRow.tsx's captureTileRect) — never read as game state, only handed
+  // to useTablePresentation to attach onto the matching DiscardEntry once
+  // the server's own snapshot actually lands. Set either from my own hand's
+  // click handler below (`onDiscard`), or — for an auto-submitted (timeout)
+  // discard that never went through a click — synchronously measured in
+  // onSnapshot below via soleDiscardedTile, while the old DOM (still showing
+  // the tile in hand) is still mounted. An opponent's discard never
+  // populates this either way, on purpose; see DiscardEntry's `flightOrigin`
+  // doc (DiscardPile.tsx) for why a flight there isn't worth it.
   // Deliberately never explicitly cleared: a TileId never repeats within a
-  // round (architecture iron rule 4), and DiscardPile's per-entry slot
+  // round (see docs/architecture/frontend-layout.md §5), and DiscardPile's per-entry slot
   // (DiscardTileSlot) only ever reads this once, at the single render where
   // it mounts — so a stale value just sits unread forever until a later
   // click overwrites it; no correctness or leak concern worth a clearing
@@ -63,8 +76,43 @@ export function TableView() {
     rect: DOMRect;
   } | null>(null);
 
+  // Drops any residue from a prior mount (StrictMode double-mount, e2e
+  // remounts) — the ledger is a module singleton, not component state, so
+  // nothing else clears it when this component first mounts.
+  useEffect(() => {
+    resetAnimationLedger();
+  }, []);
+
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
+      // registerSnapshotDiff must read the *pre-update* view/gameSeq and run
+      // before applyGameSnapshot swaps them — see animationLedger.ts's
+      // shouldRegisterSnapshotDiff for the seq guard's exact semantics.
+      const {
+        gameSeq: currentGameSeq,
+        view: currentView,
+        room: currentRoom,
+      } = useSessionStore.getState();
+      if (!prefersReducedMotion && shouldRegisterSnapshotDiff(currentGameSeq, event.seq)) {
+        registerSnapshotDiff(
+          currentView,
+          event.view,
+          event.view.seat,
+          currentRoom?.gameNumber ?? 1,
+        );
+        // Closes the gap for an auto-submitted (timeout) discard, which never
+        // ran through onDiscard's click-time capture below — measure the
+        // departing hand tile's own rect now, before this render swaps it out.
+        if (currentView) {
+          const discardedTile = soleDiscardedTile(currentView, event.view);
+          if (discardedTile !== undefined) {
+            const rect = document
+              .querySelector(`[data-tile-id="${discardedTile}"]`)
+              ?.getBoundingClientRect();
+            if (rect) setPendingDiscardOrigin({ tile: discardedTile, rect });
+          }
+        }
+      }
       useSessionStore.getState().applyGameSnapshot(event);
     };
     const onEvent = (message: GameEventEnvelope) => {
@@ -96,6 +144,7 @@ export function TableView() {
           : state,
       );
       useSessionStore.getState().resetGameSeq();
+      resetAnimationLedger();
     };
     const onSessionFinished = (message: { result: SessionResult }) =>
       setSessionResult(message.result);
@@ -127,7 +176,7 @@ export function TableView() {
       activeSocket.off("room:sessionFinished", onSessionFinished);
       activeSocket.off("room:closed", onClosed);
     };
-  }, [activeSocket, navigate, setRoom]);
+  }, [activeSocket, navigate, prefersReducedMotion, setRoom]);
 
   useEffect(() => {
     if (!view || gameSeq === null) return;
@@ -183,7 +232,6 @@ export function TableView() {
   };
 
   const isIncrementalSnapshot = useIsIncrementalSnapshot(gameSeq);
-  const prefersReducedMotion = usePrefersReducedMotion();
   const presentation = useTablePresentation({
     view,
     players: room?.players,
@@ -191,8 +239,8 @@ export function TableView() {
       if (originRect) setPendingDiscardOrigin({ tile, rect: originRect });
       void sendAction({ type: "discard", tile });
     },
-    canAnimateEntries: isIncrementalSnapshot && !prefersReducedMotion,
     pendingDiscardOrigin,
+    gameNumber: room?.gameNumber ?? 1,
   });
 
   if (!view) {
@@ -204,7 +252,7 @@ export function TableView() {
     const mySeat = room?.players.find((player) => player?.userId === userId);
     if (mySeat?.isAutoPiloted) {
       return (
-        <div className="flex h-[100dvh] w-full flex-col items-center justify-center gap-3 overflow-hidden p-6 text-center">
+        <div className="flex h-dvh w-full flex-col items-center justify-center gap-3 overflow-hidden p-6 text-center">
           <p>This seat has been taken over by AI — you're spectating, not playing.</p>
           <Link to="/games" className="text-sm underline">
             Back to games
@@ -284,6 +332,7 @@ export function TableView() {
                     : undefined
                 }
                 justDrawn={extras.justDrawn}
+                config={DESKTOP_TABLE_SCENARIO.config}
                 onAction={(action) => void sendAction(action)}
               />
             ) : undefined

@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import { DrawFlipGhost } from "./DrawFlipGhost";
 import { Tile } from "./Tile";
 
@@ -7,10 +8,10 @@ import { Tile } from "./Tile";
  * Measures a hand tile's own on-screen rect synchronously, from inside its
  * click handler — before the click's `game:action` ack (let alone the next
  * server snapshot) has any chance to land. TileId is globally unique on the
- * table at any instant (architecture iron rule 4), so this needs no
- * direction/testid scoping to find the right element. See DiscardFlipGhost.tsx
- * for why the discard flight can't just measure a live "from" element the way
- * ClaimFlipGhost/DrawFlipGhost do.
+ * table at any instant (see docs/architecture/frontend-layout.md §5), so
+ * this needs no direction/testid scoping to find the right element. See
+ * DiscardFlipGhost.tsx for why the discard flight can't just measure a live
+ * "from" element the way ClaimFlipGhost/DrawFlipGhost do.
  */
 function captureTileRect(tileId: number): DOMRect | undefined {
   return document.querySelector(`[data-tile-id="${tileId}"]`)?.getBoundingClientRect();
@@ -25,17 +26,17 @@ interface HandRowProps {
   /**
    * `originRect` is this tile's own `getBoundingClientRect()`, captured
    * synchronously inside the click handler (see `captureTileRect` below) —
-   * pure geometry, not game state (architecture iron rule 5 is unaffected).
-   * By the time the server confirms the discard and a fresh snapshot
-   * renders, the tile has genuinely left the hand array and there's no live
-   * element left to measure — see DiscardFlipGhost.tsx.
+   * pure geometry, not game state. By the time the server confirms the
+   * discard and a fresh snapshot renders, the tile has genuinely left the
+   * hand array and there's no live element left to measure — see
+   * DiscardFlipGhost.tsx.
    */
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
-  tileHeightPct: number;
+  tileHeight: number;
   tileGapPx: number;
-  /** See SeatContent.drawnSlotKey / drawnSlotEntering (components/mahjong/TableBoard.tsx). */
+  /** See SeatContent.drawnSlotKey / drawnSlotLedgerKey (components/mahjong/TableBoard.tsx). */
   drawnSlotKey: string;
-  drawnSlotEntering: boolean;
+  drawnSlotLedgerKey: string;
 }
 
 /**
@@ -51,10 +52,10 @@ export function HandRow({
   revealed,
   interactive,
   onDiscard,
-  tileHeightPct,
+  tileHeight: tileHeight,
   tileGapPx,
   drawnSlotKey,
-  drawnSlotEntering,
+  drawnSlotLedgerKey,
 }: HandRowProps) {
   const drawnIndex = handTiles.length - 1;
   return (
@@ -76,45 +77,41 @@ export function HandRow({
               revealed={revealed}
               interactive={interactive}
               onDiscard={onDiscard}
-              tileHeightPct={tileHeightPct}
-              entering={drawnSlotEntering}
+              tileHeight={tileHeight}
+              ledgerKey={drawnSlotLedgerKey}
             />
           );
         }
-        // A real revealed tile keys by its own TileId (globally unique —
-        // architecture iron rule 4) so discarding one unmounts exactly that
-        // instance instead of every slot after it silently swapping to the
-        // next tile's face. Opponents' "rest" slots are meaningless filler
-        // (all `0`, see SeatContent.handTiles) and the empty gap slot is
-        // always `-1` — both stay position-keyed. Prefixed (not bare
-        // numbers): `index` and `tileId` share the same numeric range, so an
-        // unprefixed mix collided in practice — a real TileId of e.g. 13
-        // matched the gap slot's index for a ~14-tile hand, React logged a
-        // duplicate-key warning, and both slots fought over one DOM node.
+        // A real revealed tile keys by its own TileId (globally unique — see
+        // docs/architecture/frontend-layout.md §5) so discarding one unmounts
+        // exactly that instance instead of every slot after it silently
+        // swapping to the next tile's face. Opponents' "rest" slots are
+        // meaningless filler (all `0`, see SeatContent.handTiles) and the
+        // empty gap slot is always `-1` — both stay position-keyed. Prefixed
+        // (not bare numbers): `index` and `tileId` share the same numeric
+        // range, so an unprefixed mix collided in practice — a real TileId of
+        // e.g. 13 matched the gap slot's index for a ~14-tile hand, React
+        // logged a duplicate-key warning, and both slots fought over one DOM
+        // node.
+        // TODO(tigerbook73): revisit whether this dual key-space (tileId vs.
+        // index, disambiguated only by string prefix) should be redesigned
+        // instead of kept as a prefix workaround.
         const key = isReal ? `tile-${tileId}` : `slot-${index}`;
         return (
           <Tile
             key={key}
             tileId={tileId}
             back={!revealed && !isPlaceholder}
-            heightPx={`${tileHeightPct}%`}
+            height={`${tileHeight}%`}
             clickable={interactive && isReal}
-            // Lets the remaining hand tiles glide into their new positions
-            // when one is discarded and unmounts (tileId-keyed above), or
-            // when the gap/drawn slot's own position shifts as a result —
-            // motion's `layout` (not `layoutId`, no shared-id involved) is
-            // the textbook tool for "siblings smoothly reflow when one
-            // leaves", independent of whatever flies the departed tile to
-            // the discard pile (a separate ghost clone, see MeldGroup.tsx's
-            // ClaimFlipGhost for the established pattern). Scoped to
-            // `revealed` (my own row) only — an opponent's "rest" slots are
-            // position-keyed anonymous filler (see the `key` comment below),
-            // so when their handCount shrinks (e.g. a peng/chi pulls tiles
-            // out of their concealed hand), the *surviving* filler slots keep
-            // the same key and just silently sit at a new position — with
-            // `layout` on, that reads as their entire hand visibly sliding as
-            // one block, which has no meaningful "gap closing" to show since
-            // none of those tiles represent anything identifiable.
+            // Lets the remaining hand tiles glide into their closed-up
+            // positions when one is discarded and unmounts (tileId-keyed
+            // above) — motion's `layout` (see Tile.tsx's `reflow` doc).
+            // Scoped to `revealed` (my own row) only: an opponent's "rest"
+            // slots are anonymous filler keyed by position, so when their
+            // handCount shrinks, `layout` would read as their whole hand
+            // sliding as one block — nothing there represents an
+            // identifiable gap closing, so it's off for them.
             reflow={revealed}
             {...(interactive && isReal
               ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
@@ -130,14 +127,10 @@ export function HandRow({
 /**
  * Owns the per-draw hook state a plain `.map()` callback can't (rules of
  * hooks) — specifically, whether to mount a `DrawFlipGhost` alongside the
- * pinned drawn-tile slot. Captured once via `useState` rather than read live
- * from `entering`, same reasoning as MeldGroup.tsx's `MeldClaimTile`:
- * `drawnSlotEntering` (== canAnimateEntries) is only true for the single
- * render right after a live snapshot lands, so deciding "should this draw
- * get a ghost" on every render would unmount the ghost mid-flight the
- * moment any unrelated re-render happens to land while it's still playing.
- * Remounts fresh on every new draw (keyed by `drawnSlotKey` in HandRow), so
- * `shouldGhost` is re-captured correctly each time.
+ * pinned drawn-tile slot, via `useSlotEntering` (see its own docs for why
+ * this is safe against unrelated re-renders). Remounts fresh on every new
+ * draw (keyed by `drawnSlotKey` in HandRow), so the resolution is re-read
+ * correctly each time.
  */
 function DrawnSlotTile({
   direction,
@@ -146,8 +139,8 @@ function DrawnSlotTile({
   revealed,
   interactive,
   onDiscard,
-  tileHeightPct,
-  entering,
+  tileHeight,
+  ledgerKey,
 }: {
   direction: SeatDirection;
   tileId: number;
@@ -155,10 +148,10 @@ function DrawnSlotTile({
   revealed: boolean;
   interactive?: boolean | undefined;
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
-  tileHeightPct: number;
-  entering: boolean;
+  tileHeight: number;
+  ledgerKey: string;
 }) {
-  const [shouldGhost] = useState(entering);
+  const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey);
   const toRef = useRef<HTMLDivElement>(null);
   const isPlaceholder = tileId < 0;
 
@@ -166,31 +159,45 @@ function DrawnSlotTile({
     <>
       {/*
        * `items-center`, matching the row's own cross-axis alignment: the Tile
-       * inside is only `tileHeightPct`% tall (not 100%, unlike DiscardPile/
+       * inside is only `tileHeight`% tall (not 100%, unlike DiscardPile/
        * MeldGroup's TileClaimSlot wrappers, which are always 100% all the way
        * down) — without re-centering here, a shorter-than-full-height child
        * sits at the wrapper's top edge instead of centered, so this slot's
-       * tile no longer lines up with the rest of the hand row.
+       * tile no longer lines up with the rest of the hand row. `toRef` sits
+       * on the inner, tile-sized box (not this outer full-height one) —
+       * DrawFlipGhost measures it via `getBoundingClientRect()` to size
+       * itself, and measuring the taller centering wrapper instead made the
+       * ghost render visibly oversized (full row height, not the tile's own)
+       * for its entire flight.
        */}
-      <div ref={toRef} className="flex h-full items-center">
-        <Tile
-          tileId={tileId}
-          back={!revealed && !isPlaceholder}
-          heightPx={`${tileHeightPct}%`}
-          clickable={interactive && isReal}
-          entering={entering}
-          // See the `reflow={revealed}` comment above — same scoping applies
-          // here too, though this slot always remounts fresh on a new draw
-          // (keyed by `drawnSlotKey`), so `layout` never actually has a prior
-          // instance to FLIP from either way; kept consistent for clarity.
-          reflow={revealed}
-          testId={`hand-track-drawn-${direction}`}
-          {...(interactive && isReal
-            ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
-            : {})}
-        />
+      <div className="flex h-full items-center">
+        <div ref={toRef} style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}>
+          <Tile
+            tileId={tileId}
+            back={!revealed && !isPlaceholder}
+            height="100%"
+            clickable={interactive && isReal}
+            // "opacityOnly": DrawFlipGhost already sells the arrival's
+            // physical motion on its own path — see resolveTileMotion.ts.
+            entering={entering ? "opacityOnly" : false}
+            // Same scoping as the plain hand tiles above, kept consistent
+            // for clarity — this slot always remounts fresh on a new draw,
+            // so `layout` never actually has a prior instance to FLIP from.
+            reflow={revealed}
+            testId={`hand-track-drawn-${direction}`}
+            {...(interactive && isReal
+              ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
+              : {})}
+          />
+        </div>
       </div>
-      {shouldGhost && <DrawFlipGhost {...(isReal ? { tileId } : {})} toRef={toRef} />}
+      {ghost && (
+        <DrawFlipGhost
+          {...(isReal ? { tileId } : {})}
+          toRef={toRef}
+          onAnimationComplete={onGhostComplete}
+        />
+      )}
     </>
   );
 }

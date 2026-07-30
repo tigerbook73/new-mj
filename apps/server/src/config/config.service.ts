@@ -85,6 +85,19 @@ export class ConfigService {
     return [600, 1_200];
   }
 
+  /**
+   * Server-owned pacing delay before a core "awaiting-draw" reveal is
+   * auto-submitted (docs/contracts/session-mechanics.md "摸牌延时代提交") —
+   * applies uniformly to every seat (human/bot/autopiloted alike), unlike
+   * botActionDelayRangeMs.
+   */
+  get drawRevealDelayMs(): number {
+    if (process.env["NODE_ENV"] === "test") return 0;
+    const raw = process.env["DRAW_REVEAL_DELAY_MS"];
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= 0 ? parsed : 600;
+  }
+
   /** Deterministic fixture only; production games always receive a random seed. */
   get testGameSeed(): number | undefined {
     if (process.env["NODE_ENV"] !== "test") return undefined;

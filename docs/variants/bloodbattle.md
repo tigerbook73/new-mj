@@ -85,13 +85,14 @@
 
 ## 7. Phase、Action 与私有状态
 
-- `BloodbattlePhase`：`exchanging → choosing-lack → playing ⇄ awaiting-claims → finished`（`exchangeThree=false` 时跳过 `exchanging`）
+- `BloodbattlePhase`：`exchanging → choosing-lack → playing ⇄ awaiting-claims ⇄ awaiting-draw → finished`（`exchangeThree=false` 时跳过 `exchanging`）
   - `exchanging`/`choosing-lack`：四家独立提交，全员提交后自动转移
   - `playing`：缺门出牌、碰/胡声明、多赢家、杠、抢杠胡、呼叫转移、三家胡/牌墙耗尽与流局终局结算
-- `BloodbattleAction`（`packages/core/src/rulesets/bloodbattle/types.ts`）：前置阶段的 exchangeThree/chooseLack，playing 阶段动作与垃圾胡同构复用
+  - `awaiting-draw`：出牌无人应下 / 声明窗口裁决无人胡 / 自杠或被杠后（peng 除外——peng 不摸牌，直接回 `playing`），轮到的座位已确定但还未摸牌；`myActionOptions` 精确为 `[{type:"draw"}]`
+- `BloodbattleAction`（`packages/core/src/rulesets/bloodbattle/types.ts`）：前置阶段的 exchangeThree/chooseLack，playing 阶段动作与垃圾胡同构复用（含 `draw`）
 - `BloodbattleState` 顶层可选字段（无独立 `variantState` 命名空间）：换三张阶段数据 `exchange?`、定缺选择 `lack?`、playing 阶段各家已胡标记与胡牌快照、基础杠分流水、补杠抢杠胡窗口、抢杠胡后的呼叫转移、流局查花猪/退税/查大叫
 
-摸牌为引擎自动转移，不是玩家 Action，杠后补摸同理。
+摸牌是 core 显式 gate 的 `{type:"draw"}` 动作（与垃圾胡同构，见 `junk.md` §2/§5），不是内联副作用，杠后补摸同理；谁/何时提交该动作是 server 编排层职责，不属于本文件范围。此前"出牌后无人应下"路径不会广播 `ClaimWindowResolved`——与本节 §8 开头"垃圾胡基础事件本玩法同样具备"的说法不一致——这次一并补上，payload 携带 `seat` 供事件重建判断下一位摸牌者。
 
 ## 8. 事件清单（在垃圾胡公共事件基础上新增）
 

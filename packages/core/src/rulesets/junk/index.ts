@@ -7,6 +7,7 @@ import {
   applyAnGang,
   applyBuGang,
   applyDiscard,
+  applyDrawAction,
   appendEvent,
   cloneState,
   computeNextJunkDealer,
@@ -52,6 +53,9 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
         ? [...options.map((option) => option.action), { type: "pass" }]
         : [];
     }
+    if (state.phase === "awaiting-draw") {
+      return state.currentSeat === seat ? [{ type: "draw" }] : [];
+    }
     if (state.phase !== "playing" || state.currentSeat !== seat) return [];
     const hand = state.seats[seat]!.hand;
     const actions: JunkAction[] = hand.map((tile) => ({ type: "discard", tile }));
@@ -76,6 +80,7 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
       result = applyClaimResponse(state, seat, action, events);
     else if (action.type === "anGang") result = applyAnGang(state, seat, action.kind, events);
     else if (action.type === "buGang") result = applyBuGang(state, seat, action.tile, events);
+    else if (action.type === "draw") result = applyDrawAction(state, seat, events);
     else if (action.type === "zimo") {
       result =
         state.phase !== "playing" || state.currentSeat !== seat || !isWin(state, seat)

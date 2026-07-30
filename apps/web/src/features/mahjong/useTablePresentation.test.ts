@@ -38,19 +38,20 @@ describe("useTablePresentation", () => {
     expect(presentation.seats.bottom.handTiles).toEqual([1, 2, -1, 3]);
     expect(presentation.seats.bottom.revealed).toBe(true);
     // The pinned drawn slot keys by the actual TileId so a new draw remounts
-    // it (see SeatContent.drawnSlotKey); canAnimateEntries defaults to false
-    // so nobody's drawn slot plays the entry animation here.
+    // it (see SeatContent.drawnSlotKey); whether it plays an entry animation
+    // is now decided by animationLedger, not here — see drawnSlotLedgerKey,
+    // a fixed per-seat lane key (gameNumber defaults to 1).
     expect(presentation.seats.bottom.drawnSlotKey).toBe("own-3");
-    expect(presentation.seats.bottom.drawnSlotEntering).toBe(false);
+    expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
     expect(presentation.seats.right.drawnSlotKey).toBe("none");
-    // No per-tile targeting needed for meld entries — see SeatContent.meldEntering.
-    expect(presentation.seats.bottom.meldEntering).toBe(false);
+    expect(presentation.seats.right.drawnSlotLedgerKey).toBe("g1:draw:opp:1");
     expect(presentation.discards.right[0]).toMatchObject({
       tile: 9,
       justDiscarded: true,
-      // canAnimateEntries defaults to false — a caller that omits it (or is
-      // mid reconnect/backlog-catch-up) never gets a spurious entry animation.
-      enterAnimation: false,
+      // Whether this discard plays an entry animation is now decided by
+      // animationLedger (see useSlotEntering) — this is just the fixed
+      // seat+index key it reads by, not the entering flag itself.
+      discardLedgerKey: "g1:discard:1:0",
     });
     // A regular hand tile and the pinned just-drawn tile both discard through the same callback.
     presentation.seats.bottom.onDiscard?.(1);
@@ -59,7 +60,49 @@ describe("useTablePresentation", () => {
     expect(onDiscard).toHaveBeenNthCalledWith(2, 3);
   });
 
-  it("only flags the just-discarded tile for entry animation when canAnimateEntries is set", () => {
+  it("keys each meld by seat+index+tileCount, matching diffPlayerView's meld key exactly", () => {
+    const view = {
+      seat: 0,
+      hand: [1, 2],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "playing",
+      myActionOptions: [],
+      seats: [
+        {
+          handCount: 2,
+          melds: [{ type: "anGang", tiles: [1, 1, 1] }],
+          discards: [],
+          justDrawn: false,
+        },
+        {
+          handCount: 13,
+          melds: [{ type: "peng", tiles: [5, 5, 5], from: 0 }],
+          discards: [],
+          justDrawn: false,
+        },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [{ nickname: "Me" }, null, null, null],
+      onDiscard: vi.fn(),
+      gameNumber: 2,
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    expect(presentation.seats.bottom.melds[0]).toMatchObject({ meldLedgerKey: "g2:meld:0:0:3" });
+    // A meld claimed from my discard: fromDirection is derived (see meld.from), meldLedgerKey stays seat+index+tileCount only.
+    expect(presentation.seats.right.melds[0]).toMatchObject({
+      fromDirection: "bottom",
+      meldLedgerKey: "g2:meld:1:0:3",
+    });
+  });
+
+  it("keys each discard entry by seat+index, stable regardless of which one is most recent", () => {
     const view = {
       seat: 0,
       hand: [1, 2],
@@ -80,15 +123,18 @@ describe("useTablePresentation", () => {
       view,
       players: [{ nickname: "Me" }, null, null, null],
       onDiscard: vi.fn(),
-      canAnimateEntries: true,
+      gameNumber: 3,
     });
     if (!presentation) throw new Error("missing presentation");
 
-    expect(presentation.discards.right[0]).toMatchObject({ tile: 5, enterAnimation: false });
+    expect(presentation.discards.right[0]).toMatchObject({
+      tile: 5,
+      discardLedgerKey: "g3:discard:1:0",
+    });
     expect(presentation.discards.right[1]).toMatchObject({
       tile: 9,
       justDiscarded: true,
-      enterAnimation: true,
+      discardLedgerKey: "g3:discard:1:1",
     });
   });
 
@@ -112,19 +158,38 @@ describe("useTablePresentation", () => {
       view,
       players: [{ nickname: "Me" }, null, null, null],
       onDiscard: vi.fn(),
-      canAnimateEntries: true,
     });
     if (!presentation) throw new Error("missing presentation");
 
     expect(presentation.seats.right.drawnSlotKey).toBe("opp-1-14");
-    expect(presentation.seats.right.drawnSlotEntering).toBe(true);
-    // My own seat never drew this render — no entry animation for me either.
+    expect(presentation.seats.right.drawnSlotLedgerKey).toBe("g1:draw:opp:1");
     expect(presentation.seats.bottom.drawnSlotKey).toBe("none");
-    expect(presentation.seats.bottom.drawnSlotEntering).toBe(false);
-    // meldEntering just mirrors canAnimateEntries for every seat — MeldGroup's
-    // own remount-on-new-tile-identity semantics do the actual per-tile
-    // targeting (see SeatContent.meldEntering docs).
-    expect(presentation.seats.bottom.meldEntering).toBe(true);
-    expect(presentation.seats.right.meldEntering).toBe(true);
+    expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
+  });
+
+  it("hides the action dock during awaiting-draw (draw is server-auto-submitted, never clickable)", () => {
+    const view = {
+      seat: 0,
+      hand: [1, 2, 3],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "awaiting-draw",
+      myActionOptions: [{ type: "draw" }],
+      seats: [
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [{ nickname: "Me" }, null, null, null],
+      onDiscard: vi.fn(),
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    expect(presentation.hasDockActions).toBe(false);
   });
 });

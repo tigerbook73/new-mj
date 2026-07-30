@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/shared/ui/button";
 import { desktopTableLayoutConfig } from "@/features/mahjong/desktop.table-config";
+import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { sortTilesForDisplay, tileKindOf } from "@/features/mahjong/lib/mahjongTiles";
 import { cn } from "@/shared/lib/utils";
 import { ActionLabel } from "./ActionLabel";
@@ -32,26 +33,26 @@ interface ActionDockProps {
   justDrawn?: number | undefined;
   deadline?: number | null | undefined;
   error?: string | null | undefined;
+  config?: TableLayoutConfig | undefined;
 }
 
 const actionLabel = (type: string) => ACTION_LABELS[type] ?? type;
 const actionKey = (action: Action) => JSON.stringify(action);
 const CLAIM_MELD_TYPES = new Set(["chi", "peng", "minGang"]);
-const { actionDockZone: metrics } = desktopTableLayoutConfig;
-const CANDIDATE_TILE_HEIGHT_PCT = `${metrics.candidateHeight}%`;
-
 function ActionCandidate({
   action,
   hand,
   melds = [],
   lastDiscard,
   justDrawn,
+  metrics,
 }: {
   action: Action;
   hand: number[];
   melds?: Meld[] | undefined;
   lastDiscard?: number | undefined;
   justDrawn?: number | undefined;
+  metrics: TableLayoutConfig["actionDockZone"];
 }) {
   const isClaimMeld = CLAIM_MELD_TYPES.has(String(action.type));
   const contextTile =
@@ -107,7 +108,7 @@ function ActionCandidate({
             <Tile
               key={`${String(tile)}-${index}`}
               tileId={Number(tile)}
-              heightPx={CANDIDATE_TILE_HEIGHT_PCT}
+              height={`${metrics.candidateHeight}%`}
               justDiscarded={isTarget}
               {...(isTarget ? { testId: "action-target-tile" } : {})}
             />
@@ -117,14 +118,7 @@ function ActionCandidate({
     );
   }
   const label = action.kind === undefined ? actionLabel(String(action.type)) : String(action.kind);
-  return (
-    <span
-      className="flex items-center"
-      style={{ height: CANDIDATE_TILE_HEIGHT_PCT, aspectRatio: label.length >= 2 ? 1.4 : 1 }}
-    >
-      <ActionLabel text={label} />
-    </span>
-  );
+  return <ActionLabel text={label} style={{ height: `${metrics.candidateHeight}%` }} />;
 }
 
 export function ActionDock({
@@ -137,7 +131,9 @@ export function ActionDock({
   justDrawn,
   deadline,
   error,
+  config = desktopTableLayoutConfig,
 }: ActionDockProps) {
+  const metrics = config.actionDockZone;
   const [activeType, setActiveType] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Record<string, string>>({});
   const groups = Object.values(
@@ -192,17 +188,13 @@ export function ActionDock({
           // active group, same as a candidate looks "picked" when selected.
           const isActive = type === String(activeGroup?.[0]?.type);
           const label = actionLabel(type);
-          const isWideLabel = label.length >= 2;
           return (
             <Button
               key={type}
               aria-label={label}
               variant={isActive ? "default" : "outline"}
               className={cn("p-0", !isActive && "bg-background/80 text-foreground")}
-              style={{
-                height: `${metrics.actionButtonHeight}%`,
-                aspectRatio: isWideLabel ? metrics.wideLabelWidthRatio : 1,
-              }}
+              style={{ height: `${metrics.actionButtonHeight}%` }}
               onMouseEnter={() => activate(group)}
               onFocus={() => activate(group)}
               onClick={() => {
@@ -210,7 +202,7 @@ export function ActionDock({
                 else onAction(group[0]!);
               }}
             >
-              <ActionLabel className="size-full" text={label} />
+              <ActionLabel text={label} />
             </Button>
           );
         })}
@@ -251,6 +243,7 @@ export function ActionDock({
                   melds={melds}
                   lastDiscard={lastDiscard}
                   justDrawn={justDrawn}
+                  metrics={metrics}
                 />
               </Button>
             );

@@ -1,8 +1,12 @@
+import { motion } from "motion/react";
 import { SEAT_ROTATION, type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
 import { Tile, type TileProps } from "./Tile";
+import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "./tileMotionTiming";
 
-interface TileClaimSlotProps extends Omit<TileProps, "widthPx" | "heightPx"> {
+const BADGE_ENTER_TRANSITION = { duration: TILE_ENTRY_DURATION, ease: TILE_MOTION_EASE } as const;
+
+interface TileClaimSlotProps extends Omit<TileProps, "width" | "height"> {
   /** This slot's own on-screen seat direction — the badge counter-rotates against the ambient Zone rotation for this direction so its arrow always points the true on-screen way, regardless of how this slot's own Zone is rotated. */
   direction: SeatDirection;
   /** Direction the claim came from; omit to render the tile with no badge at all. */
@@ -24,16 +28,25 @@ export function TileClaimSlot({
   claimFromDirection,
   aspectRatio,
   claimTestId,
+  entering,
   ...tileProps
 }: TileClaimSlotProps) {
   const ClaimIcon = claimFromDirection ? DIRECTION_ARROW_ICON[claimFromDirection] : undefined;
   return (
     <div className="relative h-full" style={{ aspectRatio: `1 / ${aspectRatio}` }}>
-      <Tile {...tileProps} heightPx="100%" />
+      <Tile {...tileProps} entering={entering} height="100%" />
       {ClaimIcon && (
-        <div
+        // Fades in alongside the tile's own entry instead of popping in
+        // instantly underneath it — same `entering`-gated `initial`/`animate`
+        // convention as TileMotion (motion only honors `initial` at mount, so
+        // reading `entering` live here is safe: it can't restart the fade on
+        // a later re-render).
+        <motion.div
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
           style={{ transform: `rotate(${-SEAT_ROTATION[direction]}deg)` }}
+          initial={entering ? { opacity: 0 } : false}
+          animate={{ opacity: 1 }}
+          transition={BADGE_ENTER_TRANSITION}
         >
           {/*
            * lucide-react icons render an <svg width="24" height="24"> — giving
@@ -50,7 +63,7 @@ export function TileClaimSlot({
           >
             <ClaimIcon data-testid={claimTestId} className="h-full w-full" />
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );

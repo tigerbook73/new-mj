@@ -1,8 +1,14 @@
 import type { ReactNode } from "react";
-import { assertLayoutPreset, ZoneRenderer, type LayoutPreset, type Zone } from "@/shared/lib/layoutPreset";
+import {
+  assertLayoutPreset,
+  ZoneRenderer,
+  type LayoutPreset,
+  type Zone,
+} from "@/shared/lib/layoutPreset";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { DiscardEntry } from "./DiscardPile";
 import type { Meld } from "./MeldGroup";
+import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 
 export interface SeatContent {
   melds: Meld[];
@@ -32,19 +38,8 @@ export interface SeatContent {
    * entry animation) for unrelated state changes.
    */
   drawnSlotKey: string;
-  /** Gates the pinned drawn-tile slot's one-shot entry animation — see useIsIncrementalSnapshot / usePrefersReducedMotion. */
-  drawnSlotEntering: boolean;
-  /**
-   * Gates meld tiles' one-shot entry animation. Unlike drawnSlotEntering, no
-   * per-tile targeting is needed: a whole new meld (chi/peng/minGang/anGang)
-   * is a brand-new `melds` array entry, and buGang's added 4th tile is a
-   * genuinely new TileId within an existing meld — both cases already mount
-   * fresh Tile instances under MeldGroup's existing tile-identity keys, so
-   * passing this uniformly to every meld tile only visibly animates the ones
-   * that actually mount this render (see Tile.tsx's `initial`-only-at-mount
-   * semantics).
-   */
-  meldEntering: boolean;
+  /** animationLedger key for this seat's draw lane — see useSlotEntering, and useTablePresentation.ts's drawnSlotLedgerKey. */
+  drawnSlotLedgerKey: string;
 }
 
 /**
@@ -61,6 +56,7 @@ export interface TableZoneContext {
   center: ReactNode;
   actionDock?: ReactNode | undefined;
   currentDirection?: SeatDirection | undefined;
+  config: TableLayoutConfig;
 }
 
 export type TableZoneComponent = (ctx: TableZoneContext) => ReactNode;
@@ -68,6 +64,7 @@ export type TableZoneComponent = (ctx: TableZoneContext) => ReactNode;
 /** A LayoutPreset bundled with the zone components that render into it — the atomic unit a screen scenario swaps. */
 export interface TableScenario {
   preset: LayoutPreset;
+  config: TableLayoutConfig;
   components: Readonly<Record<string, TableZoneComponent>>;
 }
 
@@ -112,6 +109,7 @@ export function TableBoard({
             center,
             actionDock,
             currentDirection,
+            config: scenario.config,
           }) ?? null
         }
       />
