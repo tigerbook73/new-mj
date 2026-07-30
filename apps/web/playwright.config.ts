@@ -1,12 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
-import { playwrightWorktreeRuntime } from "@new-mj/devtools";
+import { playwrightWorktreeOverrides } from "@new-mj/devtools";
 
 /**
  * Dedicated e2e ports, distinct from the dev-mode defaults (web 5173,
  * server 3000) so a running `pnpm dev` isn't disturbed by e2e runs and
  * vice versa — Playwright boots its own web + server pair here.
  */
-const { webPort, serverPort, workers, baseURL } = playwrightWorktreeRuntime();
+const { webPort = 5274, serverPort = 3100, workers } = playwrightWorktreeOverrides() ?? {};
+const baseURL = `http://localhost:${webPort}`;
 
 export default defineConfig({
   testDir: "./test",

@@ -4,7 +4,7 @@ import {
   firstAvailableWorktreeSlot,
   environmentLinkNames,
   parseWorktreeSlot,
-  playwrightWorktreeRuntime,
+  playwrightWorktreeOverrides,
   viteWorktreeServer,
   worktreeConfigFor,
   worktreeEnvironment,
@@ -51,21 +51,20 @@ test("Vite adapter preserves direct-command defaults and validates configured po
   assert.throws(() => viteWorktreeServer({ VITE_PORT: "invalid" }));
 });
 
-test("Playwright adapter preserves direct-command worker behavior", () => {
-  assert.deepEqual(playwrightWorktreeRuntime({}), {
-    webPort: 5274,
-    serverPort: 3100,
-    workers: undefined,
-    baseURL: "http://localhost:5274",
-  });
+test("Playwright adapter returns only validated worktree overrides", () => {
+  assert.equal(playwrightWorktreeOverrides({}), undefined);
   assert.deepEqual(
-    playwrightWorktreeRuntime({ E2E_WEB_PORT: "5278", E2E_SERVER_PORT: "3104", E2E_WORKERS: "1" }),
+    playwrightWorktreeOverrides({
+      E2E_WEB_PORT: "5278",
+      E2E_SERVER_PORT: "3104",
+      E2E_WORKERS: "1",
+    }),
     {
       webPort: 5278,
       serverPort: 3104,
       workers: 1,
-      baseURL: "http://localhost:5278",
     },
   );
-  assert.throws(() => playwrightWorktreeRuntime({ E2E_WORKERS: "0" }));
+  assert.deepEqual(playwrightWorktreeOverrides({ E2E_WEB_PORT: "5278" }), { webPort: 5278 });
+  assert.throws(() => playwrightWorktreeOverrides({ E2E_WORKERS: "0" }));
 });

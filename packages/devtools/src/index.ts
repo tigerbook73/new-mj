@@ -56,9 +56,9 @@ export const environmentLinkNames = (
     .map(({ name }) => name)
     .sort();
 
-const readPort = (name: string, fallback: number, env: NodeJS.ProcessEnv): number => {
+const readPort = (name: string, env: NodeJS.ProcessEnv): number | undefined => {
   const raw = env[name];
-  if (!raw) return fallback;
+  if (!raw) return undefined;
   const port = Number(raw);
   if (!Number.isInteger(port) || port < 1 || port > 65_535)
     throw new Error(`${name} must be an integer TCP port; received ${raw}`);
@@ -66,12 +66,19 @@ const readPort = (name: string, fallback: number, env: NodeJS.ProcessEnv): numbe
 };
 
 export const viteWorktreeServer = (env: NodeJS.ProcessEnv = process.env) => {
-  const raw = env["VITE_PORT"];
-  if (!raw) return undefined;
-  return { port: readPort("VITE_PORT", 5173, env), strictPort: true };
+  const port = readPort("VITE_PORT", env);
+  return port === undefined ? undefined : { port, strictPort: true };
 };
 
-export const playwrightWorktreeRuntime = (env: NodeJS.ProcessEnv = process.env) => {
+export type PlaywrightWorktreeOverrides = {
+  webPort?: number;
+  serverPort?: number;
+  workers?: number;
+};
+
+export const playwrightWorktreeOverrides = (
+  env: NodeJS.ProcessEnv = process.env,
+): PlaywrightWorktreeOverrides | undefined => {
   const workersRaw = env["E2E_WORKERS"];
   let workers: number | undefined;
   if (workersRaw) {
@@ -80,7 +87,12 @@ export const playwrightWorktreeRuntime = (env: NodeJS.ProcessEnv = process.env) 
       throw new Error(`E2E_WORKERS must be a positive integer; received ${workersRaw}`);
   }
 
-  const webPort = readPort("E2E_WEB_PORT", 5274, env);
-  const serverPort = readPort("E2E_SERVER_PORT", 3100, env);
-  return { webPort, serverPort, workers, baseURL: `http://localhost:${webPort}` };
+  const webPort = readPort("E2E_WEB_PORT", env);
+  const serverPort = readPort("E2E_SERVER_PORT", env);
+  if (webPort === undefined && serverPort === undefined && workers === undefined) return undefined;
+  return {
+    ...(webPort === undefined ? {} : { webPort }),
+    ...(serverPort === undefined ? {} : { serverPort }),
+    ...(workers === undefined ? {} : { workers }),
+  };
 };
