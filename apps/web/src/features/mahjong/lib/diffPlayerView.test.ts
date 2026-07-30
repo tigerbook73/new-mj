@@ -1,6 +1,6 @@
 import type { PlayerViewBase } from "@new-mj/protocol";
 import { describe, expect, it } from "vitest";
-import { diffPlayerView } from "./diffPlayerView";
+import { diffPlayerView, soleDiscardedTile } from "./diffPlayerView";
 
 const emptySeat = { handCount: 13, melds: [], discards: [], justDrawn: false };
 
@@ -149,5 +149,26 @@ describe("diffPlayerView", () => {
     const keys = diffPlayerView(prev, next, 0).map((event) => event.key);
     expect(keys).toEqual(["discard:0:0", "discard:1:0"]);
     expect(new Set(keys).size).toBe(2);
+  });
+});
+
+describe("soleDiscardedTile", () => {
+  const view = (hand: number[]): PlayerViewBase =>
+    ({ seat: 0, hand, wallCount: 80, currentSeat: 0, seats: [] }) as unknown as PlayerViewBase;
+
+  it("identifies the single tile that left the hand on a plain discard", () => {
+    expect(soleDiscardedTile(view([1, 2, 3]), view([1, 3]))).toBe(2);
+  });
+
+  it("returns undefined when the hand grew (a draw, not a discard)", () => {
+    expect(soleDiscardedTile(view([1, 2, 3]), view([1, 2, 3, 9]))).toBeUndefined();
+  });
+
+  it("returns undefined when several tiles left at once (a claim, not a plain discard)", () => {
+    expect(soleDiscardedTile(view([1, 2, 3, 4, 5]), view([1, 5]))).toBeUndefined();
+  });
+
+  it("returns undefined when the hand is unchanged", () => {
+    expect(soleDiscardedTile(view([1, 2, 3]), view([1, 2, 3]))).toBeUndefined();
   });
 });

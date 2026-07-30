@@ -50,9 +50,10 @@ describe("useTablePresentation", () => {
     expect(presentation.discards.right[0]).toMatchObject({
       tile: 9,
       justDiscarded: true,
-      // canAnimateEntries defaults to false — a caller that omits it (or is
-      // mid reconnect/backlog-catch-up) never gets a spurious entry animation.
-      enterAnimation: false,
+      // Whether this discard plays an entry animation is now decided by
+      // animationLedger (see useSlotEntering) — this is just the fixed
+      // seat+index key it reads by, not the entering flag itself.
+      discardLedgerKey: "g1:discard:1:0",
     });
     // A regular hand tile and the pinned just-drawn tile both discard through the same callback.
     presentation.seats.bottom.onDiscard?.(1);
@@ -61,7 +62,7 @@ describe("useTablePresentation", () => {
     expect(onDiscard).toHaveBeenNthCalledWith(2, 3);
   });
 
-  it("only flags the just-discarded tile for entry animation when canAnimateEntries is set", () => {
+  it("keys each discard entry by seat+index, stable regardless of which one is most recent", () => {
     const view = {
       seat: 0,
       hand: [1, 2],
@@ -83,14 +84,18 @@ describe("useTablePresentation", () => {
       players: [{ nickname: "Me" }, null, null, null],
       onDiscard: vi.fn(),
       canAnimateEntries: true,
+      gameNumber: 3,
     });
     if (!presentation) throw new Error("missing presentation");
 
-    expect(presentation.discards.right[0]).toMatchObject({ tile: 5, enterAnimation: false });
+    expect(presentation.discards.right[0]).toMatchObject({
+      tile: 5,
+      discardLedgerKey: "g3:discard:1:0",
+    });
     expect(presentation.discards.right[1]).toMatchObject({
       tile: 9,
       justDiscarded: true,
-      enterAnimation: true,
+      discardLedgerKey: "g3:discard:1:1",
     });
   });
 

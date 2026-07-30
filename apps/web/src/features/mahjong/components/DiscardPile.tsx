@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { DiscardFlipGhost } from "./DiscardFlipGhost";
 import { Tile } from "./Tile";
@@ -12,8 +13,8 @@ export type DiscardEntry = {
   claimedByDirection?: SeatDirection;
   /** True for the single most recent discard on the table (view.lastDiscard). */
   justDiscarded?: boolean;
-  /** True when justDiscarded should also play its one-shot entry animation — see useIsIncrementalSnapshot. */
-  enterAnimation?: boolean;
+  /** animationLedger key for this exact entry — see useSlotEntering, and useTablePresentation.ts's discardLedgerKey. */
+  discardLedgerKey: string;
   /**
    * This tile's own hand-side rect, captured at click time (see HandRow.tsx's
    * `captureTileRect`) — only ever present for my own discards, and only for
@@ -98,13 +99,15 @@ export function DiscardPile({ direction, discards, metrics }: DiscardPileProps) 
 /**
  * Owns the per-entry hook state a plain `.map()` callback can't (rules of
  * hooks) — specifically, whether to mount a `DiscardFlipGhost` alongside this
- * slot's real tile. `ghostOrigin` is captured once via `useState` (not read
- * live from `entry.flightOrigin` on every render), same reasoning as
- * MeldGroup.tsx's `MeldClaimTile`: TableView clears its own pending-origin
- * state once the next snapshot arrives (see TableView.tsx), which would flip
- * `entry.flightOrigin` back to `undefined` on the very next render — reading
- * it live here would yank the ghost off mid-flight for a reason that has
- * nothing to do with the flight itself actually finishing.
+ * slot's real tile. `useSlotEntering` reads animationLedger's resolution for
+ * `entry.discardLedgerKey` exactly once at mount. `ghostOrigin` is then
+ * captured once more via `useState` (not read live from `entry.flightOrigin`
+ * on every render), same reasoning as MeldGroup.tsx's `MeldClaimTile`:
+ * TableView clears its own pending-origin state once the next snapshot
+ * arrives (see TableView.tsx), which would flip `entry.flightOrigin` back to
+ * `undefined` on the very next render — reading it live here would yank the
+ * ghost off mid-flight for a reason that has nothing to do with the flight
+ * itself actually finishing.
  */
 function DiscardTileSlot({
   direction,
@@ -115,8 +118,9 @@ function DiscardTileSlot({
   entry: DiscardEntry;
   aspectRatio: number;
 }) {
+  const { entering, ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
   const [ghostOrigin] = useState<DOMRect | null>(() =>
-    entry.enterAnimation && entry.flightOrigin ? entry.flightOrigin : null,
+    ghost && entry.flightOrigin ? entry.flightOrigin : null,
   );
   const toRef = useRef<HTMLDivElement>(null);
 
@@ -138,10 +142,17 @@ function DiscardTileSlot({
           // condition `dimmed` above already reacts to on the very same
           // render, so the shrink and the dim-to-tombstone land together.
           enlarged={entry.justDiscarded && entry.claimedBy === undefined}
-          entering={entry.enterAnimation}
+          entering={entering}
         />
       </div>
-      {ghostOrigin && <DiscardFlipGhost tileId={entry.tile} fromRect={ghostOrigin} toRef={toRef} />}
+      {ghostOrigin && (
+        <DiscardFlipGhost
+          tileId={entry.tile}
+          fromRect={ghostOrigin}
+          toRef={toRef}
+          onAnimationComplete={onGhostComplete}
+        />
+      )}
     </>
   );
 }

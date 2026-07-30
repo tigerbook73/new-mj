@@ -156,7 +156,7 @@ export function useTablePresentation({
   const discards = Object.fromEntries(
     SEAT_DIRECTIONS.map((direction) => {
       const seat = seatAt(view.seat, direction);
-      const entries = seatData(seat).discards.map((entry) => {
+      const entries = seatData(seat).discards.map((entry, index) => {
         const justDiscarded =
           extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile;
         return {
@@ -166,7 +166,9 @@ export function useTablePresentation({
               ? directionOf(view.seat, entry.claimedBy as SeatId)
               : undefined,
           justDiscarded,
-          enterAnimation: justDiscarded && canAnimateEntries,
+          // animationLedger key for this exact discard entry — see
+          // diffPlayerView.ts's discard:<seat>:<index> key scheme.
+          discardLedgerKey: `g${gameNumber}:discard:${seat}:${index}`,
           flightOrigin:
             pendingDiscardOrigin?.tile === entry.tile ? pendingDiscardOrigin.rect : undefined,
         };

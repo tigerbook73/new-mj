@@ -53,6 +53,7 @@ const discardsFor = (kind: PreviewCase): Record<SeatDirection, DiscardEntry[]> =
   const pile = (start: number): DiscardEntry[] =>
     Array.from({ length: amount }, (_, index) => ({
       tile: (start + index) % 136,
+      discardLedgerKey: `preview-${start}-${index}`,
       ...(index === amount - 1 ? { justDiscarded: true } : {}),
     }));
   return { bottom: pile(0), right: pile(28), top: pile(56), left: pile(84) };

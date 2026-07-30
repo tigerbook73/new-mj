@@ -22,6 +22,7 @@ import {
   resetAnimationLedger,
   shouldRegisterSnapshotDiff,
 } from "@/features/mahjong/lib/animationLedger";
+import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
 import { useSessionStore } from "@/shared/store/session";
@@ -53,14 +54,16 @@ export function TableView() {
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
-  // Pure click-time geometry for the discard-flying-out ghost (see
-  // DiscardFlipGhost.tsx / HandRow.tsx's captureTileRect) — never read as
-  // game state, only handed to useTablePresentation to attach onto the
-  // matching DiscardEntry once the server's own snapshot actually lands.
-  // Only ever set from my own hand's click handler below (`onDiscard`) — an
-  // opponent's discard never populates this, on purpose; see DiscardEntry's
-  // `flightOrigin` doc (DiscardPile.tsx) for why a flight there isn't worth
-  // it.
+  // Pure geometry for the discard-flying-out ghost (see DiscardFlipGhost.tsx
+  // / HandRow.tsx's captureTileRect) — never read as game state, only handed
+  // to useTablePresentation to attach onto the matching DiscardEntry once
+  // the server's own snapshot actually lands. Set either from my own hand's
+  // click handler below (`onDiscard`), or — for an auto-submitted (timeout)
+  // discard that never went through a click — synchronously measured in
+  // onSnapshot below via soleDiscardedTile, while the old DOM (still showing
+  // the tile in hand) is still mounted. An opponent's discard never
+  // populates this either way, on purpose; see DiscardEntry's `flightOrigin`
+  // doc (DiscardPile.tsx) for why a flight there isn't worth it.
   // Deliberately never explicitly cleared: a TileId never repeats within a
   // round (architecture iron rule 4), and DiscardPile's per-entry slot
   // (DiscardTileSlot) only ever reads this once, at the single render where
@@ -97,6 +100,18 @@ export function TableView() {
           event.view.seat,
           currentRoom?.gameNumber ?? 1,
         );
+        // Closes the gap for an auto-submitted (timeout) discard, which never
+        // ran through onDiscard's click-time capture below — measure the
+        // departing hand tile's own rect now, before this render swaps it out.
+        if (currentView) {
+          const discardedTile = soleDiscardedTile(currentView, event.view);
+          if (discardedTile !== undefined) {
+            const rect = document
+              .querySelector(`[data-tile-id="${discardedTile}"]`)
+              ?.getBoundingClientRect();
+            if (rect) setPendingDiscardOrigin({ tile: discardedTile, rect });
+          }
+        }
       }
       useSessionStore.getState().applyGameSnapshot(event);
     };

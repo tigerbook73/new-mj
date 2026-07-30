@@ -11,6 +11,8 @@ interface DiscardFlipGhostProps {
   fromRect: DOMRect;
   /** Ref to the real discard-pile tile this ghost flies toward; also this flight's resting box. */
   toRef: RefObject<HTMLElement | null>;
+  /** Fires once the flight settles — see useSlotEntering/animationLedger's completeSlot. */
+  onAnimationComplete?: (() => void) | undefined;
 }
 
 const GHOST_TRANSITION = { duration: DISCARD_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
@@ -28,7 +30,12 @@ const GHOST_TRANSITION = { duration: DISCARD_FLIGHT_DURATION, ease: TILE_MOTION_
  * rule 5 (no state update is ever driven by this measurement or by the
  * command ack).
  */
-export function DiscardFlipGhost({ tileId, fromRect, toRef }: DiscardFlipGhostProps) {
+export function DiscardFlipGhost({
+  tileId,
+  fromRect,
+  toRef,
+  onAnimationComplete,
+}: DiscardFlipGhostProps) {
   const [flight, clear] = useFlightGhost(() => fromRect, toRef);
 
   if (!flight) return null;
@@ -53,7 +60,10 @@ export function DiscardFlipGhost({ tileId, fromRect, toRef }: DiscardFlipGhostPr
       initial={{ x: dx, y: dy, scaleX, scaleY }}
       animate={{ x: 0, y: 0, scaleX: 1, scaleY: 1 }}
       transition={GHOST_TRANSITION}
-      onAnimationComplete={clear}
+      onAnimationComplete={() => {
+        clear();
+        onAnimationComplete?.();
+      }}
     >
       <Tile tileId={tileId} height="100%" />
     </motion.div>,

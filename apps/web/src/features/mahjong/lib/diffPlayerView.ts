@@ -92,3 +92,20 @@ export function diffPlayerView(
 
   return events;
 }
+
+/**
+ * The single TileId that left my own concealed hand between `prev` and
+ * `next`, if this pair of snapshots looks like exactly one plain discard
+ * (hand shrank by exactly one tile) — `undefined` for anything else (a draw,
+ * a claim pulling several tiles out at once, or no change), so callers never
+ * have to guess which of several removed tiles was the discarded one.
+ * `PlayerViewBase.hand` is always the requesting seat's own hand regardless
+ * of ruleset, so this needs no seat/ruleset-specific field access — unlike
+ * diffPlayerView's discard/meld diffs, which do read ruleset-private fields.
+ */
+export function soleDiscardedTile(prev: PlayerViewBase, next: PlayerViewBase): number | undefined {
+  if (next.hand.length !== prev.hand.length - 1) return undefined;
+  const nextHand = new Set(next.hand);
+  const removed = prev.hand.filter((tile) => !nextHand.has(tile));
+  return removed.length === 1 ? removed[0] : undefined;
+}
