@@ -76,6 +76,30 @@ export function resolveSlot(key: string): Resolution {
 }
 
 /**
+ * Recovers the seat a *fully-prefixed* draw key (e.g. `g3:draw:opp:1`)
+ * occupies a lane for, so callers (useSlotEntering) can settle it without
+ * having to separately thread a seat prop through every consuming
+ * component. Discard/meld keys never match and yield `undefined` — harmless,
+ * since `completeSlot`'s `seat` param is a no-op when omitted.
+ */
+export function laneSeatFromKey(key: string): SeatId | undefined {
+  const match = /draw:(?:own|opp):(\d+)$/.exec(key);
+  return match ? (Number(match[1]) as SeatId) : undefined;
+}
+
+/**
+ * The seq guard TableView's `game:snapshot` handler must apply before
+ * calling registerSnapshotDiff: strictly greater than the current `gameSeq`
+ * (a same-seq resend must not re-diff and double-occupy a lane), and only
+ * once `gameSeq !== null` (the first snapshot of a new epoch never diffs
+ * against a stale, prior-game `view` — see docs/process/table-animation-
+ * refactor.md's TableView.tsx sample).
+ */
+export function shouldRegisterSnapshotDiff(gameSeq: number | null, eventSeq: number): boolean {
+  return gameSeq !== null && eventSeq > gameSeq;
+}
+
+/**
  * Must be idempotent: both a ghost's `onAnimationComplete` and the
  * consuming slot's unmount cleanup call this for the same key, and there's
  * no guarantee either fires exactly once. `seat` is only needed to release

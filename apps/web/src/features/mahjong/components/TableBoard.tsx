@@ -38,11 +38,12 @@ export interface SeatContent {
    * entry animation) for unrelated state changes.
    */
   drawnSlotKey: string;
-  /** Gates the pinned drawn-tile slot's one-shot entry animation — see useIsIncrementalSnapshot / usePrefersReducedMotion. */
-  drawnSlotEntering: boolean;
+  /** animationLedger key for this seat's draw lane — see useSlotEntering, and useTablePresentation.ts's drawnSlotLedgerKey. */
+  drawnSlotLedgerKey: string;
   /**
-   * Gates meld tiles' one-shot entry animation. Unlike drawnSlotEntering, no
-   * per-tile targeting is needed: a whole new meld (chi/peng/minGang/anGang)
+   * Gates meld tiles' one-shot entry animation. Unlike the draw slot's
+   * per-seat animationLedger lane, no per-tile targeting is needed: a whole
+   * new meld (chi/peng/minGang/anGang)
    * is a brand-new `melds` array entry, and buGang's added 4th tile is a
    * genuinely new TileId within an existing meld — both cases already mount
    * fresh Tile instances under MeldGroup's existing tile-identity keys, so

@@ -23,7 +23,7 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
   melds,
   revealed: info === "Tigerbook73",
   drawnSlotKey: `${info}-drawn`,
-  drawnSlotEntering: false,
+  drawnSlotLedgerKey: `${info}-drawn-ledger`,
   meldEntering: false,
 });
 

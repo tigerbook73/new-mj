@@ -2,9 +2,11 @@ import type { PlayerViewBase } from "@new-mj/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   completeSlot,
+  laneSeatFromKey,
   registerSnapshotDiff,
   resetAnimationLedger,
   resolveSlot,
+  shouldRegisterSnapshotDiff,
 } from "./animationLedger";
 
 const emptySeat = { handCount: 13, melds: [], discards: [], justDrawn: false };
@@ -136,6 +138,35 @@ describe("animationLedger", () => {
     expect(resolveSlot("g1:discard:0:0")).toBe("skip");
     // Settling game 1's slot must not touch game 2's identically-shaped key.
     expect(resolveSlot("g2:discard:0:0")).toBe("flight");
+  });
+
+  it("laneSeatFromKey recovers the seat from a fully-prefixed own/opp draw key", () => {
+    expect(laneSeatFromKey("g1:draw:own:0")).toBe(0);
+    expect(laneSeatFromKey("g3:draw:opp:2")).toBe(2);
+  });
+
+  it("laneSeatFromKey yields undefined for non-draw keys (discard/meld never occupy a lane)", () => {
+    expect(laneSeatFromKey("g1:discard:0:0")).toBeUndefined();
+    expect(laneSeatFromKey("g1:meld:1:0:3")).toBeUndefined();
+  });
+
+  it("shouldRegisterSnapshotDiff refuses the first snapshot of a new epoch (gameSeq === null)", () => {
+    expect(shouldRegisterSnapshotDiff(null, 1)).toBe(false);
+    expect(shouldRegisterSnapshotDiff(null, 0)).toBe(false);
+  });
+
+  it("shouldRegisterSnapshotDiff refuses a same-seq resend (must not double-register)", () => {
+    expect(shouldRegisterSnapshotDiff(5, 5)).toBe(false);
+  });
+
+  it("shouldRegisterSnapshotDiff refuses an out-of-order (older or equal) snapshot", () => {
+    expect(shouldRegisterSnapshotDiff(5, 4)).toBe(false);
+    expect(shouldRegisterSnapshotDiff(5, 1)).toBe(false);
+  });
+
+  it("shouldRegisterSnapshotDiff accepts a genuinely newer snapshot", () => {
+    expect(shouldRegisterSnapshotDiff(5, 6)).toBe(true);
+    expect(shouldRegisterSnapshotDiff(0, 1)).toBe(true);
   });
 
   it("resetAnimationLedger drops all resolutions and lane occupancy", () => {

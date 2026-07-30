@@ -10,6 +10,8 @@ interface DrawFlipGhostProps {
   tileId?: number | undefined;
   /** Ref to the real pinned drawn-tile slot this ghost flies toward; also this flight's resting box. */
   toRef: RefObject<HTMLElement | null>;
+  /** Fires once the flight settles — see useSlotEntering/animationLedger's completeSlot, which frees this seat's draw lane. */
+  onAnimationComplete?: (() => void) | undefined;
 }
 
 const GHOST_TRANSITION = { duration: DRAW_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
@@ -29,7 +31,7 @@ const GHOST_TRANSITION = { duration: DRAW_FLIGHT_DURATION, ease: TILE_MOTION_EAS
  * mid-flight and a plain "grow from smaller", and both read as an unwanted
  * "pop"/resize rather than a deliberate beat.
  */
-export function DrawFlipGhost({ tileId, toRef }: DrawFlipGhostProps) {
+export function DrawFlipGhost({ tileId, toRef, onAnimationComplete }: DrawFlipGhostProps) {
   const [flight, clear] = useFlightGhost(
     () => document.querySelector('[data-testid="table-center-status"]')?.getBoundingClientRect(),
     toRef,
@@ -55,7 +57,10 @@ export function DrawFlipGhost({ tileId, toRef }: DrawFlipGhostProps) {
       initial={{ x: dx, y: dy, opacity: 0 }}
       animate={{ x: 0, y: 0, opacity: 1 }}
       transition={GHOST_TRANSITION}
-      onAnimationComplete={clear}
+      onAnimationComplete={() => {
+        clear();
+        onAnimationComplete?.();
+      }}
     >
       <Tile {...(tileId !== undefined ? { tileId } : {})} height="100%" />
     </motion.div>,

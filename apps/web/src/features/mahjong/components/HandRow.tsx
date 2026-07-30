@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import { DrawFlipGhost } from "./DrawFlipGhost";
 import { Tile } from "./Tile";
 
@@ -33,9 +34,9 @@ interface HandRowProps {
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
   tileGapPx: number;
-  /** See SeatContent.drawnSlotKey / drawnSlotEntering (components/mahjong/TableBoard.tsx). */
+  /** See SeatContent.drawnSlotKey / drawnSlotLedgerKey (components/mahjong/TableBoard.tsx). */
   drawnSlotKey: string;
-  drawnSlotEntering: boolean;
+  drawnSlotLedgerKey: string;
 }
 
 /**
@@ -54,7 +55,7 @@ export function HandRow({
   tileHeight: tileHeight,
   tileGapPx,
   drawnSlotKey,
-  drawnSlotEntering,
+  drawnSlotLedgerKey,
 }: HandRowProps) {
   const drawnIndex = handTiles.length - 1;
   return (
@@ -77,7 +78,7 @@ export function HandRow({
               interactive={interactive}
               onDiscard={onDiscard}
               tileHeight={tileHeight}
-              entering={drawnSlotEntering}
+              ledgerKey={drawnSlotLedgerKey}
             />
           );
         }
@@ -130,14 +131,11 @@ export function HandRow({
 /**
  * Owns the per-draw hook state a plain `.map()` callback can't (rules of
  * hooks) — specifically, whether to mount a `DrawFlipGhost` alongside the
- * pinned drawn-tile slot. Captured once via `useState` rather than read live
- * from `entering`, same reasoning as MeldGroup.tsx's `MeldClaimTile`:
- * `drawnSlotEntering` (== canAnimateEntries) is only true for the single
- * render right after a live snapshot lands, so deciding "should this draw
- * get a ghost" on every render would unmount the ghost mid-flight the
- * moment any unrelated re-render happens to land while it's still playing.
- * Remounts fresh on every new draw (keyed by `drawnSlotKey` in HandRow), so
- * `shouldGhost` is re-captured correctly each time.
+ * pinned drawn-tile slot. `useSlotEntering` reads animationLedger's
+ * resolution for `ledgerKey` exactly once at mount, so a ghost already in
+ * flight is never unmounted mid-flight by an unrelated re-render. Remounts
+ * fresh on every new draw (keyed by `drawnSlotKey` in HandRow), so the
+ * resolution is re-read correctly each time.
  */
 function DrawnSlotTile({
   direction,
@@ -147,7 +145,7 @@ function DrawnSlotTile({
   interactive,
   onDiscard,
   tileHeight,
-  entering,
+  ledgerKey,
 }: {
   direction: SeatDirection;
   tileId: number;
@@ -156,9 +154,9 @@ function DrawnSlotTile({
   interactive?: boolean | undefined;
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
-  entering: boolean;
+  ledgerKey: string;
 }) {
-  const [shouldGhost] = useState(entering);
+  const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey);
   const toRef = useRef<HTMLDivElement>(null);
   const isPlaceholder = tileId < 0;
 
@@ -204,7 +202,13 @@ function DrawnSlotTile({
           />
         </div>
       </div>
-      {shouldGhost && <DrawFlipGhost {...(isReal ? { tileId } : {})} toRef={toRef} />}
+      {ghost && (
+        <DrawFlipGhost
+          {...(isReal ? { tileId } : {})}
+          toRef={toRef}
+          onAnimationComplete={onGhostComplete}
+        />
+      )}
     </>
   );
 }

@@ -158,7 +158,8 @@ const onSnapshot = (event: GameSnapshot) => {
 ### 分阶段落地
 
 - **阶段 0（纯基础设施，零可见行为变化）**：`diffPlayerView.ts` + `animationLedger.ts` 及各自单测（覆盖 junk 摸/打/吃碰杠、bloodbattle 无 justDrawn 时空产出、bloodbattle 同点数不同座位 key 不冲突、摸牌槽忙时第二次注册为 skip 且旧 lane 被结算、`completeSlot` 重复调用幂等、跨局同下标 key 因 gameNumber 前缀不碰撞；seq 守卫的同 seq/乱序场景在阶段 1 接入 TableView 时补）。验收：新单测通过，现有 e2e 原样绿。
-- **阶段 1（摸牌槽，收益最高，唯一有真实 bug 修复价值）**：`TableView.tsx` 接 `registerSnapshotDiff`（含 seq 守卫与 mount 时 `resetAnimationLedger()`）；`HandRow.tsx` 迁移；`useTablePresentation.ts` 去掉 `drawnSlotEntering`；补 seq 守卫的同 seq/乱序单测。验收：现有摸牌相关 e2e 断言不变、原样绿；新增"同座位连续两次摸牌不会强制中断/报错"的 e2e。**明确验收项**：测试环境 bot 节奏 0ms，摸牌 lane 冲突在 e2e 里是常态而非边界——摸牌动画断言优先落在己方路径，若对手摸牌断言不稳定，为动画用例单独配置非零 bot 节奏，不接受"跑一遍看看"。
+- **阶段 1（摸牌槽，收益最高，唯一有真实 bug 修复价值）**：`TableView.tsx` 接 `registerSnapshotDiff`（含 seq 守卫与 mount 时 `resetAnimationLedger()`）；`HandRow.tsx` 迁移；`useTablePresentation.ts` 去掉 `drawnSlotEntering`；补 seq 守卫的同 seq/乱序单测。验收：现有摸牌相关 e2e 断言不变、原样绿（86 个 e2e 全绿，含 draw/discard/meld 的 entering 与 reduced-motion 断言）。
+  - **"同座位连续两次摸牌不会强制中断/报错"改为单测覆盖，不新增 e2e**：实施时调研发现，当前 `apps/web/test/table.e2e-spec.ts` 的四个座位都是真实 Playwright 页面（非 AI bot），且全局共用同一个 server 进程 + 固定 `TEST_GAME_SEED=121`；这个精确形状（同一座位背靠背两次 `draw`，中间只夹一个 `GangMade`）只有暗杠/补杠会产生，而 seed=121 在朴素测试策略下全程不会出现暗杠机会。要稳定触发需要给这一个测试单独换 server 进程 + 新种子（验证过 seed=114/dealer=0 可行）或写一整局策略化脚本，投入明显超过这一验收项本身的价值。改为 `animationLedger.test.ts` 的"downgrades a second same-seat draw to skip while a first is still unresolved, and settles the old lane"直接覆盖调度逻辑本身（构造合成同座位连续两次摸牌 diff，断言不抛错、正确降级为 skip 并结算旧 lane）。
 - **阶段 2（弃牌墙）**：`DiscardPile.tsx` 迁移，去掉 `enterAnimation`。顺带落地"注册期测量手牌 rect"，让超时代打的弃牌也有飞行起点。
 - **阶段 3（副露）**：`MeldGroup.tsx` 迁移，去掉 `meldEntering`。
 - **阶段 4（收尾）**：`useTablePresentation.ts` 删掉 `canAnimateEntries` 参数；`TableView.tsx` 精简 `onSnapshot`；`useTablePresentation.test.ts` 同步更新。

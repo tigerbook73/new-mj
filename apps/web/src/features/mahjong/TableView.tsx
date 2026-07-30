@@ -17,6 +17,11 @@ import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
 import { TableBoard } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud } from "@/features/mahjong/components/TableHud";
+import {
+  registerSnapshotDiff,
+  resetAnimationLedger,
+  shouldRegisterSnapshotDiff,
+} from "@/features/mahjong/lib/animationLedger";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
 import { useSessionStore } from "@/shared/store/session";
@@ -41,6 +46,7 @@ export function TableView() {
   const snapshotRevision = useSessionStore((state) => state.snapshotRevision);
   const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -67,8 +73,31 @@ export function TableView() {
     rect: DOMRect;
   } | null>(null);
 
+  // Drops any residue from a prior mount (StrictMode double-mount, e2e
+  // remounts) — the ledger is a module singleton, not component state, so
+  // nothing else clears it when this component first mounts.
+  useEffect(() => {
+    resetAnimationLedger();
+  }, []);
+
   useEffect(() => {
     const onSnapshot = (event: GameSnapshot) => {
+      // registerSnapshotDiff must read the *pre-update* view/gameSeq and run
+      // before applyGameSnapshot swaps them — see animationLedger.ts's
+      // shouldRegisterSnapshotDiff for the seq guard's exact semantics.
+      const {
+        gameSeq: currentGameSeq,
+        view: currentView,
+        room: currentRoom,
+      } = useSessionStore.getState();
+      if (!prefersReducedMotion && shouldRegisterSnapshotDiff(currentGameSeq, event.seq)) {
+        registerSnapshotDiff(
+          currentView,
+          event.view,
+          event.view.seat,
+          currentRoom?.gameNumber ?? 1,
+        );
+      }
       useSessionStore.getState().applyGameSnapshot(event);
     };
     const onEvent = (message: GameEventEnvelope) => {
@@ -100,6 +129,7 @@ export function TableView() {
           : state,
       );
       useSessionStore.getState().resetGameSeq();
+      resetAnimationLedger();
     };
     const onSessionFinished = (message: { result: SessionResult }) =>
       setSessionResult(message.result);
@@ -131,7 +161,7 @@ export function TableView() {
       activeSocket.off("room:sessionFinished", onSessionFinished);
       activeSocket.off("room:closed", onClosed);
     };
-  }, [activeSocket, navigate, setRoom]);
+  }, [activeSocket, navigate, prefersReducedMotion, setRoom]);
 
   useEffect(() => {
     if (!view || gameSeq === null) return;
@@ -187,7 +217,6 @@ export function TableView() {
   };
 
   const isIncrementalSnapshot = useIsIncrementalSnapshot(gameSeq);
-  const prefersReducedMotion = usePrefersReducedMotion();
   const presentation = useTablePresentation({
     view,
     players: room?.players,
@@ -197,6 +226,7 @@ export function TableView() {
     },
     canAnimateEntries: isIncrementalSnapshot && !prefersReducedMotion,
     pendingDiscardOrigin,
+    gameNumber: room?.gameNumber ?? 1,
   });
 
   if (!view) {

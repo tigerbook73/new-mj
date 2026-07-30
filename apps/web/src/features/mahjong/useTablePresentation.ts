@@ -60,6 +60,7 @@ export function useTablePresentation({
   onDiscard,
   canAnimateEntries = false,
   pendingDiscardOrigin,
+  gameNumber = 1,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
@@ -68,6 +69,8 @@ export function useTablePresentation({
   canAnimateEntries?: boolean;
   /** See TableView.tsx — a click-time rect capture for the discard-flying-out ghost, matched against the newly-landed discard entry by TileId. */
   pendingDiscardOrigin?: { tile: number; rect: DOMRect } | null;
+  /** RoomInfo.gameNumber — prefixes drawnSlotLedgerKey so it lines up with animationLedger's game-scoped keys. */
+  gameNumber?: number;
 }) {
   if (!view) {
     return undefined;
@@ -124,6 +127,13 @@ export function useTablePresentation({
           : drawnVisible
             ? `opp-${seat}-${data.handCount}`
             : "none";
+      // animationLedger's key for this seat's draw lane — unlike drawnSlotKey
+      // (a React key that must change on every new draw so the slot remounts),
+      // this stays fixed per seat: only one draw can be "in flight" per seat
+      // at a time (the lane), so reusing the same ledger key across successive
+      // draws is exactly what lets a structural conflict resolve to skip — see
+      // animationLedger.ts.
+      const drawnSlotLedgerKey = `g${gameNumber}:draw:${direction === "bottom" ? "own" : "opp"}:${seat}`;
       const content: SeatContent = {
         melds: data.melds.map((meld) => ({
           ...meld,
@@ -135,7 +145,7 @@ export function useTablePresentation({
         revealed: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
         drawnSlotKey,
-        drawnSlotEntering: drawnVisible && canAnimateEntries,
+        drawnSlotLedgerKey,
         meldEntering: canAnimateEntries,
         ...(direction === "bottom" ? { interactive: isMyTurn, onDiscard } : {}),
       };

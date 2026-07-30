@@ -38,11 +38,13 @@ describe("useTablePresentation", () => {
     expect(presentation.seats.bottom.handTiles).toEqual([1, 2, -1, 3]);
     expect(presentation.seats.bottom.revealed).toBe(true);
     // The pinned drawn slot keys by the actual TileId so a new draw remounts
-    // it (see SeatContent.drawnSlotKey); canAnimateEntries defaults to false
-    // so nobody's drawn slot plays the entry animation here.
+    // it (see SeatContent.drawnSlotKey); whether it plays an entry animation
+    // is now decided by animationLedger, not here — see drawnSlotLedgerKey,
+    // a fixed per-seat lane key (gameNumber defaults to 1).
     expect(presentation.seats.bottom.drawnSlotKey).toBe("own-3");
-    expect(presentation.seats.bottom.drawnSlotEntering).toBe(false);
+    expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
     expect(presentation.seats.right.drawnSlotKey).toBe("none");
+    expect(presentation.seats.right.drawnSlotLedgerKey).toBe("g1:draw:opp:1");
     // No per-tile targeting needed for meld entries — see SeatContent.meldEntering.
     expect(presentation.seats.bottom.meldEntering).toBe(false);
     expect(presentation.discards.right[0]).toMatchObject({
@@ -117,10 +119,9 @@ describe("useTablePresentation", () => {
     if (!presentation) throw new Error("missing presentation");
 
     expect(presentation.seats.right.drawnSlotKey).toBe("opp-1-14");
-    expect(presentation.seats.right.drawnSlotEntering).toBe(true);
-    // My own seat never drew this render — no entry animation for me either.
+    expect(presentation.seats.right.drawnSlotLedgerKey).toBe("g1:draw:opp:1");
     expect(presentation.seats.bottom.drawnSlotKey).toBe("none");
-    expect(presentation.seats.bottom.drawnSlotEntering).toBe(false);
+    expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
     // meldEntering just mirrors canAnimateEntries for every seat — MeldGroup's
     // own remount-on-new-tile-identity semantics do the actual per-tile
     // targeting (see SeatContent.meldEntering docs).
