@@ -13,7 +13,7 @@ export default defineConfig({
   testDir: "./test",
   testMatch: "**/*.e2e-spec.ts",
   fullyParallel: true,
-  workers,
+  ...(workers === undefined ? {} : { workers }),
   reporter: "list",
   use: {
     baseURL,
