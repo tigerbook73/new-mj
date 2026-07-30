@@ -45,8 +45,6 @@ describe("useTablePresentation", () => {
     expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
     expect(presentation.seats.right.drawnSlotKey).toBe("none");
     expect(presentation.seats.right.drawnSlotLedgerKey).toBe("g1:draw:opp:1");
-    // No per-tile targeting needed for meld entries — see SeatContent.meldEntering.
-    expect(presentation.seats.bottom.meldEntering).toBe(false);
     expect(presentation.discards.right[0]).toMatchObject({
       tile: 9,
       justDiscarded: true,
@@ -60,6 +58,48 @@ describe("useTablePresentation", () => {
     presentation.seats.bottom.onDiscard?.(3);
     expect(onDiscard).toHaveBeenNthCalledWith(1, 1);
     expect(onDiscard).toHaveBeenNthCalledWith(2, 3);
+  });
+
+  it("keys each meld by seat+index+tileCount, matching diffPlayerView's meld key exactly", () => {
+    const view = {
+      seat: 0,
+      hand: [1, 2],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "playing",
+      myActionOptions: [],
+      seats: [
+        {
+          handCount: 2,
+          melds: [{ type: "anGang", tiles: [1, 1, 1] }],
+          discards: [],
+          justDrawn: false,
+        },
+        {
+          handCount: 13,
+          melds: [{ type: "peng", tiles: [5, 5, 5], from: 0 }],
+          discards: [],
+          justDrawn: false,
+        },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [{ nickname: "Me" }, null, null, null],
+      onDiscard: vi.fn(),
+      gameNumber: 2,
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    expect(presentation.seats.bottom.melds[0]).toMatchObject({ meldLedgerKey: "g2:meld:0:0:3" });
+    // A meld claimed from my discard: fromDirection is derived (see meld.from), meldLedgerKey stays seat+index+tileCount only.
+    expect(presentation.seats.right.melds[0]).toMatchObject({
+      fromDirection: "bottom",
+      meldLedgerKey: "g2:meld:1:0:3",
+    });
   });
 
   it("keys each discard entry by seat+index, stable regardless of which one is most recent", () => {
@@ -127,11 +167,6 @@ describe("useTablePresentation", () => {
     expect(presentation.seats.right.drawnSlotLedgerKey).toBe("g1:draw:opp:1");
     expect(presentation.seats.bottom.drawnSlotKey).toBe("none");
     expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
-    // meldEntering just mirrors canAnimateEntries for every seat — MeldGroup's
-    // own remount-on-new-tile-identity semantics do the actual per-tile
-    // targeting (see SeatContent.meldEntering docs).
-    expect(presentation.seats.bottom.meldEntering).toBe(true);
-    expect(presentation.seats.right.meldEntering).toBe(true);
   });
 
   it("hides the action dock during awaiting-draw (draw is server-auto-submitted, never clickable)", () => {

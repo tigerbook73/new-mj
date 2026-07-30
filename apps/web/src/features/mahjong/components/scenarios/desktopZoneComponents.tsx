@@ -78,7 +78,6 @@ export function MeldSlot({
           melds={seat.melds}
           tileHeight={(meldTileHeight / meldHeight) * 100}
           config={config}
-          entering={seat.meldEntering}
         />
       </div>
     </div>

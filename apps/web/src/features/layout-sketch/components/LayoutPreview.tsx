@@ -24,14 +24,22 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
   revealed: info === "Tigerbook73",
   drawnSlotKey: `${info}-drawn`,
   drawnSlotLedgerKey: `${info}-drawn-ledger`,
-  meldEntering: false,
 });
 
 const seatsFor = (kind: PreviewCase): Record<SeatDirection, SeatContent> => ({
   bottom: makeSeat(
     "Tigerbook73",
     [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52],
-    kind === "claims" ? [{ type: "peng", tiles: [56, 57, 58], fromDirection: "left" }] : [],
+    kind === "claims"
+      ? [
+          {
+            type: "peng",
+            tiles: [56, 57, 58],
+            fromDirection: "left",
+            meldLedgerKey: "preview-bottom-0",
+          },
+        ]
+      : [],
   ),
   right: makeSeat(
     "East",
@@ -40,7 +48,16 @@ const seatsFor = (kind: PreviewCase): Record<SeatDirection, SeatContent> => ({
   top: makeSeat(
     "South",
     Array.from({ length: 13 }, (_, index) => 76 + index),
-    kind === "claims" ? [{ type: "chi", tiles: [92, 96, 100], fromDirection: "right" }] : [],
+    kind === "claims"
+      ? [
+          {
+            type: "chi",
+            tiles: [92, 96, 100],
+            fromDirection: "right",
+            meldLedgerKey: "preview-top-0",
+          },
+        ]
+      : [],
   ),
   left: makeSeat(
     "West",

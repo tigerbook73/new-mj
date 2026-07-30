@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
+import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import { ClaimFlipGhost } from "./ClaimFlipGhost";
 import { TileClaimSlot } from "./TileClaimSlot";
 
@@ -11,6 +12,8 @@ export type Meld = {
   from?: number;
   /** Direction (relative to the viewer) of the seat this meld's claimed tile came from — see TableView. Absent for anGang (self-made, no claim). */
   fromDirection?: SeatDirection;
+  /** animationLedger key for this meld — see useSlotEntering, and useTablePresentation.ts's meldLedgerKey. */
+  meldLedgerKey: string;
 };
 
 interface MeldGroupProps {
@@ -29,8 +32,6 @@ interface MeldGroupProps {
    */
   tileHeight: number;
   config: TableLayoutConfig;
-  /** See SeatContent.meldEntering (components/mahjong/TableBoard.tsx). */
-  entering: boolean;
 }
 
 /**
@@ -38,7 +39,7 @@ interface MeldGroupProps {
  * shrinking — tile size is a fixed percentage of the shared shell's own
  * height, never squeezed by a fixed column count.
  */
-export function MeldGroup({ direction, melds, tileHeight, config, entering }: MeldGroupProps) {
+export function MeldGroup({ direction, melds, tileHeight, config }: MeldGroupProps) {
   if (melds.length === 0) return null;
 
   return (
@@ -71,7 +72,7 @@ export function MeldGroup({ direction, melds, tileHeight, config, entering }: Me
                   key={tile}
                   direction={direction}
                   fromDirection={isFromClaim ? meld.fromDirection : undefined}
-                  entering={entering}
+                  meldLedgerKey={meld.meldLedgerKey}
                   aspectRatio={config.shared.aspectRatio}
                   tile={tile}
                 />
@@ -87,28 +88,25 @@ export function MeldGroup({ direction, melds, tileHeight, config, entering }: Me
 /**
  * Owns the per-tile hook state a plain `.map()` callback can't (rules of
  * hooks) — specifically, whether to mount a `ClaimFlipGhost` alongside this
- * tile. Captured once via `useState` rather than read live from `entering`:
- * `entering` (== canAnimateEntries) is only true for the single render right
- * after a live snapshot lands (see useIsIncrementalSnapshot), so deciding
- * "should this tile get a ghost" on every render would unmount the ghost
- * mid-flight the moment any unrelated re-render happens to land while it's
- * still playing.
+ * tile. `useSlotEntering` reads animationLedger's resolution for
+ * `meldLedgerKey` exactly once at mount, so a ghost already in flight is
+ * never unmounted mid-flight by an unrelated re-render.
  */
 function MeldClaimTile({
   direction,
   fromDirection,
-  entering,
+  meldLedgerKey,
   aspectRatio,
   tile,
 }: {
   direction: SeatDirection;
   /** Set only for the tile that came from a claim (chi/peng/gang), at the render it was claimed — see MeldGroup's `isFromClaim`. */
   fromDirection: SeatDirection | undefined;
-  entering: boolean;
+  meldLedgerKey: string;
   aspectRatio: number;
   tile: number;
 }) {
-  const [shouldGhost] = useState(fromDirection !== undefined && entering);
+  const { entering, ghost, onGhostComplete } = useSlotEntering(meldLedgerKey);
   const toRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -123,11 +121,12 @@ function MeldClaimTile({
           entering={entering}
         />
       </div>
-      {shouldGhost && fromDirection !== undefined && (
+      {ghost && fromDirection !== undefined && (
         <ClaimFlipGhost
           tileId={tile}
           fromSelector={`[data-testid="table-area-${fromDirection}"] [data-tile-id="${tile}"]`}
           toRef={toRef}
+          onAnimationComplete={onGhostComplete}
         />
       )}
     </>

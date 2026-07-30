@@ -135,18 +135,21 @@ export function useTablePresentation({
       // animationLedger.ts.
       const drawnSlotLedgerKey = `g${gameNumber}:draw:${direction === "bottom" ? "own" : "opp"}:${seat}`;
       const content: SeatContent = {
-        melds: data.melds.map((meld) => ({
+        melds: data.melds.map((meld, meldIndex) => ({
           ...meld,
           ...(meld.from !== undefined
             ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
             : {}),
+          // Must match diffPlayerView's meld:<seat>:<index>:<tileCount> key
+          // exactly — the trailing tile count disambiguates buGang's
+          // in-place growth of an existing meldIndex from a brand-new one.
+          meldLedgerKey: `g${gameNumber}:meld:${seat}:${meldIndex}:${meld.tiles.length}`,
         })),
         handTiles,
         revealed: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
         drawnSlotKey,
         drawnSlotLedgerKey,
-        meldEntering: canAnimateEntries,
         ...(direction === "bottom" ? { interactive: isMyTurn, onDiscard } : {}),
       };
       return [direction, content];

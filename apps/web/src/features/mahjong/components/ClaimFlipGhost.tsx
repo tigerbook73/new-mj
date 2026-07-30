@@ -11,6 +11,8 @@ interface ClaimFlipGhostProps {
   fromSelector: string;
   /** Ref to the real meld tile this ghost flies toward; also this flight's resting box. */
   toRef: RefObject<HTMLElement | null>;
+  /** Fires once the flight settles — see useSlotEntering/animationLedger's completeSlot. */
+  onAnimationComplete?: (() => void) | undefined;
 }
 
 const GHOST_TRANSITION = { duration: CLAIM_FLIGHT_DURATION, ease: TILE_MOTION_EASE } as const;
@@ -31,7 +33,12 @@ const GHOST_TRANSITION = { duration: CLAIM_FLIGHT_DURATION, ease: TILE_MOTION_EA
  * transition completes (`onAnimationComplete`). Neither the tombstone's nor
  * the real meld tile's own animation state is ever touched by any of this.
  */
-export function ClaimFlipGhost({ tileId, fromSelector, toRef }: ClaimFlipGhostProps) {
+export function ClaimFlipGhost({
+  tileId,
+  fromSelector,
+  toRef,
+  onAnimationComplete,
+}: ClaimFlipGhostProps) {
   const [flight, clear] = useFlightGhost(
     () => document.querySelector(fromSelector)?.getBoundingClientRect(),
     toRef,
@@ -59,7 +66,10 @@ export function ClaimFlipGhost({ tileId, fromSelector, toRef }: ClaimFlipGhostPr
       initial={{ x: dx, y: dy, scaleX, scaleY }}
       animate={{ x: 0, y: 0, scaleX: 1, scaleY: 1 }}
       transition={GHOST_TRANSITION}
-      onAnimationComplete={clear}
+      onAnimationComplete={() => {
+        clear();
+        onAnimationComplete?.();
+      }}
     >
       <Tile tileId={tileId} height="100%" />
     </motion.div>,
