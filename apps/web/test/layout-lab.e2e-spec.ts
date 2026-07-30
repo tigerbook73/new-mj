@@ -53,10 +53,32 @@ test("real preview uses the current draft config and exposes deterministic sampl
   await gap.fill("4");
   await expect(gap).toHaveValue("4");
   await page.getByRole("button", { name: "Real preview" }).click();
-  await expect(page.getByTestId("layout-real-preview")).toBeVisible();
-  await expect(page.getByTestId("table-core")).toBeVisible();
+  const preview = page.getByTestId("layout-real-preview");
+  const table = page.getByTestId("table-core");
+  await expect(preview).toBeVisible();
+  await expect(table).toBeVisible();
+  const previewBounds = await preview.boundingBox();
+  const tableBounds = await table.boundingBox();
+  expect(previewBounds).not.toBeNull();
+  expect(tableBounds).not.toBeNull();
+  if (previewBounds && tableBounds)
+    expect(tableBounds.x + tableBounds.width / 2).toBeCloseTo(
+      previewBounds.x + previewBounds.width / 2,
+      0,
+    );
   await page.getByLabel("Preview sample").selectOption("dense");
   await expect(page.getByLabel("Preview sample")).toHaveValue("dense");
+});
+
+test("real preview honors hidden Zones without changing the production export", async ({
+  page,
+}) => {
+  await page.goto("/dev/table-layout");
+  await page.getByLabel("Active draft").selectOption("desktop");
+  await page.getByLabel("Hide hand-bottom", { exact: true }).click();
+  await page.getByRole("button", { name: "Real preview" }).click();
+  await expect(page.locator('[data-zone="hand-bottom"]')).toHaveCount(0);
+  await expect(page.locator('[data-zone="hand-top"]')).toHaveCount(1);
 });
 
 // Regression: clicking a node whose hit-test button is rotated 90°/270° must

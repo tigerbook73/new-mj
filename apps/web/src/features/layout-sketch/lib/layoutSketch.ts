@@ -95,6 +95,7 @@ const importZone = (zone: Zone): SketchNode => ({
   h: sketchPercentage(zone.localSize.h / 100),
   kind: "element",
   shadow: false,
+  hidden: zone.visible === false,
   rotationDeg: zone.rotationDeg,
   backgroundColor: colorForName(zone.id),
   children: zone.children?.map(importZone) ?? [],
@@ -119,11 +120,14 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
   const anchorCenter = objectRecord(item.anchorCenter);
   const localSize = objectRecord(item.localSize);
   const rotationDeg = item.rotationDeg;
+  const visible = item.visible;
   if (rotationDeg !== 0 && rotationDeg !== 90 && rotationDeg !== 180 && rotationDeg !== -90)
     throw new Error(`${path}.rotationDeg must be 0, 90, 180, or -90`);
   const children = item.children;
   if (children !== undefined && !Array.isArray(children))
     throw new Error(`${path}.children must be an array`);
+  if (visible !== undefined && typeof visible !== "boolean")
+    throw new Error(`${path}.visible must be a boolean`);
   return {
     id,
     anchorCenter: {
@@ -135,6 +139,7 @@ function parseImportedZone(value: unknown, path: string, names: Set<string>): Zo
       h: importNumber(localSize.h, `${path}.localSize.h`, 0.1, 100),
     },
     rotationDeg,
+    ...(visible === undefined ? {} : { visible }),
     ...(Array.isArray(children)
       ? {
           children: children.map((child, index) =>
@@ -861,6 +866,28 @@ const exportZone = (node: SketchNode): Zone => {
       h: roundExportedPercentage(node.h.resolved * 100),
     },
     rotationDeg: node.rotationDeg ?? 0,
+    visible: true,
+    ...(children.length > 0 ? { children } : {}),
+  };
+};
+
+/** Preview-only export: editor visibility becomes the Zone visibility contract. */
+const exportVisibleZone = (node: SketchNode): Zone => {
+  const children = node.children.filter(shouldExportZone).map(exportVisibleZone);
+  const centerX = node.centerX?.resolved ?? node.x.resolved + node.w.resolved / 2;
+  const centerY = node.centerY?.resolved ?? node.y.resolved + node.h.resolved / 2;
+  return {
+    id: node.name,
+    anchorCenter: {
+      x: roundExportedPercentage(centerX * 100),
+      y: roundExportedPercentage(centerY * 100),
+    },
+    localSize: {
+      w: roundExportedPercentage(node.w.resolved * 100),
+      h: roundExportedPercentage(node.h.resolved * 100),
+    },
+    rotationDeg: node.rotationDeg ?? 0,
+    visible: !node.hidden,
     ...(children.length > 0 ? { children } : {}),
   };
 };
@@ -878,4 +905,18 @@ export const exportSketchDraft = (draft: SketchDraft): TableLayoutDocument => ({
   },
   tableConfig: draft.tableConfig,
   editor: { version: 2, root: draft.root, variables: draft.variables },
+});
+
+/** Keeps the saved production preset intact while applying editor visibility in the Lab preview. */
+export const exportSketchPreviewDraft = (draft: SketchDraft): TableLayoutDocument => ({
+  ...exportSketchDraft(draft),
+  root: {
+    id: draft.root.name,
+    anchorCenter: { x: 50, y: 50 },
+    localSize: { w: 100, h: 100 },
+    rotationDeg: 0,
+    ...(draft.root.children.filter(shouldExportZone).length > 0
+      ? { children: draft.root.children.filter(shouldExportZone).map(exportVisibleZone) }
+      : {}),
+  },
 });

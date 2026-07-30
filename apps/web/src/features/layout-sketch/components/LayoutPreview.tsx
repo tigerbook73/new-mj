@@ -7,7 +7,7 @@ import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { SketchDraft } from "@/features/layout-sketch/lib/layoutSketch";
-import { exportSketchDraft } from "@/features/layout-sketch/lib/layoutSketch";
+import { exportSketchPreviewDraft } from "@/features/layout-sketch/lib/layoutSketch";
 
 type PreviewCase = "baseline" | "dense" | "claims";
 
@@ -68,7 +68,7 @@ export function LayoutPreview({
   onPreviewCase: (value: PreviewCase) => void;
 }) {
   const scenario = useMemo(
-    () => createDesktopTableScenario(exportSketchDraft(draft), draft.tableConfig),
+    () => createDesktopTableScenario(exportSketchPreviewDraft(draft), draft.tableConfig),
     [draft],
   );
   const seats = useMemo(() => seatsFor(previewCase), [previewCase]);
@@ -95,7 +95,10 @@ export function LayoutPreview({
           ))}
         </select>
       </div>
-      <div className="min-h-0 min-w-0 flex-1" style={{ containerType: "size" }}>
+      <div
+        className="flex min-h-0 min-w-0 flex-1 items-center justify-center"
+        style={{ containerType: "size" }}
+      >
         <TableBoard
           scenario={scenario}
           seats={seats}

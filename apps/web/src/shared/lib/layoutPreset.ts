@@ -8,6 +8,8 @@ export type Zone = {
   anchorCenter: { x: number; y: number };
   localSize: { w: number; h: number };
   rotationDeg: RotationDeg;
+  /** Rendering is skipped for false; omitted means visible. */
+  visible?: boolean | undefined;
   children?: Zone[] | undefined;
 };
 
@@ -83,7 +85,8 @@ export function ZoneRenderer({
   zone: Zone;
   renderService?: ZoneService | undefined;
   root?: boolean | undefined;
-}): ReactElement {
+}): ReactElement | null {
+  if (zone.visible === false) return null;
   const children = zone.children?.map((child) =>
     createElement(ZoneRenderer, {
       key: child.id,

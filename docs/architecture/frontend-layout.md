@@ -10,7 +10,7 @@
 
 ## 2. 当前三层
 
-- **几何数据**：`src/shared/lib/layoutPreset.ts` 定义并校验 `LayoutPreset`/`Zone`。Zone 只描述中心锚点、本地尺寸、四分之一旋转和父子关系，不携带业务数据或 React 组件。
+- **几何数据**：`src/shared/lib/layoutPreset.ts` 定义并校验 `LayoutPreset`/`Zone`。Zone 描述中心锚点、本地尺寸、四分之一旋转、可见性和父子关系，不携带业务数据或 React 组件。
 - **场景渲染**：`ZoneRenderer` 递归把 Zone 转成定位容器。`features/mahjong/components/TableBoard.tsx` 将 preset 与按稳定 `zone.id` 绑定的场景组件打包为 `TableScenario`；桌面场景在 `components/scenarios/desktop.tsx`。业务组件可包裹 `children`，但不得重建子 Zone 的定位层。
 - **展示逻辑**：`features/mahjong/TableView.tsx` 和 `useTablePresentation.ts` 从权威 `PlayerView` 派生可渲染数据；展示组件只接收数据和回调，不重新判断玩法规则或直接调用协议。
 
@@ -18,11 +18,11 @@
 
 ## 3. Zone 模型与布局文件
 
-`Zone` 使用父级未旋转的局部坐标；`rotationDeg` 只允许 `0 | 90 | 180 | -90`。父子结构保留旋转和层叠上下文，避免把每个子项拍平后重复计算坐标。
+`Zone` 使用父级未旋转的局部坐标；`rotationDeg` 只允许 `0 | 90 | 180 | -90`，`visible` 缺省为 `true`。父子结构保留旋转和层叠上下文，避免把每个子项拍平后重复计算坐标。
 
 - 桌面布局文档：`src/features/mahjong/layouts/desktop.table-layout.json` 同时保存 `LayoutPreset` 几何和桌面展示 Config；可由 Layout Sketch 读写。
 - 展示参数：`src/features/mahjong/desktop.table-config.ts` 只从布局文档导入并以 `TableLayoutConfig` 校验后导出，避免与 JSON 形成双真源。Config 只供真实桌面组件消费，不属于通用 `LayoutPreset` 几何契约。
-- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。Variables 仅服务几何表达式；Config Panel 只编辑真实组件的展示参数，两者不互相引用。
+- 编辑器：`src/features/layout-sketch/` 仅开发态注册；草稿/变量/辅助 Grid 服务于编辑和 round-trip，不是生产运行时依赖。Variables 仅服务几何表达式；Config Panel 只编辑真实组件的展示参数，两者不互相引用。Lab 的可见性设置保存于 editor metadata，Preview 将其映射到 Zone；生产 root 导出始终为 `visible: true`。
 
 文档内仍将通用 Zone 几何与桌面展示 Config 分层：新布局可替换几何，而不把牌桌业务参数或编辑器元数据耦合进通用 schema。
 
