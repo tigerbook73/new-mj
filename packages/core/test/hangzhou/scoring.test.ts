@@ -9,7 +9,7 @@ type HangzhouScoringCase = {
   expect: HangzhouScoringResult;
 };
 
-const CAI = "7z" as const;
+const CAI = "5z" as const; // caishen (白板), see rulesets/hangzhou/constants.ts
 const base = { baseScore: 1 };
 
 // hand is the pre-win concealed hand; the complete hand for shape checking is
@@ -151,9 +151,10 @@ export const hangzhouScoringFixtures: HangzhouScoringCase[] = [
     desc: "财神不能补出豪华的第四张（负例：其余 5 组用不同字牌，杜绝意外满足基本型）",
     input: {
       ...base,
-      hand: ["1m", "1m", "1m", CAI, "2z", "2z", "3z", "3z", "4z", "4z", "5z", "5z", "6z"],
+      // Filler honors deliberately avoid 5z (=CAI) so they don't collide with it.
+      hand: ["1m", "1m", "1m", CAI, "1z", "2z", "2z", "3z", "3z", "4z", "4z", "6z", "6z"],
       melds: [],
-      win: { tile: "6z", by: "ron" },
+      win: { tile: "1z", by: "ron" },
       caiPiaoCount: 0,
       gangChainLength: 0,
     },

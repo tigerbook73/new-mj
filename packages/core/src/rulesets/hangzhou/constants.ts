@@ -9,7 +9,10 @@ export const HANGZHOU_PHASES = [
 ] as const;
 export const HANGZHOU_MULTI_HU_POLICIES = ["headJump", "all"] as const;
 
-// White dragon is caishen (docs/variants/hangzhou.md §1). This ruleset maps
-// honor kinds 1z..7z to East/South/West/North/Red/Green/White; no other
-// ruleset gives them semantic names, so this ordering is hangzhou-local.
-export const CAISHEN_KIND: TileKind = "7z";
+// White dragon (白板) is caishen (docs/variants/hangzhou.md §1). Honor order
+// is 1z..7z = East/South/West/North/White/Green/Red — this matches
+// apps/web's existing tile-art convention (mahjongTiles.ts's
+// TILE_KIND_TO_FILE: 5z→Haku/白, 6z→Hatsu/發, 7z→Chun/中), which core
+// doesn't import but must stay numerically consistent with so the caishen
+// tile renders as the correct tile face.
+export const CAISHEN_KIND: TileKind = "5z";

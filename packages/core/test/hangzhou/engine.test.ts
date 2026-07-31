@@ -104,18 +104,18 @@ test("illegal actions do not mutate state or consume event sequence", () => {
   expect(started.state).toEqual(before);
 });
 
-// Caishen is 7z, the last honor kind (ids 132-135) — see constants.ts.
-const CAISHEN_IDS = [132, 133, 134, 135];
+// Caishen is 5z (白/Haku), ids 124-127 — see constants.ts.
+const CAISHEN_IDS = [124, 125, 126, 127];
 
 test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
-  const seat1Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 133, 134];
-  const physical = new Set([132, ...seat1Hand]);
+  const seat1Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 125, 126];
+  const physical = new Set([124, ...seat1Hand]);
   const state: HangzhouState = {
     config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
-      { hand: [132], melds: [], discards: [] },
+      { hand: [124], melds: [], discards: [] },
       { hand: seat1Hand, melds: [], discards: [] },
       { hand: [], melds: [], discards: [] },
       { hand: [], melds: [], discards: [] },
@@ -126,7 +126,7 @@ test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
     caiPiaoCount: [0, 0, 0, 0],
     gangChain: [0, 0, 0, 0],
   };
-  const discarded = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 132 }));
+  const discarded = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 124 }));
   const options = hangzhouRuleSet.getLegalActions(discarded, 1);
   expect(options.some((action) => action.type === "peng" || action.type === "minGang")).toBe(false);
   expect(options.some((action) => action.type === "chi")).toBe(false);
@@ -153,7 +153,7 @@ test("caishen is never offered as a concealed-gang kind, even holding all four",
     gangChain: [0, 0, 0, 0],
   };
   const actions = hangzhouRuleSet.getLegalActions(state, 0);
-  expect(actions.some((action) => action.type === "anGang" && action.kind === "7z")).toBe(false);
+  expect(actions.some((action) => action.type === "anGang" && action.kind === "5z")).toBe(false);
 });
 
 // 1m,2m,3m runs (0,4,8/12,16,20/24,28,32) + 1p pair (36,37) waiting on 1s/2s/3s
@@ -250,7 +250,7 @@ test("caiPiaoCount increments when a baotou hand discards caishen and stays baot
   // 1m,2m,3m,4m triplets (12 tiles) + 2 caishen = baotou both before and after
   // discarding one caishen, per docs/variants/hangzhou.md §4.
   const triplets = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
-  const hand = [...triplets, 132, 133];
+  const hand = [...triplets, 124, 125];
   const physical = new Set(hand);
   const state: HangzhouState = {
     config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
@@ -267,13 +267,13 @@ test("caiPiaoCount increments when a baotou hand discards caishen and stays baot
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
     gangChain: [0, 0, 0, 0],
-    justDrawn: { seat: 0, tile: 133 },
+    justDrawn: { seat: 0, tile: 125 },
   };
   // isBaotou is only meaningful on a "waiting" (pre-draw) hand shape; the
   // current 14-tile post-draw hand naturally reports false here (see hand.ts) —
   // what matters for caiPiaoCount is the *pre-draw* 13-tile hand (hand minus
   // justDrawn), which applyDiscard reconstructs internally.
-  const result = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 132 }));
+  const result = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 124 }));
   expect(result.caiPiaoCount).toEqual([1, 0, 0, 0]);
   const afterView = hangzhouRuleSet.getPlayerView(result, 0) as HangzhouPlayerView;
   expect(afterView.isBaotou).toBe(true);
@@ -283,7 +283,7 @@ test("caiPiaoCount increments when a baotou hand discards caishen and stays baot
 
 test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag", () => {
   const triplets = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
-  const hand = [...triplets, 132, 133];
+  const hand = [...triplets, 124, 125];
   const physical = new Set(hand);
   const state: HangzhouState = {
     config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
@@ -300,7 +300,7 @@ test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag",
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
     gangChain: [0, 0, 0, 0],
-    justDrawn: { seat: 0, tile: 133 },
+    justDrawn: { seat: 0, tile: 125 },
   };
   // rebuildPlayerView needs a GameStarted event to seed itself; not exercised
   // via createHangzhouGame here, so this test only checks the discard-driven
@@ -324,7 +324,7 @@ test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag",
     {
       seq: 3,
       visibility: { type: "public" },
-      payload: { type: "TileDiscarded", seat: 0, tile: 132 },
+      payload: { type: "TileDiscarded", seat: 0, tile: 124 },
     },
   ];
   const rebuilt = hangzhouRuleSet.rebuildPlayerView(events, 0) as HangzhouPlayerView;

@@ -8,7 +8,7 @@ import {
 } from "./hand.ts";
 
 const kinds = (list: string): TileKind[] => list.split(" ").filter(Boolean) as TileKind[];
-const CAI = "7z" as TileKind;
+const CAI = "5z" as TileKind; // caishen (白板), see constants.ts
 
 test("isStandardWinningHandWithWild: fully real hand forms 4 melds + pair", () => {
   const hand = kinds("1m 2m 3m 4m 5m 6m 7m 8m 9m 1p 1p 1s 1s 1s");
