@@ -12,6 +12,7 @@ import { useSessionStore } from "@/shared/store/session";
 const RULESETS = [
   { id: "junk", label: "Junk Hu" },
   { id: "bloodbattle", label: "Bloodbattle" },
+  { id: "hangzhou", label: "Hangzhou" },
 ] as const;
 
 const formatCreatedAt = (timestamp: number) => {
