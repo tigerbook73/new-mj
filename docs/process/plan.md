@@ -4,23 +4,27 @@
 
 ## 当前工作
 
-**专题：生产部署与 OAuth 验收**
+**专题：杭州麻将 RuleSet（Slice 1：骨架 + 基础胡牌）**
 
-- 结果：部署 Supabase 与应用，配置生产 OAuth 回调并完成一次真实登录验收。
-- 下一步第一个具体动作：确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单。
+- 结果：`packages/core/src/rulesets/hangzhou/` 下实现四签名（createGame/applyAction/getLegalActions/getPlayerView）+ 财神代打的基本胡牌判定（4 面子+1 对），`registered-rulesets.ts` 登记，CLI 可手动打完一整局，跨玩法不变量测试（容器唯一性、事件重建≡直接派生）通过。骨架照抄 junk 的 `dealing → playing ⇄ awaiting-claims ⇄ awaiting-draw → finished`，不含七对/番数/爆头派生状态（留给 Slice 2-4）。
+- 下一步第一个具体动作：在 `packages/core/src/rulesets/hangzhou/` 建 `types.ts`，定义 `HangzhouState`/`HangzhouAction`/`HangzhouPhase`（对齐 `docs/variants/hangzhou.md` §9）。
 
 ## 当前风险 / 开放问题
 
-- 尚未选择并配置生产部署环境；不能把本地 Supabase 的 OAuth 验收视为生产验收。
+- `hangzhou.md` §14 记录了两处不阻塞定稿的实现细节假设（财神替代数量上限、`caiPiaoCount` 中途清零与否），写 fixture 时如与预期不符需要回来改。
+- 生产部署与 OAuth 验收尚未完成（见 Backlog）：不能把本地 Supabase 的 OAuth 验收视为生产验收。
 
 ## Backlog
 
+- 杭州麻将：三牢点炮限制 + 连庄坐庄——需要先定跨局状态传递的契约（庄家连续坐庄次数如何进入下一局 config），立项时复审 `architecture/variant-boundary.md` 庄家轮换公式行。
+- 杭州麻将专属桌面体验：财神高亮、爆头/财飘状态展示（参照血战到底 UI 专题现状）。
+- 生产部署与 OAuth 验收：确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单，完成一次真实登录验收。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
-- 日麻立项时复审 `architecture/variant-boundary.md`。
+- 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行；庄家轮换公式行视杭州三牢专题是否已先行验证而定）。
 - 可选沉浸体验：音效、音量与静音设置。
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
-- Bot 功能增强：提升 AI 补位/断线托管的出牌质量。
+- Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
 - 配置功能：允许垃圾胡（junk）开启不同规则变种。
 
 ## 已完成摘要
