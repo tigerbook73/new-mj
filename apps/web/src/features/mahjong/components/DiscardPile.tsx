@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { isCaishenTile } from "@/features/mahjong/lib/mahjongTiles";
 import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { DiscardFlipGhost } from "./DiscardFlipGhost";
@@ -14,6 +15,8 @@ export type DiscardEntry = {
   claimedByDirection?: SeatDirection;
   /** True for the single most recent discard on the table (view.lastDiscard). */
   justDiscarded?: boolean;
+  /** See TableBoard.tsx's SeatContent.highlightCaishen — same gate, per discard entry. */
+  highlightCaishen: boolean;
   /** animationLedger key for this exact entry — see useSlotEntering, and useTablePresentation.ts's discardLedgerKey. */
   discardLedgerKey: string;
   /**
@@ -146,6 +149,7 @@ function DiscardTileSlot({
           // render, so the shrink and the dim-to-tombstone land together.
           enlarged={entry.justDiscarded && entry.claimedBy === undefined}
           entering={entering}
+          caishen={entry.highlightCaishen && isCaishenTile(entry.tile)}
         />
       </div>
       {ghostOrigin && (

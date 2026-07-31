@@ -271,6 +271,7 @@ export function TableView() {
     },
     pendingDiscardOrigin,
     gameNumber: room?.gameNumber ?? 1,
+    rulesetId: room?.rulesetId,
   });
 
   if (!view) {

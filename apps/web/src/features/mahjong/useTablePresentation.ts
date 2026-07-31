@@ -60,6 +60,7 @@ export function useTablePresentation({
   onDiscard,
   pendingDiscardOrigin,
   gameNumber = 1,
+  rulesetId,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
@@ -68,10 +69,14 @@ export function useTablePresentation({
   pendingDiscardOrigin?: { tile: number; rect: DOMRect } | null;
   /** RoomInfo.gameNumber — prefixes drawnSlotLedgerKey so it lines up with animationLedger's game-scoped keys. */
   gameNumber?: number;
+  /** RoomInfo.rulesetId — only used to gate the caishen tile highlight (see
+   * mahjongTiles.ts's isCaishenTile); nothing else here branches on it. */
+  rulesetId?: string | undefined;
 }) {
   if (!view) {
     return undefined;
   }
+  const highlightCaishen = rulesetId === "hangzhou";
   const extras = view as unknown as TableViewExtras;
   const isMyTurn = view.currentSeat === view.seat && extras.phase === "playing";
   const actionOptions = extras.myActionOptions ?? [];
@@ -147,6 +152,7 @@ export function useTablePresentation({
         info: player?.nickname ?? `Seat ${seat + 1}`,
         drawnSlotKey,
         drawnSlotLedgerKey,
+        highlightCaishen,
         ...(direction === "bottom" ? { interactive: isMyTurn, onDiscard } : {}),
       };
       return [direction, content];
@@ -171,6 +177,7 @@ export function useTablePresentation({
           discardLedgerKey: `g${gameNumber}:discard:${seat}:${index}`,
           flightOrigin:
             pendingDiscardOrigin?.tile === entry.tile ? pendingDiscardOrigin.rect : undefined,
+          highlightCaishen,
         };
       });
       return [direction, entries];

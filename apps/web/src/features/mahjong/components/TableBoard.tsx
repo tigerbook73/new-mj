@@ -24,6 +24,10 @@ export interface SeatContent {
   handTiles: number[];
   /** True only for my own seat — opponents' handTiles entries render face-down. */
   revealed: boolean;
+  /** True only when the active ruleset has a caishen tile (currently only
+   * hangzhou) — gates whether `handTiles` entries get Tile's `caishen`
+   * highlight; see mahjongTiles.ts's `isCaishenTile`. */
+  highlightCaishen: boolean;
   interactive?: boolean | undefined;
   /** See HandRow.tsx's `captureTileRect` for why `originRect` is a plain measured value, not game state. */
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;

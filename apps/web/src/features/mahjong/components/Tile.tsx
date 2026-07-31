@@ -25,6 +25,8 @@ export interface TileProps {
   selected?: boolean | undefined;
   /** See TileFace's `justDiscarded` variant for what this drives and why it's a separate prop from `enlarged`. */
   justDiscarded?: boolean | undefined;
+  /** See TileFace's `caishen` variant — hangzhou's white-dragon wild tile. */
+  caishen?: boolean | undefined;
   /** Plays the one-shot arrival animation on mount — see `resolveTileMotion` for what each value does. */
   entering?: boolean | "opacityOnly" | undefined;
   /** Fades toward 40% opacity — plain CSS on TileFace, see its own docs. */
@@ -70,6 +72,7 @@ export function Tile({
   clickable,
   selected,
   justDiscarded,
+  caishen,
   dimmed,
   entering,
   enlarged,
@@ -104,6 +107,7 @@ export function Tile({
           selected={selected}
           justDiscarded={justDiscarded}
           enlarged={enlarged}
+          caishen={caishen}
           dimmed={dimmed}
           onClick={onClick}
         />

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { isCaishenTile } from "@/features/mahjong/lib/mahjongTiles";
 import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import { DrawFlipGhost } from "./DrawFlipGhost";
 import { Tile } from "./Tile";
@@ -37,6 +38,8 @@ interface HandRowProps {
   /** See SeatContent.drawnSlotKey / drawnSlotLedgerKey (components/mahjong/TableBoard.tsx). */
   drawnSlotKey: string;
   drawnSlotLedgerKey: string;
+  /** See SeatContent.highlightCaishen (components/mahjong/TableBoard.tsx). */
+  highlightCaishen: boolean;
 }
 
 /**
@@ -56,6 +59,7 @@ export function HandRow({
   tileGapPx,
   drawnSlotKey,
   drawnSlotLedgerKey,
+  highlightCaishen,
 }: HandRowProps) {
   const drawnIndex = handTiles.length - 1;
   return (
@@ -79,6 +83,7 @@ export function HandRow({
               onDiscard={onDiscard}
               tileHeight={tileHeight}
               ledgerKey={drawnSlotLedgerKey}
+              caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
             />
           );
         }
@@ -113,6 +118,7 @@ export function HandRow({
             // sliding as one block — nothing there represents an
             // identifiable gap closing, so it's off for them.
             reflow={revealed}
+            caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
             {...(interactive && isReal
               ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
               : {})}
@@ -141,6 +147,7 @@ function DrawnSlotTile({
   onDiscard,
   tileHeight,
   ledgerKey,
+  caishen,
 }: {
   direction: SeatDirection;
   tileId: number;
@@ -150,6 +157,7 @@ function DrawnSlotTile({
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
   ledgerKey: string;
+  caishen: boolean;
 }) {
   const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey);
   const toRef = useRef<HTMLDivElement>(null);
@@ -185,6 +193,7 @@ function DrawnSlotTile({
             // so `layout` never actually has a prior instance to FLIP from.
             reflow={revealed}
             testId={`hand-track-drawn-${direction}`}
+            caishen={caishen}
             {...(interactive && isReal
               ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
               : {})}

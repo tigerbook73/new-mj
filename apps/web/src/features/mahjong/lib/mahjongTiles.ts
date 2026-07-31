@@ -109,3 +109,13 @@ export const tileImageSrc = (tileId: number, theme: TileTheme = "Regular"): stri
 
 export const tileBackImageSrc = (theme: TileTheme = "Regular"): string =>
   `/tiles/${theme}/Back.svg`;
+
+/**
+ * White dragon (Haku) is hangzhou's caishen (wild), see
+ * packages/core/src/rulesets/hangzhou/constants.ts — this must stay
+ * numerically consistent with core's `CAISHEN_KIND` ("5z") even though web
+ * doesn't import core. Callers gate this on the active ruleset themselves
+ * (junk/bloodbattle have no caishen; a plain 5z there is just an ordinary
+ * honor tile) — this helper only answers "is this tile kind the white dragon".
+ */
+export const isCaishenTile = (tileId: number): boolean => tileKindOf(tileId) === "5z";

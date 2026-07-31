@@ -24,6 +24,7 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
   revealed: info === "Tigerbook73",
   drawnSlotKey: `${info}-drawn`,
   drawnSlotLedgerKey: `${info}-drawn-ledger`,
+  highlightCaishen: false,
 });
 
 const seatsFor = (kind: PreviewCase): Record<SeatDirection, SeatContent> => ({
@@ -71,6 +72,7 @@ const discardsFor = (kind: PreviewCase): Record<SeatDirection, DiscardEntry[]> =
     Array.from({ length: amount }, (_, index) => ({
       tile: (start + index) % 136,
       discardLedgerKey: `preview-${start}-${index}`,
+      highlightCaishen: false,
       ...(index === amount - 1 ? { justDiscarded: true } : {}),
     }));
   return { bottom: pile(0), right: pile(28), top: pile(56), left: pile(84) };

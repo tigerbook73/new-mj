@@ -49,6 +49,7 @@ export function HandSeatRow({
         tileGapPx={config.shared.tileGapPx}
         drawnSlotKey={seat.drawnSlotKey}
         drawnSlotLedgerKey={seat.drawnSlotLedgerKey}
+        highlightCaishen={seat.highlightCaishen}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sortTilesForDisplay, tileBackImageSrc, tileImageSrc } from "./mahjongTiles";
+import { isCaishenTile, sortTilesForDisplay, tileBackImageSrc, tileImageSrc } from "./mahjongTiles";
 
 describe("tile asset paths", () => {
   it("uses Regular by default and supports the Black asset set", () => {
@@ -7,6 +7,19 @@ describe("tile asset paths", () => {
     expect(tileImageSrc(135, "Black")).toBe("/tiles/Black/Chun.svg");
     expect(tileBackImageSrc()).toBe("/tiles/Regular/Back.svg");
     expect(tileBackImageSrc("Black")).toBe("/tiles/Black/Back.svg");
+  });
+});
+
+describe("isCaishenTile", () => {
+  it("is true only for the white dragon (5z/Haku) kind, ids 124-127", () => {
+    expect(tileImageSrc(124)).toBe("/tiles/Regular/Haku.svg");
+    for (const tileId of [124, 125, 126, 127]) expect(isCaishenTile(tileId)).toBe(true);
+  });
+
+  it("is false for every other kind, including the visually-similar dragons", () => {
+    expect(isCaishenTile(0)).toBe(false); // 1m
+    expect(isCaishenTile(120)).toBe(false); // 6z, Hatsu/發
+    expect(isCaishenTile(135)).toBe(false); // 7z, Chun/中
   });
 });
 

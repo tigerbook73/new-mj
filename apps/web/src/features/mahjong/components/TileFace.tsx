@@ -48,12 +48,21 @@ const tileVariants = cva(
        * source.
        */
       enlarged: { true: "scale-[1.4]", false: "" },
+      /**
+       * Hangzhou's caishen (白板/white dragon) tile — a distinct amber ring
+       * so it never gets confused with `justDiscarded`'s red one; the two
+       * can coexist (e.g. discarding the caishen itself, see
+       * docs/variants/hangzhou.md §2). Only ever passed `true` when the
+       * active ruleset is hangzhou — see mahjongTiles.ts's `isCaishenTile`.
+       */
+      caishen: { true: "ring-2 ring-amber-400", false: "" },
     },
     defaultVariants: {
       clickable: false,
       selected: false,
       justDiscarded: false,
       enlarged: false,
+      caishen: false,
     },
   },
 );
@@ -81,6 +90,7 @@ export function TileFace({
   selected,
   justDiscarded,
   enlarged,
+  caishen,
   dimmed,
   onClick,
 }: TileFaceProps) {
@@ -91,7 +101,7 @@ export function TileFace({
   return (
     <div
       className={cn(
-        tileVariants({ clickable: isClickable, selected, justDiscarded, enlarged }),
+        tileVariants({ clickable: isClickable, selected, justDiscarded, enlarged, caishen }),
         tileTheme === "Black" && "border-neutral-700 bg-neutral-950",
       )}
       style={{ opacity: dimmed ? 0.4 : 1 }}
