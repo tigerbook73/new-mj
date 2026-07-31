@@ -167,6 +167,62 @@ describe("useTablePresentation", () => {
     expect(presentation.seats.bottom.drawnSlotLedgerKey).toBe("g1:draw:own:0");
   });
 
+  it("hangzhou: groups the caishen tile at the front, set off by a gap from the rest of the hand", () => {
+    const view = {
+      seat: 0,
+      hand: [0, 4, 124], // 1m, 2m, 5z (caishen)
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "playing",
+      myActionOptions: [],
+      seats: [
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [{ nickname: "Me" }, null, null, null],
+      onDiscard: vi.fn(),
+      rulesetId: "hangzhou",
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    // caishen (124) first, then a gap, then the rest sorted, then the usual
+    // trailing gap + empty drawn slot (nobody just drew here).
+    expect(presentation.seats.bottom.handTiles).toEqual([124, -1, 0, 4, -1, -1]);
+  });
+
+  it("non-hangzhou: a 5z tile is just an ordinary honor, sorted in its normal place", () => {
+    const view = {
+      seat: 0,
+      hand: [0, 4, 124],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "playing",
+      myActionOptions: [],
+      seats: [
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [{ nickname: "Me" }, null, null, null],
+      onDiscard: vi.fn(),
+      // no rulesetId — matches junk/bloodbattle, which never send a caishen concept
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    expect(presentation.seats.bottom.handTiles).toEqual([0, 4, 124, -1, -1]);
+  });
+
   it("hides the action dock during awaiting-draw (draw is server-auto-submitted, never clickable)", () => {
     const view = {
       seat: 0,

@@ -2,7 +2,7 @@ import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
-import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
+import { isCaishenTile, sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
 import {
   directionOf,
   seatAt,
@@ -104,19 +104,30 @@ export function useTablePresentation({
       const data = seatData(seat);
       const player = players?.[seat];
       const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
-      // Render order: the rest of the concealed hand, then always exactly two trailing
-      // slots — an empty gap, then the just-drawn tile (or another empty slot when nobody
-      // has just drawn) — so the pinned position never shifts the row's total width.
-      // Opponents have no real TileIds to show, so their "rest" slots are meaningless
-      // filler (0) that HandRow never reads as an id because `revealed` is false.
+      // Render order: hangzhou's caishen (financial) first, set off by an empty
+      // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
+      // §2 — it's never chi/peng/gang-able, so keeping it visually apart from
+      // the "normal" tiles you might discard alongside is worth the special
+      // case; junk/bloodbattle skip this branch entirely, same sort as before),
+      // then always exactly two trailing slots — another empty gap, then the
+      // just-drawn tile (or an empty slot when nobody has just drawn) — so the
+      // pinned position never shifts the row's total width. Opponents have no
+      // real TileIds to show, so their "rest" slots are meaningless filler (0)
+      // that HandRow never reads as an id because `revealed` is false.
+      const restOfHand =
+        extras.justDrawn !== undefined
+          ? view.hand.filter((tile) => tile !== extras.justDrawn)
+          : view.hand;
+      const caishenTiles = highlightCaishen ? restOfHand.filter(isCaishenTile) : [];
+      const nonCaishenTiles = highlightCaishen
+        ? restOfHand.filter((tile) => !isCaishenTile(tile))
+        : restOfHand;
       const handTiles: number[] =
         direction === "bottom"
           ? [
-              ...sortTilesForDisplay(
-                extras.justDrawn !== undefined
-                  ? view.hand.filter((tile) => tile !== extras.justDrawn)
-                  : view.hand,
-              ),
+              ...sortTilesForDisplay(caishenTiles),
+              ...(caishenTiles.length > 0 ? [-1] : []),
+              ...sortTilesForDisplay(nonCaishenTiles),
               -1,
               extras.justDrawn ?? -1,
             ]

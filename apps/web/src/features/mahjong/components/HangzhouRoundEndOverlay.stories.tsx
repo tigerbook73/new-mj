@@ -76,7 +76,7 @@ export const BaotouZimo: Story = {
 };
 
 export const CaipiaoGangRon: Story = {
-  name: "财飘+杠开 (\"飘杠\") off a discard",
+  name: '财飘+杠开 ("飘杠") off a discard',
   args: {
     ...baseArgs,
     result: {
