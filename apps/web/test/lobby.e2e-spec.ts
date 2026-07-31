@@ -263,9 +263,38 @@ test("leaving an in-game room keeps the other human in the match", async ({ brow
   await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
   await expect(guest).toHaveURL(/\/room\//, { timeout: 10_000 });
   await host.getByRole("button", { name: "Leave room" }).click();
-  await host.getByRole("dialog").getByRole("button", { name: "Leave room" }).click();
+  await host.getByRole("dialog").getByRole("button", { name: "Hand off to AI" }).click();
   await expect(host).toHaveURL(/\/games$/);
   await expect(guest).toHaveURL(/\/room\//);
+  await host.context().close();
+  await guest.context().close();
+});
+
+test("force exiting an in-game room ends the session for every player", async ({ browser }) => {
+  const [host, guest] = await Promise.all([
+    loginAs(browser, "force-exit-host"),
+    loginAs(browser, "force-exit-guest"),
+  ]);
+  await openVariant(host, "Junk Hu");
+  await createRoom(host, "Force exit");
+  await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
+  await host.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
+  await openRoomAsGuest(guest, "Force exit");
+  await sitAt(guest, 2);
+  await host.getByRole("checkbox", { name: "Ready" }).check();
+  await guest.getByRole("checkbox", { name: "Ready" }).check();
+  await host.getByRole("button", { name: "Start game" }).click();
+  await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
+  await expect(guest).toHaveURL(/\/room\//, { timeout: 10_000 });
+
+  await host.getByRole("button", { name: "Leave room" }).click();
+  await host.getByRole("dialog").getByRole("button", { name: "Force exit" }).click();
+
+  // The one who forced it navigates straight back to the game picker...
+  await expect(host).toHaveURL(/\/games$/);
+  // ...while everyone still on the table page lands on the settlement screen,
+  // not a stuck mid-round UI.
+  await expect(guest.getByTestId("session-finished-overlay")).toBeVisible({ timeout: 10_000 });
   await host.context().close();
   await guest.context().close();
 });

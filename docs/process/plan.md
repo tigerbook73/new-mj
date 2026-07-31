@@ -33,4 +33,5 @@
 - Web 牌桌动画重构：Tile 三层拆分（Slot/Motion/Face）+ 全桌动画调度架构（`diffPlayerView`/`animationLedger`/`useSlotEntering`，含对手弃牌飞行 ghost）已完成并合入本分支，`pnpm --filter @new-mj/web verify` 全绿；耐久结论已分流到 `architecture/frontend-layout.md` §5，专题 brief 已删除。
 - 文档体系：已取消独立 decisions 文档；架构取舍归入 architecture/contracts，局部实现理由归代码注释或 package AGENTS。
 - 开发流程：slot 化 worktree 现由私有 `@new-mj/devtools` 统一供根创建器、Vite 与 Playwright 使用；创建时自动分配空闲 slot、链接主 worktree 中全部被忽略的根 `.env.*`，并提供 status/doctor。标准 `pnpm dev`、`pnpm test:e2e` 与 `pnpm verify` 自动使用当前 slot，E2E 每 worktree 单 worker。
-- 最近一次根目录 `pnpm verify`：2026-07-30 全绿（含 format、typecheck、lint、build、unit、e2e；core junk 1000 局与 bloodbattle 10000 局 fuzz）。
+- 牌局 UI/结算功能：牌局中隐藏 Sign out；Leave room 改为始终确认，二选一"托管"（原有行为）/"强制退出"（新增 `room:end` 消息 + `RoomService.endSession`/`finishSession`，任意在座玩家可立即结束整场对局进入结算，无需他人确认）；局间确认界面新增"结束"按钮复用同一能力；`InfoLabel` 改名 `ScaleText` 并用于 `CenterStatus`；新房间默认每人 1000 积分，结算画面重写为正式 UI（排名/最终积分/冠军标记/局数/Replay 链接）。`session-mechanics.md` 已同步；server/web 均已补测试。
+- 最近一次根目录 `pnpm verify`：2026-07-31 全绿（含 format、typecheck、lint、build、unit、e2e；core junk 1000 局与 bloodbattle 10000 局 fuzz）。

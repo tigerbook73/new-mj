@@ -101,7 +101,7 @@ export class RoomService {
       phase: "waiting",
       status: "open",
       players: [null, null, null, null],
-      scores: [0, 0, 0, 0],
+      scores: [1000, 1000, 1000, 1000],
       gameNumber: 0,
       totalGames: sessionFormat === "4-round" ? DEFAULT_TOTAL_GAMES : undefined,
       wins: sessionFormat === "best-of-3" ? [0, 0, 0, 0] : undefined,
@@ -227,6 +227,32 @@ export class RoomService {
     room.players[seat] = null;
     this.playerRooms.delete(userId);
     this.eventBus.emit("room:playerLeft", { roomId, seat: seat as SeatId });
+  }
+
+  /**
+   * room:end — any seated player may end the whole session immediately,
+   * regardless of `totalGames`, no confirmation from anyone else required.
+   * Distinct from `leave()`'s in-game path (permanent auto-pilot, the
+   * session continues for everyone else): this closes the room for every
+   * seat right away. A round in progress (if any) is simply abandoned —
+   * it never scored and never reaches `finishedGames` — so settlement
+   * uses whatever `room.scores` already accumulated from fully completed
+   * rounds.
+   */
+  endSession(roomId: string, userId: string): void {
+    const room = this.mustGet(roomId);
+    const isSeated = room.players.some((player) => player?.userId === userId);
+    if (!isSeated) {
+      throw new RoomServiceError("NOT_IN_ROOM");
+    }
+    if (room.phase !== "in-game") {
+      throw new RoomServiceError("GAME_NOT_STARTED");
+    }
+    this.clearBotActionTimer(room.id);
+    this.clearRoomClaimTimers(room.id);
+    this.clearDrawRevealTimer(room.id);
+    room.awaitingNextRound = false;
+    this.finishSession(room);
   }
 
   /**
@@ -629,6 +655,38 @@ export class RoomService {
       .sort((a, b) => b.score - a.score);
   }
 
+  /**
+   * Finalizes a session — computes ranking off current `room.scores`,
+   * closes the room, archives the result, and broadcasts
+   * `room:sessionFinished`. Shared by the natural "played out totalGames"
+   * path (`handleGameEnd`) and the explicit early-end path (`endSession`).
+   * `gamesPlayed` counts `finishedGames` (fully completed rounds only) — a
+   * round abandoned mid-play by `endSession` never reaches `finishedGames`.
+   */
+  private finishSession(room: Room): void {
+    const ranking = this.computeRanking(room);
+    room.phase = "finished";
+    room.status = "closed";
+    room.finishedAt = Date.now();
+    this.untrackRoomPlayers(room);
+    room.result = {
+      winner: ranking[0]!.seatId,
+      ranking,
+      format: room.sessionFormat,
+      gamesPlayed: room.finishedGames.length,
+    };
+    this.persistenceService.fireAndForget(
+      this.persistenceService.archiveSession(room.id, {
+        rulesetId: room.rulesetId,
+        sessionFormat: room.sessionFormat,
+        result: room.result,
+        finishedAt: room.finishedAt,
+      }),
+      `archiveSession(${room.id})`,
+    );
+    this.eventBus.emit("room:sessionFinished", { roomId: room.id, result: room.result });
+  }
+
   snapshot(room: Room): RoomInfo {
     return {
       id: room.id,
@@ -811,27 +869,7 @@ export class RoomService {
     });
 
     if (!this.shouldContinue(room)) {
-      const ranking = this.computeRanking(room);
-      room.phase = "finished";
-      room.status = "closed";
-      room.finishedAt = Date.now();
-      this.untrackRoomPlayers(room);
-      room.result = {
-        winner: ranking[0]!.seatId,
-        ranking,
-        format: room.sessionFormat,
-        gamesPlayed: room.gameNumber,
-      };
-      this.persistenceService.fireAndForget(
-        this.persistenceService.archiveSession(room.id, {
-          rulesetId: room.rulesetId,
-          sessionFormat: room.sessionFormat,
-          result: room.result,
-          finishedAt: room.finishedAt,
-        }),
-        `archiveSession(${room.id})`,
-      );
-      this.eventBus.emit("room:sessionFinished", { roomId: room.id, result: room.result });
+      this.finishSession(room);
       return;
     }
 

@@ -400,6 +400,95 @@ describe("RoomService — leave (phase 4.4.4)", () => {
   });
 });
 
+describe("RoomService — endSession (room:end)", () => {
+  it("throws NOT_IN_ROOM for a caller who isn't seated", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    expect(() => service.endSession(room.id, "stranger")).toThrow(
+      expect.objectContaining({ code: "NOT_IN_ROOM" }),
+    );
+  });
+
+  it("throws GAME_NOT_STARTED before the room has started", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+
+    expect(() => service.endSession(room.id, "host")).toThrow(
+      expect.objectContaining({ code: "GAME_NOT_STARTED" }),
+    );
+  });
+
+  it("throws GAME_NOT_STARTED once the session is already finished", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    room.phase = "finished";
+
+    expect(() => service.endSession(room.id, "host")).toThrow(
+      expect.objectContaining({ code: "GAME_NOT_STARTED" }),
+    );
+  });
+
+  it("mid-round: any seated player ending settles immediately off current scores, without waiting for anyone else", () => {
+    const eventBus = new EventBus();
+    const service = new RoomService(
+      new GameService(),
+      eventBus,
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+    expect(room.phase).toBe("in-game");
+    const scoresBefore = [...room.scores];
+    const finished: unknown[] = [];
+    eventBus.on("room:sessionFinished", (event) => finished.push(event));
+
+    service.endSession(room.id, "p3");
+
+    expect(room.phase).toBe("finished");
+    expect(room.status).toBe("closed");
+    expect(room.finishedAt).toBeDefined();
+    // The round in progress never scored — settlement uses whatever was
+    // already accumulated (here, nothing yet).
+    expect(room.scores).toEqual(scoresBefore);
+    expect(room.result).toMatchObject({ format: "4-round", gamesPlayed: 0 });
+    expect(room.result?.ranking).toHaveLength(4);
+    expect(finished).toHaveLength(1);
+    expect(service.findActiveRoomForUser("p3")).toBeUndefined();
+  });
+
+  it("between rounds: gamesPlayed counts only the fully completed round, not the pending confirm gate", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+
+    const played = playJunkGame(room.seed, {}, [], room.dealer);
+    if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
+    for (const { seat, action } of played.actions) {
+      if (room.phase !== "in-game") break;
+      if (isDrawAction(action)) continue;
+      service.applyPlayerAction(room.id, seat, action);
+    }
+    expect(room.phase).toBe("in-game");
+    expect(room.awaitingNextRound).toBe(true);
+    expect(room.finishedGames).toHaveLength(1);
+
+    // Nobody has confirmed "next round" yet — endSession must not require it.
+    service.endSession(room.id, "host");
+
+    expect(room.phase).toBe("finished");
+    expect(room.result?.gamesPlayed).toBe(1);
+  });
+});
+
 describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)", () => {
   it("maps the host after create, and a joined player after join", () => {
     const service = newRoomService();

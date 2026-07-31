@@ -26,6 +26,13 @@ interface RoundEndOverlayProps {
   myConfirmed: boolean;
   onConfirm: () => void;
   /**
+   * room:end — ends the whole session right now instead of waiting for
+   * `totalGames` to play out. Any seated player may call this, confirmed
+   * or not (session-mechanics.md §6 "提前结束整场对局"), so the button
+   * always renders regardless of `myConfirmed`.
+   */
+  onEnd: () => void;
+  /**
    * Plays the mount-in transition — false for a reconnect/backlog snap that
    * resumes with the overlay already showing (see
    * useIsIncrementalSnapshot/usePrefersReducedMotion), same convention as
@@ -67,6 +74,7 @@ export function RoundEndOverlay({
   players,
   myConfirmed,
   onConfirm,
+  onEnd,
   entering,
   reducedMotion,
 }: RoundEndOverlayProps) {
@@ -113,6 +121,9 @@ export function RoundEndOverlay({
         ) : (
           <Button onClick={onConfirm}>Next round</Button>
         )}
+        <Button variant="outline" onClick={onEnd}>
+          End session
+        </Button>
       </motion.div>
     </motion.div>
   );

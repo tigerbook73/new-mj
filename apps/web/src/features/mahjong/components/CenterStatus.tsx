@@ -1,3 +1,5 @@
+import { ScaleText } from "./ScaleText";
+
 interface CenterStatusProps {
   phase: string;
   currentSeat: number;
@@ -11,11 +13,12 @@ export function CenterStatus({ phase, currentSeat, wallCount, error }: CenterSta
       data-testid="table-center-status"
       className="flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border bg-background/90 p-2 text-center text-xs shadow-sm"
     >
-      <p>Phase: {phase}</p>
-      <p>
-        Turn: seat {currentSeat + 1} · Wall: {wallCount}
-      </p>
-      {error && <p className="text-destructive">{error}</p>}
+      <ScaleText text={`Phase: ${phase}`} className="h-4 w-full" />
+      <ScaleText
+        text={`Turn: seat ${currentSeat + 1} · Wall: ${wallCount}`}
+        className="h-4 w-full"
+      />
+      {error && <ScaleText text={error} className="h-4 w-full text-destructive" />}
     </section>
   );
 }

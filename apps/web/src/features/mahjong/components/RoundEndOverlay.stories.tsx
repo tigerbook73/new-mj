@@ -77,6 +77,7 @@ function ToggleMountUnmountDemo() {
             players={players}
             myConfirmed={false}
             onConfirm={() => undefined}
+            onEnd={() => undefined}
             entering
             reducedMotion={false}
           />
@@ -110,6 +111,7 @@ export const ToggleMountUnmount: Story = {
     players,
     myConfirmed: false,
     onConfirm: () => undefined,
+    onEnd: () => undefined,
     entering: true,
     reducedMotion: false,
   },
@@ -125,6 +127,7 @@ export const Draw: Story = {
     players,
     myConfirmed: true,
     onConfirm: () => undefined,
+    onEnd: () => undefined,
     entering: false,
     reducedMotion: false,
   },

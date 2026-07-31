@@ -1,6 +1,6 @@
 import { cn } from "@/shared/lib/utils";
 
-interface InfoLabelProps {
+interface ScaleTextProps {
   text: string;
   className?: string;
 }
@@ -22,7 +22,7 @@ const PADDING = 10;
  * `aria-hidden` because the accessible name comes from the caller's own
  * `aria-label`/context, not this decorative label.
  */
-export function InfoLabel({ text, className }: InfoLabelProps) {
+export function ScaleText({ text, className }: ScaleTextProps) {
   return (
     <svg
       viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}

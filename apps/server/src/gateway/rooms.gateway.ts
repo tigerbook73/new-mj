@@ -380,6 +380,23 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
     });
   }
 
+  /**
+   * room:end — the "强制退出" side of the leave-room confirm dialog: any
+   * seated player ends the whole session immediately (see
+   * `RoomService.endSession`). Unlike room:leave this never removes the
+   * caller's own connection/seat tracking by itself — the client follows up
+   * with its own room:leave (a no-op once phase is "finished") to actually
+   * navigate away.
+   */
+  @SubscribeMessage("room:end")
+  handleRoomEnd(@ConnectedSocket() client: Socket): Reply<object> {
+    return this.reply(() => {
+      const info = this.requireConnection(client);
+      this.roomService.endSession(info.roomId, info.userId);
+      return {};
+    });
+  }
+
   @SubscribeMessage("game:action")
   handleGameAction(
     @ConnectedSocket() client: Socket,

@@ -25,6 +25,7 @@ import {
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
+import { cn } from "@/shared/lib/utils";
 import { useSessionStore } from "@/shared/store/session";
 import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
 import { useTablePresentation } from "./useTablePresentation";
@@ -231,6 +232,35 @@ export function TableView() {
     void navigate("/games");
   };
 
+  /**
+   * room:end — ends the whole session immediately for every seat (see
+   * docs/contracts/session-mechanics.md §6 "提前结束整场对局"), distinct
+   * from `leave()`'s in-game path (permanent auto-pilot, session continues
+   * for everyone else). Two entry points share this: the round-end
+   * overlay's "End" button, and the Leave room dialog's "Force exit"
+   * option (which follows up with its own `leave()` to actually navigate
+   * away — see `forceLeave` below).
+   */
+  const endSession = async (): Promise<boolean> => {
+    setError(null);
+    const result = await ack(activeSocket, "room:end", {});
+    if (!result.ok) {
+      setError(result.code);
+      return false;
+    }
+    return true;
+  };
+
+  const forceLeave = async () => {
+    setLeaveConfirmOpen(false);
+    if (await endSession()) void leave();
+  };
+
+  const handOff = () => {
+    setLeaveConfirmOpen(false);
+    void leave();
+  };
+
   const isIncrementalSnapshot = useIsIncrementalSnapshot(gameSeq);
   const presentation = useTablePresentation({
     view,
@@ -276,11 +306,6 @@ export function TableView() {
     advice?.recommendedActionIndex === undefined
       ? undefined
       : advice.actions[advice.recommendedActionIndex];
-  const isOwner = room?.ownerUserId === userId;
-  const hasOtherPlayers = room?.players.some(
-    (player, seat) => player !== null && seat !== view.seat,
-  );
-
   return (
     <div
       data-testid="table-page"
@@ -293,10 +318,7 @@ export function TableView() {
         totalGames={room?.totalGames ?? 1}
         dealer={room?.dealer ?? 0}
         scores={room?.scores ?? [0, 0, 0, 0]}
-        onLeave={() => {
-          if (isOwner && hasOtherPlayers) setLeaveConfirmOpen(true);
-          else void leave();
-        }}
+        onLeave={() => setLeaveConfirmOpen(true)}
       />
 
       <main
@@ -348,31 +370,61 @@ export function TableView() {
               players={room.players}
               myConfirmed={room.players[view.seat]?.isReady === true}
               onConfirm={() => void confirmNextRound()}
+              onEnd={() => void endSession()}
               entering={isIncrementalSnapshot && !prefersReducedMotion}
               reducedMotion={prefersReducedMotion}
             />
           )}
         </AnimatePresence>
-      </main>
 
-      {sessionResult != null && (
-        <div className="absolute bottom-3 left-3 z-20 max-w-md rounded-lg border bg-background/95 p-3 text-sm shadow-lg">
-          <p>Session finished: {JSON.stringify(sessionResult)}</p>
-          <div className="mt-1 flex flex-wrap gap-2">
-            {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
-              (gameNumber) => (
-                <Link
-                  key={gameNumber}
-                  to={`/replay/${room?.id}/${gameNumber}`}
-                  className="underline"
-                >
-                  Replay game {gameNumber}
-                </Link>
-              ),
-            )}
+        {sessionResult != null && room && (
+          <div
+            data-testid="session-finished-overlay"
+            className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 p-4"
+          >
+            <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border bg-background p-5 text-center shadow-xl">
+              <h2 className="text-lg font-semibold">Session finished</h2>
+              <p className="text-sm text-muted-foreground">
+                {sessionResult.gamesPlayed} game{sessionResult.gamesPlayed === 1 ? "" : "s"} played
+              </p>
+              <ol className="flex flex-col gap-1 text-sm">
+                {sessionResult.ranking.map((entry, index) => (
+                  <li
+                    key={entry.seatId}
+                    className={cn(
+                      "flex items-center justify-between rounded-md px-2 py-1",
+                      entry.seatId === sessionResult.winner && "bg-primary/10 font-semibold",
+                    )}
+                  >
+                    <span>
+                      #{index + 1}{" "}
+                      {room.players[entry.seatId]?.nickname ?? `Seat ${entry.seatId + 1}`}
+                      {entry.seatId === sessionResult.winner ? " \u{1F3C6}" : ""}
+                    </span>
+                    <span>{entry.score}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="flex flex-wrap justify-center gap-2 text-sm">
+                {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
+                  (gameNumber) => (
+                    <Link
+                      key={gameNumber}
+                      to={`/replay/${room.id}/${gameNumber}`}
+                      className="underline"
+                    >
+                      Replay game {gameNumber}
+                    </Link>
+                  ),
+                )}
+              </div>
+              <Button variant="outline" onClick={() => void leave()}>
+                Back to games
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
 
       <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
         <Dialog.Portal>
@@ -380,18 +432,16 @@ export function TableView() {
           <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex w-96 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border bg-background p-6 shadow-xl">
             <Dialog.Title className="text-lg font-semibold">Leave room?</Dialog.Title>
             <Dialog.Description className="text-sm text-muted-foreground">
-              Other players are still in this room. Are you sure you want to leave?
+              Hand off: an AI takes over your seat and the game continues for everyone else. Force
+              exit: the whole session ends now for every player, straight to settlement.
             </Dialog.Description>
             <div className="flex justify-end gap-2">
               <Dialog.Close render={<Button variant="outline">Cancel</Button>} />
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setLeaveConfirmOpen(false);
-                  void leave();
-                }}
-              >
-                Leave room
+              <Button variant="secondary" onClick={handOff}>
+                Hand off to AI
+              </Button>
+              <Button variant="destructive" onClick={() => void forceLeave()}>
+                Force exit
               </Button>
             </div>
           </Dialog.Popup>
