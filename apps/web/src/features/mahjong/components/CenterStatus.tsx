@@ -13,7 +13,17 @@ interface CenterStatusProps {
   isTingpai?: boolean | undefined;
   isBaotou?: boolean | undefined;
   isCaipiao?: boolean | undefined;
+  /**
+   * Hangzhou-only, public (docs/variants/hangzhou.md §5/§11) — how many
+   * consecutive terms the current dealer has held, including this game.
+   * Unlike isTingpai/isBaotou/isCaipiao, this is the same value in every
+   * seat's view (santiao's ron restriction applies table-wide, not
+   * per-seat), so it isn't a private badge — see the note near its render.
+   */
+  dealerStreak?: number | undefined;
 }
+
+const SANTIAO_UNLOCK_STREAK = 3;
 
 const BADGE_CLASS =
   "rounded-full border px-2 py-0.5 text-[0.65rem] leading-none font-medium whitespace-nowrap";
@@ -26,8 +36,15 @@ export function CenterStatus({
   isTingpai,
   isBaotou,
   isCaipiao,
+  dealerStreak,
 }: CenterStatusProps) {
   const hasBadges = isTingpai || isBaotou || isCaipiao;
+  // Only shown while ron is actually blocked — once santiao unlocks, this
+  // table-wide restriction stops being news worth taking up space over.
+  const gamesUntilSantiao =
+    dealerStreak !== undefined && dealerStreak < SANTIAO_UNLOCK_STREAK
+      ? SANTIAO_UNLOCK_STREAK - dealerStreak
+      : undefined;
   return (
     <section
       data-testid="table-center-status"
@@ -38,6 +55,14 @@ export function CenterStatus({
         text={`Turn: seat ${currentSeat + 1} · Wall: ${wallCount}`}
         className="h-4 w-full"
       />
+      {gamesUntilSantiao !== undefined && (
+        <div data-testid="santiao-status" className="h-4 w-full">
+          <ScaleText
+            text={`Santiao: ron unlocks in ${gamesUntilSantiao} more game${gamesUntilSantiao === 1 ? "" : "s"}`}
+            className="h-4 w-full text-muted-foreground"
+          />
+        </div>
+      )}
       {hasBadges && (
         <div data-testid="hangzhou-status-badges" className="flex flex-wrap justify-center gap-1">
           {/* 爆头 implies 听牌 — show only the stronger badge, not both. */}

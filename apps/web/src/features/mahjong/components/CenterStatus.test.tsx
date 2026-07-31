@@ -52,3 +52,46 @@ describe("CenterStatus", () => {
     expect(caipiaoWithBaotou).toContain(">财飘<");
   });
 });
+
+describe("CenterStatus santiao hint", () => {
+  it("shows games remaining while dealerStreak is below the santiao threshold", () => {
+    const first = renderToStaticMarkup(
+      createElement(CenterStatus, {
+        phase: "playing",
+        currentSeat: 0,
+        wallCount: 40,
+        dealerStreak: 1,
+      }),
+    );
+    expect(first).toContain('data-testid="santiao-status"');
+    expect(first).toContain("ron unlocks in 2 more games");
+
+    const second = renderToStaticMarkup(
+      createElement(CenterStatus, {
+        phase: "playing",
+        currentSeat: 0,
+        wallCount: 40,
+        dealerStreak: 2,
+      }),
+    );
+    expect(second).toContain("ron unlocks in 1 more game");
+    expect(second).not.toContain("1 more games");
+  });
+
+  it("hides the hint once dealerStreak reaches the unlock threshold, and when absent (non-hangzhou)", () => {
+    const unlocked = renderToStaticMarkup(
+      createElement(CenterStatus, {
+        phase: "playing",
+        currentSeat: 0,
+        wallCount: 40,
+        dealerStreak: 3,
+      }),
+    );
+    expect(unlocked).not.toContain('data-testid="santiao-status"');
+
+    const absent = renderToStaticMarkup(
+      createElement(CenterStatus, { phase: "playing", currentSeat: 0, wallCount: 40 }),
+    );
+    expect(absent).not.toContain('data-testid="santiao-status"');
+  });
+});

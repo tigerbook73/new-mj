@@ -345,6 +345,7 @@ export function TableView() {
               isTingpai={extras.isTingpai}
               isBaotou={extras.isBaotou}
               isCaipiao={extras.isCaipiao}
+              dealerStreak={extras.dealerStreak}
             />
           }
           actionDock={
