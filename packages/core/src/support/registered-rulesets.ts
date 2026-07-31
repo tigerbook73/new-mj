@@ -1,4 +1,5 @@
 import { bloodbattleRuleSet } from "../rulesets/bloodbattle/index.ts";
+import { hangzhouRuleSet } from "../rulesets/hangzhou/index.ts";
 import { junkRuleSet } from "../rulesets/junk/index.ts";
 import type { GameEvent } from "../events.ts";
 import type { SeatId } from "../lib/ids.ts";
@@ -62,6 +63,32 @@ export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
     computeNextDealer: (state, currentDealer) =>
       bloodbattleRuleSet.computeNextDealer(
         state as Parameters<typeof bloodbattleRuleSet.computeNextDealer>[0],
+        currentDealer,
+      ),
+  },
+  {
+    id: "hangzhou",
+    createGame: (seed) => hangzhouRuleSet.createGame(seed, 0) as ApplyResult<ReplayState>,
+    applyAction: (state, seat, action) =>
+      hangzhouRuleSet.applyAction(
+        state as Parameters<typeof hangzhouRuleSet.applyAction>[0],
+        seat,
+        action as never,
+      ) as ApplyResult<ReplayState>,
+    getLegalActions: (state, seat) =>
+      hangzhouRuleSet.getLegalActions(
+        state as Parameters<typeof hangzhouRuleSet.getLegalActions>[0],
+        seat,
+      ),
+    getPlayerView: (state, seat) =>
+      hangzhouRuleSet.getPlayerView(
+        state as Parameters<typeof hangzhouRuleSet.getPlayerView>[0],
+        seat,
+      ),
+    rebuildPlayerView: hangzhouRuleSet.rebuildPlayerView,
+    computeNextDealer: (state, currentDealer) =>
+      hangzhouRuleSet.computeNextDealer(
+        state as Parameters<typeof hangzhouRuleSet.computeNextDealer>[0],
         currentDealer,
       ),
   },

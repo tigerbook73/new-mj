@@ -2,6 +2,7 @@ import type { GameEvent } from "./events.ts";
 import type { SeatId } from "./lib/ids.ts";
 import { junkRuleSet } from "./rulesets/junk/index.ts";
 import { bloodbattleRuleSet } from "./rulesets/bloodbattle/index.ts";
+import { hangzhouRuleSet } from "./rulesets/hangzhou/index.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "./types.ts";
 import { CORE_ERROR_CODES } from "./errors.ts";
 
@@ -44,6 +45,7 @@ type StateWithConfig = { config: GameConfig };
 const rulesets: Record<string, RulesetModule<any, any, any>> = {
   junk: junkRuleSet,
   bloodbattle: bloodbattleRuleSet,
+  hangzhou: hangzhouRuleSet,
 };
 
 const getRuleset = (rulesetId: string) => rulesets[rulesetId];
