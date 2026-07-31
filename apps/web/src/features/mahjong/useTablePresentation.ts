@@ -39,6 +39,17 @@ export type TableViewExtras = {
   lastDiscard?: { seat: SeatId; tile: number };
   /** Public: present once `phase==="finished"` — drives RoundEndOverlay below. */
   result?: GameResultLike;
+  /**
+   * Hangzhou-only derived state (docs/variants/hangzhou.md §4/§11), read the
+   * same loose way as everything else in this type — absent for junk/
+   * bloodbattle views, so callers gate on presence, not on rulesetId.
+   */
+  isTingpai?: boolean;
+  isBaotou?: boolean;
+  isCaipiao?: boolean;
+  /** Hangzhou-only, public (hangzhou.md §5/§11): whether ron is currently
+   * allowed table-wide. Absent for junk/bloodbattle. */
+  dealerStreak?: number;
 };
 
 type PlayerInfo = { nickname?: string } | null;

@@ -338,6 +338,9 @@ export function TableView() {
               currentSeat={view.currentSeat}
               wallCount={view.wallCount}
               error={error}
+              isTingpai={extras.isTingpai}
+              isBaotou={extras.isBaotou}
+              isCaipiao={extras.isCaipiao}
             />
           }
           actionDock={
