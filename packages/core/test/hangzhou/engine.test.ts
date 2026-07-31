@@ -163,6 +163,46 @@ test("caishen is never offered as a concealed-gang kind, even holding all four",
   expect(actions.some((action) => action.type === "anGang" && action.kind === "5z")).toBe(false);
 });
 
+test("bug repro: zimo is not offered right after peng, even if the leftover concealed hand happens to already be complete", () => {
+  // Seat 0 holds 3 complete triplets + a pair (already a full standalone hand
+  // on its own) plus a spare pair of 9s — pengging that spare pair leaves the
+  // original 3-melds-and-pair sitting there unchanged, which used to
+  // (wrongly) satisfy isWin() and offer zimo despite no draw ever happening.
+  const seat0Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 104, 105];
+  const DISCARD_TILE = 106; // 9s, matches the spare pair (104, 105)
+  const physical = new Set([DISCARD_TILE, ...seat0Hand]);
+  const state: HangzhouState = {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [DISCARD_TILE], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 1,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [0, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+  };
+  const discarded = unwrap(
+    hangzhouRuleSet.applyAction(state, 1, { type: "discard", tile: DISCARD_TILE }),
+  );
+  // Both hu (ron) and peng are legitimately offered here — seat 0 deliberately
+  // declines the win in favor of pengging, which this test needs specifically.
+  expect(hangzhouRuleSet.getLegalActions(discarded, 0)).toContainEqual({ type: "peng" });
+  const pengged = unwrap(hangzhouRuleSet.applyAction(discarded, 0, { type: "peng" }));
+  expect(pengged.phase).toBe("playing");
+  expect(pengged.currentSeat).toBe(0);
+  expect(pengged.justDrawn).toBeUndefined();
+  expect(hangzhouRuleSet.getLegalActions(pengged, 0).some((action) => action.type === "zimo")).toBe(
+    false,
+  );
+  assertTileConservation(pengged);
+});
+
 // 1m,2m,3m runs (0,4,8/12,16,20/24,28,32) + 1p pair (36,37) waiting on 1s/2s/3s
 // (76,80) to complete a fourth run — same shape as scoring.test.ts's hz-001/013.
 const santiaoSeat1Hand = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 37, 76, 80];

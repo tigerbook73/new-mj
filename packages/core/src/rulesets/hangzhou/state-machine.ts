@@ -102,6 +102,18 @@ export const isWin = (state: HangzhouState, seat: SeatId, extra?: TileId): boole
   return isWinningHand(kindsOf(concealed), own.melds.length);
 };
 
+/**
+ * Zimo (self-draw win) requires having actually just drawn — a hand can
+ * coincidentally already satisfy isWin() right after claiming a chi/peng
+ * (whose 2 concealed tiles happen to leave the rest already complete),
+ * which is not a self-draw and must not offer `zimo`. `justDrawn` is only
+ * set by an actual draw (or the dealer's opening 14th tile, see
+ * createHangzhouGame) and is cleared by discard/chi/peng/gang, so checking
+ * it here is sufficient — no separate "did this seat just claim" flag needed.
+ */
+export const canZimo = (state: HangzhouState, seat: SeatId): boolean =>
+  state.justDrawn?.seat === seat && isWin(state, seat);
+
 export const chiOptions = (
   state: HangzhouState,
   seat: SeatId,

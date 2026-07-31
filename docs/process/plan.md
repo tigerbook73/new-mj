@@ -15,6 +15,7 @@
 - 已发现（与本次改动无关，未修复）：`apps/web/test/lobby.e2e-spec.ts` 的 "leaving an in-game room keeps the other human in the match" 与 "force exiting an in-game room ends the session for every player" 两个用例在跑完整 `test/lobby.e2e-spec.ts` 套件时容易超时（等待对话框里的 "Hand off to AI"/"Force exit" 按钮），单独跑或小范围跑均能稳定通过；已在纯净 main（无本次任何改动）上复现，确认是套件层面的既有抖动，不是本次引入的回归。谁下次碰 leave-room/force-exit 相关代码时应该顺手看一眼。
 - `hangzhou.md` §14 记录了两处不阻塞定稿的实现细节假设（财神替代数量上限、`caiPiaoCount` 中途清零与否），已按文档默认值实现并写入 fixture；如果和你的预期不符，后续只需改一行。
 - 已发现（与本次改动无关，未修复）：`CenterStatus` 的 `ScaleText` 行在桌面实际渲染尺寸下会被硬裁切、无省略号（`ScaleText` 自身文档已承认这个取舍）——不止新加的 Santiao 提示，连既有的 "Phase: playing"/"Turn: seat N · Wall: M" 两行在浏览器实跑截图里也裁得只剩前几个字符。浏览器验证杭州桌面新功能时顺手发现，是 `CenterStatus` 盒子尺寸的既有问题，不是本次引入的；新加的 Santiao 文案已经尽量精简，但没有去动 `CenterStatus`/`ScaleText` 本身的尺寸逻辑。谁下次碰这块 UI 时可以顺手看一眼。
+- 已发现且已修复（杭州）：`getLegalActions`/`applyAction` 里的 `zimo` 合法性判定原来只检查 `isWin(state, seat)`，没检查"这一家是不是刚摸完牌"——碰/吃之后剩余的手牌恰好已经自成一手（比如碰之前手里已经是 3 副刻子+一对+一副多余的对子）时，会在没摸牌的情况下错误地把自摸也列为合法动作。已加 `canZimo`（要求 `state.justDrawn?.seat===seat`）修正，配套复现用例已入库。**同一处代码（`isWin(state, seat)` 不检查是否刚摸牌）在 junk 里原样存在**（`packages/core/src/rulesets/junk/index.ts`），是我写杭州时照抄 junk 骨架带过来的既有 bug，本轮只按你反馈的范围修了杭州，junk 那份没有动——如果你也想修，说一声。
 
 ## Backlog
 
