@@ -61,6 +61,11 @@ export const InteractionStates: Story = {
         <Tile tileId={20} justDiscarded {...dims(44)} />
         <p>justDiscarded</p>
       </div>
+      <div>
+        {/* 124 = 5z (白/Haku) — hangzhou's caishen, see mahjongTiles.ts's isCaishenTile. */}
+        <Tile tileId={124} caishen {...dims(44)} />
+        <p>caishen (hangzhou)</p>
+      </div>
     </div>
   ),
 };

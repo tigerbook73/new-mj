@@ -56,9 +56,12 @@ export function CenterStatus({
         className="h-4 w-full"
       />
       {gamesUntilSantiao !== undefined && (
+        // Kept as short as the other lines here — see ScaleText's own docs:
+        // long text hard-clips with no ellipsis, so this errs terse rather
+        // than descriptive.
         <div data-testid="santiao-status" className="h-4 w-full">
           <ScaleText
-            text={`Santiao: ron unlocks in ${gamesUntilSantiao} more game${gamesUntilSantiao === 1 ? "" : "s"}`}
+            text={`Santiao: ${gamesUntilSantiao} to unlock`}
             className="h-4 w-full text-muted-foreground"
           />
         </div>

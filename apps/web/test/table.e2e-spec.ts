@@ -22,7 +22,7 @@ async function loginAs(
 
 async function createAndStartRoom(
   browser: Browser,
-  rulesetId: "junk" | "bloodbattle",
+  rulesetId: "junk" | "bloodbattle" | "hangzhou",
   identityPrefix: string = rulesetId,
   contextOptions: BrowserContextOptions = {},
 ) {
@@ -38,7 +38,8 @@ async function createAndStartRoom(
   const players: [Page, Page, Page, Page] = [host, p2, p3, p4];
   const roomName = `Table test ${identityPrefix}`;
 
-  const variant = rulesetId === "junk" ? "Junk Hu" : "Bloodbattle";
+  const variant =
+    rulesetId === "junk" ? "Junk Hu" : rulesetId === "bloodbattle" ? "Bloodbattle" : "Hangzhou";
   await host.getByRole("tab", { name: variant }).click();
   await host.getByRole("button", { name: "Create room" }).last().click();
   await host.getByLabel("Room name").fill(roomName);
@@ -852,6 +853,23 @@ test("bloodbattle table renders the common skeleton", async ({ browser }) => {
 
   await expect(host.getByTestId("table-hud")).toBeVisible({ timeout: 10_000 });
   await expect(host.getByTestId("hand-tile").first()).toBeVisible({ timeout: 10_000 });
+
+  for (const page of players) {
+    await page.context().close();
+  }
+});
+
+test("hangzhou table renders the common skeleton with the santiao status hint", async ({
+  browser,
+}) => {
+  const { players } = await createAndStartRoom(browser, "hangzhou", "hz-skeleton");
+  const [host] = players;
+
+  await expect(host.getByTestId("table-hud")).toBeVisible({ timeout: 10_000 });
+  await expect(host.getByTestId("hand-tile").first()).toBeVisible({ timeout: 10_000 });
+  // A freshly started room's dealer is on their first term (dealerStreak=1),
+  // so santiao's ron restriction is active — see docs/variants/hangzhou.md §5.
+  await expect(host.getByTestId("santiao-status")).toBeVisible({ timeout: 10_000 });
 
   for (const page of players) {
     await page.context().close();

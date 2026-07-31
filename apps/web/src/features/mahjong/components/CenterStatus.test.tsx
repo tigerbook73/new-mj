@@ -64,7 +64,7 @@ describe("CenterStatus santiao hint", () => {
       }),
     );
     expect(first).toContain('data-testid="santiao-status"');
-    expect(first).toContain("ron unlocks in 2 more games");
+    expect(first).toContain("Santiao: 2 to unlock");
 
     const second = renderToStaticMarkup(
       createElement(CenterStatus, {
@@ -74,8 +74,7 @@ describe("CenterStatus santiao hint", () => {
         dealerStreak: 2,
       }),
     );
-    expect(second).toContain("ron unlocks in 1 more game");
-    expect(second).not.toContain("1 more games");
+    expect(second).toContain("Santiao: 1 to unlock");
   });
 
   it("hides the hint once dealerStreak reaches the unlock threshold, and when absent (non-hangzhou)", () => {
