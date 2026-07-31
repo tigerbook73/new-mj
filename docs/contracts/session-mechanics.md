@@ -38,7 +38,7 @@ finished: 计算排名，对外公开 result
 
 ## 4. 计分与排名——⚠️ 现状是共享实现，不是确认的公共契约
 
-**这一节的内容目前是两个玩法共用的同一份代码，但这只是巧合，不是设计结论**——详见 `architecture/variant-boundary.md` 的边界台账。新增一个计分/排名逻辑明显不同的玩法（如引入 uma/oka 名次奖惩分的日麻）时，预期需要把这里拆成 per-ruleset dispatch，而不是在 `RoomService` 里加分支。
+**这一节的内容目前是三个玩法共用的同一份代码，但这只是巧合，不是设计结论**——详见 `architecture/variant-boundary.md` 的边界台账。新增一个计分/排名逻辑明显不同的玩法（如引入 uma/oka 名次奖惩分的日麻）时，预期需要把这里拆成 per-ruleset dispatch，而不是在 `RoomService` 里加分支。
 
 每局结束时，core engine 返回 `{ state, events }`；server 从 `events` 中提取 `Settled` 事件，累加到 `room.scores[seatId]`——**具体 `Settled` 事件的分数怎么算出来，是玩法私有的**，见对应 `variants/*.md`。
 
@@ -53,8 +53,10 @@ finished: 计算排名，对外公开 result
 
 谁来决定下一局的庄家分两种情况：
 
-- **Game 1**：房主的座位为庄家——纯房间/座位安排（房主总是第一个入座 = 座位 0），与麻将规则无关，`RoomService.create()` 直接写死，不经过 core。
-- **Game 2 起**：庄家轮换**公式**属于麻将规则本身，归属 `packages/core`，容器侧只调用 `contracts/engine-contract.md` §4 定义的 `RulesetModule.computeNextDealer(finishedState, currentDealer)`、存结果、广播 `room:dealerChanged`，不实现任何轮换公式。当前两个玩法的具体公式见各自 `variants/*.md`。
+- **Game 1**：房主的座位为庄家——纯房间/座位安排（房主总是第一个入座 = 座位 0），与麻将规则无关，`RoomService.create()` 直接写死，不经过 core；`Room.dealerStreak` 同时初始化为 1。
+- **Game 2 起**：庄家轮换**公式**属于麻将规则本身，归属 `packages/core`，容器侧只调用 `contracts/engine-contract.md` §4 定义的 `RulesetModule.computeNextDealer(finishedState, currentDealer)`、存结果、广播 `room:dealerChanged`，不实现任何轮换公式。当前三个玩法的具体公式见各自 `variants/*.md`（junk/bloodbattle 恒定顺时针；hangzhou 庄家胡牌或流局才连庄，见 `variants/hangzhou.md` §8——`architecture/variant-boundary.md` 已据此把"庄家轮换公式"确认为永久私有）。
+
+**`dealerStreak`（跨局座位连续次数计数）**：与轮换公式本身不同，这是容器侧的**通用**机制，不理解规则——`RoomService.nextRound()` 只比较"`computeNextDealer` 算出的下一局庄家座位"是否等于"当前庄家座位"，相等则 `Room.dealerStreak += 1`，不等则重置为 1；结果作为普通字段合入下一局的 `GameConfig`（`{ ...room.config, dealerStreak: room.dealerStreak }`，不改 `room.config` 本身，也不改 `createGame`/`computeNextDealer` 的签名）。目前只有 hangzhou 读取这个字段（用于三牢点炮限制，见 `variants/hangzhou.md` §5），其余玩法的 config 解析器直接忽略未知字段，行为不受影响。
 
 ## 6. 房间专属协议消息
 
