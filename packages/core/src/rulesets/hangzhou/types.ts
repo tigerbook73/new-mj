@@ -32,6 +32,10 @@ export type HangzhouConfig = GameConfig & {
   rulesetId: "hangzhou";
   multiHuPolicy: HangzhouMultiHuPolicy;
   baseScore: number;
+  /** Consecutive terms the current dealer has held, including this game (see
+   * hangzhou.md §5/§8). Session-computed by the generic room layer, not a
+   * user-facing config knob; other rulesets ignore this field. */
+  dealerStreak: number;
 };
 
 export type HangzhouPendingClaims = {

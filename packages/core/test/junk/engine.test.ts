@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   assertTileConservation,
   applyAction as engineApplyAction,
+  computeNextJunkDealer,
   createGame as engineCreateGame,
   createJunkGame,
   eventsVisibleTo,
@@ -80,6 +81,14 @@ test("junk config accepts supported switches and rejects invalid values", () => 
   expect(createJunkGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
     error: { code: "INVALID_CONFIG" },
   });
+});
+
+test("junk's dealer rotation formula is unconditionally clockwise (docs/variants/junk.md §4)", () => {
+  const started = createJunkGame(19, 0);
+  if ("error" in started) throw new Error(started.error.code);
+  for (const currentDealer of [0, 1, 2, 3] as const) {
+    expect(computeNextJunkDealer(started.state, currentDealer)).toBe((currentDealer + 1) % 4);
+  }
 });
 
 test("junk accepts a legal discard and preserves the caller state", () => {

@@ -28,7 +28,11 @@ export { computeNextHangzhouDealer, createHangzhouGame } from "./state-machine.t
 export { getPlayerView } from "./view.ts";
 export { CAISHEN_KIND } from "./constants.ts";
 export { scoreHangzhouHand } from "./scoring.ts";
-export type { HangzhouScoringInput, HangzhouScoringMeld, HangzhouScoringResult } from "./scoring.ts";
+export type {
+  HangzhouScoringInput,
+  HangzhouScoringMeld,
+  HangzhouScoringResult,
+} from "./scoring.ts";
 export type {
   HangzhouAction,
   HangzhouApplyResult,

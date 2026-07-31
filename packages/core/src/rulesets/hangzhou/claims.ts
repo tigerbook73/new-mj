@@ -2,7 +2,12 @@ import { EVENT_TYPES, type GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { Meld } from "../../lib/seat.ts";
-import type { HangzhouAction, HangzhouApplyResult, HangzhouClaimAction, HangzhouState } from "./types.ts";
+import type {
+  HangzhouAction,
+  HangzhouApplyResult,
+  HangzhouClaimAction,
+  HangzhouState,
+} from "./types.ts";
 import {
   appendEvent,
   beginTurn,
@@ -27,7 +32,10 @@ export const chooseClaims = (
   const pending = state.pendingClaims!;
   const choices = Object.entries(pending.responses)
     .filter((entry): entry is [string, HangzhouClaimAction] => entry[1].type !== "pass")
-    .map(([seat, action]) => ({ seat: Number(seat) as SeatId, action: action as HangzhouClaimAction }));
+    .map(([seat, action]) => ({
+      seat: Number(seat) as SeatId,
+      action: action as HangzhouClaimAction,
+    }));
   const sorted = choices.sort((left, right) => {
     const priorityDiff = priority(right.action) - priority(left.action);
     return priorityDiff !== 0

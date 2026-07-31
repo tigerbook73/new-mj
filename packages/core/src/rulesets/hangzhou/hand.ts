@@ -166,10 +166,7 @@ export const isWinningHand = (
 ): boolean => evaluateWinningShape(concealedKinds, openMeldsCount) !== undefined;
 
 /** `concealedHand` excludes the not-yet-drawn/claimed winning tile. */
-export const isTingpai = (
-  concealedHand: readonly TileKind[],
-  openMeldsCount: number,
-): boolean =>
+export const isTingpai = (concealedHand: readonly TileKind[], openMeldsCount: number): boolean =>
   TILE_KINDS.some((candidate) => isWinningHand([...concealedHand, candidate], openMeldsCount));
 
 /** docs/variants/hangzhou.md §4: listening, holding caishen, and every

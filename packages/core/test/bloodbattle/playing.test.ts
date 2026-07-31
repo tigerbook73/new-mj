@@ -57,6 +57,16 @@ test("bloodbattle is registered in the engine", () => {
     expect(result.state).toMatchObject({ config: { rulesetId: "bloodbattle" } });
 });
 
+test("bloodbattle's dealer rotation formula is unconditionally clockwise (docs/variants/bloodbattle.md §5)", () => {
+  const started = bloodbattleRuleSet.createGame(19, 0, config);
+  if ("error" in started) throw new Error(started.error.code);
+  for (const currentDealer of [0, 1, 2, 3] as const) {
+    expect(bloodbattleRuleSet.computeNextDealer(started.state, currentDealer)).toBe(
+      (currentDealer + 1) % 4,
+    );
+  }
+});
+
 test("playing only offers lack-suit discards and draws for the next active seat", () => {
   const state = playingState();
   const actions = getLegalActions(state, 0) as Array<{ type: string; tile?: number }>;

@@ -37,13 +37,11 @@ for (const ruleset of REGISTERED_RULESETS_FOR_TESTING) {
       }
     }
   });
-
-  test(`${ruleset.id}: computeNextDealer rotates clockwise and wraps 3→0`, () => {
-    const started = ruleset.createGame(19);
-    if ("error" in started) throw new Error(started.error.code);
-    for (const currentDealer of [0, 1, 2, 3] as const) {
-      const next = ruleset.computeNextDealer(started.state, currentDealer);
-      expect(next).toBe((currentDealer + 1) % 4);
-    }
-  });
 }
+
+// computeNextDealer's *formula* is intentionally NOT parameterized here — it's
+// ruleset-private (architecture/variant-boundary.md "庄家轮换公式"): junk and
+// bloodbattle happen to both rotate clockwise regardless of outcome, while
+// hangzhou continues the dealer on a win or a draw and only rotates when
+// someone else wins (docs/variants/hangzhou.md §8). Each ruleset asserts its
+// own formula in its own test file instead.

@@ -3,7 +3,12 @@ import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { isBaotou, isTingpai } from "./hand.ts";
-import type { HangzhouAction, HangzhouGameResult, HangzhouPlayerView, HangzhouState } from "./types.ts";
+import type {
+  HangzhouAction,
+  HangzhouGameResult,
+  HangzhouPlayerView,
+  HangzhouState,
+} from "./types.ts";
 import { kindsOf } from "./state-machine.ts";
 
 export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlayerView => {

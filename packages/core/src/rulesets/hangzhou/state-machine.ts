@@ -139,7 +139,11 @@ export const claimOptions = (state: HangzhouState, seat: SeatId): HangzhouClaimO
   const tile = pending.discard.tile;
   const kind = STANDARD_TILE_SET.kindOf(tile);
   const options: HangzhouClaimOption[] = [];
-  if (isWin(state, seat, tile)) options.push({ action: { type: "hu" } });
+  // 三牢 (hangzhou.md §5): ron is blocked for the dealer's first two
+  // consecutive terms; self-draw (zimo) is never affected by this gate.
+  if (isWin(state, seat, tile) && configOf(state).dealerStreak >= 3) {
+    options.push({ action: { type: "hu" } });
+  }
   if (kind === CAISHEN_KIND) return options;
   const hand = state.seats[seat]!.hand;
   const matching = sameKind(hand, kind);
@@ -234,12 +238,19 @@ const buildScoringInput = (
 export const finishWin = (state: HangzhouState, events: GameEvent[], winner: SeatId): void => {
   const own = state.seats[winner]!;
   const winTile =
-    state.justDrawn?.seat === winner ? state.justDrawn.tile : (own.hand[own.hand.length - 1] as TileId);
+    state.justDrawn?.seat === winner
+      ? state.justDrawn.tile
+      : (own.hand[own.hand.length - 1] as TileId);
   const scored = scoreHangzhouHand(buildScoringInput(state, winner, winTile, "zimo", true));
   // isWin() already gated the `zimo` action, so this must succeed; the branch
   // exists only to satisfy the discriminated union without an unsafe cast.
   const winDetail: HangzhouWinDetail = scored.hu
-    ? { seat: winner, fanTypes: scored.fanTypes, multiplier: scored.multiplier, payout: scored.payout }
+    ? {
+        seat: winner,
+        fanTypes: scored.fanTypes,
+        multiplier: scored.multiplier,
+        payout: scored.payout,
+      }
     : { seat: winner, fanTypes: [], multiplier: 0, payout: 0 };
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
   for (const seat of [0, 1, 2, 3] as SeatId[]) {
@@ -477,9 +488,17 @@ export const createHangzhouGame = (
   return { state, events };
 };
 
-// docs/variants/hangzhou.md §8: MVP is clockwise-only, santiao/dealer-streak
-// continuation deferred to its own follow-up topic.
+// docs/variants/hangzhou.md §8: the dealer continues (连庄) if the dealer won
+// (zimo or ron, alone or among multiple ron winners) or the game drew;
+// otherwise (someone else won) the dealer rotates clockwise. The room layer
+// separately tracks how many consecutive terms this produces and feeds it
+// back as `dealerStreak` on the next game's config (see §5/§8, session-mechanics.md).
 export const computeNextHangzhouDealer = (
-  _finished: HangzhouState,
+  finished: HangzhouState,
   currentDealer: SeatId,
-): SeatId => ((currentDealer + 1) % 4) as SeatId;
+): SeatId => {
+  const result = finished.result;
+  if (!result || result.type === "draw") return currentDealer;
+  const dealerWon = result.winners.some((detail) => detail.seat === currentDealer);
+  return dealerWon ? currentDealer : nextSeat(currentDealer);
+};

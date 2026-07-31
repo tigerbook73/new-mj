@@ -3,10 +3,13 @@ import { HANGZHOU_MULTI_HU_POLICIES } from "./constants.ts";
 
 // docs/variants/hangzhou.md §7/§12: baseScore=1, multiHuPolicy defaults to
 // headJump (confirmed); payout formula itself is fixed (not configurable).
+// dealerStreak defaults to 1 (a fresh dealer's first term) — the room layer
+// overwrites it per game, see hangzhou.md §8.
 export const DEFAULT_HANGZHOU_CONFIG: HangzhouConfig = {
   rulesetId: "hangzhou",
   multiHuPolicy: "headJump",
   baseScore: 1,
+  dealerStreak: 1,
 };
 
 export const parseHangzhouConfig = (
@@ -25,7 +28,11 @@ export const parseHangzhouConfig = (
     (candidate.baseScore !== undefined &&
       (typeof candidate.baseScore !== "number" ||
         !Number.isInteger(candidate.baseScore) ||
-        candidate.baseScore < 1))
+        candidate.baseScore < 1)) ||
+    (candidate.dealerStreak !== undefined &&
+      (typeof candidate.dealerStreak !== "number" ||
+        !Number.isInteger(candidate.dealerStreak) ||
+        candidate.dealerStreak < 1))
   ) {
     return { error: { code: "INVALID_CONFIG" } };
   }
@@ -35,9 +42,10 @@ export const parseHangzhouConfig = (
       ...(candidate.multiHuPolicy === undefined
         ? {}
         : { multiHuPolicy: candidate.multiHuPolicy as HangzhouConfig["multiHuPolicy"] }),
-      ...(candidate.baseScore === undefined
+      ...(candidate.baseScore === undefined ? {} : { baseScore: candidate.baseScore as number }),
+      ...(candidate.dealerStreak === undefined
         ? {}
-        : { baseScore: candidate.baseScore as number }),
+        : { dealerStreak: candidate.dealerStreak as number }),
     },
   };
 };

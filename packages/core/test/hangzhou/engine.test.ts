@@ -7,6 +7,7 @@ import {
   createHangzhouGame,
   createPrng,
   eventsVisibleTo,
+  computeNextHangzhouDealer,
   fuzzHangzhouGames,
   getLegalActions as engineGetLegalActions,
   getPlayerView as engineGetPlayerView,
@@ -66,10 +67,11 @@ test("hangzhou opens a deterministic complete game with private hands", () => {
 });
 
 test("hangzhou config accepts supported switches and rejects invalid values", () => {
-  expect(parseHangzhouConfig({ multiHuPolicy: "all", baseScore: 2 })).toEqual({
-    config: { rulesetId: "hangzhou", multiHuPolicy: "all", baseScore: 2 },
+  expect(parseHangzhouConfig({ multiHuPolicy: "all", baseScore: 2, dealerStreak: 3 })).toEqual({
+    config: { rulesetId: "hangzhou", multiHuPolicy: "all", baseScore: 2, dealerStreak: 3 },
   });
   expect(parseHangzhouConfig({ baseScore: 0 })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(parseHangzhouConfig({ dealerStreak: 0 })).toEqual({ error: { code: "INVALID_CONFIG" } });
   expect(createHangzhouGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
     error: { code: "INVALID_CONFIG" },
   });
@@ -109,7 +111,7 @@ test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
   const seat1Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 133, 134];
   const physical = new Set([132, ...seat1Hand]);
   const state: HangzhouState = {
-    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1 },
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -126,9 +128,7 @@ test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
   };
   const discarded = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 132 }));
   const options = hangzhouRuleSet.getLegalActions(discarded, 1);
-  expect(options.some((action) => action.type === "peng" || action.type === "minGang")).toBe(
-    false,
-  );
+  expect(options.some((action) => action.type === "peng" || action.type === "minGang")).toBe(false);
   expect(options.some((action) => action.type === "chi")).toBe(false);
   assertTileConservation(discarded);
 });
@@ -137,7 +137,7 @@ test("caishen is never offered as a concealed-gang kind, even holding all four",
   const hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, ...CAISHEN_IDS];
   const physical = new Set(hand);
   const state: HangzhouState = {
-    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1 },
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -156,6 +156,96 @@ test("caishen is never offered as a concealed-gang kind, even holding all four",
   expect(actions.some((action) => action.type === "anGang" && action.kind === "7z")).toBe(false);
 });
 
+// 1m,2m,3m runs (0,4,8/12,16,20/24,28,32) + 1p pair (36,37) waiting on 1s/2s/3s
+// (76,80) to complete a fourth run — same shape as scoring.test.ts's hz-001/013.
+const santiaoSeat1Hand = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 37, 76, 80];
+const SANTIAO_WIN_TILE = 72; // 1s
+
+const santiaoState = (dealerStreak: number): HangzhouState => {
+  const physical = new Set([SANTIAO_WIN_TILE, ...santiaoSeat1Hand]);
+  return {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: [SANTIAO_WIN_TILE], melds: [], discards: [] },
+      { hand: santiaoSeat1Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [0, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+  };
+};
+
+test("santiao: ron is blocked while dealerStreak < 3, other claims are unaffected", () => {
+  // Seat 1 is also the next seat and could otherwise chi this discard — three
+  // things this test needs to distinguish: hu is gone, chi (an unrelated
+  // claim) still isn't, and zimo (checked separately) is never touched.
+  const discarded = unwrap(
+    hangzhouRuleSet.applyAction(santiaoState(1), 0, { type: "discard", tile: SANTIAO_WIN_TILE }),
+  );
+  const options = hangzhouRuleSet.getLegalActions(discarded, 1);
+  expect(options.some((action) => action.type === "hu")).toBe(false);
+  expect(options.some((action) => action.type === "chi")).toBe(true);
+  // dealerStreak=2 (still the dealer's second term) is equally blocked.
+  const discardedAtTwo = unwrap(
+    hangzhouRuleSet.applyAction(santiaoState(2), 0, { type: "discard", tile: SANTIAO_WIN_TILE }),
+  );
+  expect(
+    hangzhouRuleSet.getLegalActions(discardedAtTwo, 1).some((action) => action.type === "hu"),
+  ).toBe(false);
+});
+
+test("santiao: ron is allowed once dealerStreak reaches 3", () => {
+  const discarded = unwrap(
+    hangzhouRuleSet.applyAction(santiaoState(3), 0, { type: "discard", tile: SANTIAO_WIN_TILE }),
+  );
+  expect(discarded.phase).toBe("awaiting-claims");
+  expect(hangzhouRuleSet.getLegalActions(discarded, 1)).toContainEqual({ type: "hu" });
+  const ended = unwrap(hangzhouRuleSet.applyAction(discarded, 1, { type: "hu" }));
+  expect(ended.result).toMatchObject({ type: "win", winner: 1, winType: "ron", from: 0 });
+});
+
+test("computeNextHangzhouDealer: dealer continues on a win or a draw, otherwise rotates", () => {
+  const base = createHangzhouGame(1, 0);
+  if ("error" in base) throw new Error(base.error.code);
+
+  const dealerWon: HangzhouState = {
+    ...base.state,
+    result: {
+      type: "win",
+      winner: 0,
+      winners: [{ seat: 0, fanTypes: ["pinghu"], multiplier: 1, payout: 1 }],
+      winType: "zimo",
+      scoreDeltas: [3, -1, -1, -1],
+    },
+  };
+  expect(computeNextHangzhouDealer(dealerWon, 0)).toBe(0);
+
+  const otherWon: HangzhouState = {
+    ...base.state,
+    result: {
+      type: "win",
+      winner: 2,
+      winners: [{ seat: 2, fanTypes: ["pinghu"], multiplier: 1, payout: 1 }],
+      winType: "ron",
+      from: 0,
+      scoreDeltas: [-1, 0, 1, 0],
+    },
+  };
+  expect(computeNextHangzhouDealer(otherWon, 0)).toBe(1);
+
+  const drawn: HangzhouState = {
+    ...base.state,
+    result: { type: "draw", scoreDeltas: [0, 0, 0, 0] },
+  };
+  expect(computeNextHangzhouDealer(drawn, 0)).toBe(0);
+});
+
 test("caiPiaoCount increments when a baotou hand discards caishen and stays baotou", () => {
   // 1m,2m,3m,4m triplets (12 tiles) + 2 caishen = baotou both before and after
   // discarding one caishen, per docs/variants/hangzhou.md §4.
@@ -163,7 +253,7 @@ test("caiPiaoCount increments when a baotou hand discards caishen and stays baot
   const hand = [...triplets, 132, 133];
   const physical = new Set(hand);
   const state: HangzhouState = {
-    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1 },
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -196,7 +286,7 @@ test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag",
   const hand = [...triplets, 132, 133];
   const physical = new Set(hand);
   const state: HangzhouState = {
-    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1 },
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -250,7 +340,7 @@ test("gang-chain tiers: two consecutive concealed gangs extend gangChain", () =>
   const physical = new Set(hand);
   const wall = allTileIds().filter((tile) => !physical.has(tile));
   const state: HangzhouState = {
-    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1 },
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
     phase: "playing",
     wall,
     seats: [

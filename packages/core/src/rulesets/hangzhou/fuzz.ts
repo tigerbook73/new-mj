@@ -73,8 +73,13 @@ export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure 
     prng = switches.prng;
     const dealerPick = nextInt(prng, 4);
     prng = dealerPick.prng;
+    // dealerStreak randomized across [1,4] so both the santiao-blocked (<3)
+    // and unlocked (>=3) ron paths get fuzzed — see hangzhou.md §5.
+    const streakPick = nextInt(prng, 4);
+    prng = streakPick.prng;
     const config = {
       multiHuPolicy: (switches.value & 1) !== 0 ? ("all" as const) : ("headJump" as const),
+      dealerStreak: streakPick.value + 1,
     };
     const result = playHangzhouGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
