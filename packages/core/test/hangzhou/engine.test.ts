@@ -64,6 +64,13 @@ test("hangzhou opens a deterministic complete game with private hands", () => {
   expect(first.state.caiPiaoCount).toEqual([0, 0, 0, 0]);
   expect(first.state.gangChain).toEqual([0, 0, 0, 0]);
   assertTileConservation(first.state);
+  // dealerStreak is public (santiao affects everyone's legal ron, not a
+  // per-seat secret) and defaults to 1 for a dealer's first term.
+  for (const seat of [0, 1, 2, 3] as const) {
+    expect(
+      (hangzhouRuleSet.getPlayerView(first.state, seat) as HangzhouPlayerView).dealerStreak,
+    ).toBe(1);
+  }
 });
 
 test("hangzhou config accepts supported switches and rejects invalid values", () => {
@@ -210,6 +217,17 @@ test("santiao: ron is allowed once dealerStreak reaches 3", () => {
   expect(ended.result).toMatchObject({ type: "win", winner: 1, winType: "ron", from: 0 });
 });
 
+test("santiao: dealerStreak is public in every seat's view, not just seat 0's", () => {
+  for (const dealerStreak of [1, 3]) {
+    const state = santiaoState(dealerStreak);
+    for (const seat of [0, 1, 2, 3] as const) {
+      expect((hangzhouRuleSet.getPlayerView(state, seat) as HangzhouPlayerView).dealerStreak).toBe(
+        dealerStreak,
+      );
+    }
+  }
+});
+
 test("computeNextHangzhouDealer: dealer continues on a win or a draw, otherwise rotates", () => {
   const base = createHangzhouGame(1, 0);
   if ("error" in base) throw new Error(base.error.code);
@@ -314,6 +332,7 @@ test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag",
         dealer: 0,
         handCounts: [14, 13, 13, 13],
         wallCount: state.wall.length,
+        config: { dealerStreak: 1 },
       },
     },
     {

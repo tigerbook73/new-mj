@@ -115,11 +115,12 @@
 - `HuDeclared` 需要携带触发的番型集合（用于结算展示），比照 bloodbattle `HuDeclared` 的做法
 - 不新增财飘/爆头相关的公开事件——它们是私有派生状态，不广播，只体现在本人 PlayerView 与胡牌结算的番型解释里
 
-## 11. PlayerView 私有字段
+## 11. PlayerView 私有/公开字段
 
-`HangzhouPlayerView` 在 `PlayerViewBase` 之上扩展 `phase`/`myActionOptions`/`myClaimOptions`/`lastDiscard`/`justDrawn`/`result`（与 junk 同构字段命名，见 `junk.md` §7），新增杭州私有的：
+`HangzhouPlayerView` 在 `PlayerViewBase` 之上扩展 `phase`/`myActionOptions`/`myClaimOptions`/`lastDiscard`/`justDrawn`/`result`（与 junk 同构字段命名，见 `junk.md` §7），新增杭州专属的：
 
-- `isTingpai: boolean`、`isBaotou: boolean`、`isCaipiao: boolean`——仅本人可见，每次状态转换后重算，通过既有的 `LegalActionsUpdated` 同步机制一并下发，不新开事件类型
+- `isTingpai: boolean`、`isBaotou: boolean`、`isCaipiao: boolean`——**私有**，仅本人可见，每次状态转换后重算，通过既有的 `LegalActionsUpdated` 同步机制一并下发，不新开事件类型
+- `dealerStreak: number`——**公开**，所有座位的 view 都带同一个值；这是全桌可推导的信息（点炮是否开放本就不是秘密，见 §5），不像上面三个是私有派生状态。整局固定不变，`getPlayerView`/`rebuildPlayerView` 都从 `state.config.dealerStreak` 取值
 
 ## 12. Config 清单
 

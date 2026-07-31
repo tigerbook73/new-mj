@@ -104,6 +104,9 @@ export type HangzhouPlayerView = Omit<PlayerViewBase, "seats"> & {
   isTingpai: boolean;
   isBaotou: boolean;
   isCaipiao: boolean;
+  /** Public: whether ron is currently allowed (dealerStreak >= 3), see
+   * hangzhou.md §5/§11 — santiao is table-wide, not a per-seat secret. */
+  dealerStreak: number;
 };
 
 export type HangzhouApplyResult = ApplyResult<HangzhouState>;

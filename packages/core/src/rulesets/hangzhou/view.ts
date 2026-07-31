@@ -9,7 +9,7 @@ import type {
   HangzhouPlayerView,
   HangzhouState,
 } from "./types.ts";
-import { kindsOf } from "./state-machine.ts";
+import { configOf, kindsOf } from "./state-machine.ts";
 
 export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlayerView => {
   const pending = state.pendingClaims;
@@ -33,6 +33,7 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
     isTingpai: isTingpai(kindsOf(own.hand), own.melds.length),
     isBaotou: isBaotou(kindsOf(own.hand), own.melds.length),
     isCaipiao: state.caiPiaoCount[seat] >= 1,
+    dealerStreak: configOf(state).dealerStreak,
   };
   if (state.lastDiscard) view.lastDiscard = { ...state.lastDiscard };
   if (state.justDrawn?.seat === seat) view.justDrawn = state.justDrawn.tile;
@@ -104,6 +105,9 @@ export const rebuildPlayerView = (
         isTingpai: false,
         isBaotou: false,
         isCaipiao: false,
+        // dealerStreak is fixed for the whole game, set once here from
+        // GameStarted's config and carried through every cloneView spread.
+        dealerStreak: (payload.config as { dealerStreak: number }).dealerStreak,
       };
       continue;
     }
