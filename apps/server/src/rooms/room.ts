@@ -64,6 +64,15 @@ export interface Room {
   totalGames?: number | undefined;
   wins?: [number, number, number, number] | undefined;
   dealer: SeatId;
+  /**
+   * Consecutive games (including the current one) the same seat has held
+   * `dealer`, tracked generically by comparing `computeNextDealer`'s output
+   * against the previous dealer — no rule content, just a seat-identity
+   * comparison (session-mechanics.md §5). Fed into each game's `GameConfig`
+   * as `dealerStreak` so a ruleset that cares (currently only hangzhou) can
+   * gate legality on it; other rulesets ignore the field.
+   */
+  dealerStreak: number;
   seed: number;
   lastEventSeq: number;
   gameState?: unknown;

@@ -106,6 +106,7 @@ export class RoomService {
       totalGames: sessionFormat === "4-round" ? DEFAULT_TOTAL_GAMES : undefined,
       wins: sessionFormat === "best-of-3" ? [0, 0, 0, 0] : undefined,
       dealer: 0,
+      dealerStreak: 1,
       seed: 0,
       lastEventSeq: 0,
       awaitingNextRound: false,
@@ -296,7 +297,9 @@ export class RoomService {
 
   nextRound(roomId: string): Room {
     const room = this.mustGet(roomId);
+    const previousDealer = room.dealer;
     room.dealer = this.gameService.computeNextDealer(room.gameState, room.dealer);
+    room.dealerStreak = room.dealer === previousDealer ? room.dealerStreak + 1 : 1;
     this.beginGame(room, false);
     this.eventBus.emit("room:dealerChanged", {
       roomId,
@@ -805,7 +808,11 @@ export class RoomService {
     this.clearDrawRevealTimer(room.id);
     room.gameNumber += 1;
     room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
-    const result = this.gameService.createGame(room.config, room.seed, room.dealer);
+    // dealerStreak is generic session bookkeeping (see room.ts), not part of
+    // the room's static config; merge it in per game rather than mutating
+    // room.config itself. Rulesets that don't read it simply ignore it.
+    const configForThisGame: GameConfig = { ...room.config, dealerStreak: room.dealerStreak };
+    const result = this.gameService.createGame(configForThisGame, room.seed, room.dealer);
     if ("error" in result) {
       throw new RoomServiceError("INVALID_CONFIG", result.error.code);
     }

@@ -1,4 +1,5 @@
-import { playJunkGame } from "@new-mj/core";
+import { playHangzhouGame, playJunkGame } from "@new-mj/core";
+import type { HangzhouGameResult } from "@new-mj/core";
 import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
 // GameService is used directly (not via RoomService) so the acceptance test
@@ -38,6 +39,7 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   gameNumber: 1,
   totalGames: 4,
   dealer: 0,
+  dealerStreak: 1,
   seed: 1,
   lastEventSeq: 0,
   awaitingNextRound: false,
@@ -486,6 +488,40 @@ describe("RoomService — endSession (room:end)", () => {
 
     expect(room.phase).toBe("finished");
     expect(room.result?.gamesPlayed).toBe(1);
+  });
+
+  it("hangzhou dealerStreak increments when the dealer continues, resets when it rotates", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "hangzhou", { rulesetId: "hangzhou" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+    expect(room.dealerStreak).toBe(1);
+
+    const dealerBefore = room.dealer;
+    const played = playHangzhouGame(room.seed, {}, [], room.dealer);
+    if ("error" in played) throw new Error(`playHangzhouGame failed: ${played.error}`);
+    for (const { seat, action } of played.actions) {
+      if (room.phase !== "in-game") break;
+      if (isDrawAction(action)) continue;
+      service.applyPlayerAction(room.id, seat, action);
+    }
+    expect(room.awaitingNextRound).toBe(true);
+
+    const result = (room.gameState as { result?: HangzhouGameResult }).result;
+    const dealerContinues =
+      result?.type === "draw" ||
+      (result?.winners.some((detail) => detail.seat === dealerBefore) ?? false);
+
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+
+    if (dealerContinues) {
+      expect(room.dealer).toBe(dealerBefore);
+      expect(room.dealerStreak).toBe(2);
+    } else {
+      expect(room.dealer).not.toBe(dealerBefore);
+      expect(room.dealerStreak).toBe(1);
+    }
   });
 });
 
