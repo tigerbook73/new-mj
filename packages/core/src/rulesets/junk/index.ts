@@ -9,12 +9,12 @@ import {
   applyDiscard,
   applyDrawAction,
   appendEvent,
+  canZimo,
   cloneState,
   computeNextJunkDealer,
   createJunkGame,
   fail,
   finishWin,
-  isWin,
   sameKind,
   seatVisibility,
 } from "./state-machine.ts";
@@ -68,7 +68,7 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
       const tile = sameKind(hand, kind)[0];
       if (tile !== undefined) actions.push({ type: "buGang", tile });
     }
-    if (isWin(state, seat)) actions.push({ type: "zimo" });
+    if (canZimo(state, seat)) actions.push({ type: "zimo" });
     return actions;
   },
   applyAction: (input, seat, action) => {
@@ -83,7 +83,7 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
     else if (action.type === "draw") result = applyDrawAction(state, seat, events);
     else if (action.type === "zimo") {
       result =
-        state.phase !== "playing" || state.currentSeat !== seat || !isWin(state, seat)
+        state.phase !== "playing" || state.currentSeat !== seat || !canZimo(state, seat)
           ? fail("ZIMO_NOT_AVAILABLE")
           : (() => {
               finishWin(state, events, seat, "zimo");

@@ -242,6 +242,84 @@ test("robKong opens a hu-only claim window and preserves the fourth tile on ron"
   assertTileConservation(ended);
 });
 
+test("bug repro: zimo is not offered right after peng, even if the leftover concealed hand happens to already be complete", () => {
+  // Seat 0 holds 3 complete triplets + a pair (already a full standalone hand
+  // on its own) plus a spare pair of 9s — pengging that spare pair leaves the
+  // original 3-melds-and-pair sitting there unchanged, which used to
+  // (wrongly) satisfy isWin() and offer zimo despite no draw ever happening.
+  const seat0Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 104, 105];
+  const DISCARD_TILE = 106; // 9s, matches the spare pair (104, 105)
+  const physical = new Set([DISCARD_TILE, ...seat0Hand]);
+  const state: JunkState = {
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [DISCARD_TILE], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 1,
+    seq: 0,
+    prng: createPrng(1),
+  };
+  const discarded = unwrap(
+    junkRuleSet.applyAction(state, 1, { type: "discard", tile: DISCARD_TILE }),
+  );
+  // Both hu (ron) and peng are legitimately offered here — seat 0 deliberately
+  // declines the win in favor of pengging, which this test needs specifically.
+  expect(junkRuleSet.getLegalActions(discarded, 0)).toContainEqual({ type: "peng" });
+  const pengged = unwrap(junkRuleSet.applyAction(discarded, 0, { type: "peng" }));
+  expect(pengged.phase).toBe("playing");
+  expect(pengged.currentSeat).toBe(0);
+  expect(pengged.justDrawn).toBeUndefined();
+  expect(junkRuleSet.getLegalActions(pengged, 0).some((action) => action.type === "zimo")).toBe(
+    false,
+  );
+  assertTileConservation(pengged);
+});
+
+test("minGang (claimed open kong) requires the replacement draw before zimo — never directly", () => {
+  const seat0Hand = [0, 1, 2, 16, 17, 20, 21, 24, 25, 28, 29, 36, 37];
+  const DISCARD_TILE = 3; // the 4th 1m
+  const physical = new Set([DISCARD_TILE, ...seat0Hand]);
+  const state: JunkState = {
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [DISCARD_TILE], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 1,
+    seq: 0,
+    prng: createPrng(1),
+  };
+  const discarded = unwrap(
+    junkRuleSet.applyAction(state, 1, { type: "discard", tile: DISCARD_TILE }),
+  );
+  expect(junkRuleSet.getLegalActions(discarded, 0)).toContainEqual({ type: "minGang" });
+  const ganged = unwrap(junkRuleSet.applyAction(discarded, 0, { type: "minGang" }));
+  expect(ganged.phase).toBe("awaiting-draw");
+  expect(junkRuleSet.getLegalActions(ganged, 0)).toEqual([{ type: "draw" }]);
+  assertTileConservation(ganged);
+});
+
+// A "杠上自摸" (self-draw off a gang's replacement tile) positive test,
+// mirroring hangzhou's, is deliberately not here yet: it surfaced a separate,
+// pre-existing bug — junk's isWin() flattens hand+meld tiles through
+// lib/win.ts's isStandardWinningHand, which requires the flat multiset to be
+// exactly (melds*3+2) tiles; any real gang (an/min/buGang) contributes 4
+// physical tiles instead of 3, so a hand containing one can never satisfy
+// that count and isWin() incorrectly returns false forever after — unlike
+// bloodbattle/hangzhou, whose isWin reuses a meldsCount-aware scoring check
+// that treats a gang as "1 meld slot" regardless of its physical tile count.
+// Filed in plan.md rather than fixed here — it's a materially different,
+// larger bug than the draw-gating one this file's other new tests cover.
+
 const multiHuState = (multiHuPolicy: "headJump" | "all"): JunkState => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const seat2Hand = [1, 9, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41];
