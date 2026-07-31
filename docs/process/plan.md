@@ -4,21 +4,20 @@
 
 ## 当前工作
 
-**专题：生产部署与 OAuth 验收**
+**专题：杭州麻将后续（三牢点炮限制 + 连庄坐庄；专属桌面体验）**
 
-- 结果：部署 Supabase 与应用，配置生产 OAuth 回调并完成一次真实登录验收。
-- 下一步第一个具体动作：确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单。
+- 结果：三牢/连庄坐庄按确定的跨局状态传递契约实现（点炮限制随连续坐庄次数生效）；桌面端补上财神高亮、爆头/财飘状态展示，替换掉目前借用血战到底的公共骨架。
+- 下一步第一个具体动作：拍板三牢/连庄的跨局状态传递方案——"连续坐庄次数"这个计数器怎么从上一局传进下一局 `GameConfig`（候选：Room 层通用地比较连续两局 `computeNextDealer` 输出座位号来计数），这是架构级问题，需要先定下来再动代码。
 
 ## 当前风险 / 开放问题
 
-- 尚未选择并配置生产部署环境；不能把本地 Supabase 的 OAuth 验收视为生产验收。
+- 生产部署与 OAuth 验收仍未完成（见 Backlog）：不能把本地 Supabase 的 OAuth 验收视为生产验收。
 - 已发现（与本次改动无关，未修复）：`apps/web/test/lobby.e2e-spec.ts` 的 "leaving an in-game room keeps the other human in the match" 与 "force exiting an in-game room ends the session for every player" 两个用例在跑完整 `test/lobby.e2e-spec.ts` 套件时容易超时（等待对话框里的 "Hand off to AI"/"Force exit" 按钮），单独跑或小范围跑均能稳定通过；已在纯净 main（无本次任何改动）上复现，确认是套件层面的既有抖动，不是本次引入的回归。谁下次碰 leave-room/force-exit 相关代码时应该顺手看一眼。
 - `hangzhou.md` §14 记录了两处不阻塞定稿的实现细节假设（财神替代数量上限、`caiPiaoCount` 中途清零与否），已按文档默认值实现并写入 fixture；如果和你的预期不符，后续只需改一行。
 
 ## Backlog
 
-- 杭州麻将：三牢点炮限制 + 连庄坐庄——需要先定跨局状态传递的契约（庄家连续坐庄次数如何进入下一局 config），立项时复审 `architecture/variant-boundary.md` 庄家轮换公式行。
-- 杭州麻将专属桌面体验：财神高亮、爆头/财飘状态展示（参照血战到底 UI 专题现状）。
+- 生产部署与 OAuth 验收：确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单，完成一次真实登录验收。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行；庄家轮换公式行视杭州三牢专题是否已先行验证而定）。
