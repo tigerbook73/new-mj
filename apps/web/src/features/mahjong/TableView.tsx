@@ -13,6 +13,10 @@ import type {
 import { Button } from "@/shared/ui/button";
 import { ActionDock } from "@/features/mahjong/components/ActionDock";
 import { CenterStatus } from "@/features/mahjong/components/CenterStatus";
+import {
+  HangzhouRoundEndOverlay,
+  type HangzhouGameResultLike,
+} from "@/features/mahjong/components/HangzhouRoundEndOverlay";
 import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
 import { TableBoard } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
@@ -365,20 +369,41 @@ export function TableView() {
           }
         />
         <AnimatePresence>
-          {extras.result && sessionResult == null && room && (
-            <RoundEndOverlay
-              key="round-end-overlay"
-              result={extras.result}
-              gameNumber={room.gameNumber}
-              totalGames={room.totalGames ?? 1}
-              players={room.players}
-              myConfirmed={room.players[view.seat]?.isReady === true}
-              onConfirm={() => void confirmNextRound()}
-              onEnd={() => void endSession()}
-              entering={isIncrementalSnapshot && !prefersReducedMotion}
-              reducedMotion={prefersReducedMotion}
-            />
-          )}
+          {extras.result &&
+            sessionResult == null &&
+            room &&
+            (room.rulesetId === "hangzhou" ? (
+              <HangzhouRoundEndOverlay
+                key="round-end-overlay"
+                result={
+                  // hangzhou's HangzhouGameResult shape genuinely differs from
+                  // junk/bloodbattle's (winners is a fan-detail array, not
+                  // plain seat numbers) — see HangzhouRoundEndOverlay.tsx.
+                  extras.result as unknown as HangzhouGameResultLike
+                }
+                gameNumber={room.gameNumber}
+                totalGames={room.totalGames ?? 1}
+                players={room.players}
+                myConfirmed={room.players[view.seat]?.isReady === true}
+                onConfirm={() => void confirmNextRound()}
+                onEnd={() => void endSession()}
+                entering={isIncrementalSnapshot && !prefersReducedMotion}
+                reducedMotion={prefersReducedMotion}
+              />
+            ) : (
+              <RoundEndOverlay
+                key="round-end-overlay"
+                result={extras.result}
+                gameNumber={room.gameNumber}
+                totalGames={room.totalGames ?? 1}
+                players={room.players}
+                myConfirmed={room.players[view.seat]?.isReady === true}
+                onConfirm={() => void confirmNextRound()}
+                onEnd={() => void endSession()}
+                entering={isIncrementalSnapshot && !prefersReducedMotion}
+                reducedMotion={prefersReducedMotion}
+              />
+            ))}
         </AnimatePresence>
 
         {sessionResult != null && room && (
