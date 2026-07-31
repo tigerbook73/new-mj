@@ -203,6 +203,87 @@ test("bug repro: zimo is not offered right after peng, even if the leftover conc
   assertTileConservation(pengged);
 });
 
+test("minGang (claimed open kong) requires the replacement draw before zimo — never directly", () => {
+  // Seat 0 holds 3 of a kind (1m) claimable as minGang off seat 1's discard,
+  // plus a hand that's one specific tile away from complete. minGang always
+  // routes through an explicit {type:"draw"} (awaiting-draw phase) before
+  // ever reaching "playing" again — zimo cannot be legal in between.
+  const seat0Hand = [0, 1, 2, 16, 17, 20, 21, 24, 25, 28, 29, 36, 37];
+  // 1m x3 (0,1,2) + 5m pair (16,17) + 6m pair (20,21) + 7m pair (24,25) +
+  // 8m pair (28,29) + 1p pair (36,37) — waiting to gang the 4th 1m, leaving
+  // a shape that needs one more meld from the spare pairs (not asserted
+  // further here; the point is only that zimo never appears mid-claim).
+  const DISCARD_TILE = 3; // the 4th 1m
+  const physical = new Set([DISCARD_TILE, ...seat0Hand]);
+  const state: HangzhouState = {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [DISCARD_TILE], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 1,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [0, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+  };
+  const discarded = unwrap(
+    hangzhouRuleSet.applyAction(state, 1, { type: "discard", tile: DISCARD_TILE }),
+  );
+  expect(hangzhouRuleSet.getLegalActions(discarded, 0)).toContainEqual({ type: "minGang" });
+  const ganged = unwrap(hangzhouRuleSet.applyAction(discarded, 0, { type: "minGang" }));
+  // minGang schedules a replacement draw instead of landing back in
+  // "playing" — the only legal action at this instant is the draw itself.
+  expect(ganged.phase).toBe("awaiting-draw");
+  expect(hangzhouRuleSet.getLegalActions(ganged, 0)).toEqual([{ type: "draw" }]);
+  assertTileConservation(ganged);
+});
+
+test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the draw actually happens", () => {
+  // Seat 0 declares anGang on 1m (holding all 4 while it's their turn, i.e.
+  // a 14-tile hand at that instant), leaving 2m2m2m/3m3m3m complete plus two
+  // spare pairs (4m4m, 5m5m) — waiting on either pair's 3rd copy to complete
+  // the hand. The wall's tail is rigged so the replacement draw is exactly
+  // that tile, completing the hand via a genuine self-draw right after the gang.
+  const seat0Hand = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 16, 17];
+  // 1m x4 (0-3, angang) + 2m x3 (4-6) + 3m x3 (8-10) + 4m pair (12,13) + 5m pair (16,17)
+  const REPLACEMENT_TILE = 14; // 3rd 4m — completes 4m4m4m, leaving 5m5m as the pair
+  const physical = new Set([...seat0Hand, REPLACEMENT_TILE]);
+  const restOfWall = allTileIds().filter((tile) => !physical.has(tile));
+  const state: HangzhouState = {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
+    phase: "playing",
+    // drawFromTail pops the *last* element — put the rigged tile there.
+    wall: [...restOfWall, REPLACEMENT_TILE],
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [0, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+  };
+  const ganged = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "anGang", kind: "1m" }));
+  expect(ganged.phase).toBe("awaiting-draw");
+  // Not legal yet — the replacement hasn't been drawn.
+  expect(hangzhouRuleSet.getLegalActions(ganged, 0)).toEqual([{ type: "draw" }]);
+  const drawn = unwrap(hangzhouRuleSet.applyAction(ganged, 0, { type: "draw" }));
+  expect(drawn.phase).toBe("playing");
+  expect(drawn.justDrawn).toEqual({ seat: 0, tile: REPLACEMENT_TILE });
+  expect(hangzhouRuleSet.getLegalActions(drawn, 0)).toContainEqual({ type: "zimo" });
+  const won = unwrap(hangzhouRuleSet.applyAction(drawn, 0, { type: "zimo" }));
+  expect(won.result).toMatchObject({ type: "win", winner: 0, winType: "zimo" });
+  assertTileConservation(won);
+});
+
 // 1m,2m,3m runs (0,4,8/12,16,20/24,28,32) + 1p pair (36,37) waiting on 1s/2s/3s
 // (76,80) to complete a fourth run — same shape as scoring.test.ts's hz-001/013.
 const santiaoSeat1Hand = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 37, 76, 80];
