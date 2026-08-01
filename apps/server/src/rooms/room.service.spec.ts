@@ -1685,7 +1685,10 @@ describe("RoomService — full 4-round session (real junk engine)", () => {
     for (let round = 0; round < 4; round++) {
       expect(room.phase).toBe("in-game");
       expect(room.gameNumber).toBe(round + 1);
-      expect(room.dealer).toBe(round as 0 | 1 | 2 | 3);
+      // Junk v3's dealer is result-dependent (winner, or the draw's next
+      // seat), covered precisely above; this end-to-end session test only
+      // needs a valid server-selected dealer for each round.
+      expect([0, 1, 2, 3]).toContain(room.dealer);
 
       const played = playJunkGame(room.seed, {}, [], room.dealer);
       if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
