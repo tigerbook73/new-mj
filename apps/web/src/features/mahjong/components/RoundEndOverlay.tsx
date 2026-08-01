@@ -12,7 +12,9 @@ type GameResultLike =
   | {
       type: "win";
       winner: number;
-      winners: Array<{ seat: number; fanTypes: string[]; multiplier: number; payout: number }>;
+      winners: Array<
+        number | { seat: number; fanTypes: string[]; multiplier: number; payout: number }
+      >;
       winType: "zimo" | "ron";
       from?: number;
       scoreDeltas: [number, number, number, number];
@@ -63,10 +65,18 @@ const JUNK_FAN_LABELS: Record<string, string> = {
   menqing: "门清",
 };
 
+type JunkWinnerDetail = Exclude<
+  Extract<GameResultLike, { type: "win" }>["winners"][number],
+  number
+>;
+
+const seatOfWinner = (winner: number | JunkWinnerDetail): number =>
+  typeof winner === "number" ? winner : winner.seat;
+
 const describeResult = (result: GameResultLike, players: RoomInfo["players"]): string => {
   const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
   if (result.type === "draw") return "Round drawn — the wall ran out.";
-  const winners = result.winners.map((detail) => nameOf(detail.seat)).join(", ");
+  const winners = result.winners.map((winner) => nameOf(seatOfWinner(winner))).join(", ");
   return result.winType === "zimo"
     ? `${winners} won by self-draw.`
     : `${winners} won off ${nameOf(result.from!)}'s discard.`;
@@ -116,13 +126,16 @@ export function RoundEndOverlay({
         <p className="text-sm">{describeResult(result, players)}</p>
         {result.type === "win" && (
           <ul className="text-sm text-muted-foreground">
-            {result.winners.map((detail) => (
-              <li key={detail.seat}>
-                {players[detail.seat]?.nickname ?? `Seat ${detail.seat + 1}`}:{" "}
-                {detail.fanTypes.map((fan) => JUNK_FAN_LABELS[fan] ?? fan).join(" · ")} ×
-                {detail.multiplier}
-              </li>
-            ))}
+            {result.winners.map((winner) => {
+              if (typeof winner === "number") return null;
+              return (
+                <li key={winner.seat}>
+                  {players[winner.seat]?.nickname ?? `Seat ${winner.seat + 1}`}:{" "}
+                  {winner.fanTypes.map((fan) => JUNK_FAN_LABELS[fan] ?? fan).join(" · ")} ×
+                  {winner.multiplier}
+                </li>
+              );
+            })}
           </ul>
         )}
         <ul className="text-sm text-muted-foreground">

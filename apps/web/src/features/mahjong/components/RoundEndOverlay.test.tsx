@@ -78,4 +78,21 @@ describe("RoundEndOverlay", () => {
     );
     expect(markup).toContain("庄家胡 · 清一色 · 门清 ×16");
   });
+
+  it("keeps rendering Bloodbattle's seat-only winners", () => {
+    const markup = renderToStaticMarkup(
+      createElement(RoundEndOverlay, {
+        ...baseProps,
+        myConfirmed: false,
+        result: {
+          type: "win",
+          winner: 0,
+          winners: [0],
+          winType: "zimo",
+          scoreDeltas: [0, 0, 0, 0],
+        },
+      }),
+    );
+    expect(markup).toContain("Alice won by self-draw.");
+  });
 });
