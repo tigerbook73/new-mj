@@ -1,4 +1,9 @@
-import { playHangzhouGame, playJunkGame } from "@new-mj/core";
+import {
+  computeInitialDealer,
+  computeNextDealer,
+  playHangzhouGame,
+  playJunkGame,
+} from "@new-mj/core";
 import type { HangzhouGameResult } from "@new-mj/core";
 import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
@@ -561,11 +566,11 @@ describe("RoomService — winSnapshot exposure (胡牌结算展示最终赢牌�
     if (!winningGame || "error" in winningGame) throw new Error("no winning junk game found");
     const result = winningGame.state.result;
     if (result?.type !== "win") throw new Error("expected a win result");
-    for (const winner of result.winners) {
-      const view = gameService.getPlayerView(winningGame.state, winner) as {
+    for (const detail of result.winners) {
+      const view = gameService.getPlayerView(winningGame.state, detail.seat) as {
         seats: Array<{ winSnapshot?: { hand: string[]; groups: string[][] } }>;
       };
-      const snapshot = view.seats[winner]?.winSnapshot;
+      const snapshot = view.seats[detail.seat]?.winSnapshot;
       expect(snapshot).toBeDefined();
       expect([...snapshot!.groups.flat()].sort()).toEqual([...snapshot!.hand].sort());
     }
@@ -748,6 +753,7 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
           wallCount: 0,
           currentSeat: 0,
         }),
+        computeInitialDealer: () => 0,
         computeNextDealer: () => 0,
       } as unknown as GameService;
       const config = new ConfigService();
@@ -854,6 +860,7 @@ describe("RoomService — bot auto-play timer interplay (phase 3 regression)", (
           wallCount: 0,
           currentSeat: 0,
         }),
+        computeInitialDealer: () => 0,
         computeNextDealer: () => 0,
       } as unknown as GameService;
       const config = new ConfigService();
@@ -918,6 +925,7 @@ describe("RoomService — bot auto-play timer interplay (phase 3 regression)", (
         wallCount: 0,
         currentSeat: 0,
       }),
+      computeInitialDealer: () => 0,
       computeNextDealer: () => 0,
     } as unknown as GameService;
     return { fakeGameService, calls };
@@ -1053,6 +1061,7 @@ describe("RoomService — bot auto-play timer interplay (phase 3 regression)", (
           wallCount: 0,
           currentSeat: 0,
         }),
+        computeInitialDealer: () => 0,
         computeNextDealer: () => 0,
       } as unknown as GameService;
       const config = new ConfigService();
@@ -1135,6 +1144,7 @@ describe("RoomService — draw reveal (server-paced awaiting-draw auto-submit)",
         wallCount: 0,
         currentSeat: 0,
       }),
+      computeInitialDealer: () => 0,
       computeNextDealer: () => 0,
     }) as unknown as GameService;
 
@@ -1439,6 +1449,7 @@ describe("RoomService — claim timeout", () => {
         wallCount: 0,
         currentSeat: 0,
       }),
+      computeInitialDealer: () => 0,
       computeNextDealer: () => 0,
     } as unknown as GameService;
     const service = new RoomService(
@@ -1736,13 +1747,17 @@ describe("RoomService — full 4-round session (real junk engine)", () => {
     for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
     service.start(room.id);
 
+    // Junk v3's dealer is result-dependent (winner stays dealer, or the
+    // draw's next seat) — recompute it independently from each round's own
+    // seed/outcome via the same core entry points room.service.ts uses, so a
+    // regression in computeInitialJunkDealer/computeNextJunkDealer here is
+    // actually caught instead of just accepting any of the 4 seats.
+    let expectedDealer = computeInitialDealer(room.config, room.seed);
+
     for (let round = 0; round < 4; round++) {
       expect(room.phase).toBe("in-game");
       expect(room.gameNumber).toBe(round + 1);
-      // Junk v3's dealer is result-dependent (winner, or the draw's next
-      // seat), covered precisely above; this end-to-end session test only
-      // needs a valid server-selected dealer for each round.
-      expect([0, 1, 2, 3]).toContain(room.dealer);
+      expect(room.dealer).toBe(expectedDealer);
 
       const played = playJunkGame(room.seed, {}, [], room.dealer);
       if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
@@ -1752,6 +1767,7 @@ describe("RoomService — full 4-round session (real junk engine)", () => {
         if (isDrawAction(action)) continue;
         service.applyPlayerAction(room.id, seat, action);
       }
+      expectedDealer = computeNextDealer(played.state, room.dealer);
       // Round ended but the session continues — every real seat must confirm
       // (§6 局间确认) before the next round's seed/dealer exist.
       if (room.phase === "in-game") {
