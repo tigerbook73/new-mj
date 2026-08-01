@@ -4,10 +4,11 @@
 
 ## 当前工作
 
-**专题：Review 配置功能**
+**专题：垃圾胡扩展规则**
 
-- 结果：已完成首个安全会话配置 `totalGames`：创建房间可选 1、4、8 局（默认 4），严格拒绝客户端传入的规则 config；该字段只由 Room 使用，不进入 core、计分或 AI。
-- 下一步第一个具体动作：盘点下一个候选配置项，并在实现前逐项确认其不影响规则、算分和 AI 算法。
+- 目标：连庄（庄家胡牌后继续坐庄，庄家胡牌结算倍率 ×2）、首局随机庄家；杠开 ×2（连续杠开连续翻倍）；混一色 ×2、清一色 ×4、七小对 ×2、碰碰胡 ×2、门清 ×2，全部番型相乘叠加。
+- 进度：已完成规则/架构盘点。单局番型、杠链和结算可私有地实现于 `packages/core/src/rulesets/junk/`；既有 Room 的 `dealerStreak` 可继续作为通用跨局计数。首局随机庄家则与当前 `engine-contract.md`/`session-mechanics.md` 的"第 1 局房主坐庄"公共约定冲突：现有 RuleSet 没有首局庄家选择扩展点，server 按 `rulesetId` 分支又违反"server 不理解规则"。
+- 下一步第一个具体动作：提交 Claude Project 确认首局庄家的架构归属——为 RuleSet 新增确定性的首局庄家选择扩展点，还是将 Room 首局随机化提升为所有玩法的通用容器行为；确认后先定稿 `docs/variants/junk.md`，再实现 core/server/web 与测试。
 
 ## 当前风险 / 开放问题
 
@@ -31,6 +32,7 @@
 
 ## 已完成摘要
 
+- Review 配置功能：已完成首个安全会话配置 `totalGames`：创建房间可选 1、4、8 局（默认 4），严格拒绝客户端传入的规则 config；该字段只由 Room 使用，不进入 core、计分或 AI。
 - 核心与服务端：junk/bloodbattle RuleSet、CLI/replay/fuzz、多房间、AI 补位/断线托管、归档与持久化已落地。
 - Web 与认证：登录、大厅、房间、Junk 可玩牌桌、Replay、主题与 Supabase Google/GitHub OAuth 已完成；房主在等待房间 ready 时客户端会以已 ready 的 AI 自动补满空座位；OAuth 已在本地 Supabase 以真实账号端到端验证。
 - Junk Table UX 与 Layout Sketch：桌面 Zone/LayoutPreset、操作 Dock、CSS 布局、事件/跨区域动画、布局编辑与保存读取均已完成并经 e2e/Storybook 验收；bloodbattle 仍只有公共桌面骨架。
