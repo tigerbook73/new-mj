@@ -2,7 +2,13 @@ import { EVENT_TYPES, type GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { Meld } from "../../lib/seat.ts";
-import type { JunkAction, JunkApplyResult, JunkClaimAction, JunkState } from "./types.ts";
+import type {
+  JunkAction,
+  JunkApplyResult,
+  JunkClaimAction,
+  JunkEventPayload,
+  JunkState,
+} from "./types.ts";
 import {
   appendEvent,
   beginTurn,
@@ -41,7 +47,10 @@ export const chooseClaims = (
   return sorted.slice(0, 1);
 };
 
-export const resolveClaimWindow = (state: JunkState, events: GameEvent[]): void => {
+export const resolveClaimWindow = (
+  state: JunkState,
+  events: GameEvent<JunkEventPayload>[],
+): void => {
   const pending = state.pendingClaims!;
   const winners = chooseClaims(state);
   if (winners.length === 0) return resolveUnclaimed(state, events);
@@ -109,7 +118,7 @@ export const applyClaimResponse = (
   state: JunkState,
   seat: SeatId,
   action: JunkAction,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "awaiting-claims" || !state.pendingClaims)
     return fail("CLAIM_WINDOW_NOT_OPEN");

@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import type { Player } from "@new-mj/protocol";
 import { Sidebar, SidebarContent, useSidebar } from "@/shared/ui/sidebar";
 import { rulesetLabel } from "@/shared/lib/playerDisplay";
+import { useAudioStore } from "@/shared/store/audio.store";
 import { TableHudPanel } from "./TableHudPanel";
 
 interface TableHudProps {
@@ -23,6 +24,10 @@ interface TableHudProps {
 export function TableHud(props: TableHudProps) {
   const { open, setOpen } = useSidebar();
   const containerRef = useRef<HTMLDivElement>(null);
+  const volume = useAudioStore((state) => state.volume);
+  const muted = useAudioStore((state) => state.muted);
+  const setVolume = useAudioStore((state) => state.setVolume);
+  const toggleMuted = useAudioStore((state) => state.toggleMuted);
 
   // Desktop-only: the mobile variant renders as a Sheet (Base UI Dialog), which already
   // closes on Escape/backdrop-click for free. `open` never becomes true on mobile (that
@@ -47,7 +52,13 @@ export function TableHud(props: TableHudProps) {
     <div ref={containerRef}>
       <Sidebar side="left" collapsible="offcanvas">
         <SidebarContent data-testid="table-hud-panel" className="gap-4 p-4">
-          <TableHudPanel {...props} />
+          <TableHudPanel
+            {...props}
+            volume={volume}
+            muted={muted}
+            onVolumeChange={setVolume}
+            onToggleMuted={toggleMuted}
+          />
         </SidebarContent>
       </Sidebar>
     </div>

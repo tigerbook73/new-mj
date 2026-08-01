@@ -44,7 +44,7 @@ const TILE_KINDS = [
   "7z",
 ] as const;
 
-type TileKind = (typeof TILE_KINDS)[number];
+export type TileKind = (typeof TILE_KINDS)[number];
 export type TileTheme = "Regular" | "Black";
 
 const COPIES_PER_KIND = 4;
@@ -107,6 +107,12 @@ const TILE_KIND_TO_FILE: Record<TileKind, string> = {
 export const tileImageSrc = (tileId: number, theme: TileTheme = "Regular"): string =>
   `/tiles/${theme}/${TILE_KIND_TO_FILE[tileKindOf(tileId)]}.svg`;
 
+/** Same mapping as tileImageSrc, but for callers that already have a TileKind
+ * string (e.g. a hu's revealed winSnapshot, which PlayerView sends as kinds,
+ * not TileIds — see docs/process/plan.md 胡牌结算展示最终赢牌组合). */
+export const tileImageSrcForKind = (kind: TileKind, theme: TileTheme = "Regular"): string =>
+  `/tiles/${theme}/${TILE_KIND_TO_FILE[kind]}.svg`;
+
 export const tileBackImageSrc = (theme: TileTheme = "Regular"): string =>
   `/tiles/${theme}/Back.svg`;
 
@@ -119,3 +125,7 @@ export const tileBackImageSrc = (theme: TileTheme = "Regular"): string =>
  * honor tile) — this helper only answers "is this tile kind the white dragon".
  */
 export const isCaishenTile = (tileId: number): boolean => tileKindOf(tileId) === "5z";
+
+/** Same check as isCaishenTile, for callers that already have a TileKind (e.g. a
+ * revealed winSnapshot's groups, see tileImageSrcForKind's doc). */
+export const isCaishenKind = (kind: TileKind): boolean => kind === "5z";

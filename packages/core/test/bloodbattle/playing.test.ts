@@ -13,6 +13,7 @@ import {
   type BloodbattleState,
 } from "../../src/index.ts";
 import { BLOODBATTLE_TILE_SET } from "../../src/rulesets/bloodbattle/prelude.ts";
+import type { BloodbattleEventPayload } from "../../src/rulesets/bloodbattle/types.ts";
 
 const config = {
   rulesetId: "bloodbattle" as const,
@@ -137,6 +138,47 @@ test("anGang records a meld, pays active seats, and draws a replacement tile", (
       expect(next.seats[0]!.hand).toContain(4);
     }
   }
+});
+
+test("anGang meld tiles survive event-replay, not just live getPlayerView (see plan.md known bug)", () => {
+  // Regression for a bug the payload-typing pass surfaced: rebuildPlayerView's
+  // GangMade branch used to read `payload.tiles` unconditionally, but
+  // anGang/buGang only ever carry kind-level `kinds` (never `tiles`) — so a
+  // replayed anGang meld came back with empty tiles even though live
+  // getPlayerView (reading straight from state) rendered it correctly.
+  const state = playingState();
+  const result = applyAction(state, 0, { type: "anGang", kind: "1m" });
+  expect("state" in result).toBe(true);
+  if (!("state" in result)) return;
+
+  const events: GameEvent[] = [
+    {
+      seq: 1,
+      visibility: { type: "public" },
+      payload: {
+        type: "GameStarted",
+        dealer: 0,
+        handCounts: [state.seats[0]!.hand.length, 0, 0, 0],
+        wallCount: state.wall.length,
+        config,
+      },
+    },
+    {
+      seq: 2,
+      visibility: { type: "seat", seats: [0] },
+      payload: { type: "HandDealt", seat: 0, tiles: state.seats[0]!.hand },
+    },
+    {
+      seq: 3,
+      visibility: { type: "seat", seats: [0] },
+      payload: { type: "LackChosen", suit: "m" },
+    },
+    ...result.events,
+  ];
+
+  const rebuilt = bloodbattleRuleSet.rebuildPlayerView(events, 0);
+  const live = bloodbattleRuleSet.getPlayerView(result.state as BloodbattleState, 0);
+  expect(rebuilt).toEqual(live);
 });
 
 test("buGang upgrades an existing peng and charges one point from each active seat", () => {
@@ -316,7 +358,7 @@ test("draw settlement applies huaZhu, gang refund, then daJiao", () => {
   state.scores = [0, 2, -2, 0];
   state.gangPayments = [{ gangEventId: 7, opener: 1, payer: 2, amount: 2 }];
 
-  const events: GameEvent[] = [];
+  const events: GameEvent<BloodbattleEventPayload>[] = [];
   settleBloodbattleDraw(state, events);
 
   expect(state.phase).toBe("finished");

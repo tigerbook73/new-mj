@@ -21,7 +21,12 @@ import {
 } from "./state-machine.ts";
 import { applyClaimResponse } from "./claims.ts";
 import { getPlayerView, rebuildPlayerView } from "./view.ts";
-import type { HangzhouAction, HangzhouApplyResult, HangzhouState } from "./types.ts";
+import type {
+  HangzhouAction,
+  HangzhouApplyResult,
+  HangzhouEventPayload,
+  HangzhouState,
+} from "./types.ts";
 
 export { DEFAULT_HANGZHOU_CONFIG, parseHangzhouConfig } from "./config.ts";
 export { computeNextHangzhouDealer, createHangzhouGame } from "./state-machine.ts";
@@ -85,7 +90,7 @@ export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
   },
   applyAction: (input, seat, action) => {
     const state = cloneState(input);
-    const events: GameEvent[] = [];
+    const events: GameEvent<HangzhouEventPayload>[] = [];
     let result: HangzhouApplyResult;
     if (action.type === "discard") result = applyDiscard(state, seat, action.tile, events);
     else if (["chi", "peng", "minGang", "hu", "pass"].includes(action.type))
@@ -112,10 +117,14 @@ export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
     ...getPlayerView(state, seat),
     myActionOptions: hangzhouRuleSet.getLegalActions(state, seat),
   }),
-  rebuildPlayerView,
+  // RulesetModule's boundary type is untyped GameEvent[] since engine.ts dispatches
+  // across heterogeneous rulesets; hangzhou's own payload union is only meaningful
+  // once narrowed back to this ruleset, which is what rebuildPlayerView does internally.
+  rebuildPlayerView: (events, seat) =>
+    rebuildPlayerView(events as GameEvent<HangzhouEventPayload>[], seat),
 };
 
-function appendLegalActions(state: HangzhouState, events: GameEvent[]): void {
+function appendLegalActions(state: HangzhouState, events: GameEvent<HangzhouEventPayload>[]): void {
   for (const seat of [0, 1, 2, 3] as const) {
     appendEvent(state, events, seatVisibility(seat), {
       type: EVENT_TYPES.legalActionsUpdated,

@@ -34,6 +34,10 @@ const baseProps = {
     null,
   ] as const,
   onLeave: () => {},
+  volume: 0.6,
+  muted: false,
+  onVolumeChange: () => {},
+  onToggleMuted: () => {},
 };
 
 describe("TableHudPanel", () => {
@@ -66,5 +70,24 @@ describe("TableHudPanel", () => {
   it("always renders the Leave room trigger", () => {
     const markup = renderToStaticMarkup(createElement(TableHudPanel, baseProps));
     expect(markup).toContain("Leave room");
+  });
+
+  it("renders a mute toggle and volume slider reflecting the current settings", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TableHudPanel, { ...baseProps, volume: 0.3 }),
+    );
+    expect(markup).toContain('aria-label="Mute sound"');
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).toContain('type="range"');
+    expect(markup).toContain('value="0.3"');
+  });
+
+  it("shows the unmute label and disables the slider once muted", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TableHudPanel, { ...baseProps, muted: true }),
+    );
+    expect(markup).toContain('aria-label="Unmute sound"');
+    expect(markup).toContain('aria-pressed="true"');
+    expect(markup).toContain('disabled=""');
   });
 });

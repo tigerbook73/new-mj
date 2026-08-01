@@ -4,7 +4,12 @@ import { createWall } from "../../lib/wall.ts";
 import { parseBloodbattleConfig } from "./config.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
-import type { BloodbattleApplyResult, BloodbattleConfig, BloodbattleState } from "./types.ts";
+import type {
+  BloodbattleApplyResult,
+  BloodbattleConfig,
+  BloodbattleEventPayload,
+  BloodbattleState,
+} from "./types.ts";
 import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 export { BLOODBATTLE_TILE_SET } from "./constants.ts";
@@ -29,9 +34,9 @@ const cloneState = (state: BloodbattleState): BloodbattleState => ({
 
 const appendEvent = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   visibility: GameEvent["visibility"],
-  payload: unknown,
+  payload: BloodbattleEventPayload,
 ): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, visibility, payload));
@@ -78,7 +83,7 @@ export const createBloodbattlePrelude = (
     status: ["active", "active", "active", "active"],
     gangPayments: [],
   };
-  const events: GameEvent[] = [];
+  const events: GameEvent<BloodbattleEventPayload>[] = [];
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gameStarted,
     config: state.config,
@@ -120,10 +125,13 @@ export const applyExchangeThree = (
   if (suits.size !== 1) return fail("EXCHANGE_TILES_NOT_SAME_SUIT");
 
   const clonedState = cloneState(state);
-  const events: GameEvent[] = [];
+  const events: GameEvent<BloodbattleEventPayload>[] = [];
   clonedState.exchange = clonedState.exchange ?? { selections: {} };
   clonedState.exchange.selections[seat] = tiles;
-  appendEvent(clonedState, events, seatVisibility(seat), { type: "ExchangeThreeSelected", tiles });
+  appendEvent(clonedState, events, seatVisibility(seat), {
+    type: EVENT_TYPES.exchangeThreeSelected,
+    tiles,
+  });
 
   const selections = clonedState.exchange.selections;
   const allSubmitted = ([0, 1, 2, 3] as SeatId[]).every((candidate) => selections[candidate]);
@@ -140,13 +148,13 @@ export const applyExchangeThree = (
     const incoming = selections[candidate]!;
     clonedState.seats[receiver]!.hand.push(...incoming);
     appendEvent(clonedState, events, seatVisibility(receiver), {
-      type: "TilesReceived",
+      type: EVENT_TYPES.tilesReceived,
       tiles: incoming,
     });
   }
   delete clonedState.exchange;
   appendEvent(clonedState, events, publicVisibility, {
-    type: "ExchangeCompleted",
+    type: EVENT_TYPES.exchangeCompleted,
     direction: direction.value,
   });
   clonedState.phase = "choosing-lack";
@@ -165,10 +173,10 @@ export const applyChooseLack = (
     return fail("SUIT_NOT_HELD");
 
   const clonedState = cloneState(state);
-  const events: GameEvent[] = [];
+  const events: GameEvent<BloodbattleEventPayload>[] = [];
   clonedState.lack = clonedState.lack ?? {};
   clonedState.lack[seat] = suit;
-  appendEvent(clonedState, events, seatVisibility(seat), { type: "LackChosen", suit });
+  appendEvent(clonedState, events, seatVisibility(seat), { type: EVENT_TYPES.lackChosen, suit });
 
   const lack = clonedState.lack;
   const allSubmitted = ([0, 1, 2, 3] as SeatId[]).every((candidate) => lack[candidate]);

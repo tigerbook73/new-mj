@@ -69,31 +69,33 @@
 
 信封结构（`GameEvent`/`EventVisibility`）见 `contracts/engine-contract.md` §6，本节只列本玩法的具体事件。
 
-| #   | 事件                 | visibility                                   | payload 要点                                                                           |
-| --- | -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 1   | GameStarted          | public                                       | config、座次、庄家、各家初始手牌张数、牌墙余量                                         |
-| 2   | HandDealt            | seat（各家各收自己的）                       | 该家 13/14 张手牌                                                                      |
-| 3   | TurnStarted          | public                                       | seat                                                                                   |
-| 4   | TileDrawn            | 双版本：seat 版含牌面；public 版仅"摸了一张" | seat, tile?                                                                            |
-| 5   | TileDiscarded        | public                                       | seat, tile                                                                             |
-| 6   | ClaimWindowOpened    | seat（仅有权响应者）                         | 自己的 ClaimOption[]                                                                   |
-| 7   | ClaimResponded       | seat（仅本人）                               | 本人的响应                                                                             |
-| 8   | ClaimWindowResolved  | public                                       | 裁决结果；`result:"unclaimed"` 时额外带 `seat`（下一位即将摸牌的座位，供事件重建判断） |
-| 9   | ChiMade              | public                                       | seat, tiles, from                                                                      |
-| 10  | PengMade             | public                                       | seat, tile, from                                                                       |
-| 11  | GangMade             | public（暗杠不露牌面，双版本）               | seat, type, tile?, from?                                                               |
-| 12  | GangReplacementDrawn | 双版本（同 TileDrawn）                       | seat, tile?                                                                            |
-| 13  | HuDeclared           | public                                       | seat, 胡型（点炮/自摸）, 亮出的完整手牌, 点炮者?                                       |
-| 14  | Settled              | public                                       | 分数变动明细                                                                           |
-| 15  | WallExhausted        | public                                       | —                                                                                      |
-| 16  | GameEnded            | public                                       | result 摘要                                                                            |
-| 17  | LegalActionsUpdated  | seat（每家各收自己的）                       | 该 seat 当前完整可执行的 JunkAction[]                                                  |
+| #   | 事件                 | visibility                                   | payload 要点                                                                                     |
+| --- | -------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1   | GameStarted          | public                                       | config、座次、庄家、各家初始手牌张数、牌墙余量                                                   |
+| 2   | HandDealt            | seat（各家各收自己的）                       | 该家 13/14 张手牌                                                                                |
+| 3   | TurnStarted          | public                                       | seat                                                                                             |
+| 4   | TileDrawn            | 双版本：seat 版含牌面；public 版仅"摸了一张" | seat, tile?                                                                                      |
+| 5   | TileDiscarded        | public                                       | seat, tile                                                                                       |
+| 6   | ClaimWindowOpened    | seat（仅有权响应者）                         | 自己的 ClaimOption[]                                                                             |
+| 7   | ClaimResponded       | seat（仅本人）                               | 本人的响应                                                                                       |
+| 8   | ClaimWindowResolved  | public                                       | 裁决结果；`result:"unclaimed"` 时额外带 `seat`（下一位即将摸牌的座位，供事件重建判断）           |
+| 9   | ChiMade              | public                                       | seat, tiles, from                                                                                |
+| 10  | PengMade             | public                                       | seat, tile, from                                                                                 |
+| 11  | GangMade             | public（暗杠不露牌面，双版本）               | seat, type, tile?, from?                                                                         |
+| 12  | GangReplacementDrawn | 双版本（同 TileDrawn）                       | seat, tile?                                                                                      |
+| 13  | HuDeclared           | public                                       | seat, 胡型（点炮/自摸）, 亮出的完整手牌(`hand`), `winTile`, `groups`（实际拆分，见 §7）, 点炮者? |
+| 14  | Settled              | public                                       | 分数变动明细                                                                                     |
+| 15  | WallExhausted        | public                                       | —                                                                                                |
+| 16  | GameEnded            | public                                       | result 摘要                                                                                      |
+| 17  | LegalActionsUpdated  | seat（每家各收自己的）                       | 该 seat 当前完整可执行的 JunkAction[]                                                            |
 
 `ClaimResponded`（#7）仅本人可见，用于回放调试的输入完整性与窗口中途重连恢复（配套：PlayerView 的 `myClaimResponse` 字段）。
 
 ## 7. PlayerView 私有字段
 
 `JunkPlayerView`（`packages/core/src/rulesets/junk/types.ts`）在 `PlayerViewBase` 之上扩展：`phase`/`myActionOptions`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`justDrawn`/`result`，以及 `TileId` 形式的 `melds`/`discards`（垃圾胡选择用 TileId，不是 TileKind——不同玩法可以有不同选择，见 `contracts/engine-contract.md` §5）。`myActionOptions` 是自己的完整可执行列表；`awaiting-claims` 时其中含可声明动作及 `pass`，而 `myClaimOptions` 继续只表示声明选项。#17 在每个成功的状态转换后为每个座位发送，保证事件重建与直接派生一致。
+
+`seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除），仿血战到底 `WinSnapshot`/`PublicWinSnapshot` 的公开揭示模式：`hand`/`winTile` 在私有状态（`TileId`）与 `PlayerView`（转换成 `TileKind`）之间做边界转换，`groups` 是实际用来判定胡牌的拆分（4 面子+1 将，或七对型的 7 组），本来就是 kind 级别不需要转换。`groups` 的家族优先级（先试基本型再试七对，`own.melds.length===0` 时）与 `isWin` 逐字复刻，保证与实际判定一致，不存在多解歧义。见 `docs/process/plan.md`「胡牌结算展示最终赢牌组合」。
 
 `justDrawn` 是这份清单里唯一分两层可见性的字段：`seats[].justDrawn`（布尔）公开给所有座位，标记"这一家现在是不是刚摸牌、还没对它/本回合做出行动"——这件事本身从来不是秘密（配套的 public `TileDrawn`/`GangReplacementDrawn` 事件本就不带 `tile`，只是不告诉你摸到了什么）；顶层 `justDrawn?: TileId` 只在请求视角正好是刚摸牌的那一家时才附加，用来在自己视角显示真实牌面。两者都在该家 discard/anGang/buGang 提交时一起清空（robKong 待裁决窗口期间保持"仍在摸牌决策中"直到裁决落定，见 `packages/core/src/rulesets/junk/state-machine.ts` 的 `resolveUnclaimed`）。庄家开局多摸的第 14 张牌视同一次摸牌，`createJunkGame` 发牌后即设置 `justDrawn`，语义与后续每回合的摸牌完全一致。
 

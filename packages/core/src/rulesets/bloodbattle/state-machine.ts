@@ -5,7 +5,12 @@ import { type Meld, type SeatState } from "../../lib/seat.ts";
 import { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 import { settleBloodbattleDraw } from "./settlement.ts";
-import type { BloodbattleAction, BloodbattleApplyResult, BloodbattleState } from "./types.ts";
+import type {
+  BloodbattleAction,
+  BloodbattleApplyResult,
+  BloodbattleEventPayload,
+  BloodbattleState,
+} from "./types.ts";
 import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 const seats = BLOODBATTLE_SEATS;
@@ -36,9 +41,9 @@ const cloneState = (state: BloodbattleState): BloodbattleState => ({
 });
 const append = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   visibility: GameEvent["visibility"],
-  payload: unknown,
+  payload: BloodbattleEventPayload,
 ): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, visibility, payload));
@@ -104,7 +109,7 @@ export const applyDiscard = (
   state: BloodbattleState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
 ): BloodbattleApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("DISCARD_NOT_AVAILABLE");
   if (hasLackTile(state, seat) && kind(tile)[1] !== state.lack?.[seat])
@@ -160,7 +165,7 @@ export const applyDiscard = (
  */
 const drawNext = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   from: SeatId,
 ): BloodbattleApplyResult => {
   const seat = nextActive(state, from);
@@ -182,7 +187,11 @@ const drawNext = (
   return { state, events };
 };
 /** Same scheduling as drawNext, for a same-seat replacement draw after a gang. */
-const drawReplacement = (state: BloodbattleState, events: GameEvent[], seat: SeatId): void => {
+const drawReplacement = (
+  state: BloodbattleState,
+  events: GameEvent<BloodbattleEventPayload>[],
+  seat: SeatId,
+): void => {
   if (state.wall.length === 0) {
     settleBloodbattleDraw(state, events);
     return;
@@ -195,7 +204,7 @@ const drawReplacement = (state: BloodbattleState, events: GameEvent[], seat: Sea
 export const applyDrawAction = (
   state: BloodbattleState,
   seat: SeatId,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
 ): BloodbattleApplyResult => {
   if (state.phase !== "awaiting-draw" || state.currentSeat !== seat || !state.pendingDraw)
     return fail("DRAW_NOT_AVAILABLE");
@@ -223,7 +232,7 @@ export const applyDrawAction = (
 };
 const settleGang = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   opener: SeatId,
   amount: number,
   onlyPayers?: readonly SeatId[],
@@ -266,7 +275,7 @@ const settleGang = (
 };
 const transferGangPayments = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   opener: SeatId,
   winner: SeatId,
 ): void => {
@@ -295,7 +304,7 @@ const applyAnGang = (
   state: BloodbattleState,
   seat: SeatId,
   gangKind: string,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
 ): BloodbattleApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("GANG_NOT_AVAILABLE");
   const tiles = state.seats[seat]!.hand.filter((tile) => kind(tile) === gangKind);
@@ -317,7 +326,7 @@ const completeBuGang = (
   state: BloodbattleState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
 ): BloodbattleApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("GANG_NOT_AVAILABLE");
   if (kind(tile)[1] !== state.lack?.[seat]) return fail("GANG_NOT_AVAILABLE");
@@ -342,7 +351,7 @@ const applyBuGang = (
   state: BloodbattleState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
 ): BloodbattleApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("GANG_NOT_AVAILABLE");
   if (kind(tile)[1] !== state.lack?.[seat]) return fail("GANG_NOT_AVAILABLE");
@@ -376,7 +385,7 @@ const applyBuGang = (
 };
 export const finishWin = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   winner: SeatId,
   winTile: TileId,
   by: "zimo" | "discard" | "robKong",
@@ -426,7 +435,7 @@ export const finishWin = (
 };
 export const resolveClaims = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
 ): BloodbattleApplyResult => {
   const pending = state.pendingClaims!;
   const responses = pending.responses;
@@ -526,7 +535,7 @@ export const applyAction = (
   action: BloodbattleAction,
 ): BloodbattleApplyResult => {
   const state = cloneState(input);
-  const events: GameEvent[] = [];
+  const events: GameEvent<BloodbattleEventPayload>[] = [];
   if (action.type === "exchangeThree") return applyExchangeThree(state, seat, action.tiles);
   if (action.type === "chooseLack") return applyChooseLack(state, seat, action.suit);
   if (

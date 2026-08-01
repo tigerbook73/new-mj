@@ -2,6 +2,7 @@ import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { GameEvent } from "../../events.ts";
 import { hangzhouRuleSet } from "./index.ts";
+import { kindsOf } from "./state-machine.ts";
 import type { HangzhouAction, HangzhouConfig, HangzhouState } from "./index.ts";
 
 export type PlayedHangzhouGame = {
@@ -64,6 +65,21 @@ export const playHangzhouGame = (
     : { seed, config, actions, error: "STEP_LIMIT_EXCEEDED" };
 };
 
+/** Every winner's winSnapshot must exist and its concealed decomposition must be
+ * exactly the same tile-kind multiset as the concealed hand it was carved from —
+ * a decompose bug would either drop this or return a mismatched shape. */
+const checkWinSnapshotInvariant = (state: HangzhouState): string | undefined => {
+  if (state.result?.type !== "win") return undefined;
+  for (const detail of state.result.winners) {
+    const snapshot = state.wins?.[detail.seat];
+    if (!snapshot) return "WIN_SNAPSHOT_MISSING";
+    const flatGroups = [...snapshot.groups.flat()].sort().join(",");
+    const flatHand = kindsOf(snapshot.hand).sort().join(",");
+    if (flatGroups !== flatHand) return "WIN_SNAPSHOT_MISMATCH";
+  }
+  return undefined;
+};
+
 export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure | undefined => {
   let prng = createPrng(seed);
   for (let index = 0; index < games; index += 1) {
@@ -83,6 +99,10 @@ export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure 
     };
     const result = playHangzhouGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
+    const invariantError = checkWinSnapshotInvariant(result.state);
+    if (invariantError) {
+      return { seed: gameSeed.value, config, actions: result.actions, error: invariantError };
+    }
   }
   return undefined;
 };

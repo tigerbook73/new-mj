@@ -7,12 +7,13 @@ import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { DEFAULT_HANGZHOU_CONFIG, parseHangzhouConfig } from "./config.ts";
-import { isBaotou, isWinningHand } from "./hand.ts";
+import { decomposeWinningShape, isBaotou, isWinningHand } from "./hand.ts";
 import { scoreHangzhouHand, type HangzhouScoringInput } from "./scoring.ts";
 import type {
   HangzhouApplyResult,
   HangzhouClaimOption,
   HangzhouConfig,
+  HangzhouEventPayload,
   HangzhouGameResult,
   HangzhouPendingClaims,
   HangzhouState,
@@ -50,9 +51,9 @@ export const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats:
 
 export const appendEvent = (
   state: HangzhouState,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
   visibility: GameEvent["visibility"],
-  payload: unknown,
+  payload: HangzhouEventPayload,
 ): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, visibility, payload));
@@ -167,7 +168,7 @@ export const claimOptions = (state: HangzhouState, seat: SeatId): HangzhouClaimO
 
 export const emitDraw = (
   state: HangzhouState,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
   seat: SeatId,
   replacement: boolean,
 ): void => {
@@ -188,7 +189,7 @@ export const emitDraw = (
 
 export const beginTurn = (
   state: HangzhouState,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
   seat: SeatId,
   draw: boolean,
   replacement = false,
@@ -216,7 +217,7 @@ export const beginTurn = (
 export const applyDrawAction = (
   state: HangzhouState,
   seat: SeatId,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "awaiting-draw" || state.currentSeat !== seat || !state.pendingDraw)
     return fail("DRAW_NOT_AVAILABLE");
@@ -247,7 +248,11 @@ const buildScoringInput = (
   };
 };
 
-export const finishWin = (state: HangzhouState, events: GameEvent[], winner: SeatId): void => {
+export const finishWin = (
+  state: HangzhouState,
+  events: GameEvent<HangzhouEventPayload>[],
+  winner: SeatId,
+): void => {
   const own = state.seats[winner]!;
   const winTile =
     state.justDrawn?.seat === winner
@@ -279,11 +284,17 @@ export const finishWin = (state: HangzhouState, events: GameEvent[], winner: Sea
   };
   state.phase = "finished";
   state.result = result;
+  // isWin() already gated the zimo action, so this must find a decomposition;
+  // the fallback exists only to satisfy the type without an unsafe cast.
+  const groups = decomposeWinningShape(kindsOf(own.hand), own.melds.length) ?? [];
+  state.wins = { ...state.wins, [winner]: { hand: [...own.hand], winTile, groups } };
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.huDeclared,
     seat: winner,
     winType: "zimo",
     hand: [...own.hand],
+    winTile,
+    groups,
     fanTypes: winDetail.fanTypes,
     multiplier: winDetail.multiplier,
   });
@@ -293,7 +304,7 @@ export const finishWin = (state: HangzhouState, events: GameEvent[], winner: Sea
 
 export const finishRonWins = (
   state: HangzhouState,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
   winners: SeatId[],
   from: SeatId,
   tile: TileId,
@@ -323,11 +334,19 @@ export const finishRonWins = (
   state.phase = "finished";
   state.result = result;
   for (const detail of winDetails) {
+    const concealedTiles = [...state.seats[detail.seat]!.hand, tile];
+    // claimOptions() already gated this via isWin(), so this must find a
+    // decomposition; the fallback exists only to satisfy the type.
+    const groups =
+      decomposeWinningShape(kindsOf(concealedTiles), state.seats[detail.seat]!.melds.length) ?? [];
+    state.wins = { ...state.wins, [detail.seat]: { hand: concealedTiles, winTile: tile, groups } };
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.huDeclared,
       seat: detail.seat,
       winType: "ron",
-      hand: [...state.seats[detail.seat]!.hand, tile],
+      hand: concealedTiles,
+      winTile: tile,
+      groups,
       from,
       fanTypes: detail.fanTypes,
       multiplier: detail.multiplier,
@@ -337,7 +356,10 @@ export const finishRonWins = (
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.gameEnded, result });
 };
 
-export const resolveUnclaimed = (state: HangzhouState, events: GameEvent[]): void => {
+export const resolveUnclaimed = (
+  state: HangzhouState,
+  events: GameEvent<HangzhouEventPayload>[],
+): void => {
   const discardedBy = state.pendingClaims!.discard.seat;
   delete state.pendingClaims;
   const next = nextSeat(discardedBy);
@@ -353,7 +375,7 @@ export const applyDiscard = (
   state: HangzhouState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const hand = state.seats[seat]!.hand;
@@ -401,7 +423,7 @@ export const applyAnGang = (
   state: HangzhouState,
   seat: SeatId,
   kind: TileKind,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   if (kind === CAISHEN_KIND) return fail("GANG_NOT_AVAILABLE");
@@ -430,7 +452,7 @@ export const applyBuGang = (
   state: HangzhouState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
@@ -474,7 +496,7 @@ export const createHangzhouGame = (
     caiPiaoCount: [0, 0, 0, 0],
     gangChain: [0, 0, 0, 0],
   };
-  const events: GameEvent[] = [];
+  const events: GameEvent<HangzhouEventPayload>[] = [];
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gameStarted,
     config: state.config,

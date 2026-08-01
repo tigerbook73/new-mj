@@ -1,4 +1,4 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, Volume2, VolumeX } from "lucide-react";
 import type { Player } from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
@@ -13,6 +13,11 @@ export interface TableHudPanelProps {
   scores: readonly number[];
   players: readonly (Player | null)[];
   onLeave: () => void;
+  /** 0..1 — see shared/store/audio.store.ts. */
+  volume: number;
+  muted: boolean;
+  onVolumeChange: (volume: number) => void;
+  onToggleMuted: () => void;
 }
 
 /** Pure content of the sidebar — kept apart from TableHud's Dialog shell so it stays
@@ -26,6 +31,10 @@ export function TableHudPanel({
   scores,
   players,
   onLeave,
+  volume,
+  muted,
+  onVolumeChange,
+  onToggleMuted,
 }: TableHudPanelProps) {
   return (
     <div className="flex h-full flex-col gap-4">
@@ -62,6 +71,32 @@ export function TableHudPanel({
           </li>
         ))}
       </ol>
+
+      <Separator />
+
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={muted ? "Unmute sound" : "Mute sound"}
+          aria-pressed={muted}
+          onClick={onToggleMuted}
+        >
+          {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+        </Button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          disabled={muted}
+          aria-label="Sound volume"
+          onChange={(event) => onVolumeChange(event.target.valueAsNumber)}
+          className="flex-1 accent-primary disabled:opacity-50"
+        />
+      </div>
 
       <Separator />
 

@@ -543,6 +543,60 @@ describe("RoomService — endSession (room:end)", () => {
   });
 });
 
+// GameService.getPlayerView is a thin passthrough to core (no server logic
+// touches winSnapshot), so this only needs to confirm the field actually
+// flows end-to-end through the server-facing wrapper — playJunkGame/
+// playHangzhouGame are pure and need no RoomService involvement at all.
+describe("RoomService — winSnapshot exposure (胡牌结算展示最终赢牌组合)", () => {
+  it("junk: getPlayerView surfaces each winner's decomposition after a win", () => {
+    const gameService = new GameService();
+    let winningGame: ReturnType<typeof playJunkGame> | undefined;
+    for (let seed = 1; seed <= 50; seed += 1) {
+      const attempt = playJunkGame(seed, {}, [], 0);
+      if (!("error" in attempt) && attempt.state.result?.type === "win") {
+        winningGame = attempt;
+        break;
+      }
+    }
+    if (!winningGame || "error" in winningGame) throw new Error("no winning junk game found");
+    const result = winningGame.state.result;
+    if (result?.type !== "win") throw new Error("expected a win result");
+    for (const winner of result.winners) {
+      const view = gameService.getPlayerView(winningGame.state, winner) as {
+        seats: Array<{ winSnapshot?: { hand: string[]; groups: string[][] } }>;
+      };
+      const snapshot = view.seats[winner]?.winSnapshot;
+      expect(snapshot).toBeDefined();
+      expect([...snapshot!.groups.flat()].sort()).toEqual([...snapshot!.hand].sort());
+    }
+  });
+
+  it("hangzhou: getPlayerView surfaces each winner's decomposition after a win", () => {
+    const gameService = new GameService();
+    let winningGame: ReturnType<typeof playHangzhouGame> | undefined;
+    for (let seed = 1; seed <= 50; seed += 1) {
+      // dealerStreak:3 unblocks ron (santiao, hangzhou.md §5) so a win — not
+      // just a draw — shows up quickly under a random-legal-action bot.
+      const attempt = playHangzhouGame(seed, { dealerStreak: 3 }, [], 0);
+      if (!("error" in attempt) && attempt.state.result?.type === "win") {
+        winningGame = attempt;
+        break;
+      }
+    }
+    if (!winningGame || "error" in winningGame) throw new Error("no winning hangzhou game found");
+    const result = winningGame.state.result;
+    if (result?.type !== "win") throw new Error("expected a win result");
+    for (const detail of result.winners) {
+      const view = gameService.getPlayerView(winningGame.state, detail.seat) as {
+        seats: Array<{ winSnapshot?: { hand: string[]; groups: string[][] } }>;
+      };
+      const snapshot = view.seats[detail.seat]?.winSnapshot;
+      expect(snapshot).toBeDefined();
+      expect([...snapshot!.groups.flat()].sort()).toEqual([...snapshot!.hand].sort());
+    }
+  });
+});
+
 describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)", () => {
   it("maps the host after create, and a joined player after join", () => {
     const service = newRoomService();

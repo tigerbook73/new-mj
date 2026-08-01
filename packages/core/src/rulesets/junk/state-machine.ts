@@ -3,7 +3,12 @@ import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../ev
 import { createPrng, nextInt } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
-import { isSevenPairsWinningHand, isStandardWinningHand } from "../../lib/win.ts";
+import {
+  decomposeSevenPairsWinningHand,
+  decomposeStandardWinningHand,
+  isSevenPairsWinningHand,
+  isStandardWinningHand,
+} from "../../lib/win.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
@@ -12,6 +17,7 @@ import type {
   JunkApplyResult,
   JunkClaimOption,
   JunkConfig,
+  JunkEventPayload,
   JunkGameResult,
   JunkPendingClaims,
   JunkState,
@@ -50,9 +56,9 @@ export const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats:
 
 export const appendEvent = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   visibility: GameEvent["visibility"],
-  payload: unknown,
+  payload: JunkEventPayload,
 ): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, visibility, payload));
@@ -108,6 +114,24 @@ export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean =
     isStandardWinningHand(tiles, STANDARD_TILE_SET) ||
     (own.melds.length === 0 && isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
   );
+};
+
+/** Witness version of isWin: branch order mirrors it exactly so the family found
+ * here always matches the one that gated the hu action. Only called once, at the
+ * moment a win is actually declared (see lib/win.ts's decompose functions' own doc). */
+const decomposeJunkWin = (
+  state: JunkState,
+  seat: SeatId,
+  tiles: readonly TileId[],
+): TileKind[][] => {
+  const own = state.seats[seat]!;
+  const standard = decomposeStandardWinningHand(tiles, STANDARD_TILE_SET);
+  if (standard) return standard;
+  if (configOf(state).sevenPairs && own.melds.length === 0) {
+    const sevenPairs = decomposeSevenPairsWinningHand(tiles, STANDARD_TILE_SET);
+    if (sevenPairs) return sevenPairs;
+  }
+  return []; // unreachable: isWin() already gated this
 };
 
 /**
@@ -174,7 +198,7 @@ export const claimOptions = (state: JunkState, seat: SeatId): JunkClaimOption[] 
  * changed in between. */
 export const emitDraw = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   seat: SeatId,
   replacement: boolean,
 ): void => {
@@ -203,7 +227,7 @@ export const emitDraw = (
  */
 export const beginTurn = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   seat: SeatId,
   draw: boolean,
   replacement = false,
@@ -232,7 +256,7 @@ export const beginTurn = (
 export const applyDrawAction = (
   state: JunkState,
   seat: SeatId,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "awaiting-draw" || state.currentSeat !== seat || !state.pendingDraw)
     return fail("DRAW_NOT_AVAILABLE");
@@ -287,7 +311,7 @@ export const settleWins = (
 
 export const finishWin = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   winner: SeatId,
   winType: "zimo" | "ron",
   from?: SeatId,
@@ -300,10 +324,21 @@ export const finishWin = (
     winningTile === undefined
       ? [...state.seats[winner]!.hand]
       : [...state.seats[winner]!.hand, winningTile];
+  const winTile = winningTile ?? state.justDrawn!.tile;
+  const groups = decomposeJunkWin(state, winner, revealedHand);
+  state.wins = { ...state.wins, [winner]: { hand: revealedHand, winTile, groups } };
   const payload =
     from === undefined
-      ? { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand }
-      : { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand, from };
+      ? { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand, winTile, groups }
+      : {
+          type: EVENT_TYPES.huDeclared,
+          seat: winner,
+          winType,
+          hand: revealedHand,
+          winTile,
+          groups,
+          from,
+        };
   appendEvent(state, events, publicVisibility, payload);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.settled,
@@ -314,7 +349,7 @@ export const finishWin = (
 
 export const finishRonWins = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   winners: SeatId[],
   from: SeatId,
   tile: TileId,
@@ -323,11 +358,16 @@ export const finishRonWins = (
   state.phase = "finished";
   state.result = result;
   for (const winner of winners) {
+    const concealedTiles = [...state.seats[winner]!.hand, tile];
+    const groups = decomposeJunkWin(state, winner, concealedTiles);
+    state.wins = { ...state.wins, [winner]: { hand: concealedTiles, winTile: tile, groups } };
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.huDeclared,
       seat: winner,
       winType: "ron",
-      hand: [...state.seats[winner]!.hand, tile],
+      hand: concealedTiles,
+      winTile: tile,
+      groups,
       from,
     });
   }
@@ -338,7 +378,7 @@ export const finishRonWins = (
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.gameEnded, result });
 };
 
-export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void => {
+export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPayload>[]): void => {
   if (state.pendingClaims!.source === "robKong") {
     const { seat, tile } = state.pendingClaims!.discard;
     delete state.pendingClaims;
@@ -380,7 +420,7 @@ export const applyDiscard = (
   state: JunkState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const hand = state.seats[seat]!.hand;
@@ -419,7 +459,7 @@ export const applyAnGang = (
   state: JunkState,
   seat: SeatId,
   kind: TileKind,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const tiles = sameKind(state.seats[seat]!.hand, kind).slice(0, 4);
@@ -447,7 +487,7 @@ export const applyBuGang = (
   state: JunkState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
@@ -514,7 +554,7 @@ export const createJunkGame = (
     prng: shuffled.prng,
     gangChain: [0, 0, 0, 0],
   };
-  const events: GameEvent[] = [];
+  const events: GameEvent<JunkEventPayload>[] = [];
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gameStarted,
     config: state.config,

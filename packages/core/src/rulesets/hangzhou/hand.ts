@@ -101,6 +101,110 @@ export const isStandardWinningHandWithWild = (
   return canComplete(countsOf(real), wild, meldsNeeded, true);
 };
 
+// Witness ("decompose") version of canComplete: only called once, at the
+// moment a win is actually declared, to reveal the specific melds/pair used
+// (see docs/process/plan.md 胡牌结算展示最终赢牌组合). Never called from the
+// isTingpai/isWinningHand hot path (those probe hypothetical kinds with no
+// physical tile behind them), so a second, independent backtracking
+// implementation is an acceptable tradeoff — branch order mirrors
+// canComplete exactly so it explores the same decision tree. A wild slot
+// used to complete a group is represented by CAISHEN_KIND itself, since a
+// caishen substituting for a gap is a real physical caishen tile sitting in
+// that position — no separate "what it stood in for" bookkeeping is needed.
+const decomposeComplete = (
+  counts: readonly number[],
+  wild: number,
+  meldsNeeded: number,
+  needPair: boolean,
+): TileKind[][] | undefined => {
+  const index = counts.findIndex((count) => count > 0);
+  if (index === -1) {
+    if (meldsNeeded === 0 && !needPair) return [];
+    if (needPair && wild >= 2) {
+      const rest = decomposeComplete(counts, wild - 2, meldsNeeded, false);
+      if (rest) return [[CAISHEN_KIND, CAISHEN_KIND], ...rest];
+    }
+    if (meldsNeeded > 0 && wild >= 3) {
+      const rest = decomposeComplete(counts, wild - 3, meldsNeeded - 1, needPair);
+      if (rest) return [[CAISHEN_KIND, CAISHEN_KIND, CAISHEN_KIND], ...rest];
+    }
+    return undefined;
+  }
+  const kind = TILE_KINDS[index] as TileKind;
+  const n = counts[index] as number;
+
+  if (needPair) {
+    const realUse = Math.min(2, n);
+    const wildUse = 2 - realUse;
+    if (wildUse <= wild) {
+      const next = [...counts];
+      next[index] = n - realUse;
+      const rest = decomposeComplete(next, wild - wildUse, meldsNeeded, false);
+      if (rest) {
+        const group = [
+          ...Array<TileKind>(realUse).fill(kind),
+          ...Array<TileKind>(wildUse).fill(CAISHEN_KIND),
+        ];
+        return [group, ...rest];
+      }
+    }
+  }
+
+  if (meldsNeeded > 0) {
+    const realUse = Math.min(3, n);
+    const wildUse = 3 - realUse;
+    if (wildUse <= wild) {
+      const next = [...counts];
+      next[index] = n - realUse;
+      const rest = decomposeComplete(next, wild - wildUse, meldsNeeded - 1, needPair);
+      if (rest) {
+        const group = [
+          ...Array<TileKind>(realUse).fill(kind),
+          ...Array<TileKind>(wildUse).fill(CAISHEN_KIND),
+        ];
+        return [group, ...rest];
+      }
+    }
+
+    if (isSuited(kind) && rankOf(kind) <= 7) {
+      const suit = kind[1];
+      const i1 = TILE_KINDS.indexOf(`${rankOf(kind) + 1}${suit}` as TileKind);
+      const i2 = TILE_KINDS.indexOf(`${rankOf(kind) + 2}${suit}` as TileKind);
+      const n1 = counts[i1] ?? 0;
+      const n2 = counts[i2] ?? 0;
+      const runWildUse = (n1 > 0 ? 0 : 1) + (n2 > 0 ? 0 : 1);
+      if (runWildUse <= wild) {
+        const next = [...counts];
+        next[index] = n - 1;
+        if (n1 > 0) next[i1] = n1 - 1;
+        if (n2 > 0) next[i2] = n2 - 1;
+        const rest = decomposeComplete(next, wild - runWildUse, meldsNeeded - 1, needPair);
+        if (rest) {
+          const group: TileKind[] = [
+            kind,
+            n1 > 0 ? (TILE_KINDS[i1] as TileKind) : CAISHEN_KIND,
+            n2 > 0 ? (TILE_KINDS[i2] as TileKind) : CAISHEN_KIND,
+          ];
+          return [group, ...rest];
+        }
+      }
+    }
+  }
+
+  return undefined;
+};
+
+/** Witness version of isStandardWinningHandWithWild: the pair + melds actually used, or undefined. */
+export const decomposeStandardWinningHandWithWild = (
+  concealedKinds: readonly TileKind[],
+  openMeldsCount: number,
+): TileKind[][] | undefined => {
+  const meldsNeeded = 4 - openMeldsCount;
+  if (meldsNeeded < 0 || concealedKinds.length !== meldsNeeded * 3 + 2) return undefined;
+  const { real, wild } = splitWild(concealedKinds);
+  return decomposeComplete(countsOf(real), wild, meldsNeeded, true);
+};
+
 export type SevenPairsEvaluation = { valid: boolean; quadCount: number };
 
 /**
@@ -141,6 +245,40 @@ export const evaluateSevenPairsWithWild = (
   return { valid: totalWildNeeded === wild, quadCount };
 };
 
+/** Witness version of evaluateSevenPairsWithWild: reuses it for validity, just materializes
+ * the 7 groups (a deluxe quad — 4 real copies of one kind — becomes a single 4-element group). */
+export const decomposeSevenPairsWithWild = (
+  concealedKinds: readonly TileKind[],
+): TileKind[][] | undefined => {
+  const evaluation = evaluateSevenPairsWithWild(concealedKinds);
+  if (!evaluation.valid) return undefined;
+  const { real } = splitWild(concealedKinds);
+  const counts = new Map<TileKind, number>();
+  for (const kind of real) counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  const groups: TileKind[][] = [];
+  // A deluxe quad is worth 2 of the 7 pair-slots (see evaluateSevenPairsWithWild's
+  // own doc) but is still just one 4-tile group, so slot count and array length
+  // diverge — track slots separately to know how many wild-only pairs to pad with.
+  let slots = 0;
+  for (const [kind, count] of counts) {
+    if (count === 4) {
+      groups.push([kind, kind, kind, kind]);
+      slots += 2;
+    } else if (count === 2) {
+      groups.push([kind, kind]);
+      slots += 1;
+    } else {
+      groups.push([kind, CAISHEN_KIND]);
+      slots += 1;
+    }
+  }
+  while (slots < 7) {
+    groups.push([CAISHEN_KIND, CAISHEN_KIND]);
+    slots += 1;
+  }
+  return groups;
+};
+
 export type HangzhouHandShape = { family: "basic" } | { family: "sevenPairs"; quadCount: number };
 
 /**
@@ -164,6 +302,20 @@ export const isWinningHand = (
   concealedKinds: readonly TileKind[],
   openMeldsCount: number,
 ): boolean => evaluateWinningShape(concealedKinds, openMeldsCount) !== undefined;
+
+/** Witness version of evaluateWinningShape: branch order mirrors it exactly (seven
+ * pairs tried first only when concealed) so the family found here always matches
+ * the one scoreHangzhouHand actually scored. */
+export const decomposeWinningShape = (
+  concealedKinds: readonly TileKind[],
+  openMeldsCount: number,
+): TileKind[][] | undefined => {
+  if (openMeldsCount === 0) {
+    const sevenPairs = decomposeSevenPairsWithWild(concealedKinds);
+    if (sevenPairs) return sevenPairs;
+  }
+  return decomposeStandardWinningHandWithWild(concealedKinds, openMeldsCount);
+};
 
 /** `concealedHand` excludes the not-yet-drawn/claimed winning tile. */
 export const isTingpai = (concealedHand: readonly TileKind[], openMeldsCount: number): boolean =>

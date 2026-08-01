@@ -112,7 +112,7 @@
 
 基础事件集与 junk 的 17 种同构（见 `junk.md` §6），本文件不重复列表；杭州特有的部分：
 
-- `HuDeclared` 需要携带触发的番型集合（用于结算展示），比照 bloodbattle `HuDeclared` 的做法
+- `HuDeclared` 携带触发的番型集合（`fanTypes`/`multiplier`，用于结算展示），并额外携带 `winTile`（胡的那张牌，`TileId`）与 `groups`（实际计分用的拆分——4 面子+1 将，或七对型的 7 组，`TileKind[][]`，财神用 `CAISHEN_KIND` 本身占位，不记录"替代了哪张牌"）；`hand` 字段维持既有的完整摊牌不变。分支顺序（门清先试七对再试基本型）与计分逻辑 `evaluateWinningShape` 逐字复刻，保证 `groups` 与 `fanTypes` 出自同一次判定，不存在多解歧义
 - 不新增财飘/爆头相关的公开事件——它们是私有派生状态，不广播，只体现在本人 PlayerView 与胡牌结算的番型解释里
 
 ## 11. PlayerView 私有/公开字段
@@ -121,6 +121,7 @@
 
 - `isTingpai: boolean`、`isBaotou: boolean`、`isCaipiao: boolean`——**私有**，仅本人可见，每次状态转换后重算，通过既有的 `LegalActionsUpdated` 同步机制一并下发，不新开事件类型
 - `dealerStreak: number`——**公开**，所有座位的 view 都带同一个值；这是全桌可推导的信息（点炮是否开放本就不是秘密，见 §5），不像上面三个是私有派生状态。整局固定不变，`getPlayerView`/`rebuildPlayerView` 都从 `state.config.dealerStreak` 取值
+- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared` 一行与 `docs/process/plan.md`「胡牌结算展示最终赢牌组合」
 
 ## 12. Config 清单
 

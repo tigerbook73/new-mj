@@ -1,7 +1,15 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { Meld, SeatState } from "../../lib/seat.ts";
 import type { PrngState } from "../../lib/prng.ts";
-import type { ApplyResult, GameConfig, PlayerViewBase } from "../../types.ts";
+import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
+import {
+  EVENT_TYPES,
+  type GameEvent,
+  type TileDiscardedPayload,
+  type TurnStartedPayload,
+  type WallExhaustedPayload,
+} from "../../events.ts";
+import type { BloodbattleScoringResult } from "./scoring.ts";
 import {
   BLOODBATTLE_DRAW_BONUSES,
   BLOODBATTLE_END_REASONS,
@@ -126,4 +134,167 @@ export type BloodbattleState = {
   result?: BloodbattleGameResult;
 };
 
-export type BloodbattleApplyResult = ApplyResult<BloodbattleState>;
+export type BloodbattleGameStartedPayload = {
+  type: typeof EVENT_TYPES.gameStarted;
+  config: BloodbattleConfig;
+  dealer: SeatId;
+  handCounts: number[];
+  wallCount: number;
+};
+
+export type BloodbattleHandDealtPayload = {
+  type: typeof EVENT_TYPES.handDealt;
+  seat: SeatId;
+  tiles: TileId[];
+};
+
+/** 换三张 prelude, only emitted when config.exchangeThree is set — see prelude.ts. */
+export type BloodbattleExchangeThreeSelectedPayload = {
+  type: typeof EVENT_TYPES.exchangeThreeSelected;
+  tiles: [TileId, TileId, TileId];
+};
+
+export type BloodbattleTilesReceivedPayload = {
+  type: typeof EVENT_TYPES.tilesReceived;
+  tiles: [TileId, TileId, TileId];
+};
+
+export type BloodbattleExchangeCompletedPayload = {
+  type: typeof EVENT_TYPES.exchangeCompleted;
+  direction: number;
+};
+
+export type BloodbattleLackChosenPayload = {
+  type: typeof EVENT_TYPES.lackChosen;
+  suit: BloodbattleSuit;
+};
+
+/** Unlike junk/hangzhou, bloodbattle's draw events never carry `tile` — the
+ * drawn tile is only ever revealed via the separate TileDrawnPrivate event
+ * (same seat-visibility instance regardless of replacement), see
+ * state-machine.ts's applyDrawAction. */
+export type BloodbattleTileDrawnPayload = {
+  type: typeof EVENT_TYPES.tileDrawn | typeof EVENT_TYPES.gangReplacementDrawn;
+  seat: SeatId;
+};
+
+export type BloodbattleTileDrawnPrivatePayload = {
+  type: typeof EVENT_TYPES.tileDrawnPrivate;
+  seat: SeatId;
+  tile: TileId;
+};
+
+/** TileDiscarded is public (matches junk/hangzhou's shared TileDiscardedPayload);
+ * TileDiscardedPrivate is bloodbattle's own redundant seat-visible duplicate of
+ * the same {seat,tile} pair — see applyDiscard. */
+export type BloodbattleTileDiscardedPrivatePayload = {
+  type: typeof EVENT_TYPES.tileDiscardedPrivate;
+  seat: SeatId;
+  tile: TileId;
+};
+
+/** Unlike junk/hangzhou (one seat-scoped event per candidate), bloodbattle emits
+ * a single PUBLIC ClaimWindowOpened carrying every candidate's options keyed by
+ * seat — see applyDiscard/applyBuGang. `source` is only present for a robKong
+ * window. */
+export type BloodbattleClaimWindowOpenedPayload = {
+  type: typeof EVENT_TYPES.claimWindowOpened;
+  seat: SeatId;
+  tile: TileId;
+  options: Partial<Record<SeatId, BloodbattleClaimOption[]>>;
+  source?: "robKong";
+};
+
+/** Public (unlike junk/hangzhou's seat-only ClaimResponded) — see applyAction. */
+export type BloodbattleClaimRespondedPayload = {
+  type: typeof EVENT_TYPES.claimResponded;
+  seat: SeatId;
+  action: BloodbattleAction;
+};
+
+/** Only ever the "nobody claimed" shape — a claimed peng/minGang/hu carries its
+ * own PengMade/GangMade/HuDeclared event instead, see resolveClaims/drawNext. */
+export type BloodbattleClaimWindowResolvedPayload = {
+  type: typeof EVENT_TYPES.claimWindowResolved;
+  result: "unclaimed";
+  seat: SeatId;
+};
+
+/** GangMade covers three declaration shapes: anGang/buGang (both public,
+ * kind-level `kinds` only — no separate private tile-id reveal, unlike
+ * junk/hangzhou) and a claimed minGang (`from` + full `tiles`, see
+ * resolveClaims). */
+export type BloodbattleGangMadePayload =
+  | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; gangType: "anGang"; kinds: TileKind[] }
+  | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; gangType: "buGang"; kinds: TileKind[] }
+  | {
+      type: typeof EVENT_TYPES.gangMade;
+      seat: SeatId;
+      gangType: "minGang";
+      from: SeatId;
+      tiles: TileId[];
+    };
+
+export type BloodbattlePengMadePayload = {
+  type: "PengMade";
+  seat: SeatId;
+  from: SeatId;
+  tile: TileId;
+  tiles: TileId[];
+};
+
+export type BloodbattleHuDeclaredPayload = {
+  type: typeof EVENT_TYPES.huDeclared;
+  seat: SeatId;
+  winType: BloodbattleWinType;
+  // Always present as a key (possibly undefined) — see finishWin — unlike
+  // junk/hangzhou's HuDeclared which omits the key entirely for a zimo win.
+  from: SeatId | undefined;
+  snapshot: {
+    hand: TileId[];
+    winTile: TileId;
+    lack: BloodbattleSuit;
+    melds: Meld[];
+  };
+  scoring: Extract<BloodbattleScoringResult, { hu: true }>;
+  activeSeats: SeatId[];
+};
+
+export type BloodbattleSettledReason = "gang" | "gangTransfer" | "huaZhu" | "gangRefund" | "daJiao";
+
+export type BloodbattleSettledPayload = {
+  type: typeof EVENT_TYPES.settled;
+  reason: BloodbattleSettledReason;
+  scoreDeltas: [number, number, number, number];
+};
+
+export type BloodbattleGameEndedPayload = {
+  type: typeof EVENT_TYPES.gameEnded;
+  result: BloodbattleGameResult;
+};
+
+export type BloodbattleEventPayload =
+  | BloodbattleGameStartedPayload
+  | BloodbattleHandDealtPayload
+  | BloodbattleExchangeThreeSelectedPayload
+  | BloodbattleTilesReceivedPayload
+  | BloodbattleExchangeCompletedPayload
+  | BloodbattleLackChosenPayload
+  | TurnStartedPayload
+  | BloodbattleTileDrawnPayload
+  | BloodbattleTileDrawnPrivatePayload
+  | TileDiscardedPayload
+  | BloodbattleTileDiscardedPrivatePayload
+  | BloodbattleClaimWindowOpenedPayload
+  | BloodbattleClaimRespondedPayload
+  | BloodbattleClaimWindowResolvedPayload
+  | BloodbattleGangMadePayload
+  | BloodbattlePengMadePayload
+  | BloodbattleHuDeclaredPayload
+  | BloodbattleSettledPayload
+  | BloodbattleGameEndedPayload
+  | WallExhaustedPayload;
+
+export type BloodbattleApplyResult =
+  | { state: BloodbattleState; events: GameEvent<BloodbattleEventPayload>[] }
+  | { error: RuleViolation };

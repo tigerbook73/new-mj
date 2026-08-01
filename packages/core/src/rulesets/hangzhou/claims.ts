@@ -6,6 +6,7 @@ import type {
   HangzhouAction,
   HangzhouApplyResult,
   HangzhouClaimAction,
+  HangzhouEventPayload,
   HangzhouState,
 } from "./types.ts";
 import {
@@ -49,7 +50,10 @@ export const chooseClaims = (
   return sorted.slice(0, 1);
 };
 
-export const resolveClaimWindow = (state: HangzhouState, events: GameEvent[]): void => {
+export const resolveClaimWindow = (
+  state: HangzhouState,
+  events: GameEvent<HangzhouEventPayload>[],
+): void => {
   const pending = state.pendingClaims!;
   const winners = chooseClaims(state);
   if (winners.length === 0) return resolveUnclaimed(state, events);
@@ -112,7 +116,7 @@ export const applyClaimResponse = (
   state: HangzhouState,
   seat: SeatId,
   action: HangzhouAction,
-  events: GameEvent[],
+  events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "awaiting-claims" || !state.pendingClaims)
     return fail("CLAIM_WINDOW_NOT_OPEN");
