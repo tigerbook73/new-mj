@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Plus, RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import type { RoomInfo, RoomSummary } from "@new-mj/protocol";
+import {
+  SESSION_TOTAL_GAMES,
+  type RoomInfo,
+  type RoomSummary,
+  type SessionTotalGames,
+} from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
@@ -29,6 +34,7 @@ export function GamePickerView() {
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [search, setSearch] = useState("");
   const [roomName, setRoomName] = useState("");
+  const [totalGames, setTotalGames] = useState<SessionTotalGames>(4);
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigationNotice =
@@ -69,6 +75,7 @@ export function GamePickerView() {
     const result = await ack<RoomInfo>(socket, "room:create", {
       rulesetId,
       name: trimmedName,
+      totalGames,
     });
     if (!result.ok) {
       setError(result.code);
@@ -76,6 +83,7 @@ export function GamePickerView() {
     }
     setCreateOpen(false);
     setRoomName("");
+    setTotalGames(4);
     setRoom(result.data);
     void navigate(`/lobby/${result.data.id}`);
   };
@@ -158,6 +166,26 @@ export function GamePickerView() {
                               onChange={(event) => setRoomName(event.target.value)}
                               autoFocus
                             />
+                          </label>
+                          <label
+                            className="flex flex-col gap-2 text-sm font-medium"
+                            htmlFor="total-games"
+                          >
+                            Total rounds
+                            <select
+                              id="total-games"
+                              value={totalGames}
+                              onChange={(event) =>
+                                setTotalGames(Number(event.target.value) as SessionTotalGames)
+                              }
+                              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            >
+                              {SESSION_TOTAL_GAMES.map((games) => (
+                                <option key={games} value={games}>
+                                  {games}
+                                </option>
+                              ))}
+                            </select>
                           </label>
                           {error && <p className="text-sm text-destructive">{error}</p>}
                           <div className="flex justify-end gap-2">

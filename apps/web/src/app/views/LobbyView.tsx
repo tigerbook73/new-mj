@@ -315,6 +315,9 @@ export function LobbyView() {
           </Button>
         </div>
         <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Rounds: {shownRoom.gameNumber} / {shownRoom.totalGames ?? 4}
+          </p>
           {shownRoom.players.map((player, seat) => (
             <div
               key={seat}

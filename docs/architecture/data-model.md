@@ -17,7 +17,7 @@
 Room（连续对局会话容器，apps/server）
  ├─ Player × 4（座位、userId、是否 bot、是否 ready）
  ├─ scores[]（跨局累加，累加方式见玩法私有实现）
- ├─ gameNumber / sessionFormat（第几局、会话何时结束）
+ ├─ gameNumber / totalGames / sessionFormat（第几局、会话何时结束；totalGames 只属 Room，不传 core）
  └─ gameState: GameState（当前这一局，内容对 Room 不透明）
        ├─ 各玩法私有 State（JunkState / BloodbattleState ……，互不共享形状）
        ├─ 公共骨架字段（seat/hand 计数等，见 engine-contract.md 的 PlayerViewBase）

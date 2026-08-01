@@ -10,12 +10,13 @@ import {
   type PlayerViewBase,
   type SeatId,
 } from "@new-mj/core";
-import type {
+import {
   GameAdviceResponse,
   RankingEntry,
   RoomInfo,
   RoomSummary,
-  SessionFormat,
+  type SessionFormat,
+  type SessionTotalGames,
 } from "@new-mj/protocol";
 import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
@@ -25,7 +26,7 @@ import type { FinishedGameLog, Room, RoomPlayer } from "./room";
 import { RoomServiceError } from "./room-service.error";
 
 const ROOM_SIZE = 4;
-const DEFAULT_TOTAL_GAMES = 4;
+const DEFAULT_TOTAL_GAMES: SessionTotalGames = 4;
 const MAX_SEED = 2 ** 31;
 
 interface SettledPayload {
@@ -89,6 +90,7 @@ export class RoomService {
     sessionFormat: SessionFormat = "4-round",
     name?: string,
     avatar?: string,
+    totalGames: SessionTotalGames = DEFAULT_TOTAL_GAMES,
   ): Room {
     const room: Room = {
       id: randomUUID(),
@@ -103,7 +105,7 @@ export class RoomService {
       players: [null, null, null, null],
       scores: [1000, 1000, 1000, 1000],
       gameNumber: 0,
-      totalGames: sessionFormat === "4-round" ? DEFAULT_TOTAL_GAMES : undefined,
+      totalGames: sessionFormat === "4-round" ? totalGames : undefined,
       wins: sessionFormat === "best-of-3" ? [0, 0, 0, 0] : undefined,
       dealer: 0,
       dealerStreak: 1,
