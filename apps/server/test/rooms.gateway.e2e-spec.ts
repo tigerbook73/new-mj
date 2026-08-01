@@ -254,6 +254,21 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     expect(result).toMatchObject({ ok: false, code: "NOT_IN_ROOM" });
   });
 
+  it("rejects client-supplied ruleset config while accepting allowed session length", async () => {
+    const host = await connectAs("config-host");
+    const rejected = await ack<RoomInfo>(host, "room:create", {
+      rulesetId: "junk",
+      config: { startingScore: 2_000 },
+    });
+    expect(rejected).toMatchObject({ ok: false, code: "INVALID_CONFIG" });
+
+    const accepted = await ack<RoomInfo>(host, "room:create", {
+      rulesetId: "junk",
+      totalGames: 8,
+    });
+    expect(accepted).toMatchObject({ ok: true, data: { totalGames: 8 } });
+  });
+
   it("lobby:list/room:peek/room:leave (phase 4.4.4) work end to end over real sockets", async () => {
     const host = await connectAs("lobby-host");
     const guest = await connectAs("lobby-guest");
@@ -261,11 +276,13 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     const created = await ack<RoomInfo>(host, "room:create", {
       rulesetId: "junk",
       name: "Alice's e2e room",
+      totalGames: 8,
     });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
     const roomId = created.data.id;
     expect(created.data.name).toBe("Alice's e2e room");
+    expect(created.data.totalGames).toBe(8);
 
     const listed = await ack<RoomSummary[]>(guest, "lobby:list", {
       rulesetId: "junk",

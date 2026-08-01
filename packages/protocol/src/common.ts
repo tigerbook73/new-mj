@@ -6,7 +6,7 @@ import { z } from "zod";
  * Single source of truth: apps/server's ConfigService and apps/web's
  * handshake both import this instead of hardcoding "1.0".
  */
-export const PROTOCOL_VERSION = "1.1";
+export const PROTOCOL_VERSION = "1.2";
 
 /** docs/contracts/protocol-shared.md §5 — the full ErrCode enum; do not invent new codes outside this list. */
 export const ERROR_CODES = [
@@ -35,6 +35,17 @@ export type Reply<T> = { ok: true; data: T } | { ok: false; code: ErrCode; messa
 
 export const SessionFormatSchema = z.enum(["4-round", "best-of-3"]);
 export type SessionFormat = z.infer<typeof SessionFormatSchema>;
+
+/** Server-owned session settings that never enter a ruleset's GameConfig. */
+export const SESSION_TOTAL_GAMES = [1, 4, 8] as const;
+export const SessionTotalGamesSchema = z.union(
+  SESSION_TOTAL_GAMES.map((games) => z.literal(games)) as [
+    z.ZodLiteral<1>,
+    z.ZodLiteral<4>,
+    z.ZodLiteral<8>,
+  ],
+);
+export type SessionTotalGames = z.infer<typeof SessionTotalGamesSchema>;
 
 export const SeatIdSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 export type SeatId = z.infer<typeof SeatIdSchema>;

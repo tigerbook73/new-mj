@@ -1,15 +1,17 @@
 import { z } from "zod";
-import { GameConfigSchema, SeatIdSchema, SessionFormatSchema } from "./common.ts";
+import { SeatIdSchema, SessionTotalGamesSchema } from "./common.ts";
 import type { PlayerViewBase } from "./game.ts";
 import type { RoomInfo } from "./room-models.ts";
 
-export const RoomCreateRequestSchema = z.object({
-  rulesetId: z.string(),
-  config: GameConfigSchema.optional(),
-  sessionFormat: SessionFormatSchema.optional(),
-  /** Defaults server-side to `${hostNickname}'s room` when omitted. */
-  name: z.string().optional(),
-});
+export const RoomCreateRequestSchema = z
+  .object({
+    rulesetId: z.string(),
+    /** A session-length setting; it never crosses into the rules engine config. */
+    totalGames: SessionTotalGamesSchema.optional(),
+    /** Defaults server-side to `${hostNickname}'s room` when omitted. */
+    name: z.string().optional(),
+  })
+  .strict();
 export type RoomCreateRequest = z.infer<typeof RoomCreateRequestSchema>;
 
 export const RoomJoinRequestSchema = z.object({

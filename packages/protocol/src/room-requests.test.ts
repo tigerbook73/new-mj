@@ -20,8 +20,13 @@ describe("room creation and entry requests", () => {
       rulesetId: "junk",
       name: "Alice's room",
     });
+    expect(RoomCreateRequestSchema.parse({ rulesetId: "junk", totalGames: 8 })).toEqual({
+      rulesetId: "junk",
+      totalGames: 8,
+    });
+    expect(() => RoomCreateRequestSchema.parse({ rulesetId: "junk", totalGames: 3 })).toThrow();
     expect(() =>
-      RoomCreateRequestSchema.parse({ rulesetId: "junk", sessionFormat: "best-of-5" }),
+      RoomCreateRequestSchema.parse({ rulesetId: "junk", config: { startingScore: 2000 } }),
     ).toThrow();
   });
 

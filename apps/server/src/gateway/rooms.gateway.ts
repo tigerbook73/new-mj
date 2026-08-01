@@ -189,10 +189,11 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         userId,
         nickname,
         parsed.rulesetId,
-        parsed.config ?? { rulesetId: parsed.rulesetId },
-        parsed.sessionFormat,
+        { rulesetId: parsed.rulesetId },
+        "4-round",
         parsed.name,
         avatar,
+        parsed.totalGames,
       );
       // Host is always seated at 0: create() seats the very first player of a fresh room.
       this.connections.track(client, room.id, userId, nickname, 0, avatar);
