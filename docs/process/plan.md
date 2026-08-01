@@ -14,9 +14,9 @@
 - 尚未选择并配置生产部署环境；不能把本地 Supabase 的 OAuth 验收视为生产验收。
 - 已发现（与本次改动无关，未修复）：`apps/web/test/lobby.e2e-spec.ts` 的 "leaving an in-game room keeps the other human in the match" 与 "force exiting an in-game room ends the session for every player" 两个用例在跑完整 `test/lobby.e2e-spec.ts` 套件时容易超时（等待对话框里的 "Hand off to AI"/"Force exit" 按钮），单独跑或小范围跑均能稳定通过；已在纯净 main（无本次任何改动）上复现，确认是套件层面的既有抖动，不是本次引入的回归。谁下次碰 leave-room/force-exit 相关代码时应该顺手看一眼。
 - `hangzhou.md` §14 记录了两处不阻塞定稿的实现细节假设（财神替代数量上限、`caiPiaoCount` 中途清零与否），已按文档默认值实现并写入 fixture；如果和你的预期不符，后续只需改一行。
-- 已发现（与本次改动无关，未修复）：`CenterStatus` 的 `ScaleText` 行在桌面实际渲染尺寸下会被硬裁切、无省略号（`ScaleText` 自身文档已承认这个取舍）——不止新加的 Santiao 提示，连既有的 "Phase: playing"/"Turn: seat N · Wall: M" 两行在浏览器实跑截图里也裁得只剩前几个字符。浏览器验证杭州桌面新功能时顺手发现，是 `CenterStatus` 盒子尺寸的既有问题，不是本次引入的；新加的 Santiao 文案已经尽量精简，但没有去动 `CenterStatus`/`ScaleText` 本身的尺寸逻辑。谁下次碰这块 UI 时可以顺手看一眼。
+- 已修复：`CenterStatus` 的裁切问题——`CenterStatus` 已经整个重排为图标化卡片（状态徽标/剩余牌数英雄数字/连庄 chip/徽标行），不再用逐行 `ScaleText` 长句，原来的裁切场景不复存在；`error` 那一行仍用 `ScaleText`，长错误信息理论上还会有同样的裁切风险，但范围比之前小很多，不再单独跟踪。
 - 已发现且已修复（杭州 + junk）：`getLegalActions`/`applyAction` 里的 `zimo` 合法性判定原来只检查 `isWin(state, seat)`，没检查"这一家是不是刚摸完牌"——碰/吃之后剩余的手牌恰好已经自成一手（比如碰之前手里已经是 3 副刻子+一对+一副多余的对子）时，会在没摸牌的情况下错误地把自摸也列为合法动作。两个玩法都已加 `canZimo`（要求 `state.justDrawn?.seat===seat`）修正，配套复现用例（含明杠必须先摸牌、暗杠补牌后自摸合法两条边界）均已入库；junk 是我写杭州时照抄骨架带过来的既有 bug，这次一并修了。
-- **新发现，未修复（仅 junk）**：写 junk 的"杠后补牌自摸"确认用例时，撞见一个独立于上面这条的更大 bug——junk 的 `isWin` 把手牌+所有副露牌铺平后交给 `lib/win.ts` 的 `isStandardWinningHand` 判定，这个函数要求铺平后的总张数严格等于"副露数×3+2"；但任何一种杠（暗杠/明杠/补杠）在副露里都是 4 张实体牌而不是 3 张，一旦手里报过杠，这个总数再也凑不出"能整除"的形状，`isWin` 会永远返回 false——也就是说**junk 里报过杠之后，那一手牌不管自摸还是点炮都再也胡不了**。血战到底和杭州都不会中招，因为它们的 `isWin` 复用的是"副露数量记 1 个字，不管物理张数"的番型判定（血战 `scoreBloodbattleHand`、杭州 `hand.ts`），junk 走的是更老的、按物理张数铺平判定的 `lib/win.ts`。已用一个独立脚本直接验证过 `isStandardWinningHand` 对这种情况返回 `false`，不是我猜的。这个改动范围比这次要修的东西大一截，没有动，等你确认要不要修。
+- 已发现且已修复（仅 junk）：junk 的 `isWin` 原来把手牌+所有副露牌铺平后交给 `lib/win.ts` 的 `isStandardWinningHand` 判定，这个函数要求铺平后的总张数严格等于"副露数×3+2"；但任何一种杠（暗杠/明杠/补杠）在副露里都是 4 张实体牌而不是 3 张，一旦手里报过杠，这个总数再也凑不出"能整除"的形状，`isWin` 会永远返回 false——即**junk 里报过杠之后，那一手牌不管自摸还是点炮都再也胡不了**。血战到底和杭州都不会中招，因为它们的 `isWin` 复用的是"副露数量记 1 个字，不管物理张数"的番型判定（血战 `scoreBloodbattleHand`、杭州 `hand.ts`），junk 走的是更老的、按物理张数铺平判定的 `lib/win.ts`。修法：`isWin` 只检查手里剩下的牌（副露本身已经是验证过的完整组合，不需要重新验证），跟血战/杭州的做法看齐；配套加了"暗杠补牌自摸"复现用例（改之前先跑过一次确认真的失败），核对过 10000 局 fuzz 无异常。
 
 ## Backlog
 
@@ -25,7 +25,6 @@
 - 可选沉浸体验：音效、音量与静音设置。
 - 垃圾胡扩展规则，支持：连庄（庄家倍率保持为2，初始随机庄家，后续赢家坐庄）、支持杠开（倍率x2、连续杠开连续翻倍）、支持混一色(倍率x2)、支持清一色（倍率x4）、支持7小对（倍率x2）、支持碰碰胡（倍率x2）、支持门清（（倍率x2））、所有翻倍可以叠加。
 - Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
-- `CenterStatus` 文字裁切：`ScaleText` 固定 viewBox 在实际桌面尺寸下裁切文本，需要重新设计尺寸自适应或换更短的文案策略。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行——庄家轮换公式行已由杭州三牢专题验证完毕，见该文档 §4/§5）。

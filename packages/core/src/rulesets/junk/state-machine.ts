@@ -79,10 +79,20 @@ export const removeTiles = (
 export const tileRank = (tile: TileId): number => Number(STANDARD_TILE_SET.kindOf(tile)[0]);
 export const tileSuit = (tile: TileId): string => STANDARD_TILE_SET.kindOf(tile)[1] as string;
 
+/**
+ * Concealed-hand-only, matching isStandardWinningHand's own contract ("exposed
+ * melds are excluded by callers"). A declared meld is already a complete,
+ * validated group regardless of its physical tile count — a gang always
+ * pairs its extra tile with an immediate replacement draw (see
+ * applyDrawAction), so `own.hand`'s length alone already accounts for
+ * however many melds (of any kind) are open; concatenating meld tiles back
+ * in used to make a real gang permanently break isStandardWinningHand's
+ * `tiles.length % 3 === 2` check (4 physical tiles, not the 3 the check
+ * assumes per meld) — see docs/process/plan.md's "junk 报过杠后永远胡不了" entry.
+ */
 export const winningTiles = (state: JunkState, seat: SeatId, extra?: TileId): TileId[] => {
   const own = state.seats[seat] as SeatState;
-  const tiles = extra === undefined ? own.hand : [...own.hand, extra];
-  return [...tiles, ...own.melds.flatMap((meld) => meld.tiles)];
+  return extra === undefined ? own.hand : [...own.hand, extra];
 };
 
 export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean => {
