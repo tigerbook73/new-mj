@@ -59,6 +59,8 @@ export interface TableZoneContext {
   discards: Record<SeatDirection, DiscardEntry[]>;
   center: ReactNode;
   actionDock?: ReactNode | undefined;
+  /** Ruleset logo badge for the "game-info" zone — see desktopZoneComponents.tsx's DesktopGameInfoSlot. */
+  gameInfo?: ReactNode | undefined;
   currentDirection?: SeatDirection | undefined;
   config: TableLayoutConfig;
 }
@@ -78,6 +80,7 @@ interface TableBoardProps {
   discards: Record<SeatDirection, DiscardEntry[]>;
   center: ReactNode;
   actionDock?: ReactNode;
+  gameInfo?: ReactNode;
   currentDirection?: SeatDirection | undefined;
 }
 
@@ -88,6 +91,7 @@ export function TableBoard({
   discards,
   center,
   actionDock,
+  gameInfo,
   currentDirection,
 }: TableBoardProps) {
   assertLayoutPreset(scenario.preset, Object.keys(scenario.components));
@@ -112,6 +116,7 @@ export function TableBoard({
             discards,
             center,
             actionDock,
+            gameInfo,
             currentDirection,
             config: scenario.config,
           }) ?? null

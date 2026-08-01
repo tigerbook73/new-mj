@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg-icon-junk" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1c5c46"/>
+      <stop offset="100%" stop-color="#0d3d2e"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="94" height="94" rx="18" ry="18"
+        fill="url(#bg-icon-junk)" stroke="#d4af37" stroke-width="3"/>
+  <rect x="7" y="7" width="86" height="86" rx="14" ry="14"
+        fill="none" stroke="#e8c468" stroke-width="1" opacity="0.5"/>
+  <text x="50" y="43.75" text-anchor="middle" fill="#f0cf76" font-family="'Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif" font-weight="700" font-size="30">垃圾</text>
+  <text x="50" y="78.25" text-anchor="middle" fill="#f0cf76" font-family="'Noto Sans CJK SC','Microsoft YaHei','PingFang SC',sans-serif" font-weight="700" font-size="30">胡</text>
+</svg>

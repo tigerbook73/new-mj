@@ -9,6 +9,7 @@ import type { TableScenario, TableZoneComponent } from "../TableBoard";
 import {
   DesktopActionDockSlot,
   DesktopCenterSlot,
+  DesktopGameInfoSlot,
   DiscardTrack,
   HandSeatRow,
   InfoSlot,
@@ -48,6 +49,7 @@ const DESKTOP_ZONE_COMPONENTS: Record<string, TableZoneComponent> = {
     <DesktopCenterSlot center={center} currentDirection={currentDirection} />
   ),
   "action-dock": ({ actionDock }) => <DesktopActionDockSlot actionDock={actionDock} />,
+  "game-info": ({ gameInfo }) => <DesktopGameInfoSlot gameInfo={gameInfo} />,
 };
 
 /** The production desktop table: LayoutPreset + the zone components rendering into it, bundled as one swappable unit. */

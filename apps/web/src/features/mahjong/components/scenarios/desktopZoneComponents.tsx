@@ -139,6 +139,15 @@ export function DesktopCenterSlot({
   );
 }
 
+/** Desktop-only corner badge for the active ruleset's logo — fills its zone completely. */
+export function DesktopGameInfoSlot({ gameInfo }: { gameInfo: ReactNode | undefined }) {
+  return (
+    <div data-testid="game-info" className="h-full w-full">
+      {gameInfo}
+    </div>
+  );
+}
+
 /** Desktop-only surface around the optional action panel. */
 export function DesktopActionDockSlot({ actionDock }: { actionDock: ReactNode | undefined }) {
   return actionDock ? (

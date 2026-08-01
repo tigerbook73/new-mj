@@ -11,6 +11,7 @@ import type {
   SessionResult,
 } from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
+import { SidebarProvider } from "@/shared/ui/sidebar";
 import { ActionDock } from "@/features/mahjong/components/ActionDock";
 import { CenterStatus } from "@/features/mahjong/components/CenterStatus";
 import {
@@ -20,7 +21,7 @@ import {
 import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
 import { TableBoard } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
-import { TableHud } from "@/features/mahjong/components/TableHud";
+import { TableHud, TableHudTrigger } from "@/features/mahjong/components/TableHud";
 import {
   registerSnapshotDiff,
   resetAnimationLedger,
@@ -312,201 +313,207 @@ export function TableView() {
       ? undefined
       : advice.actions[advice.recommendedActionIndex];
   return (
-    <div
-      data-testid="table-page"
-      className="flex h-dvh w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
-    >
-      <TableHud
-        roomName={room?.name ?? "Mahjong table"}
-        seat={view.seat}
-        gameNumber={room?.gameNumber ?? 1}
-        totalGames={room?.totalGames ?? 1}
-        dealer={room?.dealer ?? 0}
-        scores={room?.scores ?? [0, 0, 0, 0]}
-        onLeave={() => setLeaveConfirmOpen(true)}
-      />
-
-      <main
-        data-testid="table-stage"
-        className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
-        style={{ containerType: "size" }}
+    <SidebarProvider defaultOpen={false} className="contents">
+      <div
+        data-testid="table-page"
+        className="flex h-dvh w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
       >
-        <TableBoard
-          scenario={DESKTOP_TABLE_SCENARIO}
-          seats={seats}
-          discards={discards}
-          currentDirection={currentDirection}
-          center={
-            <CenterStatus
-              phase={extras.phase ?? "unknown"}
-              currentSeat={view.currentSeat}
-              wallCount={view.wallCount}
-              error={error}
-              isTingpai={extras.isTingpai}
-              isBaotou={extras.isBaotou}
-              isCaipiao={extras.isCaipiao}
-              dealerStreak={extras.dealerStreak}
+        <main
+          data-testid="table-stage"
+          className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
+          style={{ containerType: "size" }}
+        >
+          <div className="relative">
+            <TableHud
+              rulesetId={room?.rulesetId ?? ""}
+              roomName={room?.name ?? "Mahjong table"}
+              gameNumber={room?.gameNumber ?? 1}
+              totalGames={room?.totalGames ?? 1}
+              dealer={room?.dealer ?? 0}
+              scores={room?.scores ?? [0, 0, 0, 0]}
+              players={room?.players ?? [null, null, null, null]}
+              onLeave={() => setLeaveConfirmOpen(true)}
             />
-          }
-          actionDock={
-            hasDockActions ? (
-              <ActionDock
-                actions={actionOptions}
-                hand={view.hand}
-                melds={extras.seats?.[view.seat]?.melds}
-                deadline={gameDeadline}
-                error={error}
-                lastDiscard={extras.lastDiscard?.tile}
-                recommendedAction={
-                  typeof recommendedAction === "object" && recommendedAction !== null
-                    ? (recommendedAction as Record<string, unknown>)
-                    : undefined
-                }
-                justDrawn={extras.justDrawn}
-                config={DESKTOP_TABLE_SCENARIO.config}
-                onAction={(action) => void sendAction(action)}
-              />
-            ) : undefined
-          }
-        />
-        <AnimatePresence>
-          {extras.result &&
-            sessionResult == null &&
-            room &&
-            (room.rulesetId === "hangzhou" ? (
-              <HangzhouRoundEndOverlay
-                key="round-end-overlay"
-                result={
-                  // hangzhou's HangzhouGameResult shape genuinely differs from
-                  // junk/bloodbattle's (winners is a fan-detail array, not
-                  // plain seat numbers) — see HangzhouRoundEndOverlay.tsx.
-                  extras.result as unknown as HangzhouGameResultLike
-                }
-                gameNumber={room.gameNumber}
-                totalGames={room.totalGames ?? 1}
-                players={room.players}
-                myConfirmed={room.players[view.seat]?.isReady === true}
-                onConfirm={() => void confirmNextRound()}
-                onEnd={() => void endSession()}
-                entering={isIncrementalSnapshot && !prefersReducedMotion}
-                reducedMotion={prefersReducedMotion}
-              />
-            ) : (
-              <RoundEndOverlay
-                key="round-end-overlay"
-                result={extras.result}
-                gameNumber={room.gameNumber}
-                totalGames={room.totalGames ?? 1}
-                players={room.players}
-                myConfirmed={room.players[view.seat]?.isReady === true}
-                onConfirm={() => void confirmNextRound()}
-                onEnd={() => void endSession()}
-                entering={isIncrementalSnapshot && !prefersReducedMotion}
-                reducedMotion={prefersReducedMotion}
-              />
-            ))}
-        </AnimatePresence>
-
-        {sessionResult != null && room && (
-          <div
-            data-testid="session-finished-overlay"
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 p-4"
-          >
-            <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border bg-background p-5 text-center shadow-xl">
-              <h2 className="text-lg font-semibold">Session finished</h2>
-              <p className="text-sm text-muted-foreground">
-                {sessionResult.gamesPlayed} game{sessionResult.gamesPlayed === 1 ? "" : "s"} played
-              </p>
-              <ol className="flex flex-col gap-1 text-sm">
-                {sessionResult.ranking.map((entry, index) => (
-                  <li
-                    key={entry.seatId}
-                    className={cn(
-                      "flex items-center justify-between rounded-md px-2 py-1",
-                      entry.seatId === sessionResult.winner && "bg-primary/10 font-semibold",
-                    )}
-                  >
-                    <span>
-                      #{index + 1}{" "}
-                      {room.players[entry.seatId]?.nickname ?? `Seat ${entry.seatId + 1}`}
-                      {entry.seatId === sessionResult.winner ? " \u{1F3C6}" : ""}
-                    </span>
-                    <span>{entry.score}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="flex flex-wrap justify-center gap-2 text-sm">
-                {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
-                  (gameNumber) => (
-                    <Link
-                      key={gameNumber}
-                      to={`/replay/${room.id}/${gameNumber}`}
-                      className="underline"
-                    >
-                      Replay game {gameNumber}
-                    </Link>
-                  ),
-                )}
-              </div>
-              <Button variant="outline" onClick={() => void leave()}>
-                Back to games
-              </Button>
-            </div>
+            <TableBoard
+              scenario={DESKTOP_TABLE_SCENARIO}
+              seats={seats}
+              discards={discards}
+              currentDirection={currentDirection}
+              gameInfo={room && <TableHudTrigger rulesetId={room.rulesetId} />}
+              center={
+                <CenterStatus
+                  phase={extras.phase ?? "unknown"}
+                  currentSeat={view.currentSeat}
+                  wallCount={view.wallCount}
+                  error={error}
+                  isTingpai={extras.isTingpai}
+                  isBaotou={extras.isBaotou}
+                  isCaipiao={extras.isCaipiao}
+                  dealerStreak={extras.dealerStreak}
+                />
+              }
+              actionDock={
+                hasDockActions ? (
+                  <ActionDock
+                    actions={actionOptions}
+                    hand={view.hand}
+                    melds={extras.seats?.[view.seat]?.melds}
+                    deadline={gameDeadline}
+                    error={error}
+                    lastDiscard={extras.lastDiscard?.tile}
+                    recommendedAction={
+                      typeof recommendedAction === "object" && recommendedAction !== null
+                        ? (recommendedAction as Record<string, unknown>)
+                        : undefined
+                    }
+                    justDrawn={extras.justDrawn}
+                    config={DESKTOP_TABLE_SCENARIO.config}
+                    onAction={(action) => void sendAction(action)}
+                  />
+                ) : undefined
+              }
+            />
           </div>
-        )}
-      </main>
+          <AnimatePresence>
+            {extras.result &&
+              sessionResult == null &&
+              room &&
+              (room.rulesetId === "hangzhou" ? (
+                <HangzhouRoundEndOverlay
+                  key="round-end-overlay"
+                  result={
+                    // hangzhou's HangzhouGameResult shape genuinely differs from
+                    // junk/bloodbattle's (winners is a fan-detail array, not
+                    // plain seat numbers) — see HangzhouRoundEndOverlay.tsx.
+                    extras.result as unknown as HangzhouGameResultLike
+                  }
+                  gameNumber={room.gameNumber}
+                  totalGames={room.totalGames ?? 1}
+                  players={room.players}
+                  myConfirmed={room.players[view.seat]?.isReady === true}
+                  onConfirm={() => void confirmNextRound()}
+                  onEnd={() => void endSession()}
+                  entering={isIncrementalSnapshot && !prefersReducedMotion}
+                  reducedMotion={prefersReducedMotion}
+                />
+              ) : (
+                <RoundEndOverlay
+                  key="round-end-overlay"
+                  result={extras.result}
+                  gameNumber={room.gameNumber}
+                  totalGames={room.totalGames ?? 1}
+                  players={room.players}
+                  myConfirmed={room.players[view.seat]?.isReady === true}
+                  onConfirm={() => void confirmNextRound()}
+                  onEnd={() => void endSession()}
+                  entering={isIncrementalSnapshot && !prefersReducedMotion}
+                  reducedMotion={prefersReducedMotion}
+                />
+              ))}
+          </AnimatePresence>
 
-      <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
-        <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
-          <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex w-96 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border bg-background p-6 shadow-xl">
-            <Dialog.Title className="text-lg font-semibold">Leave room?</Dialog.Title>
-            <Dialog.Description className="text-sm text-muted-foreground">
-              Hand off: an AI takes over your seat and the game continues for everyone else. Force
-              exit: the whole session ends now for every player, straight to settlement.
-            </Dialog.Description>
-            <div className="flex justify-end gap-2">
-              <Dialog.Close render={<Button variant="outline">Cancel</Button>} />
-              <Button variant="secondary" onClick={handOff}>
-                Hand off to AI
-              </Button>
-              <Button variant="destructive" onClick={() => void forceLeave()}>
-                Force exit
-              </Button>
-            </div>
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <details className="absolute right-3 bottom-3 z-20 max-h-[60dvh] w-72 overflow-auto rounded-lg border bg-background/95 p-2 text-xs shadow-lg">
-        <summary className="cursor-pointer font-medium">Diagnostics</summary>
-        {import.meta.env.DEV && (
-          <div className="mt-3">
-            <h2 className="font-medium">Debug: omniscient view (dev-only)</h2>
-            <Button
-              className="mt-1"
-              variant="outline"
-              size="sm"
-              onClick={() => void fetchDebugOmniscientView()}
+          {sessionResult != null && room && (
+            <div
+              data-testid="session-finished-overlay"
+              className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 p-4"
             >
-              Show all hands + wall
-            </Button>
-            {debugView && (
-              <pre className="mt-2 max-w-full overflow-x-auto text-muted-foreground">
-                {JSON.stringify(debugView, null, 2)}
-              </pre>
-            )}
+              <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border bg-background p-5 text-center shadow-xl">
+                <h2 className="text-lg font-semibold">Session finished</h2>
+                <p className="text-sm text-muted-foreground">
+                  {sessionResult.gamesPlayed} game{sessionResult.gamesPlayed === 1 ? "" : "s"}{" "}
+                  played
+                </p>
+                <ol className="flex flex-col gap-1 text-sm">
+                  {sessionResult.ranking.map((entry, index) => (
+                    <li
+                      key={entry.seatId}
+                      className={cn(
+                        "flex items-center justify-between rounded-md px-2 py-1",
+                        entry.seatId === sessionResult.winner && "bg-primary/10 font-semibold",
+                      )}
+                    >
+                      <span>
+                        #{index + 1}{" "}
+                        {room.players[entry.seatId]?.nickname ?? `Seat ${entry.seatId + 1}`}
+                        {entry.seatId === sessionResult.winner ? " \u{1F3C6}" : ""}
+                      </span>
+                      <span>{entry.score}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="flex flex-wrap justify-center gap-2 text-sm">
+                  {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
+                    (gameNumber) => (
+                      <Link
+                        key={gameNumber}
+                        to={`/replay/${room.id}/${gameNumber}`}
+                        className="underline"
+                      >
+                        Replay game {gameNumber}
+                      </Link>
+                    ),
+                  )}
+                </div>
+                <Button variant="outline" onClick={() => void leave()}>
+                  Back to games
+                </Button>
+              </div>
+            </div>
+          )}
+        </main>
+
+        <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+          <Dialog.Portal>
+            <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
+            <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex w-96 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border bg-background p-6 shadow-xl">
+              <Dialog.Title className="text-lg font-semibold">Leave room?</Dialog.Title>
+              <Dialog.Description className="text-sm text-muted-foreground">
+                Hand off: an AI takes over your seat and the game continues for everyone else. Force
+                exit: the whole session ends now for every player, straight to settlement.
+              </Dialog.Description>
+              <div className="flex justify-end gap-2">
+                <Dialog.Close render={<Button variant="outline">Cancel</Button>} />
+                <Button variant="secondary" onClick={handOff}>
+                  Hand off to AI
+                </Button>
+                <Button variant="destructive" onClick={() => void forceLeave()}>
+                  Force exit
+                </Button>
+              </div>
+            </Dialog.Popup>
+          </Dialog.Portal>
+        </Dialog.Root>
+
+        <details className="absolute right-3 bottom-3 z-20 max-h-[60dvh] w-72 overflow-auto rounded-lg border bg-background/95 p-2 text-xs shadow-lg">
+          <summary className="cursor-pointer font-medium">Diagnostics</summary>
+          {import.meta.env.DEV && (
+            <div className="mt-3">
+              <h2 className="font-medium">Debug: omniscient view (dev-only)</h2>
+              <Button
+                className="mt-1"
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchDebugOmniscientView()}
+              >
+                Show all hands + wall
+              </Button>
+              {debugView && (
+                <pre className="mt-2 max-w-full overflow-x-auto text-muted-foreground">
+                  {JSON.stringify(debugView, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
+          <div className="mt-3">
+            <h2 className="font-medium">Recent events</h2>
+            <ul className="text-muted-foreground">
+              {log.map((line, index) => (
+                <li key={index}>{line}</li>
+              ))}
+            </ul>
           </div>
-        )}
-        <div className="mt-3">
-          <h2 className="font-medium">Recent events</h2>
-          <ul className="text-muted-foreground">
-            {log.map((line, index) => (
-              <li key={index}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      </details>
-    </div>
+        </details>
+      </div>
+    </SidebarProvider>
   );
 }

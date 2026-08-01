@@ -11,12 +11,8 @@ import type {
 } from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
 import { ack, unwrapRoomEnterAck } from "@/shared/lib/socket";
+import { initials, rulesetLabel } from "@/shared/lib/playerDisplay";
 import { useSessionStore } from "@/shared/store/session";
-
-const initials = (nickname: string): string =>
-  nickname.replace(/\s/g, "").slice(0, 2).toUpperCase();
-const rulesetLabel = (rulesetId: string): string =>
-  rulesetId === "junk" ? "Junk Hu" : rulesetId === "bloodbattle" ? "Bloodbattle" : rulesetId;
 
 export function LobbyView() {
   const { roomId } = useParams<{ roomId: string }>();

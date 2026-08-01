@@ -262,6 +262,7 @@ test("leaving an in-game room keeps the other human in the match", async ({ brow
   await host.getByRole("button", { name: "Start game" }).click();
   await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
   await expect(guest).toHaveURL(/\/room\//, { timeout: 10_000 });
+  await host.getByTestId("table-hud").click();
   await host.getByRole("button", { name: "Leave room" }).click();
   await host.getByRole("dialog").getByRole("button", { name: "Hand off to AI" }).click();
   await expect(host).toHaveURL(/\/games$/);
@@ -287,6 +288,7 @@ test("force exiting an in-game room ends the session for every player", async ({
   await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
   await expect(guest).toHaveURL(/\/room\//, { timeout: 10_000 });
 
+  await host.getByTestId("table-hud").click();
   await host.getByRole("button", { name: "Leave room" }).click();
   await host.getByRole("dialog").getByRole("button", { name: "Force exit" }).click();
 
