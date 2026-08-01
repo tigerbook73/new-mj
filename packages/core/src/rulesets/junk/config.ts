@@ -3,7 +3,6 @@ import { JUNK_MULTI_HU_POLICIES } from "./constants.ts";
 
 export const DEFAULT_JUNK_CONFIG: JunkConfig = {
   rulesetId: "junk",
-  sevenPairs: false,
   robKong: false,
   multiHuPolicy: "headJump",
 };
@@ -17,7 +16,7 @@ export const parseJunkConfig = (
   const candidate = input as Record<string, unknown>;
   if (
     (candidate.rulesetId !== undefined && candidate.rulesetId !== "junk") ||
-    (candidate.sevenPairs !== undefined && typeof candidate.sevenPairs !== "boolean") ||
+    candidate.sevenPairs !== undefined ||
     (candidate.robKong !== undefined && typeof candidate.robKong !== "boolean") ||
     (candidate.multiHuPolicy !== undefined &&
       !JUNK_MULTI_HU_POLICIES.includes(candidate.multiHuPolicy as JunkConfig["multiHuPolicy"]))
@@ -31,7 +30,6 @@ export const parseJunkConfig = (
   return {
     config: {
       ...DEFAULT_JUNK_CONFIG,
-      ...(candidate.sevenPairs === undefined ? {} : { sevenPairs: candidate.sevenPairs }),
       ...(candidate.robKong === undefined ? {} : { robKong: candidate.robKong }),
       multiHuPolicy,
     },

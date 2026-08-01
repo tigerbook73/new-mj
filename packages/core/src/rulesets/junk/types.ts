@@ -27,7 +27,8 @@ export type JunkClaimOption = {
 
 export type JunkConfig = GameConfig & {
   rulesetId: "junk";
-  sevenPairs: boolean;
+  /** Legacy fixture compatibility only; v3 always enables seven pairs. */
+  sevenPairs?: boolean;
   robKong: boolean;
   multiHuPolicy: JunkMultiHuPolicy;
 };

@@ -71,14 +71,13 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
   for (let index = 0; index < games; index += 1) {
     const gameSeed = nextInt(prng, 0x1_0000_0000);
     prng = gameSeed.prng;
-    const switches = nextInt(prng, 8);
+    const switches = nextInt(prng, 4);
     prng = switches.prng;
     const dealerPick = nextInt(prng, 4);
     prng = dealerPick.prng;
     const config = {
-      sevenPairs: (switches.value & 1) !== 0,
-      robKong: (switches.value & 2) !== 0,
-      multiHuPolicy: (switches.value & 4) !== 0 ? ("all" as const) : ("headJump" as const),
+      robKong: (switches.value & 1) !== 0,
+      multiHuPolicy: (switches.value & 2) !== 0 ? ("all" as const) : ("headJump" as const),
     };
     const result = playJunkGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;

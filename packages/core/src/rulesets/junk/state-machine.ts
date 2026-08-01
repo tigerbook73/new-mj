@@ -106,9 +106,7 @@ export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean =
   const own = state.seats[seat]!;
   return (
     isStandardWinningHand(tiles, STANDARD_TILE_SET) ||
-    (configOf(state).sevenPairs &&
-      own.melds.length === 0 &&
-      isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
+    (own.melds.length === 0 && isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
   );
 };
 

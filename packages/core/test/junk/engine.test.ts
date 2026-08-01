@@ -27,7 +27,6 @@ const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState =
 
 const playDeterministically = (seed: number): JunkState => {
   const started = createJunkGame(seed, 0, {
-    sevenPairs: seed % 2 === 0,
     robKong: seed % 3 === 0,
     multiHuPolicy: seed % 5 === 0 ? "all" : "headJump",
   });
@@ -74,11 +73,11 @@ test("junk opens a deterministic complete game with private hands", () => {
   ).toHaveLength(4);
 });
 
-test("junk config accepts supported switches and rejects invalid values", () => {
-  expect(parseJunkConfig({ sevenPairs: true, robKong: true, multiHuPolicy: "all" })).toEqual({
-    config: { rulesetId: "junk", sevenPairs: true, robKong: true, multiHuPolicy: "all" },
+test("junk config accepts supported switches and rejects the retired sevenPairs switch", () => {
+  expect(parseJunkConfig({ robKong: true, multiHuPolicy: "all" })).toEqual({
+    config: { rulesetId: "junk", robKong: true, multiHuPolicy: "all" },
   });
-  expect(parseJunkConfig({ sevenPairs: "yes" })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(parseJunkConfig({ sevenPairs: true })).toEqual({ error: { code: "INVALID_CONFIG" } });
   expect(createJunkGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
     error: { code: "INVALID_CONFIG" },
   });
