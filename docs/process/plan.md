@@ -28,6 +28,7 @@
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
 - Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
 - 配置功能：允许垃圾胡（junk）开启不同规则变种。
+- 胡牌结算展示最终赢牌组合（杭州/junk）：仿照血战到底 `BloodbattleWinSnapshot`/`BloodbattlePublicWinSnapshot` 的公开揭示模式，在 `HangzhouGameResult`/`JunkGameResult` 里补上赢家手牌（以及计分实际采用的那一种拆分），赢牌那一刻由 server 广播给所有座位。杭州/junk 目前 `result` 只有 `fanTypes`/`multiplier`/`payout`，没有牌本身；其他家的 `PlayerView` 里对方手牌只有 `handCount`，client 端根本拿不到那些 `TileId`，必须走 server 广播这条路径，不能本地算（自己的手牌虽然本地已知，但具体拆分不唯一，client 重新拆可能拆出和公布番型对不上的另一种合法组合）。
 
 ## 已完成摘要
 
