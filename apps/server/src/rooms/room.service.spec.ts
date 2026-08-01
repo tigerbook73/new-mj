@@ -523,6 +523,24 @@ describe("RoomService — endSession (room:end)", () => {
       expect(room.dealerStreak).toBe(1);
     }
   });
+
+  it("junk gives the next dealer to the winner, or to the current dealer's next seat after a draw", () => {
+    const service = newRoomService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+    const dealerBefore = room.dealer;
+    const played = playJunkGame(room.seed, {}, [], room.dealer);
+    if ("error" in played) throw new Error(`playJunkGame failed: ${played.error}`);
+    for (const { seat, action } of played.actions) {
+      if (room.phase !== "in-game") break;
+      if (!isDrawAction(action)) service.applyPlayerAction(room.id, seat, action);
+    }
+    const result = (room.gameState as { result?: { type: string; winner?: number } }).result;
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    expect(room.dealer).toBe(result?.type === "win" ? result.winner : (dealerBefore + 1) % 4);
+  });
 });
 
 describe("RoomService — findActiveRoomForUser (userId→roomId reverse index)", () => {

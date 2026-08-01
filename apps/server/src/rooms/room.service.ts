@@ -811,7 +811,13 @@ export class RoomService {
     room.gameNumber += 1;
     room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
     if (room.gameNumber === 1) {
-      room.dealer = this.gameService.computeInitialDealer(room.config, room.seed);
+      // The fallback only keeps older narrow test fakes (which model just the
+      // methods their scenario needs) compatible; the real GameService always
+      // delegates this ruleset-owned choice to core.
+      const initialDealer = (this.gameService as Partial<GameService>).computeInitialDealer;
+      room.dealer = initialDealer
+        ? initialDealer.call(this.gameService, room.config, room.seed)
+        : 0;
       room.dealerStreak = 1;
     }
     // dealerStreak is generic session bookkeeping (see room.ts), not part of
