@@ -20,15 +20,16 @@
 
 ## Backlog
 
+- Review配置功能，配置功能限制仅支持不影响规则、算分、AI算法的数据，如总局数等。
+- 胡牌结算展示最终赢牌组合（杭州/junk）：仿照血战到底 `BloodbattleWinSnapshot`/`BloodbattlePublicWinSnapshot` 的公开揭示模式，在 `HangzhouGameResult`/`JunkGameResult` 里补上赢家手牌（以及计分实际采用的那一种拆分），赢牌那一刻由 server 广播给所有座位。杭州/junk 目前 `result` 只有 `fanTypes`/`multiplier`/`payout`，没有牌本身；其他家的 `PlayerView` 里对方手牌只有 `handCount`，client 端根本拿不到那些 `TileId`，必须走 server 广播这条路径，不能本地算（自己的手牌虽然本地已知，但具体拆分不唯一，client 重新拆可能拆出和公布番型对不上的另一种合法组合）。
+- 可选沉浸体验：音效、音量与静音设置。
+- 垃圾胡扩展规则，支持：连庄（庄家倍率保持为2，初始随机庄家，后续赢家坐庄）、支持杠开（倍率x2、连续杠开连续翻倍）、支持混一色(倍率x2)、支持清一色（倍率x4）、支持7小对（倍率x2）、支持碰碰胡（倍率x2）、支持门清（（倍率x2））、所有翻倍可以叠加。
+- Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
 - `CenterStatus` 文字裁切：`ScaleText` 固定 viewBox 在实际桌面尺寸下裁切文本，需要重新设计尺寸自适应或换更短的文案策略。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行——庄家轮换公式行已由杭州三牢专题验证完毕，见该文档 §4/§5）。
-- 可选沉浸体验：音效、音量与静音设置。
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
-- Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
-- 配置功能：允许垃圾胡（junk）开启不同规则变种。
-- 胡牌结算展示最终赢牌组合（杭州/junk）：仿照血战到底 `BloodbattleWinSnapshot`/`BloodbattlePublicWinSnapshot` 的公开揭示模式，在 `HangzhouGameResult`/`JunkGameResult` 里补上赢家手牌（以及计分实际采用的那一种拆分），赢牌那一刻由 server 广播给所有座位。杭州/junk 目前 `result` 只有 `fanTypes`/`multiplier`/`payout`，没有牌本身；其他家的 `PlayerView` 里对方手牌只有 `handCount`，client 端根本拿不到那些 `TileId`，必须走 server 广播这条路径，不能本地算（自己的手牌虽然本地已知，但具体拆分不唯一，client 重新拆可能拆出和公布番型对不上的另一种合法组合）。
 
 ## 已完成摘要
 
