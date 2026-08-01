@@ -1,4 +1,5 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
+import type { GangChain } from "../../lib/gang-chain.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
@@ -9,10 +10,9 @@ import {
   type TurnStartedPayload,
   type WallExhaustedPayload,
 } from "../../events.ts";
-import { JUNK_MULTI_HU_POLICIES, JUNK_PHASES } from "./constants.ts";
+import { JUNK_PHASES } from "./constants.ts";
 
 export type JunkPhase = (typeof JUNK_PHASES)[number];
-export type JunkMultiHuPolicy = (typeof JUNK_MULTI_HU_POLICIES)[number];
 
 export type JunkAction =
   | { type: "discard"; tile: TileId }
@@ -36,8 +36,6 @@ export type JunkConfig = GameConfig & {
   rulesetId: "junk";
   /** Legacy fixture compatibility only; v3 always enables seven pairs. */
   sevenPairs?: boolean;
-  robKong: boolean;
-  multiHuPolicy: JunkMultiHuPolicy;
 };
 
 export type JunkPendingClaims = {
@@ -90,7 +88,9 @@ export type JunkState = {
   seq: number;
   prng: PrngState;
   result?: JunkGameResult;
-  gangChain?: [number, number, number, number];
+  /** Length of the current seat's unbroken consecutive-gang chain, see
+   * docs/variants/junk.md §3. Reset to 0 on that seat's next discard. */
+  gangChain: GangChain;
   /** Set for each winner right when their hu is declared; never cleared mid-hand. */
   wins?: Partial<Record<SeatId, JunkWinSnapshot>>;
 };

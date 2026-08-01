@@ -3,6 +3,12 @@ import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../ev
 import { createPrng } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
+import {
+  createGangChain,
+  incrementGangChain,
+  resetGangChain,
+  type GangChain,
+} from "../../lib/gang-chain.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { CAISHEN_KIND } from "./constants.ts";
@@ -34,7 +40,7 @@ export const cloneState = (state: HangzhouState): HangzhouState => {
       discards: seat.discards.map((discard) => ({ ...discard })),
     })),
     caiPiaoCount: [...state.caiPiaoCount] as HangzhouState["caiPiaoCount"],
-    gangChain: [...state.gangChain] as HangzhouState["gangChain"],
+    gangChain: [...state.gangChain] as GangChain,
   };
   if (state.pendingClaims) {
     cloned.pendingClaims = {
@@ -398,7 +404,7 @@ export const applyDiscard = (
   state.lastDiscard = { seat, tile };
   delete state.justDrawn;
   // A discard always breaks this seat's consecutive-gang chain (hangzhou.md §6).
-  state.gangChain[seat] = 0;
+  resetGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const pending: HangzhouPendingClaims = { discard: { seat, tile }, options: {}, responses: {} };
   state.pendingClaims = pending;
@@ -432,7 +438,7 @@ export const applyAnGang = (
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
   delete state.justDrawn;
-  state.gangChain[seat] += 1;
+  incrementGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -466,7 +472,7 @@ export const applyBuGang = (
   meld.type = "buGang";
   meld.tiles.push(tile);
   delete state.justDrawn;
-  state.gangChain[seat] += 1;
+  incrementGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -494,7 +500,7 @@ export const createHangzhouGame = (
     seq: 0,
     prng: shuffled.prng,
     caiPiaoCount: [0, 0, 0, 0],
-    gangChain: [0, 0, 0, 0],
+    gangChain: createGangChain(),
   };
   const events: GameEvent<HangzhouEventPayload>[] = [];
   appendEvent(state, events, publicVisibility, {

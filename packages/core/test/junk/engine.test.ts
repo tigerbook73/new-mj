@@ -26,10 +26,7 @@ const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState =
 };
 
 const playDeterministically = (seed: number): JunkState => {
-  const started = createJunkGame(seed, 0, {
-    robKong: seed % 3 === 0,
-    multiHuPolicy: seed % 5 === 0 ? "all" : "headJump",
-  });
+  const started = createJunkGame(seed, 0);
   if ("error" in started) throw new Error(started.error.code);
   let state = started.state;
   for (let step = 0; step < 500 && state.phase !== "finished"; step += 1) {
@@ -73,11 +70,12 @@ test("junk opens a deterministic complete game with private hands", () => {
   ).toHaveLength(4);
 });
 
-test("junk config accepts supported switches and rejects the retired sevenPairs switch", () => {
-  expect(parseJunkConfig({ robKong: true, multiHuPolicy: "all" })).toEqual({
-    config: { rulesetId: "junk", robKong: true, multiHuPolicy: "all" },
-  });
+test("junk config has no switches left: sevenPairs/robKong/multiHuPolicy are all retired and rejected", () => {
+  expect(parseJunkConfig(undefined)).toEqual({ config: { rulesetId: "junk" } });
+  expect(parseJunkConfig({})).toEqual({ config: { rulesetId: "junk" } });
   expect(parseJunkConfig({ sevenPairs: true })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(parseJunkConfig({ robKong: false })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(parseJunkConfig({ multiHuPolicy: "all" })).toEqual({ error: { code: "INVALID_CONFIG" } });
   expect(createJunkGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
     error: { code: "INVALID_CONFIG" },
   });
@@ -227,7 +225,8 @@ test("robKong opens a hu-only claim window and preserves the fourth tile on ron"
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const physical = new Set([4, 5, 6, 7, ...seat1Hand]);
   const state: JunkState = {
-    config: { rulesetId: "junk", sevenPairs: false, robKong: true, multiHuPolicy: "headJump" },
+    config: { rulesetId: "junk" },
+    gangChain: [0, 0, 0, 0],
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -259,7 +258,8 @@ test("bug repro: zimo is not offered right after peng, even if the leftover conc
   const DISCARD_TILE = 106; // 9s, matches the spare pair (104, 105)
   const physical = new Set([DISCARD_TILE, ...seat0Hand]);
   const state: JunkState = {
-    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    config: { rulesetId: "junk" },
+    gangChain: [0, 0, 0, 0],
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -293,7 +293,8 @@ test("minGang (claimed open kong) requires the replacement draw before zimo — 
   const DISCARD_TILE = 3; // the 4th 1m
   const physical = new Set([DISCARD_TILE, ...seat0Hand]);
   const state: JunkState = {
-    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    config: { rulesetId: "junk" },
+    gangChain: [0, 0, 0, 0],
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -338,7 +339,8 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   const physical = new Set([...seat0Hand, REPLACEMENT_TILE]);
   const restOfWall = allTileIds().filter((tile) => !physical.has(tile));
   const state: JunkState = {
-    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    config: { rulesetId: "junk" },
+    gangChain: [0, 0, 0, 0],
     phase: "playing",
     // drawFromTail pops the *last* element — put the rigged tile there.
     wall: [...restOfWall, REPLACEMENT_TILE],
@@ -365,12 +367,13 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   assertTileConservation(won);
 });
 
-const multiHuState = (multiHuPolicy: "headJump" | "all"): JunkState => {
+const multiHuState = (): JunkState => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const seat2Hand = [1, 9, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41];
   const physical = new Set([7, ...seat1Hand, ...seat2Hand]);
   return {
-    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy },
+    config: { rulesetId: "junk" },
+    gangChain: [0, 0, 0, 0],
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -385,25 +388,14 @@ const multiHuState = (multiHuPolicy: "headJump" | "all"): JunkState => {
   };
 };
 
-test("multiHuPolicy selects head jump or all ron winners deterministically", () => {
-  let state = unwrap(
-    junkRuleSet.applyAction(multiHuState("headJump"), 0, { type: "discard", tile: 7 }),
-  );
+test("multi-ron always head-jumps: the discarder's nearest counterclockwise claimant wins alone", () => {
+  let state = unwrap(junkRuleSet.applyAction(multiHuState(), 0, { type: "discard", tile: 7 }));
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({
     winner: 1,
     winners: [{ seat: 1, multiplier: 8, payout: 8 }],
     scoreDeltas: [-8, 8, 0, 0],
-  });
-
-  state = unwrap(junkRuleSet.applyAction(multiHuState("all"), 0, { type: "discard", tile: 7 }));
-  state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
-  state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
-  expect(state.result).toMatchObject({
-    winner: 1,
-    winners: [{ seat: 1 }, { seat: 2 }],
-    scoreDeltas: [-10, 8, 2, 0],
   });
   assertTileConservation(state);
 });

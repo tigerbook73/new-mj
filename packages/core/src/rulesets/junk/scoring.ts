@@ -23,10 +23,13 @@ const countKinds = (tiles: readonly TileKind[]): Map<TileKind, number> => {
   return counts;
 };
 
+// Mirrors lib/win.ts's isSevenPairsWinningHand strict count===2 definition (docs/variants/junk.md
+// §3 "门前 14 张牌恰为七个对子") — kept as a separate TileKind-level check since scoring only ever
+// sees the already-decomposed kind multiset, not TileId/TileSet; if either changes, check the other.
 const isSevenPairs = (hand: readonly TileKind[], melds: readonly JunkScoringMeld[]): boolean =>
   melds.length === 0 &&
   hand.length === 14 &&
-  [...countKinds(hand).values()].every((count) => count === 2 || count === 4);
+  [...countKinds(hand).values()].every((count) => count === 2);
 
 const isPengpenghu = (hand: readonly TileKind[], melds: readonly JunkScoringMeld[]): boolean => {
   if (melds.some((meld) => meld.type === "chi")) return false;

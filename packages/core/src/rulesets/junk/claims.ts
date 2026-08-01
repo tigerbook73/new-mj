@@ -1,5 +1,6 @@
 import { EVENT_TYPES, type GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import { incrementGangChain } from "../../lib/gang-chain.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { Meld } from "../../lib/seat.ts";
 import type {
@@ -12,7 +13,6 @@ import type {
 import {
   appendEvent,
   beginTurn,
-  configOf,
   fail,
   finishRonWins,
   publicVisibility,
@@ -34,6 +34,9 @@ export const chooseClaims = (
   const choices = Object.entries(pending.responses)
     .filter((entry): entry is [string, JunkClaimAction] => entry[1].type !== "pass")
     .map(([seat, action]) => ({ seat: Number(seat) as SeatId, action: action as JunkClaimAction }));
+  // Head jump (docs/variants/junk.md §4/§8): among simultaneous claimants, higher
+  // action priority wins first, ties broken by closeness to the discarder — so a
+  // single winner is always well-defined even when several seats could hu.
   const sorted = choices.sort((left, right) => {
     const priorityDiff = priority(right.action) - priority(left.action);
     return priorityDiff !== 0
@@ -41,9 +44,6 @@ export const chooseClaims = (
       : distanceFromDiscarder(pending.discard.seat, left.seat) -
           distanceFromDiscarder(pending.discard.seat, right.seat);
   });
-  if (sorted[0]?.action.type === "hu" && configOf(state).multiHuPolicy === "all") {
-    return sorted.filter((choice) => choice.action.type === "hu");
-  }
   return sorted.slice(0, 1);
 };
 
@@ -90,8 +90,7 @@ export const resolveClaimWindow = (
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
   if (action.type === "minGang") {
-    const gangChain = state.gangChain ?? (state.gangChain = [0, 0, 0, 0]);
-    gangChain[seat] += 1;
+    incrementGangChain(state.gangChain, seat);
   }
   const eventType =
     action.type === "chi" ? "ChiMade" : action.type === "peng" ? "PengMade" : "GangMade";

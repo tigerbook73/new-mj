@@ -4,6 +4,12 @@ import { createPrng, nextInt } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import {
+  createGangChain,
+  incrementGangChain,
+  resetGangChain,
+  type GangChain,
+} from "../../lib/gang-chain.ts";
+import {
   decomposeSevenPairsWinningHand,
   decomposeStandardWinningHand,
   isSevenPairsWinningHand,
@@ -11,12 +17,11 @@ import {
 } from "../../lib/win.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
-import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
+import { parseJunkConfig } from "./config.ts";
 import { scoreJunkHand } from "./scoring.ts";
 import type {
   JunkApplyResult,
   JunkClaimOption,
-  JunkConfig,
   JunkEventPayload,
   JunkGameResult,
   JunkPendingClaims,
@@ -26,8 +31,6 @@ import type {
 export const seats = (): SeatState[] =>
   [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
 export const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
-const gangChainOf = (state: JunkState): [number, number, number, number] =>
-  state.gangChain ?? (state.gangChain = [0, 0, 0, 0]);
 export const cloneState = (state: JunkState): JunkState => {
   const cloned: JunkState = {
     ...state,
@@ -37,9 +40,7 @@ export const cloneState = (state: JunkState): JunkState => {
       melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
       discards: seat.discards.map((discard) => ({ ...discard })),
     })),
-    ...(state.gangChain
-      ? { gangChain: [...state.gangChain] as [number, number, number, number] }
-      : {}),
+    gangChain: [...state.gangChain] as GangChain,
   };
   if (state.pendingClaims) {
     cloned.pendingClaims = {
@@ -66,12 +67,6 @@ export const appendEvent = (
 };
 
 export const fail = (code: string): JunkApplyResult => ({ error: { code } });
-
-export const configOf = (state: JunkState): JunkConfig => ({
-  ...DEFAULT_JUNK_CONFIG,
-  ...state.config,
-  rulesetId: "junk",
-});
 
 export const sameKind = (tiles: readonly TileId[], kind: TileKind): TileId[] =>
   tiles.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === kind);
@@ -288,7 +283,7 @@ export const settleWins = (
       })),
       isDealer: winner === state.dealer,
       winType,
-      gangChainLength: winType === "zimo" ? gangChainOf(state)[winner] : 0,
+      gangChainLength: winType === "zimo" ? state.gangChain[winner] : 0,
     });
     return { seat: winner, ...scored, payout: scored.multiplier };
   });
@@ -391,7 +386,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPa
     state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
     meld.type = "buGang";
     meld.tiles.push(tile);
-    gangChainOf(state)[seat] += 1;
+    incrementGangChain(state.gangChain, seat);
     delete state.justDrawn;
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
@@ -432,7 +427,7 @@ export const applyDiscard = (
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
   delete state.justDrawn;
-  gangChainOf(state)[seat] = 0;
+  resetGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
@@ -468,7 +463,7 @@ export const applyAnGang = (
   if (tiles.length !== 4) return fail("GANG_NOT_AVAILABLE");
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
-  gangChainOf(state)[seat] += 1;
+  incrementGangChain(state.gangChain, seat);
   delete state.justDrawn;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
@@ -499,41 +494,29 @@ export const applyBuGang = (
       candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === kind,
   );
   if (!meld) return fail("GANG_NOT_AVAILABLE");
-  if (configOf(state).robKong) {
-    state.pendingClaims = {
-      discard: { seat, tile },
-      source: "robKong",
-      options: {},
-      responses: {},
-    };
-    for (const candidate of [0, 1, 2, 3] as SeatId[]) {
-      const candidateOptions = claimOptions(state, candidate);
-      if (candidateOptions.length === 0) continue;
-      state.pendingClaims.options[candidate] = candidateOptions;
-      appendEvent(state, events, seatVisibility(candidate), {
-        type: EVENT_TYPES.claimWindowOpened,
-        options: candidateOptions,
-      });
-    }
-    if (Object.keys(state.pendingClaims.options).length > 0) {
-      state.phase = "awaiting-claims";
-      return { state, events };
-    }
-    resolveUnclaimed(state, events);
+  // Rob-kong is always allowed (docs/variants/junk.md §8): the fourth tile stays in
+  // seat's hand behind a hu-only claim window (see claimOptions) until every other
+  // seat passes — only then does resolveUnclaimed convert the meld to buGang.
+  state.pendingClaims = {
+    discard: { seat, tile },
+    source: "robKong",
+    options: {},
+    responses: {},
+  };
+  for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+    const candidateOptions = claimOptions(state, candidate);
+    if (candidateOptions.length === 0) continue;
+    state.pendingClaims.options[candidate] = candidateOptions;
+    appendEvent(state, events, seatVisibility(candidate), {
+      type: EVENT_TYPES.claimWindowOpened,
+      options: candidateOptions,
+    });
+  }
+  if (Object.keys(state.pendingClaims.options).length > 0) {
+    state.phase = "awaiting-claims";
     return { state, events };
   }
-  state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
-  meld.type = "buGang";
-  meld.tiles.push(tile);
-  gangChainOf(state)[seat] += 1;
-  delete state.justDrawn;
-  appendEvent(state, events, publicVisibility, {
-    type: EVENT_TYPES.gangMade,
-    seat,
-    gangType: "buGang",
-    tiles: [...meld.tiles],
-  });
-  beginTurn(state, events, seat, true, true);
+  resolveUnclaimed(state, events);
   return { state, events };
 };
 
@@ -554,7 +537,7 @@ export const createJunkGame = (
     dealer,
     seq: 0,
     prng: shuffled.prng,
-    gangChain: [0, 0, 0, 0],
+    gangChain: createGangChain(),
   };
   const events: GameEvent<JunkEventPayload>[] = [];
   appendEvent(state, events, publicVisibility, {
@@ -582,7 +565,8 @@ export const createJunkGame = (
   return { state, events };
 };
 
-// docs/variants/junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
+// docs/variants/junk.md §4「赢家坐庄 / 连庄」「流局轮庄」：有赢家时下一局庄家为该赢家；
+// 流局时轮到当前庄家的打牌下家。
 export const computeNextJunkDealer = (_finished: JunkState, currentDealer: SeatId): SeatId =>
   _finished.result?.type === "win"
     ? _finished.result.winner

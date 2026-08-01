@@ -1,6 +1,6 @@
 # 垃圾胡规则（rulesetId: `junk`）
 
-> 状态：v3 规则已确认，待实现（`packages/core/src/rulesets/junk/` 仍是 v2）
+> 状态：v3 规则已确认并实现（`packages/core/src/rulesets/junk/`）
 > 定位：最简玩法，用于验证 core 基建/插件分层
 > 本文件内聚了垃圾胡的全部知识：规则、专属类型、专属事件、跨局规则。公共契约见 `contracts/engine-contract.md`；即使某节内容和 `bloodbattle.md` 恰好一样，也各写一份，不互相链接（见 `architecture/variant-boundary.md`）。
 
@@ -47,7 +47,7 @@
 ## 4. 跨局规则
 
 - **首局定庄**：调用 `RulesetModule.computeInitialDealer(seed) → SeatId`；Junk 用 seed 驱动的 PRNG 从四个座位随机选一位。Room 只提供 seed、保存返回值并创建游戏，不理解随机公式
-- **赢家坐庄 / 连庄**：有赢家时，下一局庄家为 `result.winner`。头跳时它就是唯一赢家；允许一炮多响的 `all` 策略时，沿用 result 的主赢家（离点炮者最近者）作为下一局庄家，避免一局产生多个庄家
+- **赢家坐庄 / 连庄**：有赢家时，下一局庄家为 `result.winner`——多家可同时点炮时固定头跳（§8），同一时刻只有一位赢家，不存在下一局庄家歧义
 - **流局轮庄**：无人胡时轮到当前庄家的打牌下家，即逆时针下一座 `nextSeat(currentDealer)`；按现有座位编号为 `(currentDealer + 1) % 4`
 - **`dealerStreak`**：Room 继续以相邻两局庄家座位是否相等计算连续次数并注入下一局 config；Junk 当前不以它影响合法性，但结算中的"庄家胡 ×2"读取本局 dealer，不读取该计数
 - **会话排名**：当前复用房间层的通用实现（纯分数从高到低排序），见 `contracts/session-mechanics.md` §4 的现状说明与警示——这不是垃圾胡自己的排名逻辑，只是暂时共用。
@@ -63,7 +63,7 @@
 - `JunkAction`（`packages/core/src/rulesets/junk/types.ts`）：discard/anGang/buGang/zimo/chi/peng/minGang/hu/pass/draw
 - `JunkState`/`JunkPendingClaims` 见 `packages/core/src/rulesets/junk/types.ts`；不存在跨玩法共享的全局 `GameState`
 
-`source='robKong'` 仅在 `robKong=true` 时出现：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸；若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
+`source='robKong'` 出现在每次补杠：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸；若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
 
 ## 6. 事件清单（垃圾胡全集，17 种）
 
@@ -99,15 +99,15 @@
 
 `justDrawn` 是这份清单里唯一分两层可见性的字段：`seats[].justDrawn`（布尔）公开给所有座位，标记"这一家现在是不是刚摸牌、还没对它/本回合做出行动"——这件事本身从来不是秘密（配套的 public `TileDrawn`/`GangReplacementDrawn` 事件本就不带 `tile`，只是不告诉你摸到了什么）；顶层 `justDrawn?: TileId` 只在请求视角正好是刚摸牌的那一家时才附加，用来在自己视角显示真实牌面。两者都在该家 discard/anGang/buGang 提交时一起清空（robKong 待裁决窗口期间保持"仍在摸牌决策中"直到裁决落定，见 `packages/core/src/rulesets/junk/state-machine.ts` 的 `resolveUnclaimed`）。庄家开局多摸的第 14 张牌视同一次摸牌，`createJunkGame` 发牌后即设置 `justDrawn`，语义与后续每回合的摸牌完全一致。
 
-## 8. Config 清单（均有默认值，已确认：全取默认）
+## 8. Config 清单（v3 已无可开关项，均固定规则）
 
-| 选项            | 默认建议         | 说明                                                                     |
-| --------------- | ---------------- | ------------------------------------------------------------------------ |
-| `sevenPairs`    | **移除**         | v3 七小对是固定规则，不再由客户端或房间 config 开关                      |
-| `robKong`       | **false ✓**      | 抢杠胡（他家补杠时可胡该张）是否允许                                     |
-| `multiHuPolicy` | **'headJump' ✓** | 多家可同时点炮胡时：头跳（按逆时针最近者独胡）或 'all'（均胡）。头跳最简 |
+| 选项            | 固定值   | 说明                                                                 |
+| --------------- | -------- | -------------------------------------------------------------------- |
+| `sevenPairs`    | **移除** | 七小对是固定规则，不再由客户端或房间 config 开关                     |
+| `robKong`       | **移除** | 抢杠胡（他家补杠时可胡该张）固定允许，不再由 config 开关             |
+| `multiHuPolicy` | **移除** | 多家可同时点炮胡时固定头跳（按逆时针最近者独胡），不再由 config 开关 |
 
-`robKong`/`multiHuPolicy` 延续 v2；`sevenPairs` 从 config 移除，旧输入在迁移实现时应被拒绝而非静默改变规则。
+`sevenPairs`/`robKong`/`multiHuPolicy` 均已从 config 移除并固定为上表的行为；旧输入（显式传入这三者中任意一个）在解析时应被拒绝而非静默改变规则，见 `parseJunkConfig`。
 
 ## 9. 已知信息泄漏（记录，不处理）
 
@@ -115,4 +115,4 @@
 
 ## 10. 状态
 
-v3 规则已确认、待实现。实现需同步扩展结果中的赢家番型/倍率/支付明细，补核心单测、server 连续对局测试与 ≥1000 局 fuzz。
+v3 规则已确认并实现：首局庄家由 seed 确定，赢家连庄、流局轮庄；庄家胡、连续杠开、混一色、清一色、七小对、碰碰胡、门清均已按规则叠乘结算，Web 结算面板已展示赢家番型/倍率/支付明细，核心单测、server 连续对局测试与 ≥1000 局 fuzz 均已覆盖。
