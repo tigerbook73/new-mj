@@ -810,6 +810,10 @@ export class RoomService {
     this.clearDrawRevealTimer(room.id);
     room.gameNumber += 1;
     room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
+    if (room.gameNumber === 1) {
+      room.dealer = this.gameService.computeInitialDealer(room.config, room.seed);
+      room.dealerStreak = 1;
+    }
     // dealerStreak is generic session bookkeeping (see room.ts), not part of
     // the room's static config; merge it in per game rather than mutating
     // room.config itself. Rulesets that don't read it simply ignore it.

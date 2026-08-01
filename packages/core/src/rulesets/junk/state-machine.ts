@@ -1,6 +1,6 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
-import { createPrng } from "../../lib/prng.ts";
+import { createPrng, nextInt } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import { isSevenPairsWinningHand, isStandardWinningHand } from "../../lib/win.ts";
@@ -515,4 +515,10 @@ export const createJunkGame = (
 
 // docs/variants/junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
 export const computeNextJunkDealer = (_finished: JunkState, currentDealer: SeatId): SeatId =>
-  ((currentDealer + 1) % 4) as SeatId;
+  _finished.result?.type === "win"
+    ? _finished.result.winner
+    : (((currentDealer + 1) % 4) as SeatId);
+
+/** Junk v3: first dealer is seed-derived so replay/fuzz remain reproducible. */
+export const computeInitialJunkDealer = (seed: number): SeatId =>
+  nextInt(createPrng(seed), 4).value as SeatId;

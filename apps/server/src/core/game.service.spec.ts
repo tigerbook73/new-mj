@@ -13,6 +13,13 @@ describe("GameService", () => {
     }
   });
 
+  it("delegates the deterministic first-dealer choice to @new-mj/core", () => {
+    expect(service.computeInitialDealer({ rulesetId: "junk" }, 19)).toBe(
+      service.computeInitialDealer({ rulesetId: "junk" }, 19),
+    );
+    expect(service.computeInitialDealer({ rulesetId: "hangzhou" }, 19)).toBe(0);
+  });
+
   it("returns an error for an unknown rulesetId", () => {
     const result = service.createGame({ rulesetId: "not-a-real-ruleset" }, 1, 0);
 

@@ -13,6 +13,8 @@ import { CORE_ERROR_CODES } from "./errors.ts";
  * tests) — nothing beyond this shape is a public contract.
  */
 export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
+  /** Deterministic, ruleset-owned choice for a session's first dealer. */
+  computeInitialDealer: (seed: number) => SeatId;
   createGame: (seed: number, dealer: SeatId, config?: unknown) => ApplyResult<TState>;
   applyAction: (state: TState, seat: SeatId, action: TAction) => ApplyResult<TState>;
   getLegalActions: (state: TState, seat: SeatId) => readonly TAction[];
@@ -49,6 +51,9 @@ const rulesets: Record<string, RulesetModule<any, any, any>> = {
 };
 
 const getRuleset = (rulesetId: string) => rulesets[rulesetId];
+
+export const computeInitialDealer = (config: GameConfig, seed: number): SeatId =>
+  getRuleset(config.rulesetId)?.computeInitialDealer(seed) ?? 0;
 
 export const createGame = (
   config: GameConfig,

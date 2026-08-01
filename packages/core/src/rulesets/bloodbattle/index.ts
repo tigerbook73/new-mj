@@ -33,6 +33,7 @@ export const bloodbattleRuleSet: RulesetModule<
   BloodbattleAction,
   BloodbattlePlayerView
 > = {
+  computeInitialDealer: () => 0,
   createGame: createBloodbattleGame,
   computeNextDealer: computeNextBloodbattleDealer,
   applyAction,

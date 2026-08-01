@@ -3,6 +3,7 @@ import {
   assertTileConservation,
   applyAction as engineApplyAction,
   computeNextJunkDealer,
+  computeInitialDealer,
   createGame as engineCreateGame,
   createJunkGame,
   eventsVisibleTo,
@@ -83,12 +84,20 @@ test("junk config accepts supported switches and rejects invalid values", () => 
   });
 });
 
-test("junk's dealer rotation formula is unconditionally clockwise (docs/variants/junk.md §4)", () => {
+test("junk's draw dealer rotation is clockwise (docs/variants/junk.md §4)", () => {
   const started = createJunkGame(19, 0);
   if ("error" in started) throw new Error(started.error.code);
   for (const currentDealer of [0, 1, 2, 3] as const) {
     expect(computeNextJunkDealer(started.state, currentDealer)).toBe((currentDealer + 1) % 4);
   }
+});
+
+test("junk's first dealer is seed-deterministic while existing rulesets keep seat zero", () => {
+  expect(computeInitialDealer({ rulesetId: "junk" }, 19)).toBe(
+    computeInitialDealer({ rulesetId: "junk" }, 19),
+  );
+  expect(computeInitialDealer({ rulesetId: "bloodbattle" }, 19)).toBe(0);
+  expect(computeInitialDealer({ rulesetId: "hangzhou" }, 19)).toBe(0);
 });
 
 test("junk accepts a legal discard and preserves the caller state", () => {

@@ -11,6 +11,7 @@ import {
   appendEvent,
   canZimo,
   cloneState,
+  computeInitialJunkDealer,
   computeNextJunkDealer,
   createJunkGame,
   fail,
@@ -23,7 +24,11 @@ import { getPlayerView, rebuildPlayerView } from "./view.ts";
 import type { JunkAction, JunkApplyResult, JunkState } from "./types.ts";
 
 export { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
-export { computeNextJunkDealer, createJunkGame } from "./state-machine.ts";
+export {
+  computeInitialJunkDealer,
+  computeNextJunkDealer,
+  createJunkGame,
+} from "./state-machine.ts";
 export { getPlayerView } from "./view.ts";
 export type {
   JunkAction,
@@ -39,6 +44,7 @@ export type {
 } from "./types.ts";
 
 export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
+  computeInitialDealer: computeInitialJunkDealer,
   createGame: (config, dealer) => {
     const result = createJunkGame(config, dealer);
     if ("state" in result) appendLegalActions(result.state, result.events);

@@ -48,6 +48,7 @@ export type {
 } from "./types.ts";
 
 export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
+  computeInitialDealer: () => 0,
   createGame: (seed, dealer, config) => {
     const result = createHangzhouGame(seed, dealer, config);
     if ("state" in result) appendLegalActions(result.state, result.events);
