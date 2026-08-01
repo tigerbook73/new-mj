@@ -5,56 +5,49 @@ import { WinningHandReveal } from "@/features/mahjong/components/WinningHandReve
 import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
 
 /**
- * bloodbattle's game-result shape (packages/core/src/rulesets/bloodbattle/
- * types.ts), read loosely off `view.result` the same way TableView reads
- * `phase`/`myClaimOptions` — not imported from @new-mj/core (architecture
- * rule 6). `winners` here is a plain seat-number array — junk and hangzhou
- * each score a per-winner fan breakdown instead and use their own overlay
- * component (JunkRoundEndOverlay.tsx / HangzhouRoundEndOverlay.tsx).
+ * junk's `JunkGameResult` shape (packages/core/src/rulesets/junk/types.ts),
+ * read loosely off `view.result` the same way TableView reads `phase`/
+ * `myClaimOptions` — not imported from @new-mj/core (architecture rule 6).
+ * `winners` is always a per-winner fan breakdown (junk v3 always scores fan
+ * payouts) — see RoundEndOverlay.tsx for bloodbattle's plain seat-number
+ * shape, which is why junk needs its own component rather than reusing that
+ * generic one.
  */
-export type GameResultLike =
+export type JunkWinDetail = {
+  seat: number;
+  fanTypes: string[];
+  multiplier: number;
+  payout: number;
+};
+
+export type JunkGameResultLike =
   | { type: "draw"; scoreDeltas: [number, number, number, number] }
   | {
       type: "win";
       winner: number;
-      winners: number[];
+      winners: JunkWinDetail[];
       winType: "zimo" | "ron";
       from?: number;
       scoreDeltas: [number, number, number, number];
     };
 
-interface RoundEndOverlayProps {
-  result: GameResultLike;
+interface JunkRoundEndOverlayProps {
+  result: JunkGameResultLike;
   gameNumber: number;
   totalGames: number;
   players: RoomInfo["players"];
   myConfirmed: boolean;
   onConfirm: () => void;
-  /**
-   * room:end — ends the whole session right now instead of waiting for
-   * `totalGames` to play out. Any seated player may call this, confirmed
-   * or not (session-mechanics.md §6 "提前结束整场对局"), so the button
-   * always renders regardless of `myConfirmed`.
-   */
+  /** See RoundEndOverlay.tsx's `onEnd` doc — same room:end capability, same reasoning. */
   onEnd: () => void;
-  /**
-   * Plays the mount-in transition — false for a reconnect/backlog snap that
-   * resumes with the overlay already showing (see
-   * useIsIncrementalSnapshot/usePrefersReducedMotion), same convention as
-   * Tile.tsx's `entering`. The exit transition (this component unmounting
-   * under TableView's `<AnimatePresence>` when the next round starts or the
-   * session ends) always plays regardless — it's only ever reached via a
-   * live, already-loaded page transition, never a reconnect.
-   */
+  /** See RoundEndOverlay.tsx's `entering` doc. */
   entering: boolean;
-  /** Collapses both the enter and exit transition to instant — see usePrefersReducedMotion. */
   reducedMotion: boolean;
   /**
    * Per-seat final hand (already-declared open melds + the concealed
    * decomposition actually used), indexed by seat — undefined for a seat that
    * didn't win. Assembled by TableView.tsx from `view.seats` (melds +
    * winSnapshot.groups), see docs/process/plan.md 胡牌结算展示最终赢牌组合.
-   * bloodbattle has no winSnapshot wiring yet, so this is always empty there.
    * Optional so callers that don't care about the reveal (stories/tests)
    * don't need to pass it.
    */
@@ -68,21 +61,33 @@ const CARD_INITIAL = { opacity: 0, scale: 0.9, y: 16 };
 const CARD_ANIMATE = { opacity: 1, scale: 1, y: 0 };
 const CARD_EXIT = { opacity: 0, scale: 0.9, y: 16 };
 
-const describeResult = (result: GameResultLike, players: RoomInfo["players"]): string => {
+const JUNK_FAN_LABELS: Record<string, string> = {
+  dealer: "庄家胡",
+  gangkai: "杠开",
+  hunYise: "混一色",
+  qingYise: "清一色",
+  qixiaodui: "七小对",
+  pengpenghu: "碰碰胡",
+  menqing: "门清",
+};
+
+const describeResult = (result: JunkGameResultLike, players: RoomInfo["players"]): string => {
   const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
   if (result.type === "draw") return "Round drawn — the wall ran out.";
-  const winners = result.winners.map(nameOf).join(", ");
+  const winners = result.winners.map((winner) => nameOf(winner.seat)).join(", ");
   return result.winType === "zimo"
     ? `${winners} won by self-draw.`
     : `${winners} won off ${nameOf(result.from!)}'s discard.`;
 };
 
 /**
- * Shown while `RoomService.awaitingNextRound` is true (docs/contracts/
- * session-mechanics.md §6 局间确认) — every real seat must confirm via the
- * existing room:ready before the server deals the next game.
+ * Junk's own settlement panel — see RoundEndOverlay.tsx for the shared
+ * layout/animation this mirrors. TableView.tsx picks between the two by
+ * `room.rulesetId`, not a shared component, matching this project's
+ * per-ruleset (not shared-and-branching) convention (see
+ * HangzhouRoundEndOverlay.tsx, which established the pattern).
  */
-export function RoundEndOverlay({
+export function JunkRoundEndOverlay({
   result,
   gameNumber,
   totalGames,
@@ -93,7 +98,7 @@ export function RoundEndOverlay({
   entering,
   reducedMotion,
   winningHands = [],
-}: RoundEndOverlayProps) {
+}: JunkRoundEndOverlayProps) {
   const waitingOn = players
     .map((player, seat) => ({ player, seat }))
     .filter(({ player }) => player && !player.isBot && player.isReady !== true)
@@ -120,8 +125,20 @@ export function RoundEndOverlay({
           Game {gameNumber} of {totalGames} finished
         </h2>
         <p className="text-sm">{describeResult(result, players)}</p>
+        {result.type === "win" && (
+          <ul className="text-sm text-muted-foreground">
+            {result.winners.map((winner) => (
+              <li key={winner.seat}>
+                {players[winner.seat]?.nickname ?? `Seat ${winner.seat + 1}`}:{" "}
+                {winner.fanTypes.map((fan) => JUNK_FAN_LABELS[fan] ?? fan).join(" · ")} ×
+                {winner.multiplier}
+              </li>
+            ))}
+          </ul>
+        )}
         {result.type === "win" &&
           result.winners
+            .map((winner) => winner.seat)
             .filter((seat) => winningHands[seat])
             .map((seat) => <WinningHandReveal key={seat} groups={winningHands[seat]!} />)}
         <ul className="text-sm text-muted-foreground">

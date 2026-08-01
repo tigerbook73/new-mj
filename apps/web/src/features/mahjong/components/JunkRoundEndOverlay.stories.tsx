@@ -3,13 +3,13 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AnimatePresence } from "motion/react";
 import type { RoomInfo } from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
-import { RoundEndOverlay } from "./RoundEndOverlay";
+import { JunkRoundEndOverlay } from "./JunkRoundEndOverlay";
 
 const meta = {
-  title: "Mahjong/06 Round End Overlay",
-  component: RoundEndOverlay,
+  title: "Mahjong/08 Junk Round End Overlay",
+  component: JunkRoundEndOverlay,
   parameters: { layout: "centered" },
-} satisfies Meta<typeof RoundEndOverlay>;
+} satisfies Meta<typeof JunkRoundEndOverlay>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -63,12 +63,12 @@ function ToggleMountUnmountDemo() {
       </Button>
       <AnimatePresence>
         {visible && (
-          <RoundEndOverlay
+          <JunkRoundEndOverlay
             key="round-end-overlay"
             result={{
               type: "win",
               winner: 0,
-              winners: [0],
+              winners: [{ seat: 0, fanTypes: ["dealer"], multiplier: 8, payout: 8 }],
               winType: "zimo",
               scoreDeltas: [24, -8, -8, -8],
             }}
@@ -80,6 +80,14 @@ function ToggleMountUnmountDemo() {
             onEnd={() => undefined}
             entering
             reducedMotion={false}
+            winningHands={[
+              [
+                ["1m", "2m", "3m"],
+                ["5p", "5p", "5p"],
+                ["7s", "8s", "9s"],
+                ["9m", "9m"],
+              ],
+            ]}
           />
         )}
       </AnimatePresence>
@@ -102,7 +110,7 @@ export const ToggleMountUnmount: Story = {
     result: {
       type: "win",
       winner: 0,
-      winners: [0],
+      winners: [{ seat: 0, fanTypes: ["dealer"], multiplier: 8, payout: 8 }],
       winType: "zimo",
       scoreDeltas: [24, -8, -8, -8],
     },

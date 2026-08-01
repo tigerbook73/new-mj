@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { RoomInfo } from "@new-mj/protocol";
-import { RoundEndOverlay } from "./RoundEndOverlay";
+import { JunkRoundEndOverlay } from "./JunkRoundEndOverlay";
 
 const players: RoomInfo["players"] = [
   {
@@ -38,10 +38,10 @@ const baseProps = {
   reducedMotion: true,
 };
 
-describe("RoundEndOverlay", () => {
+describe("JunkRoundEndOverlay", () => {
   it("renders an End session action alongside Next round when not yet confirmed", () => {
     const markup = renderToStaticMarkup(
-      createElement(RoundEndOverlay, { ...baseProps, myConfirmed: false }),
+      createElement(JunkRoundEndOverlay, { ...baseProps, myConfirmed: false }),
     );
 
     expect(markup).toContain(">Next round<");
@@ -50,7 +50,7 @@ describe("RoundEndOverlay", () => {
 
   it("still renders End session once the caller has already confirmed next round", () => {
     const markup = renderToStaticMarkup(
-      createElement(RoundEndOverlay, { ...baseProps, myConfirmed: true }),
+      createElement(JunkRoundEndOverlay, { ...baseProps, myConfirmed: true }),
     );
 
     // Any seated player may end the session early, confirmed or not
@@ -60,20 +60,42 @@ describe("RoundEndOverlay", () => {
     expect(markup).not.toContain(">Next round<");
   });
 
-  it("keeps rendering Bloodbattle's seat-only winners", () => {
+  it("renders Junk v3 fan labels and multiplier from the server result", () => {
     const markup = renderToStaticMarkup(
-      createElement(RoundEndOverlay, {
+      createElement(JunkRoundEndOverlay, {
         ...baseProps,
         myConfirmed: false,
         result: {
           type: "win",
           winner: 0,
-          winners: [0],
+          winners: [
+            { seat: 0, fanTypes: ["dealer", "qingYise", "menqing"], multiplier: 16, payout: 16 },
+          ],
           winType: "zimo",
-          scoreDeltas: [0, 0, 0, 0],
+          scoreDeltas: [48, -16, -16, -16],
         },
       }),
     );
+    expect(markup).toContain("庄家胡 · 清一色 · 门清 ×16");
     expect(markup).toContain("Alice won by self-draw.");
+  });
+
+  it("names the discarder for a ron win", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JunkRoundEndOverlay, {
+        ...baseProps,
+        myConfirmed: false,
+        result: {
+          type: "win",
+          winner: 1,
+          winners: [{ seat: 1, fanTypes: ["pengpenghu"], multiplier: 2, payout: 2 }],
+          winType: "ron",
+          from: 0,
+          scoreDeltas: [-2, 2, 0, 0],
+        },
+      }),
+    );
+    expect(markup).toContain("Bob won off Alice&#x27;s discard.");
+    expect(markup).toContain("碰碰胡 ×2");
   });
 });
