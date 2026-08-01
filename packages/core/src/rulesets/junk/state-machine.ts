@@ -44,6 +44,7 @@ export const cloneState = (state: JunkState): JunkState => {
   if (state.pendingClaims) {
     cloned.pendingClaims = {
       discard: { ...state.pendingClaims.discard },
+      ...(state.pendingClaims.source ? { source: state.pendingClaims.source } : {}),
       options: { ...state.pendingClaims.options },
       responses: { ...state.pendingClaims.responses },
     };
@@ -127,7 +128,7 @@ const decomposeJunkWin = (
   const own = state.seats[seat]!;
   const standard = decomposeStandardWinningHand(tiles, STANDARD_TILE_SET);
   if (standard) return standard;
-  if (configOf(state).sevenPairs && own.melds.length === 0) {
+  if (own.melds.length === 0) {
     const sevenPairs = decomposeSevenPairsWinningHand(tiles, STANDARD_TILE_SET);
     if (sevenPairs) return sevenPairs;
   }
@@ -390,6 +391,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPa
     state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
     meld.type = "buGang";
     meld.tiles.push(tile);
+    gangChainOf(state)[seat] += 1;
     delete state.justDrawn;
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
