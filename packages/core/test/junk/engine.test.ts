@@ -308,17 +308,54 @@ test("minGang (claimed open kong) requires the replacement draw before zimo — 
   assertTileConservation(ganged);
 });
 
-// A "杠上自摸" (self-draw off a gang's replacement tile) positive test,
-// mirroring hangzhou's, is deliberately not here yet: it surfaced a separate,
-// pre-existing bug — junk's isWin() flattens hand+meld tiles through
-// lib/win.ts's isStandardWinningHand, which requires the flat multiset to be
-// exactly (melds*3+2) tiles; any real gang (an/min/buGang) contributes 4
-// physical tiles instead of 3, so a hand containing one can never satisfy
-// that count and isWin() incorrectly returns false forever after — unlike
-// bloodbattle/hangzhou, whose isWin reuses a meldsCount-aware scoring check
-// that treats a gang as "1 meld slot" regardless of its physical tile count.
-// Filed in plan.md rather than fixed here — it's a materially different,
-// larger bug than the draw-gating one this file's other new tests cover.
+test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the draw actually happens", () => {
+  // Seat 0 declares anGang on 1m (holding all 4 while it's their turn, i.e. a
+  // 14-tile hand at that instant), leaving 2m2m2m/3m3m3m complete plus two
+  // spare pairs (4m4m, 5m5m) — waiting on either pair's 3rd copy to complete
+  // the hand. The wall's tail is rigged so the replacement draw is exactly
+  // that tile, completing the hand via a genuine self-draw right after the
+  // gang. This is also the repro for a separate, previously-unfixed bug:
+  // isWin() used to flatten hand+meld tiles through lib/win.ts's
+  // isStandardWinningHand, which requires the flat multiset to be exactly
+  // (melds*3+2) tiles — any real gang contributes 4 physical tiles instead
+  // of 3, so a hand containing one could never satisfy that count and
+  // isWin() incorrectly returned false forever after. Fixed by checking only
+  // the concealed hand (own.melds are already-validated complete groups the
+  // check doesn't need to re-verify — isStandardWinningHand's own doc
+  // comment says as much), matching how bloodbattle/hangzhou never flatten
+  // melds into their win-shape checks either.
+  const seat0Hand = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 16, 17];
+  // 1m x4 (0-3, angang) + 2m x3 (4-6) + 3m x3 (8-10) + 4m pair (12,13) + 5m pair (16,17)
+  const REPLACEMENT_TILE = 14; // 3rd 4m — completes 4m4m4m, leaving 5m5m as the pair
+  const physical = new Set([...seat0Hand, REPLACEMENT_TILE]);
+  const restOfWall = allTileIds().filter((tile) => !physical.has(tile));
+  const state: JunkState = {
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    phase: "playing",
+    // drawFromTail pops the *last* element — put the rigged tile there.
+    wall: [...restOfWall, REPLACEMENT_TILE],
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    seq: 0,
+    prng: createPrng(1),
+  };
+  const ganged = unwrap(junkRuleSet.applyAction(state, 0, { type: "anGang", kind: "1m" }));
+  expect(ganged.phase).toBe("awaiting-draw");
+  // Not legal yet — the replacement hasn't been drawn.
+  expect(junkRuleSet.getLegalActions(ganged, 0)).toEqual([{ type: "draw" }]);
+  const drawn = unwrap(junkRuleSet.applyAction(ganged, 0, { type: "draw" }));
+  expect(drawn.phase).toBe("playing");
+  expect(drawn.justDrawn).toEqual({ seat: 0, tile: REPLACEMENT_TILE });
+  expect(junkRuleSet.getLegalActions(drawn, 0)).toContainEqual({ type: "zimo" });
+  const won = unwrap(junkRuleSet.applyAction(drawn, 0, { type: "zimo" }));
+  expect(won.result).toMatchObject({ type: "win", winner: 0, winType: "zimo" });
+  assertTileConservation(won);
+});
 
 const multiHuState = (multiHuPolicy: "headJump" | "all"): JunkState => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
