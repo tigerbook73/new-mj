@@ -29,6 +29,7 @@ import {
 } from "@/features/mahjong/lib/animationLedger";
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
 import { tileKindOf, type TileKind } from "@/features/mahjong/lib/mahjongTiles";
+import { playSound, type SoundName } from "@/shared/lib/sounds";
 import { buildStatusBadges } from "@/features/mahjong/lib/statusBadges";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
@@ -36,6 +37,45 @@ import { cn } from "@/shared/lib/utils";
 import { useSessionStore } from "@/shared/store/session";
 import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
 import { useTablePresentation } from "./useTablePresentation";
+
+// Sound-effect scope (see docs/process/plan.md 可选沉浸体验), matching the actual
+// clip set provided: 8 action clips (chi/peng/gang/angang/bugang/hu/zimo/pass) plus
+// a full 34-kind tile-name voice set (public/sounds/{1m,...,7z}.m4a, same naming as
+// TileKind) — a discard announces the discarded tile's name instead of a generic
+// click. `game:event` fires once per live occurrence (not replayed on reconnect,
+// see apps/web AGENTS.md), so no dedup is needed beyond what onEvent already does
+// for its debug log below.
+// - GangMade carries no `gangType` at all for a claimed open kong (junk/claims.ts's
+//   applyClaimResponse only sets `gangType` for anGang/buGang — see hangzhou/junk
+//   state-machine.ts) — that's the "gang" (明杠) case below.
+// - HuDeclared's `winType` distinguishes self-draw (zimo) from off-discard (hu).
+// - ClaimResponded is seat-visible only to the responder, so this only ever fires
+//   for *my own* pass — other seats' passes never reach my `game:event` stream.
+// - A discard is always public (TileId shown is the actual discarded tile — no
+//   visibility concern, unlike a concealed hand), so tileKindOf is safe here.
+const soundForEvent = (payload: {
+  type: string;
+  [key: string]: unknown;
+}): SoundName | undefined => {
+  switch (payload.type) {
+    case "TileDiscarded":
+      return tileKindOf(payload.tile as number);
+    case "ChiMade":
+      return "chi";
+    case "PengMade":
+      return "peng";
+    case "GangMade": {
+      const gangType = payload.gangType as "anGang" | "buGang" | undefined;
+      return gangType === "anGang" ? "angang" : gangType === "buGang" ? "bugang" : "gang";
+    }
+    case "HuDeclared":
+      return payload.winType === "zimo" ? "zimo" : "hu";
+    case "ClaimResponded":
+      return (payload.action as { type: string }).type === "pass" ? "pass" : undefined;
+    default:
+      return undefined;
+  }
+};
 
 /**
  * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myActionOptions），
@@ -124,8 +164,10 @@ export function TableView() {
       useSessionStore.getState().applyGameSnapshot(event);
     };
     const onEvent = (message: GameEventEnvelope) => {
-      const payload = message.event.payload as { type: string };
+      const payload = message.event.payload as { type: string; [key: string]: unknown };
       setLog((prev) => [...prev.slice(-9), `#${message.event.seq} ${payload.type}`]);
+      const sound = soundForEvent(payload);
+      if (sound) playSound(sound);
     };
     const onScoreUpdated = (message: {
       scores: [number, number, number, number];

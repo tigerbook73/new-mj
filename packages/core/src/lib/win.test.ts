@@ -97,7 +97,10 @@ test("decompose functions agree with the boolean checks across random hands (pro
     prng = shuffled.prng;
     const standardTiles = shuffled.items.slice(0, 14);
     const standardGroups = decomposeStandardWinningHand(standardTiles, STANDARD_TILE_SET);
-    assert.equal(standardGroups !== undefined, isStandardWinningHand(standardTiles, STANDARD_TILE_SET));
+    assert.equal(
+      standardGroups !== undefined,
+      isStandardWinningHand(standardTiles, STANDARD_TILE_SET),
+    );
     if (standardGroups) {
       assert.deepEqual(
         sortedKinds(standardGroups.flat()),
@@ -107,7 +110,10 @@ test("decompose functions agree with the boolean checks across random hands (pro
 
     const sevenPairTiles = shuffled.items.slice(14, 28);
     const sevenPairGroups = decomposeSevenPairsWinningHand(sevenPairTiles, STANDARD_TILE_SET);
-    assert.equal(sevenPairGroups !== undefined, isSevenPairsWinningHand(sevenPairTiles, STANDARD_TILE_SET));
+    assert.equal(
+      sevenPairGroups !== undefined,
+      isSevenPairsWinningHand(sevenPairTiles, STANDARD_TILE_SET),
+    );
     if (sevenPairGroups) {
       assert.deepEqual(
         sortedKinds(sevenPairGroups.flat()),
