@@ -5,7 +5,8 @@ import { useAudioStore } from "@/shared/store/audio.store";
 // clips are the full 34-kind voice set (public/sounds/{1m,...,7z}.m4a) — see
 // docs/process/plan.md 可选沉浸体验. Both live in the same flat directory and
 // share the same playback path, so one union covers both.
-export type SoundName = "chi" | "peng" | "gang" | "angang" | "bugang" | "hu" | "zimo" | "pass" | TileKind;
+export type SoundName =
+  "chi" | "peng" | "gang" | "angang" | "bugang" | "hu" | "zimo" | "pass" | TileKind;
 
 // A ~0-length silent WAV, used only to satisfy the browser's autoplay-unlock
 // requirement (see unlockAudioPlayback below) — no network request, no
