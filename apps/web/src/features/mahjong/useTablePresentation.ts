@@ -23,7 +23,7 @@ export type GameResultLike =
   | {
       type: "win";
       winner: number;
-      winners: number[];
+      winners: Array<{ seat: number; fanTypes: string[]; multiplier: number; payout: number }>;
       winType: "zimo" | "ron";
       from?: number;
       scoreDeltas: [number, number, number, number];

@@ -59,4 +59,23 @@ describe("RoundEndOverlay", () => {
     expect(markup).toContain(">End session<");
     expect(markup).not.toContain(">Next round<");
   });
+
+  it("renders Junk v3 fan labels and multiplier from the server result", () => {
+    const markup = renderToStaticMarkup(
+      createElement(RoundEndOverlay, {
+        ...baseProps,
+        myConfirmed: false,
+        result: {
+          type: "win",
+          winner: 0,
+          winners: [
+            { seat: 0, fanTypes: ["dealer", "qingYise", "menqing"], multiplier: 16, payout: 16 },
+          ],
+          winType: "zimo",
+          scoreDeltas: [48, -16, -16, -16],
+        },
+      }),
+    );
+    expect(markup).toContain("庄家胡 · 清一色 · 门清 ×16");
+  });
 });

@@ -68,7 +68,7 @@ function ToggleMountUnmountDemo() {
             result={{
               type: "win",
               winner: 0,
-              winners: [0],
+              winners: [{ seat: 0, fanTypes: ["dealer"], multiplier: 8, payout: 8 }],
               winType: "zimo",
               scoreDeltas: [24, -8, -8, -8],
             }}
@@ -102,7 +102,7 @@ export const ToggleMountUnmount: Story = {
     result: {
       type: "win",
       winner: 0,
-      winners: [0],
+      winners: [{ seat: 0, fanTypes: ["dealer"], multiplier: 8, payout: 8 }],
       winType: "zimo",
       scoreDeltas: [24, -8, -8, -8],
     },

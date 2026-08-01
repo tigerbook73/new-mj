@@ -12,7 +12,7 @@ type GameResultLike =
   | {
       type: "win";
       winner: number;
-      winners: number[];
+      winners: Array<{ seat: number; fanTypes: string[]; multiplier: number; payout: number }>;
       winType: "zimo" | "ron";
       from?: number;
       scoreDeltas: [number, number, number, number];
@@ -53,10 +53,20 @@ const CARD_INITIAL = { opacity: 0, scale: 0.9, y: 16 };
 const CARD_ANIMATE = { opacity: 1, scale: 1, y: 0 };
 const CARD_EXIT = { opacity: 0, scale: 0.9, y: 16 };
 
+const JUNK_FAN_LABELS: Record<string, string> = {
+  dealer: "庄家胡",
+  gangkai: "杠开",
+  hunYise: "混一色",
+  qingYise: "清一色",
+  qixiaodui: "七小对",
+  pengpenghu: "碰碰胡",
+  menqing: "门清",
+};
+
 const describeResult = (result: GameResultLike, players: RoomInfo["players"]): string => {
   const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
   if (result.type === "draw") return "Round drawn — the wall ran out.";
-  const winners = result.winners.map(nameOf).join(", ");
+  const winners = result.winners.map((detail) => nameOf(detail.seat)).join(", ");
   return result.winType === "zimo"
     ? `${winners} won by self-draw.`
     : `${winners} won off ${nameOf(result.from!)}'s discard.`;
@@ -104,6 +114,17 @@ export function RoundEndOverlay({
           Game {gameNumber} of {totalGames} finished
         </h2>
         <p className="text-sm">{describeResult(result, players)}</p>
+        {result.type === "win" && (
+          <ul className="text-sm text-muted-foreground">
+            {result.winners.map((detail) => (
+              <li key={detail.seat}>
+                {players[detail.seat]?.nickname ?? `Seat ${detail.seat + 1}`}:{" "}
+                {detail.fanTypes.map((fan) => JUNK_FAN_LABELS[fan] ?? fan).join(" · ")} ×
+                {detail.multiplier}
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="text-sm text-muted-foreground">
           {result.scoreDeltas.map((delta, seat) => (
             <li key={seat}>
