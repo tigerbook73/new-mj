@@ -4,14 +4,14 @@
 
 ## 当前工作
 
-**专题：生产部署与 OAuth 验收**
+**专题：Review 配置功能**
 
-- 结果：部署 Supabase 与应用，配置生产 OAuth 回调并完成一次真实登录验收。
-- 下一步第一个具体动作：确认目标部署平台与生产 Supabase 项目的环境变量、回调 URL 清单。
+- 结果：审查并明确配置功能的边界；仅支持不影响规则、算分或 AI 算法的数据，例如总局数。
+- 下一步第一个具体动作：盘点现有配置入口与数据流，列出候选配置项，并逐项确认其不影响规则、算分和 AI 算法。
 
 ## 当前风险 / 开放问题
 
-- 尚未选择并配置生产部署环境；不能把本地 Supabase 的 OAuth 验收视为生产验收。
+- 配置项若会改变规则、算分或 AI 算法，必须排除在此功能范围外；这类需求应另行立项并先更新契约/设计文档。
 - 已发现（与本次改动无关，未修复）：`apps/web/test/lobby.e2e-spec.ts` 的 "leaving an in-game room keeps the other human in the match" 与 "force exiting an in-game room ends the session for every player" 两个用例在跑完整 `test/lobby.e2e-spec.ts` 套件时容易超时（等待对话框里的 "Hand off to AI"/"Force exit" 按钮），单独跑或小范围跑均能稳定通过；已在纯净 main（无本次任何改动）上复现，确认是套件层面的既有抖动，不是本次引入的回归。谁下次碰 leave-room/force-exit 相关代码时应该顺手看一眼。
 - `hangzhou.md` §14 记录了两处不阻塞定稿的实现细节假设（财神替代数量上限、`caiPiaoCount` 中途清零与否），已按文档默认值实现并写入 fixture；如果和你的预期不符，后续只需改一行。
 - 已发现（与本次改动无关，未修复）：`CenterStatus` 的 `ScaleText` 行在桌面实际渲染尺寸下会被硬裁切、无省略号（`ScaleText` 自身文档已承认这个取舍）——不止新加的 Santiao 提示，连既有的 "Phase: playing"/"Turn: seat N · Wall: M" 两行在浏览器实跑截图里也裁得只剩前几个字符。浏览器验证杭州桌面新功能时顺手发现，是 `CenterStatus` 盒子尺寸的既有问题，不是本次引入的；新加的 Santiao 文案已经尽量精简，但没有去动 `CenterStatus`/`ScaleText` 本身的尺寸逻辑。谁下次碰这块 UI 时可以顺手看一眼。
@@ -20,7 +20,6 @@
 
 ## Backlog
 
-- Review配置功能，配置功能限制仅支持不影响规则、算分、AI算法的数据，如总局数等。
 - 胡牌结算展示最终赢牌组合（杭州/junk）：仿照血战到底 `BloodbattleWinSnapshot`/`BloodbattlePublicWinSnapshot` 的公开揭示模式，在 `HangzhouGameResult`/`JunkGameResult` 里补上赢家手牌（以及计分实际采用的那一种拆分），赢牌那一刻由 server 广播给所有座位。杭州/junk 目前 `result` 只有 `fanTypes`/`multiplier`/`payout`，没有牌本身；其他家的 `PlayerView` 里对方手牌只有 `handCount`，client 端根本拿不到那些 `TileId`，必须走 server 广播这条路径，不能本地算（自己的手牌虽然本地已知，但具体拆分不唯一，client 重新拆可能拆出和公布番型对不上的另一种合法组合）。
 - 可选沉浸体验：音效、音量与静音设置。
 - 垃圾胡扩展规则，支持：连庄（庄家倍率保持为2，初始随机庄家，后续赢家坐庄）、支持杠开（倍率x2、连续杠开连续翻倍）、支持混一色(倍率x2)、支持清一色（倍率x4）、支持7小对（倍率x2）、支持碰碰胡（倍率x2）、支持门清（（倍率x2））、所有翻倍可以叠加。
