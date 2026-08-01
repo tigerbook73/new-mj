@@ -63,6 +63,22 @@ export type HangzhouGameResult =
       scoreDeltas: [number, number, number, number];
     };
 
+/** Revealed at the moment of a hu, mirrors bloodbattle's WinSnapshot/PublicWinSnapshot
+ * split (see docs/process/plan.md 胡牌结算展示最终赢牌组合). `groups` is the concealed
+ * decomposition actually used for scoring (melds+pair, or seven pair-groups) — already
+ * kind-level so it needs no public/private conversion, unlike `hand`/`winTile`. */
+export type HangzhouWinSnapshot = {
+  hand: TileId[];
+  winTile: TileId;
+  groups: TileKind[][];
+};
+
+export type HangzhouPublicWinSnapshot = {
+  hand: TileKind[];
+  winTile: TileKind;
+  groups: TileKind[][];
+};
+
 export type HangzhouState = {
   config: HangzhouConfig;
   phase: HangzhouPhase;
@@ -84,6 +100,8 @@ export type HangzhouState = {
   /** Length of the current seat's unbroken consecutive-gang chain, see
    * docs/variants/hangzhou.md §6. Reset to 0 on that seat's next discard. */
   gangChain: [number, number, number, number];
+  /** Set for each winner right when their hu is declared; never cleared mid-hand. */
+  wins?: Partial<Record<SeatId, HangzhouWinSnapshot>>;
 };
 
 export type HangzhouPlayerView = Omit<PlayerViewBase, "seats"> & {
@@ -92,6 +110,7 @@ export type HangzhouPlayerView = Omit<PlayerViewBase, "seats"> & {
     discards: DiscardEntry[];
     handCount: number;
     justDrawn: boolean;
+    winSnapshot?: HangzhouPublicWinSnapshot;
   }>;
   phase: HangzhouPhase;
   myClaimOptions?: HangzhouClaimOption[];

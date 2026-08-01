@@ -7,7 +7,7 @@ import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { DEFAULT_HANGZHOU_CONFIG, parseHangzhouConfig } from "./config.ts";
-import { isBaotou, isWinningHand } from "./hand.ts";
+import { decomposeWinningShape, isBaotou, isWinningHand } from "./hand.ts";
 import { scoreHangzhouHand, type HangzhouScoringInput } from "./scoring.ts";
 import type {
   HangzhouApplyResult,
@@ -279,11 +279,17 @@ export const finishWin = (state: HangzhouState, events: GameEvent[], winner: Sea
   };
   state.phase = "finished";
   state.result = result;
+  // isWin() already gated the zimo action, so this must find a decomposition;
+  // the fallback exists only to satisfy the type without an unsafe cast.
+  const groups = decomposeWinningShape(kindsOf(own.hand), own.melds.length) ?? [];
+  state.wins = { ...state.wins, [winner]: { hand: [...own.hand], winTile, groups } };
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.huDeclared,
     seat: winner,
     winType: "zimo",
     hand: [...own.hand],
+    winTile,
+    groups,
     fanTypes: winDetail.fanTypes,
     multiplier: winDetail.multiplier,
   });
@@ -323,11 +329,19 @@ export const finishRonWins = (
   state.phase = "finished";
   state.result = result;
   for (const detail of winDetails) {
+    const concealedTiles = [...state.seats[detail.seat]!.hand, tile];
+    // claimOptions() already gated this via isWin(), so this must find a
+    // decomposition; the fallback exists only to satisfy the type.
+    const groups =
+      decomposeWinningShape(kindsOf(concealedTiles), state.seats[detail.seat]!.melds.length) ?? [];
+    state.wins = { ...state.wins, [detail.seat]: { hand: concealedTiles, winTile: tile, groups } };
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.huDeclared,
       seat: detail.seat,
       winType: "ron",
-      hand: [...state.seats[detail.seat]!.hand, tile],
+      hand: concealedTiles,
+      winTile: tile,
+      groups,
       from,
       fanTypes: detail.fanTypes,
       multiplier: detail.multiplier,

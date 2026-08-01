@@ -28,6 +28,7 @@ import {
   shouldRegisterSnapshotDiff,
 } from "@/features/mahjong/lib/animationLedger";
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
+import { tileKindOf, type TileKind } from "@/features/mahjong/lib/mahjongTiles";
 import { buildStatusBadges } from "@/features/mahjong/lib/statusBadges";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
@@ -314,6 +315,14 @@ export function TableView() {
   // junk/state-machine.ts's applyDiscard), not a new "whoever can claim" seat — so
   // the center box's highlighted edge switches to a cooler "pending" color and
   // drops the arrow, rather than looking like a live turn for that seat.
+  // Per-seat final hand for the settlement panel — already-declared open melds
+  // (converted TileId→TileKind) plus the concealed decomposition actually used,
+  // undefined for a seat that didn't win. See docs/process/plan.md 胡牌结算展示最终赢牌组合.
+  const winningHands: Array<TileKind[][] | undefined> = (extras.seats ?? []).map((seat) => {
+    if (!seat.winSnapshot) return undefined;
+    const openMeldGroups = seat.melds.map((meld) => meld.tiles.map((tile) => tileKindOf(tile)));
+    return [...openMeldGroups, ...seat.winSnapshot.groups];
+  });
   const turnHighlight: TurnHighlight | undefined = currentDirection && {
     direction: currentDirection,
     tone: extras.phase === "awaiting-claims" ? "pending" : "active",
@@ -402,6 +411,7 @@ export function TableView() {
                   onEnd={() => void endSession()}
                   entering={isIncrementalSnapshot && !prefersReducedMotion}
                   reducedMotion={prefersReducedMotion}
+                  winningHands={winningHands}
                 />
               ) : (
                 <RoundEndOverlay
@@ -415,6 +425,7 @@ export function TableView() {
                   onEnd={() => void endSession()}
                   entering={isIncrementalSnapshot && !prefersReducedMotion}
                   reducedMotion={prefersReducedMotion}
+                  winningHands={winningHands}
                 />
               ))}
           </AnimatePresence>

@@ -1,6 +1,8 @@
 import type { RoomInfo } from "@new-mj/protocol";
 import { motion } from "motion/react";
 import { Button } from "@/shared/ui/button";
+import { WinningHandReveal } from "@/features/mahjong/components/WinningHandReveal";
+import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
 
 /**
  * junk's `JunkGameResult` shape (packages/core/src/rulesets/junk/types.ts),
@@ -44,6 +46,16 @@ interface RoundEndOverlayProps {
   entering: boolean;
   /** Collapses both the enter and exit transition to instant — see usePrefersReducedMotion. */
   reducedMotion: boolean;
+  /**
+   * Per-seat final hand (already-declared open melds + the concealed
+   * decomposition actually used), indexed by seat — undefined for a seat that
+   * didn't win. Assembled by TableView.tsx from `view.seats` (melds +
+   * winSnapshot.groups), see docs/process/plan.md 胡牌结算展示最终赢牌组合.
+   * bloodbattle has no winSnapshot wiring yet, so this is always empty there.
+   * Optional so callers that don't care about the reveal (stories/tests)
+   * don't need to pass it.
+   */
+  winningHands?: Array<TileKind[][] | undefined>;
 }
 
 const BACKDROP_INITIAL = { opacity: 0 };
@@ -77,6 +89,7 @@ export function RoundEndOverlay({
   onEnd,
   entering,
   reducedMotion,
+  winningHands = [],
 }: RoundEndOverlayProps) {
   const waitingOn = players
     .map((player, seat) => ({ player, seat }))
@@ -104,6 +117,10 @@ export function RoundEndOverlay({
           Game {gameNumber} of {totalGames} finished
         </h2>
         <p className="text-sm">{describeResult(result, players)}</p>
+        {result.type === "win" &&
+          result.winners
+            .filter((seat) => winningHands[seat])
+            .map((seat) => <WinningHandReveal key={seat} groups={winningHands[seat]!} />)}
         <ul className="text-sm text-muted-foreground">
           {result.scoreDeltas.map((delta, seat) => (
             <li key={seat}>

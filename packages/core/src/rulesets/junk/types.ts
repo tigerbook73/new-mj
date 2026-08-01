@@ -50,6 +50,22 @@ export type JunkGameResult =
       scoreDeltas: [number, number, number, number];
     };
 
+/** Revealed at the moment of a hu, mirrors bloodbattle's WinSnapshot/PublicWinSnapshot
+ * split (see docs/process/plan.md 胡牌结算展示最终赢牌组合). `groups` is the concealed
+ * decomposition actually used (melds+pair, or seven pair-groups) — already kind-level
+ * so it needs no public/private conversion, unlike `hand`/`winTile`. */
+export type JunkWinSnapshot = {
+  hand: TileId[];
+  winTile: TileId;
+  groups: TileKind[][];
+};
+
+export type JunkPublicWinSnapshot = {
+  hand: TileKind[];
+  winTile: TileKind;
+  groups: TileKind[][];
+};
+
 export type JunkState = {
   config: JunkConfig;
   phase: JunkPhase;
@@ -65,6 +81,8 @@ export type JunkState = {
   seq: number;
   prng: PrngState;
   result?: JunkGameResult;
+  /** Set for each winner right when their hu is declared; never cleared mid-hand. */
+  wins?: Partial<Record<SeatId, JunkWinSnapshot>>;
 };
 
 export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
@@ -74,6 +92,7 @@ export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
     handCount: number;
     /** Public: whether this seat just drew and hasn't acted yet — the fact is public (see the unrevealed public TileDrawn event), only the tile identity is private. */
     justDrawn: boolean;
+    winSnapshot?: JunkPublicWinSnapshot;
   }>;
   phase: JunkPhase;
   myClaimOptions?: JunkClaimOption[];

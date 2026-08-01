@@ -1,5 +1,6 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
-import type { SeatId } from "../../lib/ids.ts";
+import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { JunkAction, JunkGameResult, JunkPlayerView, JunkState } from "./types.ts";
 
 export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView => {
@@ -16,6 +17,15 @@ export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView =>
       discards: entry.discards.map((discard) => ({ ...discard })),
       handCount: entry.hand.length,
       justDrawn: state.justDrawn?.seat === index,
+      ...(state.wins?.[index as SeatId]
+        ? {
+            winSnapshot: {
+              hand: state.wins[index as SeatId]!.hand.map((tile) => STANDARD_TILE_SET.kindOf(tile)),
+              winTile: STANDARD_TILE_SET.kindOf(state.wins[index as SeatId]!.winTile),
+              groups: state.wins[index as SeatId]!.groups,
+            },
+          }
+        : {}),
     })),
     wallCount: state.wall.length,
     currentSeat: state.currentSeat,
@@ -39,6 +49,7 @@ const cloneView = (view: JunkPlayerView): JunkPlayerView => ({
     melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
     discards: seat.discards.map((discard) => ({ ...discard })),
     justDrawn: seat.justDrawn,
+    ...(seat.winSnapshot ? { winSnapshot: seat.winSnapshot } : {}),
   })),
   ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
   ...(view.result ? { result: view.result } : {}),
@@ -229,9 +240,18 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
         }
         break;
       }
-      case "HuDeclared":
+      case "HuDeclared": {
         view.phase = "finished";
+        const winner = payload.seat as SeatId;
+        if ("groups" in payload) {
+          view.seats[winner]!.winSnapshot = {
+            hand: (payload.hand as TileId[]).map((tile) => STANDARD_TILE_SET.kindOf(tile)),
+            winTile: STANDARD_TILE_SET.kindOf(payload.winTile as TileId),
+            groups: payload.groups as TileKind[][],
+          };
+        }
         break;
+      }
       case "WallExhausted":
         view.phase = "finished";
         break;

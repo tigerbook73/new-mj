@@ -1,6 +1,6 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { SeatId, TileId } from "../../lib/ids.ts";
+import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { isBaotou, isTingpai } from "./hand.ts";
 import type {
@@ -26,6 +26,15 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
       discards: entry.discards.map((discard) => ({ ...discard })),
       handCount: entry.hand.length,
       justDrawn: state.justDrawn?.seat === index,
+      ...(state.wins?.[index as SeatId]
+        ? {
+            winSnapshot: {
+              hand: kindsOf(state.wins[index as SeatId]!.hand),
+              winTile: STANDARD_TILE_SET.kindOf(state.wins[index as SeatId]!.winTile),
+              groups: state.wins[index as SeatId]!.groups,
+            },
+          }
+        : {}),
     })),
     wallCount: state.wall.length,
     currentSeat: state.currentSeat,
@@ -53,6 +62,7 @@ const cloneView = (view: HangzhouPlayerView): HangzhouPlayerView => ({
     melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
     discards: seat.discards.map((discard) => ({ ...discard })),
     justDrawn: seat.justDrawn,
+    ...(seat.winSnapshot ? { winSnapshot: seat.winSnapshot } : {}),
   })),
   ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
   ...(view.result ? { result: view.result } : {}),
@@ -262,9 +272,18 @@ export const rebuildPlayerView = (
         }
         break;
       }
-      case "HuDeclared":
+      case "HuDeclared": {
         view.phase = "finished";
+        const winner = payload.seat as SeatId;
+        if ("groups" in payload) {
+          view.seats[winner]!.winSnapshot = {
+            hand: kindsOf(payload.hand as TileId[]),
+            winTile: STANDARD_TILE_SET.kindOf(payload.winTile as TileId),
+            groups: payload.groups as TileKind[][],
+          };
+        }
         break;
+      }
       case "WallExhausted":
         view.phase = "finished";
         break;

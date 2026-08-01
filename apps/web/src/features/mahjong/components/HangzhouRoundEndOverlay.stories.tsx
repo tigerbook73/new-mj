@@ -72,6 +72,17 @@ export const BaotouZimo: Story = {
       winType: "zimo",
       scoreDeltas: [12, -4, -4, -4],
     },
+    // Exercises WinningHandReveal, including a caishen (5z) filling a run gap
+    // and a caishen completing the pair — see docs/process/plan.md
+    // 胡牌结算展示最终赢牌组合.
+    winningHands: [
+      [
+        ["1m", "2m", "3m"],
+        ["4p", "5z", "6p"],
+        ["7s", "8s", "9s"],
+        ["1z", "5z"],
+      ],
+    ],
   },
 };
 
@@ -87,6 +98,15 @@ export const CaipiaoGangRon: Story = {
       from: 0,
       scoreDeltas: [-8, 8, 0, 0],
     },
+    winningHands: [
+      undefined,
+      [
+        ["2m", "3m", "4m"],
+        ["6p", "6p", "6p"],
+        ["3s", "4s", "5s"],
+        ["9s", "9s"],
+      ],
+    ],
   },
 };
 

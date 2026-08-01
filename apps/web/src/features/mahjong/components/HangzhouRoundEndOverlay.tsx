@@ -1,6 +1,8 @@
 import type { RoomInfo } from "@new-mj/protocol";
 import { motion } from "motion/react";
 import { Button } from "@/shared/ui/button";
+import { WinningHandReveal } from "@/features/mahjong/components/WinningHandReveal";
+import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
 
 /**
  * hangzhou's `HangzhouGameResult` shape (packages/core/src/rulesets/hangzhou/
@@ -41,6 +43,15 @@ interface HangzhouRoundEndOverlayProps {
   /** See RoundEndOverlay.tsx's `entering` doc. */
   entering: boolean;
   reducedMotion: boolean;
+  /**
+   * Per-seat final hand (already-declared open melds + the concealed
+   * decomposition actually used for scoring), indexed by seat — undefined for
+   * a seat that didn't win. Assembled by TableView.tsx from `view.seats`
+   * (melds + winSnapshot.groups), see docs/process/plan.md 胡牌结算展示最终赢牌组合.
+   * Optional so callers that don't care about the reveal (stories/tests) don't
+   * need to pass it.
+   */
+  winningHands?: Array<TileKind[][] | undefined>;
 }
 
 const BACKDROP_INITIAL = { opacity: 0 };
@@ -98,6 +109,7 @@ export function HangzhouRoundEndOverlay({
   onEnd,
   entering,
   reducedMotion,
+  winningHands = [],
 }: HangzhouRoundEndOverlayProps) {
   const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
   const waitingOn = players
@@ -128,9 +140,14 @@ export function HangzhouRoundEndOverlay({
         {result.type === "draw" ? (
           <p className="text-sm">Round drawn — the wall ran out.</p>
         ) : (
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="flex flex-col gap-2 text-sm">
             {result.winners.map((detail) => (
-              <li key={detail.seat}>{describeWinner(detail, result, nameOf)}</li>
+              <li key={detail.seat} className="flex flex-col items-center gap-1">
+                {describeWinner(detail, result, nameOf)}
+                {winningHands[detail.seat] && (
+                  <WinningHandReveal groups={winningHands[detail.seat]!} />
+                )}
+              </li>
             ))}
           </ul>
         )}

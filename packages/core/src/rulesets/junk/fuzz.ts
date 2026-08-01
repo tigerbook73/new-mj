@@ -1,4 +1,5 @@
 import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
+import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { GameEvent } from "../../events.ts";
 import { junkRuleSet } from "./index.ts";
@@ -64,6 +65,24 @@ export const playJunkGame = (
     : { seed, config, actions, error: "STEP_LIMIT_EXCEEDED" };
 };
 
+/** Every winner's winSnapshot must exist and its concealed decomposition must be
+ * exactly the same tile-kind multiset as the concealed hand it was carved from —
+ * a decompose bug would either drop this or return a mismatched shape. */
+const checkWinSnapshotInvariant = (state: JunkState): string | undefined => {
+  if (state.result?.type !== "win") return undefined;
+  for (const winner of state.result.winners) {
+    const snapshot = state.wins?.[winner];
+    if (!snapshot) return "WIN_SNAPSHOT_MISSING";
+    const flatGroups = [...snapshot.groups.flat()].sort().join(",");
+    const flatHand = snapshot.hand
+      .map((tile) => STANDARD_TILE_SET.kindOf(tile))
+      .sort()
+      .join(",");
+    if (flatGroups !== flatHand) return "WIN_SNAPSHOT_MISMATCH";
+  }
+  return undefined;
+};
+
 // --ruleset-parameterized fuzz entry point is future work — only junk has a
 // full applyAction/getLegalActions/createGame trio today (see rulesets/junk/index.ts).
 export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined => {
@@ -82,6 +101,10 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
     };
     const result = playJunkGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
+    const invariantError = checkWinSnapshotInvariant(result.state);
+    if (invariantError) {
+      return { seed: gameSeed.value, config, actions: result.actions, error: invariantError };
+    }
   }
   return undefined;
 };

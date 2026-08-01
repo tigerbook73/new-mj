@@ -3,7 +3,12 @@ import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../ev
 import { createPrng } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
-import { isSevenPairsWinningHand, isStandardWinningHand } from "../../lib/win.ts";
+import {
+  decomposeSevenPairsWinningHand,
+  decomposeStandardWinningHand,
+  isSevenPairsWinningHand,
+  isStandardWinningHand,
+} from "../../lib/win.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
@@ -104,6 +109,24 @@ export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean =
       own.melds.length === 0 &&
       isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
   );
+};
+
+/** Witness version of isWin: branch order mirrors it exactly so the family found
+ * here always matches the one that gated the hu action. Only called once, at the
+ * moment a win is actually declared (see lib/win.ts's decompose functions' own doc). */
+const decomposeJunkWin = (
+  state: JunkState,
+  seat: SeatId,
+  tiles: readonly TileId[],
+): TileKind[][] => {
+  const own = state.seats[seat]!;
+  const standard = decomposeStandardWinningHand(tiles, STANDARD_TILE_SET);
+  if (standard) return standard;
+  if (configOf(state).sevenPairs && own.melds.length === 0) {
+    const sevenPairs = decomposeSevenPairsWinningHand(tiles, STANDARD_TILE_SET);
+    if (sevenPairs) return sevenPairs;
+  }
+  return []; // unreachable: isWin() already gated this
 };
 
 /**
@@ -278,10 +301,21 @@ export const finishWin = (
     winningTile === undefined
       ? [...state.seats[winner]!.hand]
       : [...state.seats[winner]!.hand, winningTile];
+  const winTile = winningTile ?? state.justDrawn!.tile;
+  const groups = decomposeJunkWin(state, winner, revealedHand);
+  state.wins = { ...state.wins, [winner]: { hand: revealedHand, winTile, groups } };
   const payload =
     from === undefined
-      ? { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand }
-      : { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand, from };
+      ? { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand, winTile, groups }
+      : {
+          type: EVENT_TYPES.huDeclared,
+          seat: winner,
+          winType,
+          hand: revealedHand,
+          winTile,
+          groups,
+          from,
+        };
   appendEvent(state, events, publicVisibility, payload);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.settled,
@@ -301,11 +335,16 @@ export const finishRonWins = (
   state.phase = "finished";
   state.result = result;
   for (const winner of winners) {
+    const concealedTiles = [...state.seats[winner]!.hand, tile];
+    const groups = decomposeJunkWin(state, winner, concealedTiles);
+    state.wins = { ...state.wins, [winner]: { hand: concealedTiles, winTile: tile, groups } };
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.huDeclared,
       seat: winner,
       winType: "ron",
-      hand: [...state.seats[winner]!.hand, tile],
+      hand: concealedTiles,
+      winTile: tile,
+      groups,
       from,
     });
   }

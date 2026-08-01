@@ -2,7 +2,11 @@ import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
-import { isCaishenTile, sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
+import {
+  isCaishenTile,
+  sortTilesForDisplay,
+  type TileKind,
+} from "@/features/mahjong/lib/mahjongTiles";
 import {
   directionOf,
   seatAt,
@@ -16,6 +20,10 @@ type JunkSeatExtra = {
   discards: DiscardEntry[];
   /** Public: this seat just drew and hasn't acted yet — see docs/variants/junk.md §7. */
   justDrawn: boolean;
+  /** Public, present only for a seat that just won this round (hangzhou/junk) — see
+   * docs/process/plan.md 胡牌结算展示最终赢牌组合. `groups` is already TileKind-level
+   * (the concealed decomposition actually used), so it needs no id→kind conversion. */
+  winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] };
 };
 
 export type GameResultLike =
