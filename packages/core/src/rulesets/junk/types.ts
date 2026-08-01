@@ -44,7 +44,7 @@ export type JunkGameResult =
   | {
       type: "win";
       winner: SeatId;
-      winners: SeatId[];
+      winners: Array<{ seat: SeatId; fanTypes: string[]; multiplier: number; payout: number }>;
       winType: "zimo" | "ron";
       from?: SeatId;
       scoreDeltas: [number, number, number, number];
@@ -56,6 +56,7 @@ export type JunkState = {
   wall: TileId[];
   seats: SeatState[];
   currentSeat: SeatId;
+  dealer?: SeatId;
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };
@@ -65,6 +66,7 @@ export type JunkState = {
   seq: number;
   prng: PrngState;
   result?: JunkGameResult;
+  gangChain?: [number, number, number, number];
 };
 
 export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {

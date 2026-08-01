@@ -392,12 +392,20 @@ test("multiHuPolicy selects head jump or all ron winners deterministically", () 
   );
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
-  expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-1, 1, 0, 0] });
+  expect(state.result).toMatchObject({
+    winner: 1,
+    winners: [{ seat: 1, multiplier: 8, payout: 8 }],
+    scoreDeltas: [-8, 8, 0, 0],
+  });
 
   state = unwrap(junkRuleSet.applyAction(multiHuState("all"), 0, { type: "discard", tile: 7 }));
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
-  expect(state.result).toMatchObject({ winner: 1, winners: [1, 2], scoreDeltas: [-2, 1, 1, 0] });
+  expect(state.result).toMatchObject({
+    winner: 1,
+    winners: [{ seat: 1 }, { seat: 2 }],
+    scoreDeltas: [-10, 8, 2, 0],
+  });
   assertTileConservation(state);
 });
 

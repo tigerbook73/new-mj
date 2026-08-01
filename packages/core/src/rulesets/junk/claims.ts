@@ -80,6 +80,10 @@ export const resolveClaimWindow = (state: JunkState, events: GameEvent[]): void 
   state.seats[seat]!.hand = remaining;
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
+  if (action.type === "minGang") {
+    const gangChain = state.gangChain ?? (state.gangChain = [0, 0, 0, 0]);
+    gangChain[seat] += 1;
+  }
   const eventType =
     action.type === "chi" ? "ChiMade" : action.type === "peng" ? "PengMade" : "GangMade";
   appendEvent(state, events, publicVisibility, {

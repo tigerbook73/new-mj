@@ -7,6 +7,7 @@ import { isSevenPairsWinningHand, isStandardWinningHand } from "../../lib/win.ts
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
+import { scoreJunkHand } from "./scoring.ts";
 import type {
   JunkApplyResult,
   JunkClaimOption,
@@ -19,6 +20,8 @@ import type {
 export const seats = (): SeatState[] =>
   [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
 export const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
+const gangChainOf = (state: JunkState): [number, number, number, number] =>
+  state.gangChain ?? (state.gangChain = [0, 0, 0, 0]);
 export const cloneState = (state: JunkState): JunkState => {
   const cloned: JunkState = {
     ...state,
@@ -28,6 +31,9 @@ export const cloneState = (state: JunkState): JunkState => {
       melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
       discards: seat.discards.map((discard) => ({ ...discard })),
     })),
+    ...(state.gangChain
+      ? { gangChain: [...state.gangChain] as [number, number, number, number] }
+      : {}),
   };
   if (state.pendingClaims) {
     cloned.pendingClaims = {
@@ -241,26 +247,44 @@ export const applyDrawAction = (
 };
 
 export const settleWins = (
+  state: JunkState,
   winners: SeatId[],
   winType: "zimo" | "ron",
   from?: SeatId,
+  winningTile?: TileId,
 ): JunkGameResult => {
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
+  const details = winners.map((winner) => {
+    const scored = scoreJunkHand({
+      hand: [...state.seats[winner]!.hand, ...(winningTile === undefined ? [] : [winningTile])].map(
+        (tile) => STANDARD_TILE_SET.kindOf(tile),
+      ),
+      melds: state.seats[winner]!.melds.map((meld) => ({
+        type: meld.type,
+        tiles: meld.tiles.map((tile) => STANDARD_TILE_SET.kindOf(tile)),
+      })),
+      isDealer: winner === state.dealer,
+      winType,
+      gangChainLength: winType === "zimo" ? gangChainOf(state)[winner] : 0,
+    });
+    return { seat: winner, ...scored, payout: scored.multiplier };
+  });
   if (winType === "zimo") {
     for (const seat of [0, 1, 2, 3] as SeatId[]) {
       if (seat === winners[0]) continue;
-      scoreDeltas[seat] -= 1;
-      scoreDeltas[winners[0]!] += 1;
+      scoreDeltas[seat] -= details[0]!.payout;
+      scoreDeltas[winners[0]!] += details[0]!.payout;
     }
   } else if (from !== undefined) {
     for (const winner of winners) {
-      scoreDeltas[from] -= 1;
-      scoreDeltas[winner] += 1;
+      const payout = details.find((detail) => detail.seat === winner)!.payout;
+      scoreDeltas[from] -= payout;
+      scoreDeltas[winner] += payout;
     }
   }
   return from === undefined
-    ? { type: "win", winner: winners[0]!, winners, winType, scoreDeltas }
-    : { type: "win", winner: winners[0]!, winners, winType, from, scoreDeltas };
+    ? { type: "win", winner: winners[0]!, winners: details, winType, scoreDeltas }
+    : { type: "win", winner: winners[0]!, winners: details, winType, from, scoreDeltas };
 };
 
 export const finishWin = (
@@ -271,7 +295,7 @@ export const finishWin = (
   from?: SeatId,
   winningTile?: TileId,
 ): void => {
-  const result = settleWins([winner], winType, from);
+  const result = settleWins(state, [winner], winType, from, winningTile);
   state.phase = "finished";
   state.result = result;
   const revealedHand =
@@ -297,7 +321,7 @@ export const finishRonWins = (
   from: SeatId,
   tile: TileId,
 ): void => {
-  const result = settleWins(winners, "ron", from);
+  const result = settleWins(state, winners, "ron", from, tile);
   state.phase = "finished";
   state.result = result;
   for (const winner of winners) {
@@ -368,6 +392,7 @@ export const applyDiscard = (
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
   delete state.justDrawn;
+  gangChainOf(state)[seat] = 0;
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
@@ -403,6 +428,7 @@ export const applyAnGang = (
   if (tiles.length !== 4) return fail("GANG_NOT_AVAILABLE");
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
+  gangChainOf(state)[seat] += 1;
   delete state.justDrawn;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
@@ -459,6 +485,7 @@ export const applyBuGang = (
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
   meld.type = "buGang";
   meld.tiles.push(tile);
+  gangChainOf(state)[seat] += 1;
   delete state.justDrawn;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
@@ -484,8 +511,10 @@ export const createJunkGame = (
     wall: shuffled.wall,
     seats: seats(),
     currentSeat: dealer,
+    dealer,
     seq: 0,
     prng: shuffled.prng,
+    gangChain: [0, 0, 0, 0],
   };
   const events: GameEvent[] = [];
   appendEvent(state, events, publicVisibility, {
