@@ -7,8 +7,8 @@
 **专题：垃圾胡扩展规则**
 
 - 目标：连庄（庄家胡牌后继续坐庄，庄家胡牌结算倍率 ×2）、首局随机庄家；杠开 ×2（连续杠开连续翻倍）；混一色 ×2、清一色 ×4、七小对 ×2、碰碰胡 ×2、门清 ×2，全部番型相乘叠加。
-- 进度：已完成规则/架构盘点。单局番型、杠链和结算可私有地实现于 `packages/core/src/rulesets/junk/`；既有 Room 的 `dealerStreak` 可继续作为通用跨局计数。首局随机庄家则与当前 `engine-contract.md`/`session-mechanics.md` 的"第 1 局房主坐庄"公共约定冲突：现有 RuleSet 没有首局庄家选择扩展点，server 按 `rulesetId` 分支又违反"server 不理解规则"。
-- 下一步第一个具体动作：提交 Claude Project 确认首局庄家的架构归属——为 RuleSet 新增确定性的首局庄家选择扩展点，还是将 Room 首局随机化提升为所有玩法的通用容器行为；确认后先定稿 `docs/variants/junk.md`，再实现 core/server/web 与测试。
+- 进度：Claude Project 已确认首局庄家是 RuleSet 的确定性扩展点；`computeInitialDealer(seed)`、Junk v3 番型/计分、赢家坐庄和既有玩法兼容性已写入契约与规则文档。唯一待拍板项是 Junk 流局后的下一庄（原庄连庄或顺时针轮庄）。
+- 下一步第一个具体动作：确认 Junk 流局轮庄规则；随后先在 core 为三个 RuleSet 和顶层 engine 加 `computeInitialDealer(seed)`，并让 Room 在首局创建前调用它。
 
 ## 当前风险 / 开放问题
 
@@ -23,7 +23,6 @@
 
 - 胡牌结算展示最终赢牌组合（杭州/junk）：仿照血战到底 `BloodbattleWinSnapshot`/`BloodbattlePublicWinSnapshot` 的公开揭示模式，在 `HangzhouGameResult`/`JunkGameResult` 里补上赢家手牌（以及计分实际采用的那一种拆分），赢牌那一刻由 server 广播给所有座位。杭州/junk 目前 `result` 只有 `fanTypes`/`multiplier`/`payout`，没有牌本身；其他家的 `PlayerView` 里对方手牌只有 `handCount`，client 端根本拿不到那些 `TileId`，必须走 server 广播这条路径，不能本地算（自己的手牌虽然本地已知，但具体拆分不唯一，client 重新拆可能拆出和公布番型对不上的另一种合法组合）。
 - 可选沉浸体验：音效、音量与静音设置。
-- 垃圾胡扩展规则，支持：连庄（庄家倍率保持为2，初始随机庄家，后续赢家坐庄）、支持杠开（倍率x2、连续杠开连续翻倍）、支持混一色(倍率x2)、支持清一色（倍率x4）、支持7小对（倍率x2）、支持碰碰胡（倍率x2）、支持门清（（倍率x2））、所有翻倍可以叠加。
 - Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
