@@ -859,7 +859,7 @@ test("bloodbattle table renders the common skeleton", async ({ browser }) => {
   }
 });
 
-test("hangzhou table renders the common skeleton with the santiao status hint", async ({
+test("hangzhou table renders the common skeleton with the dealer streak chip", async ({
   browser,
 }) => {
   const { players } = await createAndStartRoom(browser, "hangzhou", "hz-skeleton");
@@ -867,9 +867,9 @@ test("hangzhou table renders the common skeleton with the santiao status hint", 
 
   await expect(host.getByTestId("table-hud")).toBeVisible({ timeout: 10_000 });
   await expect(host.getByTestId("hand-tile").first()).toBeVisible({ timeout: 10_000 });
-  // A freshly started room's dealer is on their first term (dealerStreak=1),
-  // so santiao's ron restriction is active — see docs/variants/hangzhou.md §5.
-  await expect(host.getByTestId("santiao-status")).toBeVisible({ timeout: 10_000 });
+  // dealerStreak is hangzhou-only and always public once present — see
+  // docs/variants/hangzhou.md §5; junk/bloodbattle never render this chip.
+  await expect(host.getByTestId("dealer-streak-chip")).toBeVisible({ timeout: 10_000 });
 
   for (const page of players) {
     await page.context().close();

@@ -25,6 +25,7 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
   drawnSlotKey: `${info}-drawn`,
   drawnSlotLedgerKey: `${info}-drawn-ledger`,
   highlightCaishen: false,
+  isDealer: false,
 });
 
 const seatsFor = (kind: PreviewCase): Record<SeatDirection, SeatContent> => ({
@@ -123,8 +124,8 @@ export function LayoutPreview({
           scenario={scenario}
           seats={seats}
           discards={discards}
-          currentDirection="bottom"
-          center={<CenterStatus phase="discard" currentSeat={0} wallCount={58} />}
+          turnHighlight={{ direction: "bottom", tone: "active" }}
+          center={<CenterStatus phase="playing" wallCount={58} />}
           actionDock={
             <ActionDock
               actions={actions}

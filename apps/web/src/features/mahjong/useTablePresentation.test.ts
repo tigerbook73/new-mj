@@ -248,4 +248,34 @@ describe("useTablePresentation", () => {
 
     expect(presentation.hasDockActions).toBe(false);
   });
+
+  it("marks only the dealer's own seat direction as isDealer, regardless of viewing seat", () => {
+    const view = {
+      seat: 1,
+      hand: [1, 2, 3],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "playing",
+      seats: [
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const presentation = useTablePresentation({
+      view,
+      players: [null, { nickname: "Me" }, null, null],
+      onDiscard: vi.fn(),
+      dealer: 0,
+    });
+    if (!presentation) throw new Error("missing presentation");
+
+    // Viewing seat is 1, so seat 0 (the dealer) sits at direction "left" — see seatLayout.
+    expect(presentation.seats.left.isDealer).toBe(true);
+    expect(presentation.seats.bottom.isDealer).toBe(false);
+    expect(presentation.seats.top.isDealer).toBe(false);
+    expect(presentation.seats.right.isDealer).toBe(false);
+  });
 });

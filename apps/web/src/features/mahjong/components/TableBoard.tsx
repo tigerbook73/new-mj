@@ -10,6 +10,16 @@ import type { DiscardEntry } from "./DiscardPile";
 import type { Meld } from "./MeldGroup";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 
+export interface TurnHighlight {
+  direction: SeatDirection;
+  /** Active: genuinely this seat's turn right now (scenarios typically also show an
+   * arrow). Pending: this seat just discarded and a claim window is open —
+   * currentSeat hasn't moved on yet (see junk/state-machine.ts's applyDiscard), so
+   * it's a distinct, cooler color and no arrow, since the arrow would misleadingly
+   * look like a live turn. */
+  tone: "active" | "pending";
+}
+
 export interface SeatContent {
   melds: Meld[];
   /**
@@ -33,6 +43,9 @@ export interface SeatContent {
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   /** Player nickname (or "Seat N" fallback) — rendered as SVG text, see InfoSlot. */
   info: string;
+  /** Public: RoomInfo.dealer says which seat is dealing this game — rendered as a
+   * crown badge on the seat's own label instead of duplicating it in CenterStatus. */
+  isDealer: boolean;
   /**
    * React key for the pinned drawn-tile slot (the last `handTiles` entry) —
    * distinct from every other slot's plain index key so a genuinely new draw
@@ -61,7 +74,7 @@ export interface TableZoneContext {
   actionDock?: ReactNode | undefined;
   /** Ruleset logo badge for the "game-info" zone — see desktopZoneComponents.tsx's DesktopGameInfoSlot. */
   gameInfo?: ReactNode | undefined;
-  currentDirection?: SeatDirection | undefined;
+  turnHighlight?: TurnHighlight | undefined;
   config: TableLayoutConfig;
 }
 
@@ -81,7 +94,7 @@ interface TableBoardProps {
   center: ReactNode;
   actionDock?: ReactNode;
   gameInfo?: ReactNode;
-  currentDirection?: SeatDirection | undefined;
+  turnHighlight?: TurnHighlight | undefined;
 }
 
 /** Pure geometry-to-content wiring: which LayoutPreset and which components render it come entirely from `scenario`. */
@@ -92,7 +105,7 @@ export function TableBoard({
   center,
   actionDock,
   gameInfo,
-  currentDirection,
+  turnHighlight,
 }: TableBoardProps) {
   assertLayoutPreset(scenario.preset, Object.keys(scenario.components));
   return (
@@ -117,7 +130,7 @@ export function TableBoard({
             center,
             actionDock,
             gameInfo,
-            currentDirection,
+            turnHighlight,
             config: scenario.config,
           }) ?? null
         }

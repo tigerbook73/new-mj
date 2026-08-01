@@ -45,8 +45,8 @@ const DESKTOP_ZONE_COMPONENTS: Record<string, TableZoneComponent> = {
       ],
     ]),
   ),
-  center: ({ center, currentDirection }) => (
-    <DesktopCenterSlot center={center} currentDirection={currentDirection} />
+  center: ({ center, turnHighlight }) => (
+    <DesktopCenterSlot center={center} turnHighlight={turnHighlight} />
   ),
   "action-dock": ({ actionDock }) => <DesktopActionDockSlot actionDock={actionDock} />,
   "game-info": ({ gameInfo }) => <DesktopGameInfoSlot gameInfo={gameInfo} />,

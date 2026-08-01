@@ -1,90 +1,79 @@
+import type { ReactNode } from "react";
 import { ScaleText } from "./ScaleText";
+
+/**
+ * Ruleset-private derived flag rendered as a small pill — see docs/variants/hangzhou.md §4.
+ * CenterStatus only renders whatever list it's given; which flags exist, their precedence
+ * (e.g. 爆头 implying 听牌), and their color accents are entirely the caller's call, so this
+ * component never needs updating when a ruleset adds a new one.
+ */
+export interface StatusBadge {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  /** Color accent classes, e.g. "border-amber-400 text-amber-600 dark:text-amber-400". */
+  className?: string;
+}
 
 interface CenterStatusProps {
   phase: string;
-  currentSeat: number;
   wallCount: number;
-  error?: string | null;
+  error?: string | null | undefined;
   /**
-   * Hangzhou-only private derived state (docs/variants/hangzhou.md §4) —
-   * undefined for junk/bloodbattle, so no badge renders for them. Only ever
-   * reflects the viewer's own hand; never sent for other seats.
-   */
-  isTingpai?: boolean | undefined;
-  isBaotou?: boolean | undefined;
-  isCaipiao?: boolean | undefined;
-  /**
-   * Hangzhou-only, public (docs/variants/hangzhou.md §5/§11) — how many
-   * consecutive terms the current dealer has held, including this game.
-   * Unlike isTingpai/isBaotou/isCaipiao, this is the same value in every
-   * seat's view (santiao's ron restriction applies table-wide, not
-   * per-seat), so it isn't a private badge — see the note near its render.
+   * Hangzhou-only, public (docs/variants/hangzhou.md §5/§11) — how many consecutive terms
+   * the current dealer has held, including this game. Same value in every seat's view
+   * (santiao's ron restriction applies table-wide, not per-seat), so it isn't a private badge.
    */
   dealerStreak?: number | undefined;
+  badges?: StatusBadge[] | undefined;
 }
 
-const SANTIAO_UNLOCK_STREAK = 3;
+const PHASE_LABELS: Record<string, string> = {
+  dealing: "发牌中",
+  exchanging: "换三张",
+  "choosing-lack": "定缺中",
+  playing: "进行中",
+  "awaiting-claims": "待响应",
+  "awaiting-draw": "摸牌中",
+  finished: "已结束",
+};
 
-const BADGE_CLASS =
-  "rounded-full border px-2 py-0.5 text-[0.65rem] leading-none font-medium whitespace-nowrap";
-
-export function CenterStatus({
-  phase,
-  currentSeat,
-  wallCount,
-  error,
-  isTingpai,
-  isBaotou,
-  isCaipiao,
-  dealerStreak,
-}: CenterStatusProps) {
-  const hasBadges = isTingpai || isBaotou || isCaipiao;
-  // Only shown while ron is actually blocked — once santiao unlocks, this
-  // table-wide restriction stops being news worth taking up space over.
-  const gamesUntilSantiao =
-    dealerStreak !== undefined && dealerStreak < SANTIAO_UNLOCK_STREAK
-      ? SANTIAO_UNLOCK_STREAK - dealerStreak
-      : undefined;
+export function CenterStatus({ phase, wallCount, error, dealerStreak, badges }: CenterStatusProps) {
   return (
     <section
       data-testid="table-center-status"
-      className="flex min-h-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border bg-background/90 p-2 text-center text-xs shadow-sm"
+      className="flex h-full w-full flex-col items-center justify-center gap-[4cqmin] overflow-hidden rounded-lg border bg-background/90 p-[7cqmin] text-center shadow-sm"
+      style={{ containerType: "size" }}
     >
-      <ScaleText text={`Phase: ${phase}`} className="h-4 w-full" />
-      <ScaleText
-        text={`Turn: seat ${currentSeat + 1} · Wall: ${wallCount}`}
-        className="h-4 w-full"
-      />
-      {gamesUntilSantiao !== undefined && (
-        // Kept as short as the other lines here — see ScaleText's own docs:
-        // long text hard-clips with no ellipsis, so this errs terse rather
-        // than descriptive.
-        <div data-testid="santiao-status" className="h-4 w-full">
-          <ScaleText
-            text={`Santiao: ${gamesUntilSantiao} to unlock`}
-            className="h-4 w-full text-muted-foreground"
-          />
-        </div>
+      <span className="rounded-full bg-primary/10 px-[5cqmin] py-[1.6cqmin] text-[10cqmin] leading-tight font-semibold whitespace-nowrap text-primary">
+        {PHASE_LABELS[phase] ?? phase}
+      </span>
+      <div className="flex items-baseline gap-[2cqmin]">
+        <span className="text-[20cqmin] leading-none font-extrabold tabular-nums">{wallCount}</span>
+        <span className="text-[7cqmin] leading-none font-medium text-muted-foreground">张</span>
+      </div>
+      {dealerStreak !== undefined && (
+        <span
+          data-testid="dealer-streak-chip"
+          className="rounded-full bg-muted px-[4cqmin] py-[1.4cqmin] text-[6cqmin] leading-tight font-semibold whitespace-nowrap text-muted-foreground"
+        >
+          连庄 {dealerStreak}
+        </span>
       )}
-      {hasBadges && (
-        <div data-testid="hangzhou-status-badges" className="flex flex-wrap justify-center gap-1">
-          {/* 爆头 implies 听牌 — show only the stronger badge, not both. */}
-          {isBaotou ? (
-            <span className={`${BADGE_CLASS} border-amber-400 text-amber-600 dark:text-amber-400`}>
-              爆头
+      {badges && badges.length > 0 && (
+        <div
+          data-testid="status-badges"
+          className="flex w-full flex-wrap justify-center gap-[2cqmin] border-t pt-[3cqmin]"
+        >
+          {badges.map((badge) => (
+            <span
+              key={badge.key}
+              className={`inline-flex items-center gap-[1.2cqmin] rounded-full border px-[3cqmin] py-[1cqmin] text-[5.6cqmin] leading-tight font-medium whitespace-nowrap ${badge.className ?? ""}`}
+            >
+              {badge.icon}
+              {badge.label}
             </span>
-          ) : (
-            isTingpai && (
-              <span className={`${BADGE_CLASS} border-sky-400 text-sky-600 dark:text-sky-400`}>
-                听牌
-              </span>
-            )
-          )}
-          {isCaipiao && (
-            <span className={`${BADGE_CLASS} border-rose-400 text-rose-600 dark:text-rose-400`}>
-              财飘
-            </span>
-          )}
+          ))}
         </div>
       )}
       {error && <ScaleText text={error} className="h-4 w-full text-destructive" />}

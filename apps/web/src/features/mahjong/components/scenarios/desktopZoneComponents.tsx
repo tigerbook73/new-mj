@@ -1,3 +1,5 @@
+import { Crown } from "lucide-react";
+import { cn } from "@/shared/lib/utils";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { DIRECTION_ARROW_ICON } from "../directionArrowIcon";
@@ -5,7 +7,7 @@ import { DiscardPile, type DiscardEntry } from "../DiscardPile";
 import { HandRow } from "../HandRow";
 import { MeldGroup } from "../MeldGroup";
 import { ScaleText } from "../ScaleText";
-import type { SeatContent } from "../TableBoard";
+import type { SeatContent, TurnHighlight } from "../TableBoard";
 
 const EDGE_POSITION: Record<SeatDirection, string> = {
   top: "top-1 left-1/2 -translate-x-1/2",
@@ -97,9 +99,16 @@ export function InfoSlot({
   return (
     <div
       data-testid={`player-info-${direction}`}
-      className={`h-full w-full border-2 border-dashed ${config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
+      className={`relative h-full w-full border-2 border-dashed ${config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
     >
       <ScaleText text={seat.info} className="text-white" />
+      {seat.isDealer && (
+        <Crown
+          data-testid={`dealer-badge-${direction}`}
+          className="absolute top-0 right-0 text-amber-400"
+          style={{ width: "4cqmin", height: "4cqmin" }}
+        />
+      )}
     </div>
   );
 }
@@ -123,18 +132,34 @@ export function DiscardTrack({
   );
 }
 
-/** Desktop-only center surface; keeps the turn marker above the supplied center content. */
+/** Which edge of the center box faces each seat direction — same side the arrow sits on. */
+const EDGE_BORDER_CLASS: Record<SeatDirection, string> = {
+  top: "border-t-4",
+  bottom: "border-b-4",
+  left: "border-l-4",
+  right: "border-r-4",
+};
+
+/** Desktop-only center surface; highlights the edge facing whoever currentSeat is,
+ * and keeps the turn arrow above the supplied center content while it's a live turn. */
 export function DesktopCenterSlot({
   center,
-  currentDirection,
+  turnHighlight,
 }: {
   center: ReactNode;
-  currentDirection: SeatDirection | undefined;
+  turnHighlight: TurnHighlight | undefined;
 }) {
   return (
-    <div className="relative grid h-full w-full place-items-center overflow-hidden rounded-md bg-green-950/50 dark:bg-black/50">
+    <div
+      className={cn(
+        "relative grid h-full w-full place-items-center overflow-hidden rounded-md border-transparent bg-green-950/50 dark:bg-black/50",
+        turnHighlight && EDGE_BORDER_CLASS[turnHighlight.direction],
+        turnHighlight?.tone === "active" && "border-amber-400",
+        turnHighlight?.tone === "pending" && "border-slate-400",
+      )}
+    >
       {center}
-      {currentDirection && <TurnIndicator direction={currentDirection} />}
+      {turnHighlight?.tone === "active" && <TurnIndicator direction={turnHighlight.direction} />}
     </div>
   );
 }

@@ -72,6 +72,7 @@ export function useTablePresentation({
   pendingDiscardOrigin,
   gameNumber = 1,
   rulesetId,
+  dealer,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
@@ -83,6 +84,8 @@ export function useTablePresentation({
   /** RoomInfo.rulesetId — only used to gate the caishen tile highlight (see
    * mahjongTiles.ts's isCaishenTile); nothing else here branches on it. */
   rulesetId?: string | undefined;
+  /** RoomInfo.dealer — which seat gets InfoSlot's crown badge. */
+  dealer?: SeatId | undefined;
 }) {
   if (!view) {
     return undefined;
@@ -172,6 +175,7 @@ export function useTablePresentation({
         handTiles,
         revealed: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
+        isDealer: seat === dealer,
         drawnSlotKey,
         drawnSlotLedgerKey,
         highlightCaishen,

@@ -19,7 +19,7 @@ import {
   type HangzhouGameResultLike,
 } from "@/features/mahjong/components/HangzhouRoundEndOverlay";
 import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
-import { TableBoard } from "@/features/mahjong/components/TableBoard";
+import { TableBoard, type TurnHighlight } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud, TableHudTrigger } from "@/features/mahjong/components/TableHud";
 import {
@@ -28,6 +28,7 @@ import {
   shouldRegisterSnapshotDiff,
 } from "@/features/mahjong/lib/animationLedger";
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
+import { buildStatusBadges } from "@/features/mahjong/lib/statusBadges";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
 import { cn } from "@/shared/lib/utils";
@@ -277,6 +278,7 @@ export function TableView() {
     pendingDiscardOrigin,
     gameNumber: room?.gameNumber ?? 1,
     rulesetId: room?.rulesetId,
+    dealer: room?.dealer,
   });
 
   if (!view) {
@@ -308,6 +310,14 @@ export function TableView() {
   }
 
   const { actionOptions, currentDirection, discards, extras, hasDockActions, seats } = presentation;
+  // currentSeat is still the discarder during awaiting-claims (see
+  // junk/state-machine.ts's applyDiscard), not a new "whoever can claim" seat — so
+  // the center box's highlighted edge switches to a cooler "pending" color and
+  // drops the arrow, rather than looking like a live turn for that seat.
+  const turnHighlight: TurnHighlight | undefined = currentDirection && {
+    direction: currentDirection,
+    tone: extras.phase === "awaiting-claims" ? "pending" : "active",
+  };
   const recommendedAction =
     advice?.recommendedActionIndex === undefined
       ? undefined
@@ -338,18 +348,15 @@ export function TableView() {
               scenario={DESKTOP_TABLE_SCENARIO}
               seats={seats}
               discards={discards}
-              currentDirection={currentDirection}
+              turnHighlight={turnHighlight}
               gameInfo={room && <TableHudTrigger rulesetId={room.rulesetId} />}
               center={
                 <CenterStatus
                   phase={extras.phase ?? "unknown"}
-                  currentSeat={view.currentSeat}
                   wallCount={view.wallCount}
                   error={error}
-                  isTingpai={extras.isTingpai}
-                  isBaotou={extras.isBaotou}
-                  isCaipiao={extras.isCaipiao}
                   dealerStreak={extras.dealerStreak}
+                  badges={buildStatusBadges(extras)}
                 />
               }
               actionDock={
