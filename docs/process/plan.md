@@ -7,8 +7,8 @@
 **专题：垃圾胡扩展规则**
 
 - 目标：连庄（庄家胡牌后继续坐庄，庄家胡牌结算倍率 ×2）、首局随机庄家；杠开 ×2（连续杠开连续翻倍）；混一色 ×2、清一色 ×4、七小对 ×2、碰碰胡 ×2、门清 ×2，全部番型相乘叠加。
-- 进度：Claude Project 已确认首局庄家是 RuleSet 的确定性扩展点；`computeInitialDealer(seed)`、Junk v3 番型/计分、赢家坐庄和既有玩法兼容性已写入契约与规则文档。唯一待拍板项是 Junk 流局后的下一庄（原庄连庄或顺时针轮庄）。
-- 下一步第一个具体动作：确认 Junk 流局轮庄规则；随后先在 core 为三个 RuleSet 和顶层 engine 加 `computeInitialDealer(seed)`，并让 Room 在首局创建前调用它。
+- 进度：Claude Project 已确认首局庄家是 RuleSet 的确定性扩展点；`computeInitialDealer(seed)`、Junk v3 番型/计分、赢家坐庄、流局时逆时针轮到打牌下家和既有玩法兼容性已写入契约与规则文档。
+- 下一步第一个具体动作：在 core 为三个 RuleSet 和顶层 engine 加 `computeInitialDealer(seed)`，并让 Room 在首局创建前调用它。
 
 ## 当前风险 / 开放问题
 
