@@ -1,7 +1,7 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { JunkAction, JunkGameResult, JunkPlayerView, JunkState } from "./types.ts";
+import type { SeatId } from "../../lib/ids.ts";
+import type { JunkEventPayload, JunkPlayerView, JunkState } from "./types.ts";
 
 export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView => {
   const pending = state.pendingClaims;
@@ -39,8 +39,6 @@ export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView =>
   return view;
 };
 
-type EventPayload = { type: string; [key: string]: unknown };
-
 const cloneView = (view: JunkPlayerView): JunkPlayerView => ({
   ...view,
   hand: [...view.hand],
@@ -54,8 +52,6 @@ const cloneView = (view: JunkPlayerView): JunkPlayerView => ({
   ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
   ...(view.result ? { result: view.result } : {}),
 });
-
-const expectPayload = (payload: unknown): EventPayload => payload as EventPayload;
 
 const updateMeld = (
   view: JunkPlayerView,
@@ -72,26 +68,28 @@ const updateMeld = (
  * Rebuild the state a seat can observe from its filtered event stream.
  * It intentionally has no JunkState input, so tests catch accidental leakage.
  */
-export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): JunkPlayerView => {
+export const rebuildPlayerView = (
+  events: readonly GameEvent<JunkEventPayload>[],
+  seat: SeatId,
+): JunkPlayerView => {
   let view: JunkPlayerView | undefined;
   // The dealer's initial 14th tile is dealt, not drawn via TileDrawn, but it's
   // the same "just drew, haven't acted yet" state — see docs/variants/junk.md §7.
   let dealer: SeatId | undefined;
   for (const event of eventsVisibleTo(events, seat)) {
-    const payload = expectPayload(event.payload);
+    const payload = event.payload;
     if (payload.type === "GameStarted") {
-      const handCounts = payload.handCounts as number[];
-      dealer = payload.dealer as SeatId;
+      dealer = payload.dealer;
       view = {
         seat,
         hand: [],
-        seats: handCounts.map((handCount, index) => ({
+        seats: payload.handCounts.map((handCount, index) => ({
           handCount,
           melds: [],
           discards: [],
           justDrawn: index === dealer,
         })),
-        wallCount: payload.wallCount as number,
+        wallCount: payload.wallCount,
         currentSeat: dealer,
         phase: "dealing",
       };
@@ -101,27 +99,27 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
     view = cloneView(view);
     switch (payload.type) {
       case "HandDealt": {
-        if ((payload.seat as SeatId) === seat) {
-          view.hand = [...(payload.tiles as number[])];
+        if (payload.seat === seat) {
+          view.hand = [...payload.tiles];
           // Dealer's HandDealt always carries 14 tiles, so the last index exists.
           if (seat === dealer) view.justDrawn = view.hand[view.hand.length - 1]!;
         }
         break;
       }
       case "TurnStarted":
-        view.currentSeat = payload.seat as SeatId;
+        view.currentSeat = payload.seat;
         view.phase = "playing";
         delete view.myClaimOptions;
         delete view.myClaimResponse;
         break;
       case "TileDrawn":
       case "GangReplacementDrawn": {
-        const drawnSeat = payload.seat as SeatId;
+        const drawnSeat = payload.seat;
         view.seats[drawnSeat]!.justDrawn = true;
         if ("tile" in payload) {
           if (drawnSeat === seat) {
-            view.hand.push(payload.tile as number);
-            view.justDrawn = payload.tile as number;
+            view.hand.push(payload.tile);
+            view.justDrawn = payload.tile;
           }
         } else {
           view.seats[drawnSeat]!.handCount += 1;
@@ -130,8 +128,8 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
         break;
       }
       case "TileDiscarded": {
-        const discardedSeat = payload.seat as SeatId;
-        const tile = payload.tile as number;
+        const discardedSeat = payload.seat;
+        const tile = payload.tile;
         view.seats[discardedSeat]!.handCount -= 1;
         view.seats[discardedSeat]!.discards.push({ tile });
         view.seats[discardedSeat]!.justDrawn = false;
@@ -144,13 +142,13 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
         break;
       }
       case "ClaimWindowOpened":
-        view.myClaimOptions = [...((payload.options as JunkPlayerView["myClaimOptions"]) ?? [])];
+        view.myClaimOptions = [...payload.options];
         break;
       case "LegalActionsUpdated":
-        view.myActionOptions = [...(payload.actions as JunkAction[])];
+        view.myActionOptions = [...payload.actions];
         break;
       case "ClaimResponded":
-        view.myClaimResponse = payload.action as JunkAction;
+        view.myClaimResponse = payload.action;
         break;
       case "ClaimWindowResolved":
         delete view.myClaimOptions;
@@ -159,26 +157,26 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
         // follow-up meld event, so it's the only branch that needs to advance
         // phase/currentSeat itself — chi/peng finish via TurnStarted, gang claims
         // via the GangMade case below.
-        if (payload.result === "unclaimed") {
+        if ("result" in payload) {
           view.phase = "awaiting-draw";
-          view.currentSeat = payload.seat as SeatId;
+          view.currentSeat = payload.seat;
         }
         break;
       case "ChiMade":
       case "PengMade":
       case "GangMade": {
-        const meldSeat = payload.seat as SeatId;
+        const meldSeat = payload.seat;
         view.seats[meldSeat]!.justDrawn = false;
         if (meldSeat === seat) delete view.justDrawn;
-        const gangType = payload.gangType as "anGang" | "buGang" | undefined;
+        const gangType = "gangType" in payload ? payload.gangType : undefined;
         const type =
           payload.type === "ChiMade"
             ? "chi"
             : payload.type === "PengMade"
               ? "peng"
               : (gangType ?? "minGang");
-        const tiles = "tiles" in payload ? [...(payload.tiles as number[])] : [];
-        const from = payload.from as SeatId | undefined;
+        const tiles = "tiles" in payload ? [...payload.tiles] : [];
+        const from = "from" in payload ? payload.from : undefined;
         const privateAnGangReveal =
           type === "anGang" &&
           tiles.length > 0 &&
@@ -242,21 +240,19 @@ export const rebuildPlayerView = (events: readonly GameEvent[], seat: SeatId): J
       }
       case "HuDeclared": {
         view.phase = "finished";
-        const winner = payload.seat as SeatId;
-        if ("groups" in payload) {
-          view.seats[winner]!.winSnapshot = {
-            hand: (payload.hand as TileId[]).map((tile) => STANDARD_TILE_SET.kindOf(tile)),
-            winTile: STANDARD_TILE_SET.kindOf(payload.winTile as TileId),
-            groups: payload.groups as TileKind[][],
-          };
-        }
+        const winner = payload.seat;
+        view.seats[winner]!.winSnapshot = {
+          hand: payload.hand.map((tile) => STANDARD_TILE_SET.kindOf(tile)),
+          winTile: STANDARD_TILE_SET.kindOf(payload.winTile),
+          groups: payload.groups,
+        };
         break;
       }
       case "WallExhausted":
         view.phase = "finished";
         break;
       case "GameEnded":
-        view.result = payload.result as JunkGameResult;
+        view.result = payload.result;
         view.phase = "finished";
         break;
       default:

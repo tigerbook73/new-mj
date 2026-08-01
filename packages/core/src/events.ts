@@ -19,6 +19,11 @@ export const EVENT_TYPES = {
   settled: "Settled",
   gameEnded: "GameEnded",
   wallExhausted: "WallExhausted",
+  // bloodbattle-only (换三张/定缺 prelude), no other ruleset emits these.
+  exchangeThreeSelected: "ExchangeThreeSelected",
+  tilesReceived: "TilesReceived",
+  exchangeCompleted: "ExchangeCompleted",
+  lackChosen: "LackChosen",
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -29,6 +34,21 @@ export type GameEvent<TPayload = unknown> = {
   seq: number;
   visibility: EventVisibility;
   payload: TPayload;
+};
+
+/**
+ * Payload shapes shared verbatim across every ruleset's event stream (junk,
+ * hangzhou, bloodbattle) — the handful of events with no ruleset-specific
+ * fields. Ruleset-specific events (GameStarted, HuDeclared, GangMade, ...)
+ * live in each ruleset's own types.ts since their payload depends on that
+ * ruleset's Action/GameResult types.
+ */
+export type TurnStartedPayload = { type: typeof EVENT_TYPES.turnStarted; seat: SeatId };
+export type WallExhaustedPayload = { type: typeof EVENT_TYPES.wallExhausted };
+export type TileDiscardedPayload = {
+  type: typeof EVENT_TYPES.tileDiscarded;
+  seat: SeatId;
+  tile: number;
 };
 
 export const nextEventSeq = (currentSeq: number): number => {

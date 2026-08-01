@@ -16,6 +16,7 @@ import type {
   JunkApplyResult,
   JunkClaimOption,
   JunkConfig,
+  JunkEventPayload,
   JunkGameResult,
   JunkPendingClaims,
   JunkState,
@@ -49,9 +50,9 @@ export const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats:
 
 export const appendEvent = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   visibility: GameEvent["visibility"],
-  payload: unknown,
+  payload: JunkEventPayload,
 ): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, visibility, payload));
@@ -193,7 +194,7 @@ export const claimOptions = (state: JunkState, seat: SeatId): JunkClaimOption[] 
  * changed in between. */
 export const emitDraw = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   seat: SeatId,
   replacement: boolean,
 ): void => {
@@ -222,7 +223,7 @@ export const emitDraw = (
  */
 export const beginTurn = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   seat: SeatId,
   draw: boolean,
   replacement = false,
@@ -251,7 +252,7 @@ export const beginTurn = (
 export const applyDrawAction = (
   state: JunkState,
   seat: SeatId,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "awaiting-draw" || state.currentSeat !== seat || !state.pendingDraw)
     return fail("DRAW_NOT_AVAILABLE");
@@ -288,7 +289,7 @@ export const settleWins = (
 
 export const finishWin = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   winner: SeatId,
   winType: "zimo" | "ron",
   from?: SeatId,
@@ -326,7 +327,7 @@ export const finishWin = (
 
 export const finishRonWins = (
   state: JunkState,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
   winners: SeatId[],
   from: SeatId,
   tile: TileId,
@@ -355,7 +356,7 @@ export const finishRonWins = (
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.gameEnded, result });
 };
 
-export const resolveUnclaimed = (state: JunkState, events: GameEvent[]): void => {
+export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPayload>[]): void => {
   if (state.pendingClaims!.source === "robKong") {
     const { seat, tile } = state.pendingClaims!.discard;
     delete state.pendingClaims;
@@ -397,7 +398,7 @@ export const applyDiscard = (
   state: JunkState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const hand = state.seats[seat]!.hand;
@@ -435,7 +436,7 @@ export const applyAnGang = (
   state: JunkState,
   seat: SeatId,
   kind: TileKind,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   const tiles = sameKind(state.seats[seat]!.hand, kind).slice(0, 4);
@@ -462,7 +463,7 @@ export const applyBuGang = (
   state: JunkState,
   seat: SeatId,
   tile: TileId,
-  events: GameEvent[],
+  events: GameEvent<JunkEventPayload>[],
 ): JunkApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
@@ -526,7 +527,7 @@ export const createJunkGame = (
     seq: 0,
     prng: shuffled.prng,
   };
-  const events: GameEvent[] = [];
+  const events: GameEvent<JunkEventPayload>[] = [];
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gameStarted,
     config: state.config,

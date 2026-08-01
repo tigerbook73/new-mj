@@ -3,13 +3,21 @@ import { createEvent, EVENT_TYPES, nextEventSeq } from "../../events.ts";
 import type { SeatId, TileKind } from "../../lib/ids.ts";
 import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
 import { ronCandidates } from "./tingpai.ts";
-import type { BloodbattleState } from "./types.ts";
+import type {
+  BloodbattleEventPayload,
+  BloodbattleSettledReason,
+  BloodbattleState,
+} from "./types.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 
 const seats = BLOODBATTLE_SEATS;
 type ScoreDeltas = [number, number, number, number];
 
-const append = (state: BloodbattleState, events: GameEvent[], payload: unknown): void => {
+const append = (
+  state: BloodbattleState,
+  events: GameEvent<BloodbattleEventPayload>[],
+  payload: BloodbattleEventPayload,
+): void => {
   state.seq = nextEventSeq(state.seq);
   events.push(createEvent(state.seq, { type: "public" }, payload));
 };
@@ -72,15 +80,18 @@ const maxRonMultiplier = (state: BloodbattleState, seat: SeatId): number => {
 
 const emitSettlement = (
   state: BloodbattleState,
-  events: GameEvent[],
-  reason: string,
+  events: GameEvent<BloodbattleEventPayload>[],
+  reason: BloodbattleSettledReason,
   deltas: ScoreDeltas,
 ): void => {
   if (deltas.some((delta) => delta !== 0))
     append(state, events, { type: EVENT_TYPES.settled, reason, scoreDeltas: deltas });
 };
 
-const settleHuaZhu = (state: BloodbattleState, events: GameEvent[]): Set<SeatId> => {
+const settleHuaZhu = (
+  state: BloodbattleState,
+  events: GameEvent<BloodbattleEventPayload>[],
+): Set<SeatId> => {
   const huaZhu = new Set(
     seats.filter((seat) => state.status[seat] === "active" && isHuaZhu(state, seat)),
   );
@@ -97,7 +108,7 @@ const settleHuaZhu = (state: BloodbattleState, events: GameEvent[]): Set<SeatId>
 
 const settleGangRefund = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   huaZhu: ReadonlySet<SeatId>,
   ting: ReadonlySet<SeatId>,
 ): void => {
@@ -116,7 +127,7 @@ const settleGangRefund = (
 
 const settleDaJiao = (
   state: BloodbattleState,
-  events: GameEvent[],
+  events: GameEvent<BloodbattleEventPayload>[],
   huaZhu: ReadonlySet<SeatId>,
   ting: ReadonlySet<SeatId>,
   maxRon: readonly number[],
@@ -137,7 +148,10 @@ const settleDaJiao = (
   emitSettlement(state, events, "daJiao", deltas);
 };
 
-export const settleBloodbattleDraw = (state: BloodbattleState, events: GameEvent[]): void => {
+export const settleBloodbattleDraw = (
+  state: BloodbattleState,
+  events: GameEvent<BloodbattleEventPayload>[],
+): void => {
   const active = seats.filter((seat) => state.status[seat] === "active");
   const huaZhu = settleHuaZhu(state, events);
   const ting = new Set<SeatId>();

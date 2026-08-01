@@ -1,7 +1,14 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat.ts";
 import type { PrngState } from "../../lib/prng.ts";
-import type { ApplyResult, GameConfig, PlayerViewBase } from "../../types.ts";
+import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
+import {
+  EVENT_TYPES,
+  type GameEvent,
+  type TileDiscardedPayload,
+  type TurnStartedPayload,
+  type WallExhaustedPayload,
+} from "../../events.ts";
 import { HANGZHOU_MULTI_HU_POLICIES, HANGZHOU_PHASES } from "./constants.ts";
 
 export type HangzhouPhase = (typeof HANGZHOU_PHASES)[number];
@@ -128,4 +135,122 @@ export type HangzhouPlayerView = Omit<PlayerViewBase, "seats"> & {
   dealerStreak: number;
 };
 
-export type HangzhouApplyResult = ApplyResult<HangzhouState>;
+export type HangzhouGameStartedPayload = {
+  type: typeof EVENT_TYPES.gameStarted;
+  config: HangzhouConfig;
+  dealer: SeatId;
+  handCounts: number[];
+  wallCount: number;
+};
+
+export type HangzhouHandDealtPayload = {
+  type: typeof EVENT_TYPES.handDealt;
+  seat: SeatId;
+  tiles: TileId[];
+};
+
+/** TileDrawn/GangReplacementDrawn are each emitted twice per draw: a public
+ * instance with no `tile` and a seat-visible instance with `tile` — see
+ * state-machine.ts's emitDraw. */
+export type HangzhouTileDrawnPayload =
+  | { type: typeof EVENT_TYPES.tileDrawn | typeof EVENT_TYPES.gangReplacementDrawn; seat: SeatId }
+  | {
+      type: typeof EVENT_TYPES.tileDrawn | typeof EVENT_TYPES.gangReplacementDrawn;
+      seat: SeatId;
+      tile: TileId;
+    };
+
+export type HangzhouClaimWindowOpenedPayload = {
+  type: typeof EVENT_TYPES.claimWindowOpened;
+  options: HangzhouClaimOption[];
+};
+
+export type HangzhouClaimRespondedPayload = {
+  type: typeof EVENT_TYPES.claimResponded;
+  action: HangzhouAction;
+};
+
+/** Two distinct outcomes share one event type: a discard that drew no claims
+ * at all (`result: "unclaimed"`, see resolveUnclaimed) vs one resolved by a
+ * winning claim (see claims.ts resolveClaimWindow) — the latter carries no
+ * `result` field, only the winning `action`'s type. */
+export type HangzhouClaimWindowResolvedPayload =
+  | { type: typeof EVENT_TYPES.claimWindowResolved; result: "unclaimed"; seat: SeatId }
+  | {
+      type: typeof EVENT_TYPES.claimWindowResolved;
+      seat: SeatId;
+      action: HangzhouClaimAction["type"];
+    };
+
+export type HangzhouLegalActionsUpdatedPayload = {
+  type: typeof EVENT_TYPES.legalActionsUpdated;
+  actions: readonly HangzhouAction[];
+};
+
+/** GangMade covers three declaration shapes: anGang (public instance hides
+ * `tiles`, seat-visible instance reveals them — see applyAnGang), buGang
+ * (always public, always reveals `tiles` — see applyBuGang), and a claimed
+ * minGang (public, carries `from` instead of `gangType` — see claims.ts
+ * resolveClaimWindow). */
+export type HangzhouGangMadePayload =
+  | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; gangType: "anGang" }
+  | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; gangType: "anGang"; tiles: TileId[] }
+  | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; gangType: "buGang"; tiles: TileId[] }
+  | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; tiles: TileId[]; from: SeatId };
+
+export type HangzhouChiMadePayload = {
+  type: "ChiMade";
+  seat: SeatId;
+  tiles: TileId[];
+  from: SeatId;
+};
+
+export type HangzhouPengMadePayload = {
+  type: "PengMade";
+  seat: SeatId;
+  tiles: TileId[];
+  from: SeatId;
+};
+
+export type HangzhouHuDeclaredPayload = {
+  type: typeof EVENT_TYPES.huDeclared;
+  seat: SeatId;
+  winType: "zimo" | "ron";
+  hand: TileId[];
+  winTile: TileId;
+  groups: TileKind[][];
+  fanTypes: string[];
+  multiplier: number;
+  from?: SeatId;
+};
+
+export type HangzhouSettledPayload = {
+  type: typeof EVENT_TYPES.settled;
+  scoreDeltas: [number, number, number, number];
+};
+
+export type HangzhouGameEndedPayload = {
+  type: typeof EVENT_TYPES.gameEnded;
+  result: HangzhouGameResult;
+};
+
+export type HangzhouEventPayload =
+  | HangzhouGameStartedPayload
+  | HangzhouHandDealtPayload
+  | TurnStartedPayload
+  | HangzhouTileDrawnPayload
+  | TileDiscardedPayload
+  | HangzhouClaimWindowOpenedPayload
+  | HangzhouClaimRespondedPayload
+  | HangzhouClaimWindowResolvedPayload
+  | HangzhouLegalActionsUpdatedPayload
+  | HangzhouGangMadePayload
+  | HangzhouChiMadePayload
+  | HangzhouPengMadePayload
+  | HangzhouHuDeclaredPayload
+  | HangzhouSettledPayload
+  | HangzhouGameEndedPayload
+  | WallExhaustedPayload;
+
+export type HangzhouApplyResult =
+  { state: HangzhouState; events: GameEvent<HangzhouEventPayload>[] } | { error: RuleViolation };

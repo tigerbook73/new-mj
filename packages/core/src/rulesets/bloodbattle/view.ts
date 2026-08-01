@@ -1,6 +1,6 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
 import type { SeatId } from "../../lib/ids.ts";
-import type { BloodbattlePlayerView, BloodbattleState } from "./types.ts";
+import type { BloodbattleEventPayload, BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 const publicMelds = (state: BloodbattleState, seat: SeatId) =>
@@ -58,8 +58,6 @@ export const getPlayerView = (state: BloodbattleState, seat: SeatId): Bloodbattl
   ...(state.result ? { result: state.result } : {}),
 });
 
-type EventPayload = { type: string; [key: string]: unknown };
-
 const cloneView = (view: BloodbattlePlayerView): BloodbattlePlayerView => ({
   ...view,
   hand: [...view.hand],
@@ -83,8 +81,6 @@ const cloneView = (view: BloodbattlePlayerView): BloodbattlePlayerView => ({
   ...(view.result ? { result: { ...view.result, winners: [...view.result.winners] } } : {}),
 });
 
-const payloadOf = (payload: unknown): EventPayload => payload as EventPayload;
-
 const removeKind = (hand: number[], tileKind: string, count: number): void => {
   let remaining = count;
   for (let index = hand.length - 1; index >= 0 && remaining > 0; index -= 1) {
@@ -104,28 +100,26 @@ const markClaimed = (view: BloodbattlePlayerView, from: SeatId, kind: string, by
 
 /** Rebuild a seat's public view from only the events visible to that seat. */
 export const rebuildPlayerView = (
-  events: readonly GameEvent[],
+  events: readonly GameEvent<BloodbattleEventPayload>[],
   seat: SeatId,
 ): BloodbattlePlayerView => {
   let view: BloodbattlePlayerView | undefined;
   let exchangeTiles: number[] | undefined;
   for (const event of eventsVisibleTo(events, seat)) {
-    const payload = payloadOf(event.payload);
+    const payload = event.payload;
     if (payload.type === "GameStarted") {
-      const config = payload.config as { exchangeThree?: boolean };
-      const handCounts = payload.handCounts as number[];
       view = {
         seat,
         hand: [],
-        seats: handCounts.map((handCount) => ({
+        seats: payload.handCounts.map((handCount) => ({
           handCount,
           melds: [],
           discards: [],
           status: "active",
         })),
-        wallCount: payload.wallCount as number,
-        currentSeat: payload.dealer as SeatId,
-        phase: config.exchangeThree ? "exchanging" : "choosing-lack",
+        wallCount: payload.wallCount,
+        currentSeat: payload.dealer,
+        phase: payload.config.exchangeThree ? "exchanging" : "choosing-lack",
         scores: [0, 0, 0, 0],
       };
       continue;
@@ -134,15 +128,15 @@ export const rebuildPlayerView = (
     view = cloneView(view);
     switch (payload.type) {
       case "HandDealt":
-        if (payload.seat === seat) view.hand = [...(payload.tiles as number[])];
+        if (payload.seat === seat) view.hand = [...payload.tiles];
         break;
       case "ExchangeThreeSelected":
         if (event.visibility.type === "seat" && event.visibility.seats.includes(seat))
-          exchangeTiles = [...(payload.tiles as number[])];
+          exchangeTiles = [...payload.tiles];
         break;
       case "TilesReceived":
         if (event.visibility.type === "seat" && event.visibility.seats.includes(seat))
-          view.hand.push(...(payload.tiles as number[]));
+          view.hand.push(...payload.tiles);
         break;
       case "ExchangeCompleted":
         if (exchangeTiles) {
@@ -155,117 +149,100 @@ export const rebuildPlayerView = (
         view.phase = "choosing-lack";
         break;
       case "LackChosen":
-        if (
-          event.visibility.type === "seat" &&
-          event.visibility.seats.includes(seat) &&
-          payload.suit
-        )
-          view.myLackSuit = payload.suit as "m" | "p" | "s";
+        if (event.visibility.type === "seat" && event.visibility.seats.includes(seat))
+          view.myLackSuit = payload.suit;
         break;
       case "TurnStarted":
-        view.currentSeat = payload.seat as SeatId;
+        view.currentSeat = payload.seat;
         view.phase = "playing";
         delete view.myClaimOptions;
         delete view.myClaimResponse;
         break;
       case "TileDrawn":
       case "GangReplacementDrawn": {
-        const drawnSeat = payload.seat as SeatId;
+        const drawnSeat = payload.seat;
         view.wallCount -= 1;
         view.seats[drawnSeat]!.handCount += 1;
         break;
       }
       case "TileDrawnPrivate":
-        if (payload.seat === seat) view.hand.push(payload.tile as number);
+        if (payload.seat === seat) view.hand.push(payload.tile);
         break;
       case "TileDiscarded": {
-        const discardedSeat = payload.seat as SeatId;
-        const tile = payload.tile as number;
+        const discardedSeat = payload.seat;
+        const tile = payload.tile;
         const tileKind = BLOODBATTLE_TILE_SET.kindOf(tile);
         view.seats[discardedSeat]!.handCount -= 1;
-        view.seats[discardedSeat]!.discards.push({ tile: tileKind as never });
-        view.lastDiscard = { seat: discardedSeat, tile: tileKind as never };
+        view.seats[discardedSeat]!.discards.push({ tile: tileKind });
+        view.lastDiscard = { seat: discardedSeat, tile: tileKind };
         view.phase = "awaiting-claims";
         break;
       }
       case "TileDiscardedPrivate":
         if (payload.seat === seat) {
-          const index = view.hand.indexOf(payload.tile as number);
+          const index = view.hand.indexOf(payload.tile);
           if (index >= 0) view.hand.splice(index, 1);
         }
         break;
-      case "ClaimWindowOpened":
+      case "ClaimWindowOpened": {
         view.phase = "awaiting-claims";
-        {
-          const tile = payload.tile as number;
-          const tileKind = BLOODBATTLE_TILE_SET.kindOf(tile);
-          view.lastDiscard = {
-            seat: payload.seat as SeatId,
-            tile: tileKind as never,
-          };
-        }
-        if (payload.options && (payload.options as Record<string, unknown>)[seat])
-          view.myClaimOptions = [
-            ...(((payload.options as Record<string, unknown>)[
-              seat
-            ] as BloodbattlePlayerView["myClaimOptions"]) ?? []),
-          ];
+        const tileKind = BLOODBATTLE_TILE_SET.kindOf(payload.tile);
+        view.lastDiscard = { seat: payload.seat, tile: tileKind };
+        const own = payload.options[seat];
+        if (own) view.myClaimOptions = [...own];
         break;
+      }
       case "ClaimResponded":
-        if (payload.seat === seat && payload.action)
-          view.myClaimResponse = payload.action as NonNullable<
-            BloodbattlePlayerView["myClaimResponse"]
-          >;
+        if (payload.seat === seat) view.myClaimResponse = payload.action;
         break;
       case "ClaimWindowResolved":
         // Only ever emitted for the "nobody claimed" result (see drawNext) — a
         // claimed peng/minGang/hu has its own PengMade/GangMade/HuDeclared event to
         // carry this signal instead, so there's no other branch to handle here.
-        if (payload.result === "unclaimed") {
-          view.phase = "awaiting-draw";
-          view.currentSeat = payload.seat as SeatId;
-        }
+        view.phase = "awaiting-draw";
+        view.currentSeat = payload.seat;
         break;
       case "PengMade": {
-        const meldSeat = payload.seat as SeatId;
-        const tiles = (payload.tiles as number[]) ?? [];
-        const tileKind = tiles.length > 0 ? BLOODBATTLE_TILE_SET.kindOf(tiles[0]!) : "";
+        const meldSeat = payload.seat;
+        // tiles is always the 3-element [pair, pair, claimed] triple — see resolveClaims.
+        const tileKind = BLOODBATTLE_TILE_SET.kindOf(payload.tiles[0]!);
         view.seats[meldSeat]!.handCount -= 2;
         view.seats[meldSeat]!.melds.push({
           type: "peng",
-          tiles: [tileKind, tileKind, tileKind] as never,
-          from: payload.from as SeatId,
+          tiles: [tileKind, tileKind, tileKind],
+          from: payload.from,
         });
         if (meldSeat === seat) removeKind(view.hand, tileKind, 2);
-        markClaimed(view, payload.from as SeatId, tileKind, meldSeat);
+        markClaimed(view, payload.from, tileKind, meldSeat);
         delete view.myClaimOptions;
         delete view.myClaimResponse;
         break;
       }
       case "GangMade": {
-        const meldSeat = payload.seat as SeatId;
-        const gangType = payload.gangType as "anGang" | "buGang" | "minGang";
-        const tiles = (payload.tiles as number[]) ?? [];
-        const tileKind = tiles.length > 0 ? BLOODBATTLE_TILE_SET.kindOf(tiles[0]!) : "";
-        const kinds = tiles.map((t) => BLOODBATTLE_TILE_SET.kindOf(t));
+        const meldSeat = payload.seat;
+        const gangType = payload.gangType;
+        // anGang/buGang carry kind-level `kinds` directly; only a claimed minGang
+        // carries raw `tiles`, converted to kinds here (see BloodbattleGangMadePayload).
+        const kinds =
+          "kinds" in payload ? payload.kinds : payload.tiles.map(BLOODBATTLE_TILE_SET.kindOf);
+        const tileKind = kinds.length > 0 ? kinds[0]! : "";
         const existing = view.seats[meldSeat]!.melds.find(
           (meld) => meld.type === "peng" && meld.tiles[0] === tileKind,
         );
         if (gangType === "buGang" && existing) {
           existing.type = "buGang";
-          existing.tiles = kinds as never;
+          existing.tiles = kinds;
         } else {
           view.seats[meldSeat]!.melds.push({
             type: gangType,
-            tiles: kinds as never,
-            ...(payload.from === undefined ? {} : { from: payload.from as SeatId }),
+            tiles: kinds,
+            ...("from" in payload ? { from: payload.from } : {}),
           });
         }
         const used = gangType === "anGang" ? 4 : gangType === "minGang" ? 3 : 1;
         view.seats[meldSeat]!.handCount -= used;
         if (meldSeat === seat) removeKind(view.hand, tileKind, used);
-        if (payload.from !== undefined)
-          markClaimed(view, payload.from as SeatId, tileKind, meldSeat);
+        if ("from" in payload) markClaimed(view, payload.from, tileKind, meldSeat);
         delete view.myClaimOptions;
         delete view.myClaimResponse;
         // Every gang — self-gang or claimed minGang — is followed by a draw (never
@@ -275,32 +252,27 @@ export const rebuildPlayerView = (
         break;
       }
       case "HuDeclared": {
-        const winner = payload.seat as SeatId;
-        const snapshot = payload.snapshot as {
-          hand: number[];
-          winTile: number;
-          lack: BloodbattlePlayerView["myLackSuit"];
-          melds: Array<{ type: string; tiles: number[]; from?: SeatId }>;
-        };
+        const winner = payload.seat;
+        const snapshot = payload.snapshot;
         view.seats[winner]!.status = "won";
         view.seats[winner]!.handCount = 0;
         view.seats[winner]!.winSnapshot = {
-          hand: snapshot.hand.map((t) => BLOODBATTLE_TILE_SET.kindOf(t)) as never,
-          winTile: BLOODBATTLE_TILE_SET.kindOf(snapshot.winTile) as never,
-          lack: snapshot.lack!,
+          hand: snapshot.hand.map((t) => BLOODBATTLE_TILE_SET.kindOf(t)),
+          winTile: BLOODBATTLE_TILE_SET.kindOf(snapshot.winTile),
+          lack: snapshot.lack,
           melds: snapshot.melds.map((meld) => ({
-            type: meld.type as never,
-            tiles: meld.tiles.map((t) => BLOODBATTLE_TILE_SET.kindOf(t)) as never,
-            ...(meld.from === undefined ? {} : { from: meld.from as never }),
-          })) as BloodbattlePlayerView["seats"][number]["melds"],
+            type: meld.type,
+            tiles: meld.tiles.map((t) => BLOODBATTLE_TILE_SET.kindOf(t)),
+            ...(meld.from === undefined ? {} : { from: meld.from }),
+          })),
         };
-        view.scores[winner] += (payload.scoring as { multiplier: number }).multiplier;
+        view.scores[winner] += payload.scoring.multiplier;
         delete view.myClaimOptions;
         delete view.myClaimResponse;
         break;
       }
       case "Settled": {
-        const deltas = payload.scoreDeltas as number[];
+        const deltas = payload.scoreDeltas;
         view.scores = view.scores.map(
           (score, index) => score + deltas[index]!,
         ) as BloodbattlePlayerView["scores"];
@@ -310,8 +282,7 @@ export const rebuildPlayerView = (
         view.phase = "finished";
         break;
       case "GameEnded":
-        if (payload.result)
-          view.result = payload.result as NonNullable<BloodbattlePlayerView["result"]>;
+        view.result = payload.result;
         view.phase = "finished";
         break;
       default:

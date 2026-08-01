@@ -1,14 +1,9 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
+import type { SeatId } from "../../lib/ids.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { isBaotou, isTingpai } from "./hand.ts";
-import type {
-  HangzhouAction,
-  HangzhouGameResult,
-  HangzhouPlayerView,
-  HangzhouState,
-} from "./types.ts";
+import type { HangzhouEventPayload, HangzhouPlayerView, HangzhouState } from "./types.ts";
 import { configOf, kindsOf } from "./state-machine.ts";
 
 export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlayerView => {
@@ -52,8 +47,6 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
   return view;
 };
 
-type EventPayload = { type: string; [key: string]: unknown };
-
 const cloneView = (view: HangzhouPlayerView): HangzhouPlayerView => ({
   ...view,
   hand: [...view.hand],
@@ -67,8 +60,6 @@ const cloneView = (view: HangzhouPlayerView): HangzhouPlayerView => ({
   ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
   ...(view.result ? { result: view.result } : {}),
 });
-
-const expectPayload = (payload: unknown): EventPayload => payload as EventPayload;
 
 const updateMeld = (
   view: HangzhouPlayerView,
@@ -89,27 +80,26 @@ const updateMeld = (
  * is a cumulative counter that can't be derived from the final hand alone.
  */
 export const rebuildPlayerView = (
-  events: readonly GameEvent[],
+  events: readonly GameEvent<HangzhouEventPayload>[],
   seat: SeatId,
 ): HangzhouPlayerView => {
   let view: HangzhouPlayerView | undefined;
   let dealer: SeatId | undefined;
   let caiPiaoCount = 0;
   for (const event of eventsVisibleTo(events, seat)) {
-    const payload = expectPayload(event.payload);
+    const payload = event.payload;
     if (payload.type === "GameStarted") {
-      const handCounts = payload.handCounts as number[];
-      dealer = payload.dealer as SeatId;
+      dealer = payload.dealer;
       view = {
         seat,
         hand: [],
-        seats: handCounts.map((handCount, index) => ({
+        seats: payload.handCounts.map((handCount, index) => ({
           handCount,
           melds: [],
           discards: [],
           justDrawn: index === dealer,
         })),
-        wallCount: payload.wallCount as number,
+        wallCount: payload.wallCount,
         currentSeat: dealer,
         phase: "dealing",
         isTingpai: false,
@@ -117,7 +107,7 @@ export const rebuildPlayerView = (
         isCaipiao: false,
         // dealerStreak is fixed for the whole game, set once here from
         // GameStarted's config and carried through every cloneView spread.
-        dealerStreak: (payload.config as { dealerStreak: number }).dealerStreak,
+        dealerStreak: payload.config.dealerStreak,
       };
       continue;
     }
@@ -125,26 +115,26 @@ export const rebuildPlayerView = (
     view = cloneView(view);
     switch (payload.type) {
       case "HandDealt": {
-        if ((payload.seat as SeatId) === seat) {
-          view.hand = [...(payload.tiles as number[])];
+        if (payload.seat === seat) {
+          view.hand = [...payload.tiles];
           if (seat === dealer) view.justDrawn = view.hand[view.hand.length - 1]!;
         }
         break;
       }
       case "TurnStarted":
-        view.currentSeat = payload.seat as SeatId;
+        view.currentSeat = payload.seat;
         view.phase = "playing";
         delete view.myClaimOptions;
         delete view.myClaimResponse;
         break;
       case "TileDrawn":
       case "GangReplacementDrawn": {
-        const drawnSeat = payload.seat as SeatId;
+        const drawnSeat = payload.seat;
         view.seats[drawnSeat]!.justDrawn = true;
         if ("tile" in payload) {
           if (drawnSeat === seat) {
-            view.hand.push(payload.tile as number);
-            view.justDrawn = payload.tile as number;
+            view.hand.push(payload.tile);
+            view.justDrawn = payload.tile;
           }
         } else {
           view.seats[drawnSeat]!.handCount += 1;
@@ -153,8 +143,8 @@ export const rebuildPlayerView = (
         break;
       }
       case "TileDiscarded": {
-        const discardedSeat = payload.seat as SeatId;
-        const tile = payload.tile as TileId;
+        const discardedSeat = payload.seat;
+        const tile = payload.tile;
         if (discardedSeat === seat) {
           const meldsCount = view.seats[seat]!.melds.length;
           const justDrawnTile = view.justDrawn;
@@ -182,39 +172,37 @@ export const rebuildPlayerView = (
         break;
       }
       case "ClaimWindowOpened":
-        view.myClaimOptions = [
-          ...((payload.options as HangzhouPlayerView["myClaimOptions"]) ?? []),
-        ];
+        view.myClaimOptions = [...payload.options];
         break;
       case "LegalActionsUpdated":
-        view.myActionOptions = [...(payload.actions as HangzhouAction[])];
+        view.myActionOptions = [...payload.actions];
         break;
       case "ClaimResponded":
-        view.myClaimResponse = payload.action as HangzhouAction;
+        view.myClaimResponse = payload.action;
         break;
       case "ClaimWindowResolved":
         delete view.myClaimOptions;
         delete view.myClaimResponse;
-        if (payload.result === "unclaimed") {
+        if ("result" in payload) {
           view.phase = "awaiting-draw";
-          view.currentSeat = payload.seat as SeatId;
+          view.currentSeat = payload.seat;
         }
         break;
       case "ChiMade":
       case "PengMade":
       case "GangMade": {
-        const meldSeat = payload.seat as SeatId;
+        const meldSeat = payload.seat;
         view.seats[meldSeat]!.justDrawn = false;
         if (meldSeat === seat) delete view.justDrawn;
-        const gangType = payload.gangType as "anGang" | "buGang" | undefined;
+        const gangType = "gangType" in payload ? payload.gangType : undefined;
         const type =
           payload.type === "ChiMade"
             ? "chi"
             : payload.type === "PengMade"
               ? "peng"
               : (gangType ?? "minGang");
-        const tiles = "tiles" in payload ? [...(payload.tiles as number[])] : [];
-        const from = payload.from as SeatId | undefined;
+        const tiles = "tiles" in payload ? [...payload.tiles] : [];
+        const from = "from" in payload ? payload.from : undefined;
         const privateAnGangReveal =
           type === "anGang" &&
           tiles.length > 0 &&
@@ -274,21 +262,19 @@ export const rebuildPlayerView = (
       }
       case "HuDeclared": {
         view.phase = "finished";
-        const winner = payload.seat as SeatId;
-        if ("groups" in payload) {
-          view.seats[winner]!.winSnapshot = {
-            hand: kindsOf(payload.hand as TileId[]),
-            winTile: STANDARD_TILE_SET.kindOf(payload.winTile as TileId),
-            groups: payload.groups as TileKind[][],
-          };
-        }
+        const winner = payload.seat;
+        view.seats[winner]!.winSnapshot = {
+          hand: kindsOf(payload.hand),
+          winTile: STANDARD_TILE_SET.kindOf(payload.winTile),
+          groups: payload.groups,
+        };
         break;
       }
       case "WallExhausted":
         view.phase = "finished";
         break;
       case "GameEnded":
-        view.result = payload.result as HangzhouGameResult;
+        view.result = payload.result;
         view.phase = "finished";
         break;
       default:

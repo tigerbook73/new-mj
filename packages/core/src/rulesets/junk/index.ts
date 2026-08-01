@@ -20,7 +20,7 @@ import {
 } from "./state-machine.ts";
 import { applyClaimResponse } from "./claims.ts";
 import { getPlayerView, rebuildPlayerView } from "./view.ts";
-import type { JunkAction, JunkApplyResult, JunkState } from "./types.ts";
+import type { JunkAction, JunkApplyResult, JunkEventPayload, JunkState } from "./types.ts";
 
 export { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 export { computeNextJunkDealer, createJunkGame } from "./state-machine.ts";
@@ -73,7 +73,7 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
   },
   applyAction: (input, seat, action) => {
     const state = cloneState(input);
-    const events: GameEvent[] = [];
+    const events: GameEvent<JunkEventPayload>[] = [];
     let result: JunkApplyResult;
     if (action.type === "discard") result = applyDiscard(state, seat, action.tile, events);
     else if (["chi", "peng", "minGang", "hu", "pass"].includes(action.type))
@@ -100,10 +100,14 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
     ...getPlayerView(state, seat),
     myActionOptions: junkRuleSet.getLegalActions(state, seat),
   }),
-  rebuildPlayerView,
+  // RulesetModule's boundary type is untyped GameEvent[] since engine.ts dispatches
+  // across heterogeneous rulesets; junk's own payload union is only meaningful once
+  // narrowed back to this ruleset, which is what rebuildPlayerView does internally.
+  rebuildPlayerView: (events, seat) =>
+    rebuildPlayerView(events as GameEvent<JunkEventPayload>[], seat),
 };
 
-function appendLegalActions(state: JunkState, events: GameEvent[]): void {
+function appendLegalActions(state: JunkState, events: GameEvent<JunkEventPayload>[]): void {
   for (const seat of [0, 1, 2, 3] as const) {
     appendEvent(state, events, seatVisibility(seat), {
       type: EVENT_TYPES.legalActionsUpdated,
