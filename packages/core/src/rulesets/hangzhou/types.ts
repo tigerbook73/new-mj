@@ -100,6 +100,10 @@ export type HangzhouState = {
   wall: TileId[];
   seats: SeatState[];
   currentSeat: SeatId;
+  /** Fixed for the whole game — who dealt this hand; feeds the dealerStreak-tiered
+   * payout multiplier (hangzhou.md §7). Cross-game continuity (who deals the NEXT
+   * game) is computeNextHangzhouDealer's job and isn't tracked by this field. */
+  dealer: SeatId;
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };
@@ -141,6 +145,8 @@ export type HangzhouPlayerView = Omit<PlayerViewBase, "seats"> & {
   /** Public: whether ron is currently allowed (dealerStreak >= 3), see
    * hangzhou.md §5/§11 — santiao is table-wide, not a per-seat secret. */
   dealerStreak: number;
+  /** Public: this game's dealer seat, fixed for the whole game (hangzhou.md §11). */
+  dealer: SeatId;
 };
 
 export type HangzhouGameStartedPayload = {

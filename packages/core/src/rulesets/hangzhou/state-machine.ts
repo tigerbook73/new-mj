@@ -230,6 +230,22 @@ export const applyDrawAction = (
   return { state, events };
 };
 
+// hangzhou.md §7: a second, independent effect of `dealerStreak` (distinct from
+// §5's ron-block threshold) — the dealer's payout tier scales with how many
+// consecutive terms they've held, starting from their very first term.
+const DEALER_STREAK_MULTIPLIERS = [2, 4, 8] as const;
+const dealerBonusMultiplier = (dealerStreak: number): number =>
+  DEALER_STREAK_MULTIPLIERS[Math.min(dealerStreak, DEALER_STREAK_MULTIPLIERS.length) - 1]!;
+
+/** A payment involving the dealer on either side (payer or receiver) gets the
+ * dealerStreak-tiered multiplier on top of the hand's own fan multiplier —
+ * hangzhou.md §7. Doesn't compound when both sides are the dealer (impossible:
+ * a seat never pays itself), so a simple either-side check is exactly the rule. */
+const edgeAmount = (state: HangzhouState, payer: SeatId, receiver: SeatId, payout: number): number =>
+  payer === state.dealer || receiver === state.dealer
+    ? payout * dealerBonusMultiplier(configOf(state).dealerStreak)
+    : payout;
+
 const buildScoringInput = (
   state: HangzhouState,
   seat: SeatId,
@@ -273,8 +289,9 @@ export const finishWin = (
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
   for (const seat of SEAT_IDS) {
     if (seat === winner) continue;
-    scoreDeltas[seat] -= winDetail.payout;
-    scoreDeltas[winner] += winDetail.payout;
+    const amount = edgeAmount(state, seat, winner, winDetail.payout);
+    scoreDeltas[seat] -= amount;
+    scoreDeltas[winner] += amount;
   }
   const result: HangzhouGameResult = {
     type: "win",
@@ -321,8 +338,9 @@ export const finishRonWins = (
       multiplier: scored.multiplier,
       payout: scored.payout,
     });
-    scoreDeltas[from] -= scored.payout;
-    scoreDeltas[winner] += scored.payout;
+    const amount = edgeAmount(state, from, winner, scored.payout);
+    scoreDeltas[from] -= amount;
+    scoreDeltas[winner] += amount;
   }
   const result: HangzhouGameResult = {
     type: "win",
@@ -492,6 +510,7 @@ export const createHangzhouGame = (
     wall: shuffled.wall,
     seats: seats(),
     currentSeat: dealer,
+    dealer,
     seq: 0,
     prng: shuffled.prng,
     caiPiaoCount: [0, 0, 0, 0],

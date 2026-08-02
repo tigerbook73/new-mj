@@ -38,6 +38,7 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
     isBaotou: isBaotou(kindsOf(own.hand), own.melds.length),
     isCaipiao: state.caiPiaoCount[seat] >= 1,
     dealerStreak: configOf(state).dealerStreak,
+    dealer: state.dealer,
   };
   if (state.lastDiscard) view.lastDiscard = { ...state.lastDiscard };
   if (state.justDrawn?.seat === seat) view.justDrawn = state.justDrawn.tile;
@@ -108,6 +109,7 @@ export const rebuildPlayerView = (
         // dealerStreak is fixed for the whole game, set once here from
         // GameStarted's config and carried through every cloneView spread.
         dealerStreak: payload.config.dealerStreak,
+        dealer,
       };
       continue;
     }

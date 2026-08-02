@@ -82,6 +82,14 @@ const checkWinSnapshotInvariant = (state: HangzhouState): string | undefined => 
   return undefined;
 };
 
+/** Every payout is a zero-sum transfer between seats — a bug in the dealer's
+ * streak-tiered multiplier (double-counting or dropping an edge) would break this. */
+const checkScoreDeltasInvariant = (state: HangzhouState): string | undefined => {
+  if (!state.result) return undefined;
+  const sum = state.result.scoreDeltas.reduce((total, delta) => total + delta, 0);
+  return sum === 0 ? undefined : "SCORE_DELTAS_NOT_ZERO_SUM";
+};
+
 export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure | undefined => {
   let prng = createPrng(seed);
   for (let index = 0; index < games; index += 1) {
@@ -101,7 +109,8 @@ export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure 
     };
     const result = playHangzhouGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
-    const invariantError = checkWinSnapshotInvariant(result.state);
+    const invariantError =
+      checkWinSnapshotInvariant(result.state) ?? checkScoreDeltasInvariant(result.state);
     if (invariantError) {
       return { seed: gameSeed.value, config, actions: result.actions, error: invariantError };
     }
