@@ -1,6 +1,11 @@
 import { expect, test } from "vitest";
 import { scoreJunkHand } from "../../src/index.ts";
-import type { JunkScoringInput, JunkScoringMeld, JunkScoringResult, TileKind } from "../../src/index.ts";
+import type {
+  JunkScoringInput,
+  JunkScoringMeld,
+  JunkScoringResult,
+  TileKind,
+} from "../../src/index.ts";
 
 type JunkScoringCase = {
   id: string;

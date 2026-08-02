@@ -18,7 +18,14 @@ import {
   HangzhouRoundEndOverlay,
   type HangzhouGameResultLike,
 } from "@/features/mahjong/components/HangzhouRoundEndOverlay";
-import { RoundEndOverlay } from "@/features/mahjong/components/RoundEndOverlay";
+import {
+  JunkRoundEndOverlay,
+  type JunkGameResultLike,
+} from "@/features/mahjong/components/JunkRoundEndOverlay";
+import {
+  RoundEndOverlay,
+  type GameResultLike,
+} from "@/features/mahjong/components/RoundEndOverlay";
 import { TableBoard, type TurnHighlight } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud, TableHudTrigger } from "@/features/mahjong/components/TableHud";
@@ -466,9 +473,27 @@ export function TableView() {
                   key="round-end-overlay"
                   result={
                     // hangzhou's HangzhouGameResult shape genuinely differs from
-                    // junk/bloodbattle's (winners is a fan-detail array, not
-                    // plain seat numbers) — see HangzhouRoundEndOverlay.tsx.
+                    // bloodbattle's (winners is a fan-detail array, not plain
+                    // seat numbers) — see HangzhouRoundEndOverlay.tsx.
                     extras.result as unknown as HangzhouGameResultLike
+                  }
+                  gameNumber={room.gameNumber}
+                  totalGames={room.totalGames ?? 1}
+                  players={room.players}
+                  myConfirmed={room.players[view.seat]?.isReady === true}
+                  onConfirm={() => void confirmNextRound()}
+                  onEnd={() => void endSession()}
+                  entering={isIncrementalSnapshot && !prefersReducedMotion}
+                  reducedMotion={prefersReducedMotion}
+                  winningHands={winningHands}
+                />
+              ) : room.rulesetId === "junk" ? (
+                <JunkRoundEndOverlay
+                  key="round-end-overlay"
+                  result={
+                    // junk keeps numeric winner seats for the shared room
+                    // contract and exposes fan data separately as winnerDetails.
+                    extras.result as unknown as JunkGameResultLike
                   }
                   gameNumber={room.gameNumber}
                   totalGames={room.totalGames ?? 1}
@@ -483,7 +508,11 @@ export function TableView() {
               ) : (
                 <RoundEndOverlay
                   key="round-end-overlay"
-                  result={extras.result}
+                  result={
+                    // bloodbattle's winners are plain seat numbers, unlike junk/
+                    // hangzhou's fan-detail arrays — see RoundEndOverlay.tsx.
+                    extras.result as unknown as GameResultLike
+                  }
                   gameNumber={room.gameNumber}
                   totalGames={room.totalGames ?? 1}
                   players={room.players}

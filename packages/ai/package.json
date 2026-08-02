@@ -16,6 +16,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src",
     "test": "vitest run",
+    "test:full": "pnpm test",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {

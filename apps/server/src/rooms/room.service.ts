@@ -7,7 +7,6 @@ import {
   type GameConfig,
   type GameEvent,
   type JunkAction,
-  type JunkConfig,
   type JunkPlayerView,
   type OmniscientView,
   type PlayerViewBase,
@@ -295,7 +294,16 @@ export class RoomService {
     if (!this.canStart(room)) {
       throw new RoomServiceError("INVALID_CONFIG", "room is not full and ready");
     }
-    this.beginGame(room);
+    this.beginGame(room, false);
+    // Game 1's dealer is ruleset-chosen from the seed inside beginGame (junk
+    // picks a random seat) — clients cached RoomInfo.dealer at join time, so
+    // broadcast it exactly like nextRound() does, before the first snapshots.
+    this.eventBus.emit("room:dealerChanged", {
+      roomId,
+      dealer: room.dealer,
+      gameNumber: room.gameNumber,
+    });
+    this.emitSnapshots(room);
     this.autoPlayBots(room);
     return room;
   }
@@ -386,11 +394,7 @@ export class RoomService {
     const actions = [...this.gameService.getLegalActions(room.gameState, seat)];
     const recommended =
       room.rulesetId === "junk" && "phase" in view && "dealer" in view
-        ? recommendJunkAction(
-            view as JunkPlayerView,
-            actions as JunkAction[],
-            room.config as JunkConfig,
-          )
+        ? recommendJunkAction(view as JunkPlayerView, actions as JunkAction[])
         : recommendAction(view, actions);
     const recommendedActionIndex =
       recommended === undefined ? undefined : actions.indexOf(recommended);
@@ -528,11 +532,7 @@ export class RoomService {
         const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
         const action =
           room.rulesetId === "junk" && view && "phase" in view && "dealer" in view
-            ? chooseJunkAction(
-                view as JunkPlayerView,
-                legalActions as JunkAction[],
-                room.config as JunkConfig,
-              )
+            ? chooseJunkAction(view as JunkPlayerView, legalActions as JunkAction[])
             : chooseAction(legalActions);
         return { seat: seat as SeatId, action };
       }
@@ -829,6 +829,10 @@ export class RoomService {
     this.clearDrawRevealTimer(room.id);
     room.gameNumber += 1;
     room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
+    if (room.gameNumber === 1) {
+      room.dealer = this.gameService.computeInitialDealer(room.config, room.seed);
+      room.dealerStreak = 1;
+    }
     // dealerStreak is generic session bookkeeping (see room.ts), not part of
     // the room's static config; merge it in per game rather than mutating
     // room.config itself. Rulesets that don't read it simply ignore it.

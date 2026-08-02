@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   applyAction as coreApplyAction,
+  computeInitialDealer as coreComputeInitialDealer,
   computeNextDealer as coreComputeNextDealer,
   createGame as coreCreateGame,
   getLegalActions as coreGetLegalActions,
@@ -21,6 +22,10 @@ import {
  */
 @Injectable()
 export class GameService {
+  computeInitialDealer(config: GameConfig, seed: number): SeatId {
+    return coreComputeInitialDealer(config, seed);
+  }
+
   createGame(config: GameConfig, seed: number, dealer: SeatId): ApplyResult<unknown> {
     return coreCreateGame(config, seed, dealer);
   }

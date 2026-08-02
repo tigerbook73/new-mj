@@ -24,6 +24,7 @@ export * from "./rulesets/hangzhou/fuzz.ts";
 export type { RulesetModule } from "./engine.ts";
 export {
   applyAction,
+  computeInitialDealer,
   computeNextDealer,
   createGame,
   getLegalActions,

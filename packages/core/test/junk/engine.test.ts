@@ -26,11 +26,7 @@ const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState =
 };
 
 const playDeterministically = (seed: number): JunkState => {
-  const started = createJunkGame(seed, 0, {
-    sevenPairs: seed % 2 === 0,
-    robKong: seed % 3 === 0,
-    multiHuPolicy: seed % 5 === 0 ? "all" : "headJump",
-  });
+  const started = createJunkGame(seed, 0);
   if ("error" in started) throw new Error(started.error.code);
   let state = started.state;
   for (let step = 0; step < 500 && state.phase !== "finished"; step += 1) {
@@ -74,14 +70,12 @@ test("junk opens a deterministic complete game with private hands", () => {
   ).toHaveLength(4);
 });
 
-test("junk config accepts supported switches and rejects invalid values", () => {
-  expect(parseJunkConfig({ sevenPairs: true, robKong: true, multiHuPolicy: "all" })).toEqual({
-    config: { rulesetId: "junk", sevenPairs: true, robKong: true, multiHuPolicy: "all" },
-  });
-  expect(parseJunkConfig({ sevenPairs: "yes" })).toEqual({ error: { code: "INVALID_CONFIG" } });
-  expect(createJunkGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
-    error: { code: "INVALID_CONFIG" },
-  });
+test("junk config has no switches left", () => {
+  expect(parseJunkConfig(undefined)).toEqual({ config: { rulesetId: "junk" } });
+  expect(parseJunkConfig({})).toEqual({ config: { rulesetId: "junk" } });
+  expect(parseJunkConfig({ sevenPairs: true })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(parseJunkConfig({ robKong: false })).toEqual({ error: { code: "INVALID_CONFIG" } });
+  expect(parseJunkConfig({ multiHuPolicy: "all" })).toEqual({ error: { code: "INVALID_CONFIG" } });
 });
 
 test("junk's dealer rotation formula: the winner sits next dealer (docs/variants/junk.md §4)", () => {
@@ -97,6 +91,7 @@ test("junk's dealer rotation formula: the winner sits next dealer (docs/variants
           type: "win",
           winner,
           winners: [winner],
+          winnerDetails: [{ seat: winner, fanTypes: [], multiplier: 1, payout: 0 }],
           winType: "zimo",
           scoreDeltas: [0, 0, 0, 0],
         },
@@ -224,13 +219,13 @@ test("public draw and concealed-gang events never contain a TileId", () => {
   }
 });
 
-test("action logs replay a complete game and fuzz reports no failure", () => {
+test("action logs replay a complete game and fuzz reports no failure", { tags: ["slow"] }, () => {
   const played = playJunkGame(31);
   if ("error" in played) throw new Error(played.error);
   const replayed = playJunkGame(31, {}, played.actions);
   expect(replayed).toEqual(played);
   expect(fuzzJunkGames(1000, 41)).toBeUndefined();
-}, 60_000);
+});
 
 test("illegal actions do not mutate state or consume event sequence", () => {
   const started = createJunkGame(13, 0);
@@ -432,12 +427,12 @@ test("a discard resets gangChain to 0 even after building one up", () => {
 // a seat uninvolved in either payment so these multipliers show up unscaled;
 // the dedicated dealer-doubling tests below reuse this same fixture with
 // dealer set to the payer or a winner instead.
-const multiHuState = (multiHuPolicy: "headJump" | "all", dealer: SeatId = 3): JunkState => {
+const multiHuState = (dealer: SeatId = 3): JunkState => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const seat2Hand = [1, 9, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41];
   const physical = new Set([7, ...seat1Hand, ...seat2Hand]);
   return {
-    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy },
+    config: { rulesetId: "junk" },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -454,43 +449,37 @@ const multiHuState = (multiHuPolicy: "headJump" | "all", dealer: SeatId = 3): Ju
   };
 };
 
-test("multiHuPolicy selects head jump or all ron winners deterministically", () => {
-  let state = unwrap(
-    junkRuleSet.applyAction(multiHuState("headJump"), 0, { type: "discard", tile: 7 }),
-  );
+test("multi-ron always head-jumps deterministically", () => {
+  let state = unwrap(junkRuleSet.applyAction(multiHuState(), 0, { type: "discard", tile: 7 }));
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-8, 8, 0, 0] });
-
-  state = unwrap(junkRuleSet.applyAction(multiHuState("all"), 0, { type: "discard", tile: 7 }));
-  state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
-  state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
-  expect(state.result).toMatchObject({ winner: 1, winners: [1, 2], scoreDeltas: [-10, 8, 2, 0] });
+  expect(state.result).toMatchObject({
+    winnerDetails: [{ seat: 1, fanTypes: ["menqing", "qingyise"], multiplier: 8, payout: 8 }],
+  });
   assertTileConservation(state);
 });
 
 test("dealer's flat x2 applies to a payment involving either the payer or the winner (junk.md §3)", () => {
   // dealer=0: the discarder/payer is the dealer.
-  let state = unwrap(
-    junkRuleSet.applyAction(multiHuState("headJump", 0), 0, { type: "discard", tile: 7 }),
-  );
+  let state = unwrap(junkRuleSet.applyAction(multiHuState(0), 0, { type: "discard", tile: 7 }));
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({ scoreDeltas: [-16, 16, 0, 0] });
 
   // dealer=1: the winner is the dealer — same doubling, not a compounding x4.
-  state = unwrap(junkRuleSet.applyAction(multiHuState("headJump", 1), 0, { type: "discard", tile: 7 }));
+  state = unwrap(junkRuleSet.applyAction(multiHuState(1), 0, { type: "discard", tile: 7 }));
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({ scoreDeltas: [-16, 16, 0, 0] });
 });
 
-test("1000 seeded games finish while preserving tile conservation", () => {
+test("1000 seeded games finish while preserving tile conservation", { tags: ["slow"] }, () => {
   for (let seed = 1; seed <= 1000; seed += 1) {
     const state = playDeterministically(seed);
     expect(state.result).toBeDefined();
   }
-}, 20_000);
+});
 
 test("engine-api createGame/applyAction/getLegalActions/getPlayerView dispatch by rulesetId", () => {
   const started = engineCreateGame({ rulesetId: "junk" }, 7, 0);

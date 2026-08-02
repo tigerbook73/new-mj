@@ -1,3 +1,4 @@
+import type { GangChain } from "../../lib/gang-chain.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
@@ -118,7 +119,7 @@ export type HangzhouState = {
   caiPiaoCount: [number, number, number, number];
   /** Length of the current seat's unbroken consecutive-gang chain, see
    * docs/variants/hangzhou.md §6. Reset to 0 on that seat's next discard. */
-  gangChain: [number, number, number, number];
+  gangChain: GangChain;
   /** Set for each winner right when their hu is declared; never cleared mid-hand. */
   wins?: Partial<Record<SeatId, HangzhouWinSnapshot>>;
 };

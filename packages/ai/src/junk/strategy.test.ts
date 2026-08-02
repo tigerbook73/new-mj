@@ -26,12 +26,10 @@ const view = (hand: TileKind[]): JunkPlayerView => ({
   phase: "playing",
   seats: [0, 1, 2, 3].map(() => ({ handCount: 13, melds: [], discards: [], justDrawn: false })),
 });
-const config = { sevenPairs: false, robKong: false } as const;
-
 describe("junk strategy", () => {
   it("always takes a legal win and preserves its original reference", () => {
     const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
-    expect(recommendJunkAction(view(["1m"]), actions, config)).toBe(actions[1]);
+    expect(recommendJunkAction(view(["1m"]), actions)).toBe(actions[1]);
   });
 
   it("keeps a one-away hand instead of breaking it", () => {
@@ -52,14 +50,14 @@ describe("junk strategy", () => {
       "1s",
     ]);
     const actions: JunkAction[] = player.hand.map((tile) => ({ type: "discard", tile }));
-    const result = chooseJunkAction(player, actions, config);
+    const result = chooseJunkAction(player, actions);
     expect(result.type).toBe("discard");
     if (result.type !== "discard") throw new Error("expected discard");
     expect(actions).toContain(result);
     expect(
       isTingpai(
         player.hand.filter((tile) => tile !== result.tile),
-        { sevenPairs: false },
+        { sevenPairs: true },
       ),
     ).toBe(true);
   });
@@ -69,11 +67,14 @@ describe("junk strategy", () => {
     const first = player.hand[0]!;
     const second = player.hand[2]!;
     expect(
-      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, first, config, [first]),
-    ).toBeGreaterThan(scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, second, config));
+      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, first, [first]),
+    ).toBeGreaterThan(scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, second));
   });
 
-  it("changes hand-shape evaluation when seven pairs is enabled", () => {
+  it("always evaluates seven-pairs potential under Junk's fixed rules", () => {
+    // 6 对 + 7z + 9m：打掉孤张 9m 后按七对听 7z（向听 0）；拆一对 1z 则退回
+    // 向听 1。两者分差主要来自向听 ×100——若七对不再参与向听评估，两个弃牌
+    // 的标准型向听相同，分差会塌缩到个位数，本断言即失败。
     const player = view([
       "1z",
       "1z",
@@ -88,19 +89,26 @@ describe("junk strategy", () => {
       "6z",
       "6z",
       "7z",
-      "7z",
+      "9m",
     ]);
-    expect(
-      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, player.hand[0]!, {
-        ...config,
-        sevenPairs: true,
-      }),
-    ).toBeGreaterThan(
-      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, player.hand[0]!, config),
+    const keepPairs = scoreHandShapeAfterDiscard(
+      { hand: player.hand, melds: [] },
+      player.hand[13]!,
     );
+    const breakPair = scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, player.hand[0]!);
+    expect(keepPairs - breakPair).toBeGreaterThan(50);
+  });
+
+  it("keeps the fixed rob-kong risk when comparing gang actions", () => {
+    const player = view(["1m", "1m", "1m", "1m"]);
+    const actions: JunkAction[] = [
+      { type: "anGang", kind: "1m" },
+      { type: "buGang", tile: player.hand[0]! },
+    ];
+    expect(recommendJunkAction(player, actions)).toBe(actions[0]);
   });
 
   it("throws only when there is no legal action", () => {
-    expect(() => chooseJunkAction(view([]), [], config)).toThrow("no legal actions");
+    expect(() => chooseJunkAction(view([]), [])).toThrow("no legal actions");
   });
 });

@@ -1,9 +1,15 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
-import { createPrng } from "../../lib/prng.ts";
+import { createPrng, nextInt } from "../../lib/prng.ts";
 import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
+import {
+  createGangChain,
+  incrementGangChain,
+  resetGangChain,
+  type GangChain,
+} from "../../lib/gang-chain.ts";
 import {
   decomposeSevenPairsWinningHand,
   decomposeStandardWinningHand,
@@ -12,9 +18,9 @@ import {
 } from "../../lib/standard-hand.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat-state.ts";
-import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
+import { parseJunkConfig } from "./config.ts";
 import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
-import { scoreJunkHand } from "./scoring.ts";
+import { scoreJunkHand, type JunkFanType } from "./scoring.ts";
 import type {
   JunkApplyResult,
   JunkClaimOption,
@@ -27,11 +33,14 @@ import type {
 } from "./types.ts";
 
 export const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], discards: [] }));
+
+export const computeInitialJunkDealer = (seed: number): SeatId =>
+  nextInt(createPrng(seed), SEAT_IDS.length).value as SeatId;
 export const cloneState = (state: JunkState): JunkState => {
   const cloned: JunkState = {
     ...state,
     wall: [...state.wall],
-    gangChain: [...state.gangChain] as JunkState["gangChain"],
+    gangChain: [...state.gangChain] as GangChain,
     seats: state.seats.map((seat) => ({
       hand: [...seat.hand],
       melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
@@ -62,12 +71,6 @@ export const appendEvent = (
 };
 
 export const fail = (code: JunkErrorCode): JunkApplyResult => ({ error: { code } });
-
-export const configOf = (state: JunkState): JunkConfig => ({
-  ...DEFAULT_JUNK_CONFIG,
-  ...state.config,
-  rulesetId: "junk",
-});
 
 export const sameKind = (tiles: readonly TileId[], kind: TileKind): TileId[] =>
   tiles.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === kind);
@@ -108,9 +111,7 @@ export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean =
   const own = state.seats[seat]!;
   return (
     isStandardWinningHand(tiles, STANDARD_TILE_SET) ||
-    (configOf(state).sevenPairs &&
-      own.melds.length === 0 &&
-      isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
+    (own.melds.length === 0 && isSevenPairsWinningHand(tiles, STANDARD_TILE_SET))
   );
 };
 
@@ -125,7 +126,7 @@ const decomposeJunkWin = (
   const own = state.seats[seat]!;
   const standard = decomposeStandardWinningHand(tiles, STANDARD_TILE_SET);
   if (standard) return { family: "standard", groups: standard };
-  if (configOf(state).sevenPairs && own.melds.length === 0) {
+  if (own.melds.length === 0) {
     const sevenPairs = decomposeSevenPairsWinningHand(tiles, STANDARD_TILE_SET);
     if (sevenPairs) return { family: "sevenPairs", groups: sevenPairs };
   }
@@ -270,12 +271,16 @@ export const applyDrawAction = (
  * ×2 on top of the hand's own fan multiplier — junk.md §3. This doesn't
  * compound when both sides happen to be the dealer (impossible: a seat never
  * pays itself), so a simple either-side check is exactly the rule. */
-const edgeAmount = (state: JunkState, payer: SeatId, receiver: SeatId, multiplier: number): number =>
-  payer === state.dealer || receiver === state.dealer ? multiplier * 2 : multiplier;
+const edgeAmount = (
+  state: JunkState,
+  payer: SeatId,
+  receiver: SeatId,
+  multiplier: number,
+): number => (payer === state.dealer || receiver === state.dealer ? multiplier * 2 : multiplier);
 
 export const settleWins = (
   state: JunkState,
-  winners: Array<{ seat: SeatId; multiplier: number }>,
+  winners: Array<{ seat: SeatId; fanTypes: JunkFanType[]; multiplier: number }>,
   winType: "zimo" | "ron",
   from?: SeatId,
 ): JunkGameResult => {
@@ -296,9 +301,30 @@ export const settleWins = (
     }
   }
   const winnerSeats = winners.map(({ seat }) => seat);
+  const winnerDetails = winners.map(({ seat, fanTypes, multiplier }) => ({
+    seat,
+    fanTypes,
+    multiplier,
+    payout: scoreDeltas[seat],
+  }));
   return from === undefined
-    ? { type: "win", winner: winnerSeats[0]!, winners: winnerSeats, winType, scoreDeltas }
-    : { type: "win", winner: winnerSeats[0]!, winners: winnerSeats, winType, from, scoreDeltas };
+    ? {
+        type: "win",
+        winner: winnerSeats[0]!,
+        winners: winnerSeats,
+        winnerDetails,
+        winType,
+        scoreDeltas,
+      }
+    : {
+        type: "win",
+        winner: winnerSeats[0]!,
+        winners: winnerSeats,
+        winnerDetails,
+        winType,
+        from,
+        scoreDeltas,
+      };
 };
 
 export const finishWin = (
@@ -325,7 +351,12 @@ export const finishWin = (
     win: { by: winType },
     gangChainLength: state.gangChain[winner],
   });
-  const result = settleWins(state, [{ seat: winner, multiplier: scored.multiplier }], winType, from);
+  const result = settleWins(
+    state,
+    [{ seat: winner, fanTypes: scored.fanTypes, multiplier: scored.multiplier }],
+    winType,
+    from,
+  );
   state.phase = "finished";
   state.result = result;
   state.wins = { ...state.wins, [winner]: { hand: revealedHand, winTile, groups } };
@@ -384,7 +415,11 @@ export const finishRonWins = (
   });
   const result = settleWins(
     state,
-    scoredWinners.map(({ winner, scored }) => ({ seat: winner, multiplier: scored.multiplier })),
+    scoredWinners.map(({ winner, scored }) => ({
+      seat: winner,
+      fanTypes: scored.fanTypes,
+      multiplier: scored.multiplier,
+    })),
     "ron",
     from,
   );
@@ -424,7 +459,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPa
     meld.type = "buGang";
     meld.tiles.push(tile);
     delete state.justDrawn;
-    state.gangChain[seat] += 1;
+    incrementGangChain(state.gangChain, seat);
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
       result: "unclaimed",
@@ -465,7 +500,7 @@ export const applyDiscard = (
   state.lastDiscard = { seat, tile };
   delete state.justDrawn;
   // A discard always breaks this seat's consecutive-gang chain (junk.md §3/§6).
-  state.gangChain[seat] = 0;
+  resetGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
@@ -502,7 +537,7 @@ export const applyAnGang = (
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
   delete state.justDrawn;
-  state.gangChain[seat] += 1;
+  incrementGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -532,41 +567,26 @@ export const applyBuGang = (
       candidate.type === "peng" && STANDARD_TILE_SET.kindOf(candidate.tiles[0]!) === kind,
   );
   if (!meld) return fail("GANG_NOT_AVAILABLE");
-  if (configOf(state).robKong) {
-    state.pendingClaims = {
-      discard: { seat, tile },
-      source: "robKong",
-      options: {},
-      responses: {},
-    };
-    for (const candidate of SEAT_IDS) {
-      const candidateOptions = claimOptions(state, candidate);
-      if (candidateOptions.length === 0) continue;
-      state.pendingClaims.options[candidate] = candidateOptions;
-      appendEvent(state, events, seatVisibility(candidate), {
-        type: EVENT_TYPES.claimWindowOpened,
-        options: candidateOptions,
-      });
-    }
-    if (Object.keys(state.pendingClaims.options).length > 0) {
-      state.phase = "awaiting-claims";
-      return { state, events };
-    }
-    resolveUnclaimed(state, events);
+  state.pendingClaims = {
+    discard: { seat, tile },
+    source: "robKong",
+    options: {},
+    responses: {},
+  };
+  for (const candidate of SEAT_IDS) {
+    const candidateOptions = claimOptions(state, candidate);
+    if (candidateOptions.length === 0) continue;
+    state.pendingClaims.options[candidate] = candidateOptions;
+    appendEvent(state, events, seatVisibility(candidate), {
+      type: EVENT_TYPES.claimWindowOpened,
+      options: candidateOptions,
+    });
+  }
+  if (Object.keys(state.pendingClaims.options).length > 0) {
+    state.phase = "awaiting-claims";
     return { state, events };
   }
-  state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, [tile])!;
-  meld.type = "buGang";
-  meld.tiles.push(tile);
-  delete state.justDrawn;
-  state.gangChain[seat] += 1;
-  appendEvent(state, events, publicVisibility, {
-    type: EVENT_TYPES.gangMade,
-    seat,
-    gangType: "buGang",
-    tiles: [...meld.tiles],
-  });
-  beginTurn(state, events, seat, true, true);
+  resolveUnclaimed(state, events);
   return { state, events };
 };
 
@@ -585,7 +605,7 @@ export const createJunkGame = (
     seats: seats(),
     currentSeat: dealer,
     dealer,
-    gangChain: [0, 0, 0, 0],
+    gangChain: createGangChain(),
     seq: 0,
     prng: shuffled.prng,
   };

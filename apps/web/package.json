@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src dev",
     "test": "vitest run --passWithNoTests",
+    "test:full": "pnpm test",
     "test:e2e": "playwright test --grep-invert \"@slow|@lab\"",
     "test:e2e:full": "playwright test",
     "test:e2e:lab": "playwright test --grep @lab",

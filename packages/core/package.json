@@ -15,7 +15,9 @@
     "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src test",
-    "test": "vitest run",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "test": "vitest run --tags-filter '!slow'",
+    "test:full": "vitest run",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "verify:full": "pnpm typecheck && pnpm lint && pnpm test:full && pnpm build"
   }
 }

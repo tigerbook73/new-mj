@@ -1,4 +1,5 @@
 import type { GameEvent } from "../../events.ts";
+import { incrementGangChain } from "../../lib/gang-chain.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { seatDistance } from "../../lib/seats.ts";
 import type { SeatId } from "../../lib/ids.ts";
@@ -14,7 +15,6 @@ import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import {
   appendEvent,
   beginTurn,
-  configOf,
   fail,
   finishRonWins,
   publicVisibility,
@@ -43,9 +43,6 @@ export const chooseClaims = (
       : distanceFromDiscarder(pending.discard.seat, left.seat) -
           distanceFromDiscarder(pending.discard.seat, right.seat);
   });
-  if (sorted[0]?.action.type === "hu" && configOf(state).multiHuPolicy === "all") {
-    return sorted.filter((choice) => choice.action.type === "hu");
-  }
   return sorted.slice(0, 1);
 };
 
@@ -91,7 +88,7 @@ export const resolveClaimWindow = (
   state.seats[seat]!.hand = remaining;
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
-  if (action.type === "minGang") state.gangChain[seat] += 1;
+  if (action.type === "minGang") incrementGangChain(state.gangChain, seat);
   const eventType =
     action.type === "chi"
       ? EVENT_TYPES.chiMade

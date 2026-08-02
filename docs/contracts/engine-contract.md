@@ -40,7 +40,8 @@
 
 除了单局内的四签名，`RulesetModule` 还承担其他 dispatch 职责——**这里只列契约签名，具体公式/解释逻辑属于玩法私有，见各 `variants/*.md`**：
 
-- `computeNextDealer(finishedState, currentDealer) → SeatId`（跨局）：给定上一局怎么打完的，下一局谁坐庄。`finishedState` 就是刚打完那局的最终状态，不是新发明的类型。第 1 局的庄家（房主座位）不经过这个方法，由房间层直接决定，见 `session-mechanics.md`。
+- `computeInitialDealer(seed) → SeatId`（首局）：给定本局 seed，确定第 1 局庄家。必须是纯的、可复现的玩法私有公式；Room 生成 seed、调用并保存结果，不按 `rulesetId` 实现规则。现有玩法可保持"座位 0"，Junk v3 用 seed 随机定庄，见各 `variants/*.md`
+- `computeNextDealer(finishedState, currentDealer) → SeatId`（跨局）：给定上一局怎么打完的，下一局谁坐庄。`finishedState` 就是刚打完那局的最终状态，不是新发明的类型
 - 会话排名策略（跨局）：**当前尚未拆成 dispatch 方法**，现状是房间层（`RoomService.computeRanking`）直接实现，两个玩法共用同一份代码——这是待验证的私有决策，不是确认的公共契约，见 `architecture/variant-boundary.md`。新增玩法如果排名逻辑与现状不同，这里预期会新增一个 dispatch 方法（可能命名为 `computeRanking`），而不是分支硬编码进房间层。
 - `rebuildPlayerView(events, seat) → TView`（局内，非跨局）：不经过实时 `state`，直接从一段历史事件流重建某座位的 view——跟 `getPlayerView` 是同一个"事件重建 ≡ 直接派生"不变量的两种入口，区别只是数据来源是存量事件而非当前 state。事件 payload 的解释逻辑是玩法私有的，所以（跟 `computeNextDealer` 同理）必须走 dispatch，不能像 `getOmniscientView`（§8）那样做成跨玩法通用的结构化纯函数。`packages/core/src/engine.ts` 导出的顶层 `rebuildPlayerView(rulesetId, events, seat)` 按 `rulesetId` 显式 dispatch（没有 `state` 可读，不能像其余函数那样从 `state.config.rulesetId` 取）。供阶段 4.5 的 `replay:get` 使用（见 `session-mechanics.md` §10）。
 

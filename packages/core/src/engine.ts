@@ -6,6 +6,8 @@ import { getRuleset } from "./ruleset-registry.ts";
 
 /** engine-api 分发的六个规则集能力；除此之外的玩法导出不构成公共契约。 */
 export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
+  /** 玩法私有的首局定庄公式：给定本局 seed，确定性地返回第 1 局庄家。 */
+  computeInitialDealer: (seed: number) => SeatId;
   createGame: (seed: number, dealer: SeatId, config?: unknown) => ApplyResult<TState>;
   applyAction: (state: TState, seat: SeatId, action: TAction) => ApplyResult<TState>;
   getLegalActions: (state: TState, seat: SeatId) => readonly TAction[];
@@ -17,6 +19,9 @@ export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
 };
 
 type StateWithConfig = { config: GameConfig };
+
+export const computeInitialDealer = (config: GameConfig, seed: number): SeatId =>
+  getRuleset(config.rulesetId)?.computeInitialDealer(seed) ?? 0;
 
 export const createGame = (
   config: GameConfig,

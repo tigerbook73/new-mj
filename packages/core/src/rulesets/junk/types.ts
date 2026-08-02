@@ -1,14 +1,15 @@
+import type { GangChain } from "../../lib/gang-chain.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
 import type { GameEvent } from "../../events.ts";
 import { CORE_ERROR_CODES } from "../../errors.ts";
-import { JUNK_MULTI_HU_POLICIES, JUNK_PHASES } from "./constants.ts";
+import { JUNK_PHASES } from "./constants.ts";
 import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
+import type { JunkFanType } from "./scoring.ts";
 
 export type JunkPhase = (typeof JUNK_PHASES)[number];
-export type JunkMultiHuPolicy = (typeof JUNK_MULTI_HU_POLICIES)[number];
 
 /** junk 的 applyAction/createGame 能返回给调用方的完整错误码集合；`fail`/config 解析都按这个联合收窄，防止拼写漂移。 */
 export type JunkErrorCode =
@@ -42,9 +43,6 @@ export type JunkClaimOption = {
 
 export type JunkConfig = GameConfig & {
   rulesetId: "junk";
-  sevenPairs: boolean;
-  robKong: boolean;
-  multiHuPolicy: JunkMultiHuPolicy;
 };
 
 export type JunkPendingClaims = {
@@ -54,12 +52,23 @@ export type JunkPendingClaims = {
   responses: Partial<Record<SeatId, JunkAction>>;
 };
 
+export type JunkWinnerDetail = {
+  seat: SeatId;
+  fanTypes: JunkFanType[];
+  multiplier: number;
+  /** 该赢家本次结算实收的总分（含庄家 ×2 后的 scoreDeltas[seat]）。 */
+  payout: number;
+};
+
 export type JunkGameResult =
   | { type: "draw"; scoreDeltas: [number, number, number, number] }
   | {
       type: "win";
       winner: SeatId;
       winners: SeatId[];
+      /** 供快照/重连使用的稳定结算明细；数字 winners 座位列表保持不变，
+       * 房间/会话层的既有消费方不受影响。 */
+      winnerDetails: JunkWinnerDetail[];
       winType: "zimo" | "ron";
       from?: SeatId;
       scoreDeltas: [number, number, number, number];
@@ -93,7 +102,7 @@ export type JunkState = {
   dealer: SeatId;
   /** Per-seat consecutive-gang counter feeding the 杠开 bonus (junk.md §3/§6):
    * anGang/buGang/a claimed minGang each +1, that seat's own discard resets to 0. */
-  gangChain: [number, number, number, number];
+  gangChain: GangChain;
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };

@@ -79,7 +79,7 @@ test("shanten property: -1 is equivalent to the direct winning checks", () => {
   }
 });
 
-test("shanten property: every ukeire strictly reduces shanten", () => {
+test("shanten property: every ukeire strictly reduces shanten", { tags: ["slow"] }, () => {
   let prng = createPrng(20260803);
   const allIds = allTileIds();
   for (let trial = 0; trial < 2500; trial += 1) {
@@ -91,4 +91,4 @@ test("shanten property: every ukeire strictly reduces shanten", () => {
       assert.ok(junkShanten([...hand, id(kind)], withSevenPairs) < current);
     }
   }
-}, 30_000);
+});
