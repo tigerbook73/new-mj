@@ -108,7 +108,11 @@ export function TableView() {
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
-  const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
+  // God mode (dev-only, protocol-shared.md §7): renders every seat's real
+  // hand + anGang tiles with the same face-up treatment the bottom seat
+  // gets — see useTablePresentation's `godView` param.
+  const [godMode, setGodMode] = useState(false);
+  const [godView, setGodView] = useState<DebugOmniscientView | null>(null);
   // Pure geometry for the discard-flying-out ghost (see DiscardFlipGhost.tsx
   // / HandRow.tsx's captureTileRect) — never read as game state, only handed
   // to useTablePresentation to attach onto the matching DiscardEntry once
@@ -250,6 +254,27 @@ export function TableView() {
     };
   }, [activeSocket, gameDeadline, gameSeq, snapshotRevision, view]);
 
+  // Refetches on every snapshot while god mode is on, same shape as the
+  // game:advice effect above — a fresh in-flight request always wins over a
+  // stale one via the snapshotRevision guard (session.ts's applyGameAdvice
+  // idiom), since debug:omniscientView's ack carries no seq of its own to
+  // correlate against.
+  useEffect(() => {
+    if (!godMode || !view) return;
+    const requestedRevision = snapshotRevision;
+    let cancelled = false;
+    void ack<DebugOmniscientView>(activeSocket, "debug:omniscientView", {}).then((result) => {
+      if (cancelled || useSessionStore.getState().snapshotRevision !== requestedRevision) return;
+      if (result.ok) setGodView(result.data);
+      // Fails closed and silent (e.g. ALLOW_DEBUG_OMNISCIENT off server-side)
+      // — a dev toggle degrading invisibly, not a user-facing error.
+      else setGodMode(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSocket, godMode, snapshotRevision, view]);
+
   const confirmNextRound = async () => {
     setError(null);
     const result = await ack(activeSocket, "room:ready", { ready: true });
@@ -262,19 +287,6 @@ export function TableView() {
     if (!result.ok) {
       setError(result.code);
     }
-  };
-
-  // Dev/test-only escape hatch (protocol-shared.md §7) — raw TileIds, no
-  // tile-face rendering; server rejects unless
-  // ALLOW_DEBUG_OMNISCIENT is set, so this is a no-op against a normal deploy.
-  const fetchDebugOmniscientView = async () => {
-    setError(null);
-    const result = await ack<DebugOmniscientView>(activeSocket, "debug:omniscientView", {});
-    if (!result.ok) {
-      setError(result.code);
-      return;
-    }
-    setDebugView(result.data);
   };
 
   const leave = async () => {
@@ -329,6 +341,7 @@ export function TableView() {
     gameNumber: room?.gameNumber ?? 1,
     rulesetId: room?.rulesetId,
     dealer: room?.dealer,
+    godView: godMode ? (godView ?? undefined) : undefined,
   });
 
   if (!view) {
@@ -384,8 +397,20 @@ export function TableView() {
     <SidebarProvider defaultOpen={false} className="contents">
       <div
         data-testid="table-page"
-        className="flex h-dvh w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+        className={cn(
+          "flex h-dvh w-full flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
+          // Unmissable, always-on treatment tied to the same boolean that
+          // drives the fetch effect above — god mode can't be on without
+          // this also being on, so a screenshot/recording is never
+          // mistakable for a legitimate (non-omniscient) view.
+          godMode && "ring-4 ring-inset ring-fuchsia-500",
+        )}
       >
+        {godMode && (
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-50 bg-fuchsia-600 py-1 text-center text-xs font-bold tracking-widest text-white">
+            GOD MODE — dev-only, all hands visible
+          </div>
+        )}
         <main
           data-testid="table-stage"
           className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-4"
@@ -580,17 +605,12 @@ export function TableView() {
               <h2 className="font-medium">Debug: omniscient view (dev-only)</h2>
               <Button
                 className="mt-1"
-                variant="outline"
+                variant={godMode ? "default" : "outline"}
                 size="sm"
-                onClick={() => void fetchDebugOmniscientView()}
+                onClick={() => setGodMode((current) => !current)}
               >
-                Show all hands + wall
+                {godMode ? "God mode: on" : "God mode: off"}
               </Button>
-              {debugView && (
-                <pre className="mt-2 max-w-full overflow-x-auto text-muted-foreground">
-                  {JSON.stringify(debugView, null, 2)}
-                </pre>
-              )}
             </div>
           )}
           <div className="mt-3">

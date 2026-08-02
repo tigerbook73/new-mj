@@ -1640,6 +1640,7 @@ describe("RoomService — getReplayOmniscientView (phase 4.5 step 5)", () => {
     const view = await service.getReplayOmniscientView(room.id, 1);
 
     expect(view.hands).toHaveLength(4);
+    expect(view.melds).toHaveLength(4);
     // Game already finished (won), so melds/discards also hold physical
     // tiles by now — wall+hands is a subset of the 136-tile set, not the
     // whole thing (that only holds for a state with none dealt out yet).
