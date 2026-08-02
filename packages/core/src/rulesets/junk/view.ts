@@ -40,20 +40,6 @@ export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView =>
   return view;
 };
 
-const cloneView = (view: JunkPlayerView): JunkPlayerView => ({
-  ...view,
-  hand: [...view.hand],
-  seats: view.seats.map((seat) => ({
-    handCount: seat.handCount,
-    melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
-    discards: seat.discards.map((discard) => ({ ...discard })),
-    justDrawn: seat.justDrawn,
-    ...(seat.winSnapshot ? { winSnapshot: seat.winSnapshot } : {}),
-  })),
-  ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
-  ...(view.result ? { result: view.result } : {}),
-});
-
 const updateMeld = (
   view: JunkPlayerView,
   seat: SeatId,
@@ -98,7 +84,7 @@ export const rebuildPlayerView = (
       continue;
     }
     if (!view) throw new Error("MISSING_GAME_STARTED");
-    view = cloneView(view);
+    view = structuredClone(view);
     switch (payload.type) {
       case "HandDealt": {
         if (payload.seat === seat) {

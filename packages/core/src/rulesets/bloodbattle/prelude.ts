@@ -22,9 +22,16 @@ const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats: [seat]
 
 const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], discards: [] }));
 
-const cloneState = (state: BloodbattleState): BloodbattleState => ({
+// Shared with state-machine.ts: applyAction clones once per call, so this needs
+// to stay a hand-rolled shallow-where-safe clone rather than a generic deep
+// clone (structuredClone benchmarks ~30x slower on this shape, which would show
+// up in the 1000/10000-game fuzz smoke).
+export const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
   wall: [...state.wall],
+  scores: [...state.scores] as BloodbattleState["scores"],
+  status: [...state.status] as BloodbattleState["status"],
+  gangPayments: state.gangPayments.map((payment) => ({ ...payment })),
   seats: state.seats.map((seat) => ({
     hand: [...seat.hand],
     melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
@@ -32,6 +39,17 @@ const cloneState = (state: BloodbattleState): BloodbattleState => ({
   })),
   ...(state.exchange ? { exchange: { selections: { ...state.exchange.selections } } } : {}),
   ...(state.lack ? { lack: { ...state.lack } } : {}),
+  ...(state.wins ? { wins: { ...state.wins } } : {}),
+  ...(state.lastDiscard ? { lastDiscard: { ...state.lastDiscard } } : {}),
+  ...(state.pendingClaims
+    ? {
+        pendingClaims: {
+          ...state.pendingClaims,
+          options: { ...state.pendingClaims.options },
+          responses: { ...state.pendingClaims.responses },
+        },
+      }
+    : {}),
 });
 
 const appendEvent = (

@@ -21,16 +21,18 @@
 
 ## Backlog
 
-- `junk/view.ts`（以及同构的 hangzhou/bloodbattle `view.ts`）给事件 payload 补判别联合类型定稿后单文件行数偏长（`rebuildPlayerView` 一个大 switch），可能需要拆分重构（如按事件类型拆出独立 handler 或分发表）；具体拆法待分析，暂不动。
+- `hangzhou/view.ts` 与 `junk/view.ts` 的 `rebuildPlayerView` 存在约 100 行逐字重复（Chi/Peng/Gang 回放 case 块 + `getPlayerView` 的 melds/discards 映射），根源是两者共用同一种"melds 保留 `TileId` 数字身份"的 view 表示法；`bloodbattle/view.ts` 在存储时已把 melds 转成 kind 字符串，结构性不同、不该合并（三者不是同一个重构对象，之前笼统归成一类是误判）。方向：把这段回放逻辑下沉到 `lib/`（仿 `lib/seat-state.ts` 先例），留回调处理 hangzhou 独有的 `caiPiaoCount`/`dealerStreak` 分支；但目前只有 junk/hangzhou 两个同构样本，抽象是否稳定最好等第三个同构玩法出现、或下次真正 touch 到这两个文件时再评估，暂不动。
 - Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行——庄家轮换公式行已由杭州三牢专题验证完毕，见该文档 §4/§5）。
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
 - 创建房间时总局数（`totalGames`）选择下拉框在暗黑模式下 theme 不正确，需修。
+- core 评估是否引入 immer 替代三个 ruleset 手写的 `cloneState`（`applyAction` 每次调用都会跑一次的克隆-再修改样板代码，写字段时容易漏克隆——`AGENTS.md` 明确允许"内部可用 class/immer"但目前未采用）；需先验证性能（手写版本比 `structuredClone` 快约 30 倍，是这类克隆的实际下限，immer 的 Proxy 结构共享理论上接近但未实测）不会拖慢 1000/10000 局 fuzz 冒烟。
 
 ## 已完成摘要
 
+- core `cloneView`/`cloneState` 去重：三个 ruleset 手写的 `cloneView`（冷路径，仅断线重连/测试调用）统一换成内置 `structuredClone`；bloodbattle 内部两份重复的 `cloneState`（`state-machine.ts`/`prelude.ts`）合并成 `prelude.ts` 导出的唯一一份。`cloneState` 本身因是 `applyAction` 热路径（`structuredClone` 实测比手写版本慢约 30 倍，会拖慢 fuzz 冒烟）未一并替换，评估是否上 immer 留在 Backlog。`pnpm --filter @new-mj/core verify` 全绿（161 测试 + junk 1000 局/bloodbattle 10000 局 fuzz）。
 - 核心与服务端：junk/bloodbattle RuleSet、CLI/replay/fuzz、多房间、AI 补位/断线托管、归档与持久化已落地。
 - Web 与认证：登录、大厅、房间、Junk 可玩牌桌、Replay、主题与 Supabase Google/GitHub OAuth 已完成；房主在等待房间 ready 时客户端会以已 ready 的 AI 自动补满空座位；OAuth 已在本地 Supabase 以真实账号端到端验证。
 - Junk Table UX 与 Layout Sketch：桌面 Zone/LayoutPreset、操作 Dock、CSS 布局、事件/跨区域动画、布局编辑与保存读取均已完成并经 e2e/Storybook 验收；bloodbattle 仍只有公共桌面骨架。

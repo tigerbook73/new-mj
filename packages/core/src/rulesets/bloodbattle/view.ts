@@ -58,29 +58,6 @@ export const getPlayerView = (state: BloodbattleState, seat: SeatId): Bloodbattl
   ...(state.result ? { result: state.result } : {}),
 });
 
-const cloneView = (view: BloodbattlePlayerView): BloodbattlePlayerView => ({
-  ...view,
-  hand: [...view.hand],
-  scores: [...view.scores] as BloodbattlePlayerView["scores"],
-  seats: view.seats.map((entry) => ({
-    ...entry,
-    melds: entry.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
-    discards: entry.discards.map((discard) => ({ ...discard })),
-    ...(entry.winSnapshot
-      ? {
-          winSnapshot: {
-            ...entry.winSnapshot,
-            hand: [...entry.winSnapshot.hand],
-            melds: entry.winSnapshot.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
-          },
-        }
-      : {}),
-  })),
-  ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
-  ...(view.myClaimOptions ? { myClaimOptions: [...view.myClaimOptions] } : {}),
-  ...(view.result ? { result: { ...view.result, winners: [...view.result.winners] } } : {}),
-});
-
 const removeKind = (hand: number[], tileKind: string, count: number): void => {
   let remaining = count;
   for (let index = hand.length - 1; index >= 0 && remaining > 0; index -= 1) {
@@ -125,7 +102,7 @@ export const rebuildPlayerView = (
       continue;
     }
     if (!view) throw new Error("MISSING_GAME_STARTED");
-    view = cloneView(view);
+    view = structuredClone(view);
     switch (payload.type) {
       case "HandDealt":
         if (payload.seat === seat) view.hand = [...payload.tiles];

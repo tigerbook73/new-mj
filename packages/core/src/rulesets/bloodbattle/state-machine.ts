@@ -4,7 +4,12 @@ import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
 import { type Meld, type SeatState } from "../../lib/seat-state.ts";
 import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
-import { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
+import {
+  applyChooseLack,
+  applyExchangeThree,
+  cloneState,
+  createBloodbattlePrelude,
+} from "./prelude.ts";
 import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 import { settleBloodbattleDraw } from "./settlement.ts";
@@ -19,30 +24,6 @@ import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 const seats = SEAT_IDS;
 const fail = (code: BloodbattleErrorCode): BloodbattleApplyResult => ({ error: { code } });
-const cloneState = (state: BloodbattleState): BloodbattleState => ({
-  ...state,
-  wall: [...state.wall],
-  scores: [...state.scores] as BloodbattleState["scores"],
-  status: [...state.status] as BloodbattleState["status"],
-  gangPayments: state.gangPayments.map((payment) => ({ ...payment })),
-  seats: state.seats.map((seat) => ({
-    hand: [...seat.hand],
-    melds: seat.melds.map((m) => ({ ...m, tiles: [...m.tiles] })),
-    discards: seat.discards.map((d) => ({ ...d })),
-  })),
-  ...(state.lack ? { lack: { ...state.lack } } : {}),
-  ...(state.wins ? { wins: { ...state.wins } } : {}),
-  ...(state.lastDiscard ? { lastDiscard: { ...state.lastDiscard } } : {}),
-  ...(state.pendingClaims
-    ? {
-        pendingClaims: {
-          ...state.pendingClaims,
-          options: { ...state.pendingClaims.options },
-          responses: { ...state.pendingClaims.responses },
-        },
-      }
-    : {}),
-});
 const append = (
   state: BloodbattleState,
   events: GameEvent<BloodbattleEventPayload>[],
