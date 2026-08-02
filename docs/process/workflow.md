@@ -24,7 +24,7 @@
 1. `pnpm typecheck`
 2. `pnpm lint`
 3. `pnpm test`（受影响包）
-4. core 改动：fuzz 冒烟 ≥1000 局；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md`
+4. core 改动：fuzz 冒烟 ≥1000 局（慢速用例，日常 `test` 默认跳过，经 core `verify:full`/`test:full` 运行）；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md` §1.2
 5. e2e：日常提交用 `pnpm verify`（`test:e2e` 排除标了 `@slow`/`@lab` 的用例——前者是慢速/低边际用例，后者是像 `apps/web` layout-sketch 这样的领域限定 DEV 工具，改到对应领域时手动加跑）；合并到 main 前改跑 `pnpm verify:full`（`test:e2e:full`，跑全部用例，不筛选），与 fuzz 冒烟/全量的分层原则一致
 
 - 测试与实现同一 commit；修 bug 先写复现用例（红→绿）。
@@ -37,6 +37,7 @@
 - pnpm 是唯一包管理器；各 package 依生态选 runner，跨包测试由根脚本调度。core/protocol/ai 优先 Vitest，server 用 Jest，web 用 Vitest + Playwright；mobile 立项时确定。
 - 每个 workspace 提供 `typecheck`、`lint`、`test`、`verify`；有运行时产物的 workspace 提供 `build` 并声明 Turbo 输出。根 `pnpm verify` 还包括 `format:check`。
 - 有 e2e 的 workspace（当前 `apps/web`）额外提供 `test:e2e:full`/`verify:full`：`test:e2e` 是日常子集，`test:e2e:full` 不筛选、只在合并到 main 前跑一次；没有可筛选慢速用例的 workspace（如 `apps/server`）让 `test:e2e:full` 等于 `test:e2e` 即可，不必强行拆分。
+- 单测同理分层：每个 workspace 提供 `test:full`——有慢速 Vitest 用例的（当前 `packages/core`，打 `slow` test tag）`test` 用 `--tags-filter '!slow'` 排除、`test:full` 全量并额外提供 `verify:full`，其余 workspace `test:full` 等于 `test`；根 `pnpm verify:full` 用 `test:full` + `test:e2e:full`，标记标准见 `../testing-strategy.md` §1.2。
 - `pnpm format` 写入格式，`pnpm format:check` 只校验；format 不能代替 lint/typecheck。
 
 ## 并行 worktree

@@ -375,9 +375,9 @@ test("draw settlement applies huaZhu, gang refund, then daJiao", () => {
   ]);
 });
 
-test("10000 seeded bloodbattle games cover config combinations", () => {
+test("10000 seeded bloodbattle games cover config combinations", { tags: ["slow"] }, () => {
   expect(fuzzBloodbattleGames(10_000, 73)).toBeUndefined();
-}, 60_000);
+});
 
 test("bloodbattle public events expose public tiles' TileIds, private events hide hand tiles", () => {
   const state = playingState();

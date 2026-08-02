@@ -6,8 +6,9 @@
 
 当前专题：修复 Junk v3 PR review。
 
-- 进度：Junk 终局结果保留兼容的数字 `winners`，并新增可重连结算快照 `winnerDetails`（seat、fanTypes、multiplier、payout）；Web 结算面板改读详情，番型 id 已与 scorer 对齐。AI 已移除旧 config 依赖，七小对与抢杠按固定规则评估；core、Web、AI 回归测试与完整 `pnpm verify` 均已通过。
-- 下一步第一个具体动作：推送本次 review 修复至 PR #6，等待下一轮 review。
+- 进度：Junk 终局结果保留兼容的数字 `winners`，并新增可重连结算快照 `winnerDetails`（seat、fanTypes、multiplier、payout）；Web 结算面板改读详情，番型 id 已与 scorer 对齐。AI 已移除旧 config 依赖，七小对与抢杠按固定规则评估。第二轮 review 修复：首局 seed 随机庄家现在在首局快照前广播 `room:dealerChanged`（此前 web 皇冠标记整局指向过期的座位 0）；`fanTypes` 收窄为 `JunkFanType` 字面量联合；junk 迁移到 `lib/gang-chain.ts`（hangzhou/junk 类型统一）；web fixture 改用 scorer 真实可产生的番型组合（删除不存在的 `dealer` 番型标签）；AI 七对测试改为有判别力的分差断言；rebind e2e 不再假设庄家=座位 0（消除随机庄家引入的 ~25% flake）。四包 verify 全绿。
+- 追加：Vitest 慢速用例分层落地——core 6 个 fuzz/property 冒烟用例打一等 `slow` test tag（Vitest 4.1 `test.tags`，timeout 由 tag 统一提供），`test` 以 `--tags-filter '!slow'` 排除（core 单测 48s→1.5s），`test:full` 全量；各 workspace 统一提供 `test:full`（无慢速用例的做别名），根 `verify:full` 改用 `test:full`；docs（testing-strategy §1.2、workflow、双 AGENTS.md）同 commit 更新。
+- 下一步第一个具体动作：commit 并推送本次 review 修复 + 慢速测试分层至 PR #6，等待下一轮 review。
 
 ## 阻塞与遗留问题
 

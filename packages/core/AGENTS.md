@@ -31,5 +31,5 @@
 
 ## core DoD
 
-- 修改后必须通过 `pnpm --filter @new-mj/core verify`。
-- core 改动必须跑 fuzz 冒烟，至少 1000 局；测试与实现同一 commit。
+- 修改后必须通过 `pnpm --filter @new-mj/core verify`（快速子集，打 `slow` tag 的 fuzz/property 用例默认排除）。
+- core 改动必须跑 fuzz 冒烟，至少 1000 局：提交前跑 `pnpm --filter @new-mj/core verify:full`（`test:full` 不筛选、含全部 `slow` tag 用例，见 `docs/testing-strategy.md` §1.2）；测试与实现同一 commit。

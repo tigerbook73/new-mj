@@ -597,20 +597,20 @@ test("gang-chain tiers: two consecutive concealed gangs extend gangChain", () =>
   assertTileConservation(current);
 });
 
-test("action logs replay a complete game and fuzz reports no failure", () => {
+test("action logs replay a complete game and fuzz reports no failure", { tags: ["slow"] }, () => {
   const played = playHangzhouGame(31);
   if ("error" in played) throw new Error(played.error);
   const replayed = playHangzhouGame(31, {}, played.actions);
   expect(replayed).toEqual(played);
   expect(fuzzHangzhouGames(1000, 41)).toBeUndefined();
-}, 60_000);
+});
 
-test("1000 seeded games finish while preserving tile conservation", () => {
+test("1000 seeded games finish while preserving tile conservation", { tags: ["slow"] }, () => {
   for (let seed = 1; seed <= 1000; seed += 1) {
     const state = playDeterministically(seed);
     expect(state.result).toBeDefined();
   }
-}, 20_000);
+});
 
 test("views and event filtering do not expose another seat's concealed hand", () => {
   const started = createHangzhouGame(17, 0);
