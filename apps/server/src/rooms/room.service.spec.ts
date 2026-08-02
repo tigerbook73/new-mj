@@ -546,6 +546,32 @@ describe("RoomService — endSession (room:end)", () => {
     for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
     expect(room.dealer).toBe(result?.type === "win" ? result.winner : (dealerBefore + 1) % 4);
   });
+
+  it("broadcasts game 1's seed-chosen dealer via room:dealerChanged before the first snapshots (session-mechanics.md §5)", () => {
+    const eventBus = new EventBus();
+    const service = new RoomService(
+      new GameService(),
+      eventBus,
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    const broadcasts: Array<{ kind: string; dealer?: number }> = [];
+    eventBus.on("room:dealerChanged", ({ dealer }) =>
+      broadcasts.push({ kind: "dealerChanged", dealer }),
+    );
+    eventBus.on("game:snapshot", () => broadcasts.push({ kind: "snapshot" }));
+
+    service.start(room.id);
+
+    // Clients cached RoomInfo.dealer (a placeholder) at join time, so the
+    // real game-1 dealer must arrive as an event, and before any snapshot.
+    expect(room.dealer).toBe(computeInitialDealer(room.config, room.seed));
+    expect(broadcasts[0]).toEqual({ kind: "dealerChanged", dealer: room.dealer });
+    expect(broadcasts.filter(({ kind }) => kind === "snapshot").length).toBeGreaterThan(0);
+  });
 });
 
 // GameService.getPlayerView is a thin passthrough to core (no server logic

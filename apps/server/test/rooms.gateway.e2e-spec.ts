@@ -402,37 +402,43 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
       const started = await ack<object>(a, "room:start", {});
       if (!started.ok) throw new Error(`room:start failed: ${started.code}`);
 
-      // b (seat 1) disconnects without room:leave — enters the grace period
-      // (RoomService.handleDisconnect), same as a real network drop.
-      b.disconnect();
+      // A non-dealer seat disconnects without room:leave — enters the grace
+      // period (RoomService.handleDisconnect), same as a real network drop.
+      // Junk's game-1 dealer is seed-random since v3, and right after start
+      // only the dealer has a legal action, so the victim must be chosen
+      // relative to the actual dealer rather than hard-coded.
+      const room = roomService.get(roomId)!;
+      const victimSeat = ((room.dealer + 1) % 4) as 0 | 1 | 2 | 3;
+      const victimIdentity = ["rebind-a", "rebind-b", "rebind-c", "rebind-d"][victimSeat]!;
+      seatSockets[victimSeat]!.disconnect();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // A fresh connection, same identity, reconnects within the grace
       // window — the exact client restore path (connect() + room:enter).
-      const bReconnected = await connectAs("rebind-b");
+      const reconnected = await connectAs(victimIdentity);
       const entered = await ack<RoomInfo | { room: RoomInfo; view?: unknown; seq?: number }>(
-        bReconnected,
+        reconnected,
         "room:enter",
         { roomId },
       );
       expect(entered.ok).toBe(true);
       if (entered.ok) expect("view" in entered.data).toBe(true);
 
-      // Drive a legal action from a still-connected seat (never seat 1 — a
-      // merely-disconnected-but-not-yet-auto-piloted seat isn't bot-driven,
+      // Drive a legal action from a still-connected seat (never the victim —
+      // a merely-disconnected-but-not-yet-auto-piloted seat isn't bot-driven,
       // see RoomService.nextBotAction). The resulting game:event must reach
-      // bReconnected: before the fix, room:enter only called
+      // the reconnected socket: before the fix, room:enter only called
       // ConnectionRegistry.enter(), never track(), so seatSockets kept
-      // pointing at the original (now fully disconnected) `b` and this
+      // pointing at the original (now fully disconnected) socket and this
       // unicast/broadcast would silently go nowhere.
       const gameService = new GameService();
-      const room = roomService.get(roomId)!;
-      const otherSeat = ([0, 2, 3] as const).find(
-        (seat) => gameService.getLegalActions(room.gameState, seat).length > 0,
+      const otherSeat = ([0, 1, 2, 3] as const).find(
+        (seat) =>
+          seat !== victimSeat && gameService.getLegalActions(room.gameState, seat).length > 0,
       );
       if (otherSeat === undefined) throw new Error("no connected seat has a legal action");
       const legalActions = gameService.getLegalActions(room.gameState, otherSeat);
-      const receivedByNewSocket = once(bReconnected, "game:event");
+      const receivedByNewSocket = once(reconnected, "game:event");
       const acted = await ack<object>(seatSockets[otherSeat], "game:action", {
         action: legalActions[0],
       });

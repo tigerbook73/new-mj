@@ -294,7 +294,16 @@ export class RoomService {
     if (!this.canStart(room)) {
       throw new RoomServiceError("INVALID_CONFIG", "room is not full and ready");
     }
-    this.beginGame(room);
+    this.beginGame(room, false);
+    // Game 1's dealer is ruleset-chosen from the seed inside beginGame (junk
+    // picks a random seat) — clients cached RoomInfo.dealer at join time, so
+    // broadcast it exactly like nextRound() does, before the first snapshots.
+    this.eventBus.emit("room:dealerChanged", {
+      roomId,
+      dealer: room.dealer,
+      gameNumber: room.gameNumber,
+    });
+    this.emitSnapshots(room);
     this.autoPlayBots(room);
     return room;
   }

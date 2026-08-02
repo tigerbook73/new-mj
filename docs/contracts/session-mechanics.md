@@ -53,7 +53,7 @@ finished: 计算排名，对外公开 result
 
 谁来决定庄家分两种情况：
 
-- **Game 1**：首局定庄公式属于麻将规则，Room 生成本局 seed 后调用 `RulesetModule.computeInitialDealer(seed)`、存结果并以此创建游戏；Room 不按玩法名称分支。现有玩法可返回房主座位 0，Junk v3 返回由 seed 决定的随机座位。
+- **Game 1**：首局定庄公式属于麻将规则，Room 生成本局 seed 后调用 `RulesetModule.computeInitialDealer(seed)`、存结果并以此创建游戏；Room 不按玩法名称分支。现有玩法可返回房主座位 0，Junk v3 返回由 seed 决定的随机座位。客户端入房时缓存的 `RoomInfo.dealer` 是开局前的占位值，因此 `room:start` 流程在首局快照下发前同样广播 `room:dealerChanged`（与 Game 2 起的路径同型），客户端不需要区分首局与后续局。
 - **Game 2 起**：庄家轮换**公式**属于麻将规则本身，归属 `packages/core`，容器侧只调用 `contracts/engine-contract.md` §4 定义的 `RulesetModule.computeNextDealer(finishedState, currentDealer)`、存结果、广播 `room:dealerChanged`，不实现任何轮换公式。当前三个玩法的具体公式见各自 `variants/*.md`（Junk v3 为赢家坐庄；bloodbattle 恒定顺时针；hangzhou 庄家胡牌或流局才连庄，见 `variants/hangzhou.md` §8——`architecture/variant-boundary.md` 已据此把"庄家轮换公式"确认为永久私有）。
 
 **`dealerStreak`（跨局座位连续次数计数）**：与轮换公式本身不同，这是容器侧的**通用**机制，不理解规则——`RoomService.nextRound()` 只比较"`computeNextDealer` 算出的下一局庄家座位"是否等于"当前庄家座位"，相等则 `Room.dealerStreak += 1`，不等则重置为 1；结果作为普通字段合入下一局的 `GameConfig`（`{ ...room.config, dealerStreak: room.dealerStreak }`，不改 `room.config` 本身，也不改 `createGame`/`computeNextDealer` 的签名）。目前只有 hangzhou 读取这个字段（用于三牢点炮限制，见 `variants/hangzhou.md` §5），其余玩法的 config 解析器直接忽略未知字段，行为不受影响。
@@ -106,7 +106,7 @@ finished: 计算排名，对外公开 result
 | `room:playerAutoPiloted`  | seat                                     | 到期或主动离开，永久转 AI 代打                       |
 | `room:readyChanged`       | seat、ready                              |                                                      |
 | `room:scoreUpdated`       | scores、gameNumber、totalGames?          | 每局结束后 broadcast                                 |
-| `room:dealerChanged`      | dealer、gameNumber                       | 进下一局时                                           |
+| `room:dealerChanged`      | dealer、gameNumber                       | 每局开局确定庄家时（含首局，见 §5）                  |
 | `room:sessionFinished`    | result                                   | 会话结束，公开排名                                   |
 | `room:playerLeft`         | seat                                     | `waiting` 阶段非房主主动离开                         |
 | `room:closed`             | reason（`hostLeft` \| `allPlayersLeft`） | 房间不再存在：房主等待阶段离开，或对局中全部真人退出 |
