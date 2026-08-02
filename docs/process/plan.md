@@ -4,9 +4,9 @@
 
 ## 当前任务
 
-当前无进行中专题。
+当前暂无进行中专题。最近完成：junk AI 出牌质量提升（向听数驱动规则 bot）：为 junk 新增通用向听数/进张计算和表驱动 bot 策略，RoomService 仅向真实 junk 视图分流；其他玩法保持随机 baseline。策略以向听数、临近听牌时的进张、番型潜力和公开安全牌评分；完成 `@new-mj/ai verify`、replay-get/replay-omniscient 7 条 E2E，以及 1 万局 junk fuzz。
 
-- 下一步第一个具体动作：从 Backlog 挑选下一项（Bot 出牌质量增强 / 血战到底专属桌面体验 / 手机横竖屏布局均可开始），或等新需求出现。
+- 下一步第一个具体动作：从 Backlog 选择下一个专题并建立其一页 brief。
 
 ## 阻塞与遗留问题
 
@@ -16,7 +16,6 @@
 
 ## Backlog
 
-- Bot 功能增强：提升 AI 补位/断线托管的出牌质量，优先评估杭州财神策略。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 规划并实现 mobile 横屏/竖屏布局与 Expo 路线。
 - 日麻立项时复审 `architecture/variant-boundary.md`。

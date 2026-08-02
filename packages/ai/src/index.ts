@@ -4,3 +4,4 @@ export const packageName = "@new-mj/ai" as const;
 export const coreDependency = corePackageName;
 
 export * from "./strategy.ts";
+export * from "./junk/strategy.ts";
