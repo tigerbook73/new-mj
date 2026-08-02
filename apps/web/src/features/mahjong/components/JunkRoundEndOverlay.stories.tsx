@@ -69,9 +69,13 @@ function ToggleMountUnmountDemo() {
               type: "win",
               winner: 0,
               winners: [0],
-              winnerDetails: [{ seat: 0, fanTypes: ["dealer"], multiplier: 8, payout: 24 }],
+              // Realistic fixture: menqing ×2 · qingyise ×4 = 8, and the winner
+              // is this game's dealer so every payment doubles (8 → 16 each).
+              winnerDetails: [
+                { seat: 0, fanTypes: ["menqing", "qingyise"], multiplier: 8, payout: 48 },
+              ],
               winType: "zimo",
-              scoreDeltas: [24, -8, -8, -8],
+              scoreDeltas: [48, -16, -16, -16],
             }}
             gameNumber={2}
             totalGames={8}
@@ -112,9 +116,9 @@ export const ToggleMountUnmount: Story = {
       type: "win",
       winner: 0,
       winners: [0],
-      winnerDetails: [{ seat: 0, fanTypes: ["dealer"], multiplier: 8, payout: 24 }],
+      winnerDetails: [{ seat: 0, fanTypes: ["menqing", "qingyise"], multiplier: 8, payout: 48 }],
       winType: "zimo",
-      scoreDeltas: [24, -8, -8, -8],
+      scoreDeltas: [48, -16, -16, -16],
     },
     gameNumber: 2,
     totalGames: 8,

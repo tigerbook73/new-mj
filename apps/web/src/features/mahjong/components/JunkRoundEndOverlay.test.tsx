@@ -69,15 +69,17 @@ describe("JunkRoundEndOverlay", () => {
           type: "win",
           winner: 0,
           winners: [0],
+          // gangkai ×2 · qingyise ×4 · menqing ×2 = 16; the dealer's flat ×2
+          // is not a fan type (junk.md §3) and never appears in fanTypes.
           winnerDetails: [
-            { seat: 0, fanTypes: ["dealer", "qingyise", "menqing"], multiplier: 16, payout: 48 },
+            { seat: 0, fanTypes: ["gangkai", "qingyise", "menqing"], multiplier: 16, payout: 48 },
           ],
           winType: "zimo",
           scoreDeltas: [48, -16, -16, -16],
         },
       }),
     );
-    expect(markup).toContain("庄家胡 · 清一色 · 门清 ×16");
+    expect(markup).toContain("杠开 · 清一色 · 门清 ×16");
     expect(markup).toContain("Alice won by self-draw.");
   });
 
@@ -110,14 +112,17 @@ describe("JunkRoundEndOverlay", () => {
           type: "win",
           winner: 0,
           winners: [0],
+          // A seven-pairs hand is necessarily concealed, so qidui always comes
+          // with menqing; qidui ×2 · menqing ×2 · hunyise ×2 = 8. Seat 1 is the
+          // dealer here, so only that payment doubles (8 → 16).
           winnerDetails: [
-            { seat: 0, fanTypes: ["hunyise", "qingyise", "qidui"], multiplier: 16, payout: 16 },
+            { seat: 0, fanTypes: ["qidui", "menqing", "hunyise"], multiplier: 8, payout: 32 },
           ],
           winType: "zimo",
-          scoreDeltas: [16, -8, -4, -4],
+          scoreDeltas: [32, -16, -8, -8],
         },
       }),
     );
-    expect(markup).toContain("混一色 · 清一色 · 七小对 ×16");
+    expect(markup).toContain("七小对 · 门清 · 混一色 ×8");
   });
 });

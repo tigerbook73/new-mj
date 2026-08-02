@@ -61,8 +61,9 @@ const CARD_INITIAL = { opacity: 0, scale: 0.9, y: 16 };
 const CARD_ANIMATE = { opacity: 1, scale: 1, y: 0 };
 const CARD_EXIT = { opacity: 0, scale: 0.9, y: 16 };
 
+// Keys are core's JunkFanType ids (junk.md §3) — the dealer's flat ×2 is not a
+// fan type and only ever shows up inside scoreDeltas, so it has no label here.
 const JUNK_FAN_LABELS: Record<string, string> = {
-  dealer: "庄家胡",
   gangkai: "杠开",
   hunyise: "混一色",
   qingyise: "清一色",
