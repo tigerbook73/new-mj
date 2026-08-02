@@ -2,7 +2,7 @@
 
 > 本文是针对 `packages/core` 的只读审计结论和候选实施计划，不代表已批准的设计，也不改变当前运行行为。它是本专题的结构路线图；`claude-suggestions.md` 保留为带精确位置的一次性审计清单。实施任何 slice 前，先确认其是否触及 `docs/architecture/variant-boundary.md`、`docs/contracts/engine-contract.md` 或玩法规则文档。
 
-> 进度（2026-08-02）：Slice A、已确认的事件迁移、junk CLI 定位以及 Slice E 的 `INVALID_CONFIG`/`SeatId` 机械项已完成；后续从唯一 ruleset registry 开始。
+> 进度（2026-08-02）：Slice A、已确认的事件迁移、junk CLI 定位、Slice E 的 `INVALID_CONFIG`/`SeatId` 机械项、Slice B（唯一 ruleset registry）均已完成；后续从 Slice E 剩余的命名/错误码/注释项开始。
 
 ## 目标与非目标
 

@@ -22,7 +22,8 @@
 
 ## 代码地图
 
-- `src/engine.ts`：engine API 六个 dispatch 签名与 ruleset 静态注册表。
+- `src/engine.ts`：engine API 六个 dispatch 签名，只读 `ruleset-registry.ts` 做分发。
+- `src/ruleset-registry.ts`：唯一运行时 `rulesetId → RulesetModule` 登记表；`engine.ts` 与 `support/registered-rulesets.ts`（测试适配）都从这里派生，新增玩法只改这一处。
 - `src/lib/`：tiles、prng、wall、win、invariants、ids、seats、seat 等通用积木。
 - `src/rulesets/junk/`：完整 junk 状态机、结算、PlayerView 与 fuzz。
 - `src/rulesets/bloodbattle/`：血战前置、playing、番型、杠分/抢杠胡/呼叫转移、流局结算和 1000 局 fuzz。

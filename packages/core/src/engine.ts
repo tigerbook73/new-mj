@@ -1,10 +1,8 @@
 import type { GameEvent } from "./events.ts";
 import type { SeatId } from "./lib/ids.ts";
-import { junkRuleSet } from "./rulesets/junk/index.ts";
-import { bloodbattleRuleSet } from "./rulesets/bloodbattle/index.ts";
-import { hangzhouRuleSet } from "./rulesets/hangzhou/index.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "./types.ts";
 import { CORE_ERROR_CODES } from "./errors.ts";
+import { getRuleset } from "./ruleset-registry.ts";
 
 /** engine-api 分发的六个规则集能力；除此之外的玩法导出不构成公共契约。 */
 export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
@@ -19,16 +17,6 @@ export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
 };
 
 type StateWithConfig = { config: GameConfig };
-
-// any: registry holds heterogeneous ruleset modules; each entry is concretely
-// typed at its own module, the public functions below re-narrow at the boundary.
-const rulesets: Record<string, RulesetModule<any, any, any>> = {
-  junk: junkRuleSet,
-  bloodbattle: bloodbattleRuleSet,
-  hangzhou: hangzhouRuleSet,
-};
-
-const getRuleset = (rulesetId: string) => rulesets[rulesetId];
 
 export const createGame = (
   config: GameConfig,
