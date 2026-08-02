@@ -31,6 +31,7 @@
 
 ## 已完成摘要
 
+- 中央桌面轮次边框布局稳定：`DesktopCenterSlot` 平时是默认 1px 透明边框、轮到某家时才把对应边改为 4px，导致中心内容盒缩小而偏移；现四边始终保留 4px 透明边框，仅把当前方向一边着色，显示轮次边框不会改变中间几何。
 - 创建房间 `totalGames` 下拉框暗黑模式修复：根因是原生 `<select>` 展开的选项列表由浏览器/OS 渲染，不受页面 CSS 控制，项目此前从未设置 `color-scheme`；加了标准的 `color-scheme` CSS 属性后，用 Playwright 截图核实发现这个项目实际打包出的完整 Tailwind v4 样式表（92KB）体量下，原生 select 弹出列表在 Chromium（headless 与 headed 皆然）里仍不跟随变暗——二分排查定位到需要 `theme`+`utilities` 两个 Tailwind 层同时存在才触发，但没能收敛到具体某条冲突规则，判断是浏览器对复杂样式表下原生弹层渲染的引擎级局限，CSS 内容层面已经无法再修。因此改为用 `shadcn add select`（`base-nova`/Base UI 风格）生成 `shared/ui/select.tsx`，把 `GamePickerView.tsx` 的原生 `<select>` 换成完全由 DOM+CSS 渲染的自定义下拉，从机制上绕开原生弹层，light/dark 两种模式截图确认均正确；`lobby.e2e-spec.ts` 里唯一依赖原生 `<select>` 的 `selectOption("8")` 改成点击 trigger + 点击 `role=option` 的等价写法。`pnpm --filter @new-mj/web verify` 全绿（38 e2e + build + storybook build）。
 - core `cloneView`/`cloneState` 去重：三个 ruleset 手写的 `cloneView`（冷路径，仅断线重连/测试调用）统一换成内置 `structuredClone`；bloodbattle 内部两份重复的 `cloneState`（`state-machine.ts`/`prelude.ts`）合并成 `prelude.ts` 导出的唯一一份。`cloneState` 本身因是 `applyAction` 热路径（`structuredClone` 实测比手写版本慢约 30 倍，会拖慢 fuzz 冒烟）未一并替换，评估是否上 immer 留在 Backlog。`pnpm --filter @new-mj/core verify` 全绿（161 测试 + junk 1000 局/bloodbattle 10000 局 fuzz）。
 - 核心与服务端：junk/bloodbattle RuleSet、CLI/replay/fuzz、多房间、AI 补位/断线托管、归档与持久化已落地。
