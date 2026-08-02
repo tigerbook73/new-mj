@@ -125,7 +125,7 @@ junk 和 hangzhou 改为引用；bloodbattle 的方向版本保持不变（语�
 三个 ruleset 各自的 `PHASES`/`SEATS`/`TILE_SET` 常量文件模式一致，这是"每个 ruleset 自己的立场常量"，
 符合 AGENTS.md"`lib/` 只放不带玩法立场的纯函数积木"的铁律，定位清楚，不需要改。
 
-### B4. `lib/seat.ts` 命名与实际内容不符
+### B4. ✅ 已完成 `lib/seat.ts` 命名与实际内容不符
 
 文件实际导出的是 `Meld`/`DiscardEntry`/`SeatState`——即"一个座位手里的牌局状态"，
 不是"座位是什么"（那是 `ids.ts` 里 `SeatId` 的职责）。命名容易让人误以为这里放座位轮转之类的通用工具
@@ -134,7 +134,7 @@ junk 和 hangzhou 改为引用；bloodbattle 的方向版本保持不变（语�
 **建议**：改名为 `seat-state.ts` 或 `player-state.ts`，与 `ids.ts`（座位是什么）、
 新建的座位数学工具（座位怎么算，见 A2）三者职责分开、命名对应。
 
-### B5. `lib/win.ts` 不是通用算法，命名/文档应体现这一点
+### B5. ✅ 已完成 `lib/win.ts` 不是通用算法，命名/文档应体现这一点
 
 虽然函数签名接受任意 `TileSet`，但 `isSuit`（`win.ts:4-5`）硬编码判断花色后缀是 `m`/`p`/`s`，
 胡牌形状固定为"四组面子+一对"和"七对"——这是标准中国麻将的规则前提，不是跟 `TileSet` 参数一样可以自由替换的。

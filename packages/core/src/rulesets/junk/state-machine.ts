@@ -9,9 +9,9 @@ import {
   decomposeStandardWinningHand,
   isSevenPairsWinningHand,
   isStandardWinningHand,
-} from "../../lib/win.ts";
+} from "../../lib/standard-hand.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import type { SeatState } from "../../lib/seat-state.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import type {
@@ -114,7 +114,7 @@ export const isWin = (state: JunkState, seat: SeatId, extra?: TileId): boolean =
 
 /** Witness version of isWin: branch order mirrors it exactly so the family found
  * here always matches the one that gated the hu action. Only called once, at the
- * moment a win is actually declared (see lib/win.ts's decompose functions' own doc). */
+ * moment a win is actually declared (see lib/standard-hand.ts's decompose functions' own doc). */
 const decomposeJunkWin = (
   state: JunkState,
   seat: SeatId,

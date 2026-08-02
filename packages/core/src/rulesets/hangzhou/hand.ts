@@ -30,7 +30,7 @@ const countsOf = (kinds: readonly TileKind[]): number[] => {
  * Backtracking search over one suit/honor-indexed count array: can the real
  * tiles plus `wild` caishen complete `meldsNeeded` melds (runs/triplets;
  * honors are triplet-only) and one pair (if `needPair`)? Mirrors
- * lib/win.ts's canFormMelds shape, generalized with a wildcard budget since
+ * lib/standard-hand.ts's canFormMelds shape, generalized with a wildcard budget since
  * caishen substitutes for any single tile (docs/variants/hangzhou.md §2).
  */
 const canComplete = (

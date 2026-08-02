@@ -5,7 +5,7 @@ import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import type { SeatState } from "../../lib/seat-state.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { DEFAULT_HANGZHOU_CONFIG, parseHangzhouConfig } from "./config.ts";
 import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";

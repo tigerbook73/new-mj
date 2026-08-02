@@ -1,5 +1,5 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { Meld, SeatState } from "../../lib/seat.ts";
+import type { Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
 import type { GameEvent } from "../../events.ts";

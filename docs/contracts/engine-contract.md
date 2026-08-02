@@ -6,7 +6,7 @@
 
 ## 1. 基础类型
 
-- `TileKind`/`TileId`/`SeatId` 与唯一的 `SEAT_IDS` 值来源见 `packages/core/src/lib/ids.ts`；座位环运算见 `packages/core/src/lib/seats.ts`；`MeldType`/`Meld` 见 `packages/core/src/lib/seat.ts`
+- `TileKind`/`TileId`/`SeatId` 与唯一的 `SEAT_IDS` 值来源见 `packages/core/src/lib/ids.ts`；座位环运算见 `packages/core/src/lib/seats.ts`；`MeldType`/`Meld`/`SeatState` 见 `packages/core/src/lib/seat-state.ts`
 - 牌面记法：`m/p/s/z` 分别对应万/筒/条/字牌（东南西北白发中）
 - `SeatId` 只是 0-3，core 不认识用户，userId ↔ SeatId 映射由 server 维护
 - 状态与事件存 `TileId`；规则逻辑（胡牌判定、碰杠匹配）经 `kindOf(id)` 按种类运算
@@ -27,7 +27,7 @@
 - `PlayerViewBase`（见 §5）
 - `ApplyResult<TState>`：`{ state: TState; events: GameEvent[] } | { error: RuleViolation }`
 
-每个 ruleset 在 `rulesets/<id>/types.ts` 定义自己完整的 `<Id>State`，没有跨玩法共享的全局 `GameState`；公共子结构 `SeatState`/`Meld`/`DiscardEntry` 来自 `lib/seat.ts`，玩法都可以用，但玩法私有状态形状互不相同。
+每个 ruleset 在 `rulesets/<id>/types.ts` 定义自己完整的 `<Id>State`，没有跨玩法共享的全局 `GameState`；公共子结构 `SeatState`/`Meld`/`DiscardEntry` 来自 `lib/seat-state.ts`，玩法都可以用，但玩法私有状态形状互不相同。
 
 ## 3. 四签名（唯一冻结契约）
 

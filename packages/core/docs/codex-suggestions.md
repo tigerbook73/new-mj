@@ -2,7 +2,7 @@
 
 > 本文是针对 `packages/core` 的只读审计结论和候选实施计划，不代表已批准的设计，也不改变当前运行行为。它是本专题的结构路线图；`claude-suggestions.md` 保留为带精确位置的一次性审计清单。实施任何 slice 前，先确认其是否触及 `docs/architecture/variant-boundary.md`、`docs/contracts/engine-contract.md` 或玩法规则文档。
 
-> 进度（2026-08-02）：Slice A、已确认的事件迁移、junk CLI 定位、Slice E 的 `INVALID_CONFIG`/`SeatId` 机械项、Slice B（唯一 ruleset registry）均已完成；后续从 Slice E 剩余的命名/错误码/注释项开始。
+> 进度（2026-08-02）：Slice A、已确认的事件迁移、junk CLI 定位、Slice E 的 `INVALID_CONFIG`/`SeatId` 机械项、Slice B（唯一 ruleset registry）、Slice E 的 `lib/seat.ts`→`seat-state.ts`/`lib/win.ts`→`standard-hand.ts` 改名均已完成；后续从 `RuleViolation.code` 收敛与剩余注释英译中开始。
 
 ## 目标与非目标
 
@@ -141,9 +141,9 @@ rulesets/<id>/
 
 候选调整：
 
-- `lib/constants.ts` 只含座位常量，随 Slice A 删除并迁入 `seats.ts`。
-- `lib/seat.ts` 当前承载的是玩家的手牌/副露/牌河状态，宜改名为 `seat-state.ts` 或 `player-state.ts`。
-- `lib/win.ts` 依赖标准中文麻将牌面编码、四面子一对与七对规则；它不是任意 `TileSet` 的泛型算法。可改名 `standard-hand.ts`，或至少在文件开头说明前提。
+- ✅ 已完成 `lib/constants.ts` 只含座位常量，随 Slice A 删除并迁入 `seats.ts`。
+- ✅ 已完成 `lib/seat.ts` 改名为 `seat-state.ts`。
+- ✅ 已完成 `lib/win.ts` 改名为 `standard-hand.ts`，文件头加了假设说明。
 - 已确认 CLI 是 junk 的开发/诊断工具：移至 `rulesets/junk/cli.ts`，根脚本改为 `cli:junk:play` 与 `fuzz:junk`；不在本次泛化 `--ruleset`。
 - 三个玩法的 config 解析器统一引用既有 `CORE_ERROR_CODES.invalidConfig`，替换重复的 `"INVALID_CONFIG"` 字面量。这是无语义变化的机械收敛。
 - `eventsVisibleTo` 使用既有 `SeatId` 类型断言，替换唯一一处内联 `0 | 1 | 2 | 3` 联合。

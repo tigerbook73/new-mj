@@ -315,7 +315,7 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   // the hand. The wall's tail is rigged so the replacement draw is exactly
   // that tile, completing the hand via a genuine self-draw right after the
   // gang. This is also the repro for a separate, previously-unfixed bug:
-  // isWin() used to flatten hand+meld tiles through lib/win.ts's
+  // isWin() used to flatten hand+meld tiles through lib/standard-hand.ts's
   // isStandardWinningHand, which requires the flat multiset to be exactly
   // (melds*3+2) tiles — any real gang contributes 4 physical tiles instead
   // of 3, so a hand containing one could never satisfy that count and

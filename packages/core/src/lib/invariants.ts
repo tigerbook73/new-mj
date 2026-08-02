@@ -1,5 +1,5 @@
 import type { SeatId, TileId } from "./ids.ts";
-import type { SeatState } from "./seat.ts";
+import type { SeatState } from "./seat-state.ts";
 import type { TileSet } from "./tiles.ts";
 import { STANDARD_TILE_SET } from "./tiles.ts";
 

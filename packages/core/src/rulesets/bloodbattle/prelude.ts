@@ -5,7 +5,7 @@ import { SEAT_COUNT, SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { parseBloodbattleConfig } from "./config.ts";
 import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import type { SeatState } from "../../lib/seat-state.ts";
 import type {
   BloodbattleApplyResult,
   BloodbattleConfig,
