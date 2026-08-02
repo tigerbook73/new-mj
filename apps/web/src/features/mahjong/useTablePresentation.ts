@@ -125,13 +125,27 @@ export function useTablePresentation({
       const player = players?.[seat];
       const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
       // God mode (see godView doc above): an opponent seat with real hand
-      // data available renders like the bottom seat — full sorted block,
-      // no separate pinned "just drawn" slot (the drawn tile is simply part
-      // of the hand array debug:omniscientView returns, so there's nothing
-      // to distinguish it with; a dev-only simplification, not a fidelity
-      // goal).
+      // data available renders like the bottom seat, including the pinned
+      // drawn-tile slot. Identifying *which* tile was just drawn relies on
+      // an invariant from junk/state-machine.ts: a draw always
+      // `hand.push()`s onto the end, and discards/claims only ever splice
+      // specific tiles back out (order-preserving for the rest, never a
+      // re-sort) — see removeTiles — so the last entry of a god hand is
+      // reliably the most recent draw whenever `data.justDrawn` is true.
       const godHand = direction !== "bottom" ? godView?.hands[seat] : undefined;
       const revealed = direction === "bottom" || godHand !== undefined;
+      // Framer Motion's `layout` FLIP (HandRow's `reflow`) measures via
+      // getBoundingClientRect() in screen space but computes/composes its
+      // own delta unaware of the ancestor Zone's plain-CSS `rotate()`
+      // (zoneStyle() in layoutPreset.ts) that left/right seats sit under —
+      // the result is tiles visibly sliding left/right instead of up/down.
+      // Fixing that needs Motion's projection tree to know about the
+      // ancestor rotation (e.g. promoting the rotated Zone to a motion
+      // component); until then, left/right god-mode hands reorder with a
+      // plain snap instead of a broken slide. Bottom/top are unaffected —
+      // bottom never rotates, top's 180° rotation preserves the horizontal
+      // axis instead of swapping it.
+      const godReflow = godHand !== undefined && direction !== "left" && direction !== "right";
       // Render order: hangzhou's caishen (financial) first, set off by an empty
       // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
       // §2 — it's never chi/peng/gang-able, so keeping it visually apart from
@@ -150,12 +164,16 @@ export function useTablePresentation({
       const nonCaishenTiles = highlightCaishen
         ? restOfHand.filter((tile) => !isCaishenTile(tile))
         : restOfHand;
-      const godCaishenTiles = highlightCaishen ? (godHand?.filter(isCaishenTile) ?? []) : [];
-      const godNonCaishenTiles = godHand
-        ? highlightCaishen
-          ? godHand.filter((tile) => !isCaishenTile(tile))
+      const godDrawnTile = godHand && drawnVisible ? godHand[godHand.length - 1] : undefined;
+      const godRestOfHand = godHand
+        ? godDrawnTile !== undefined
+          ? godHand.slice(0, -1)
           : godHand
         : [];
+      const godCaishenTiles = highlightCaishen ? godRestOfHand.filter(isCaishenTile) : [];
+      const godNonCaishenTiles = highlightCaishen
+        ? godRestOfHand.filter((tile) => !isCaishenTile(tile))
+        : godRestOfHand;
       const handTiles: number[] =
         direction === "bottom"
           ? [
@@ -171,7 +189,7 @@ export function useTablePresentation({
                 ...(godCaishenTiles.length > 0 ? [-1] : []),
                 ...sortTilesForDisplay(godNonCaishenTiles),
                 -1,
-                -1,
+                godDrawnTile ?? -1,
               ]
             : [
                 ...Array<number>(drawnVisible ? data.handCount - 1 : data.handCount).fill(0),
@@ -180,20 +198,21 @@ export function useTablePresentation({
               ];
       // A real TileId is globally unique (see docs/architecture/frontend-
       // layout.md §5), so keying my own drawn slot by it already changes on
-      // every new draw. Opponents never expose a real TileId here (public
-      // events can't reveal concealed hands); their handCount toggles between two values
-      // across a draw/discard cycle, which is enough to tell "this draw" from
-      // "last draw" apart across the one render transition that matters, even
-      // though the same numeric value recurs turn after turn. God mode never
-      // uses this slot at all (see handTiles above), so it's always "none"
-      // there regardless of drawnVisible.
+      // every new draw — god mode reuses the same trick via godDrawnTile.
+      // Non-god opponents never expose a real TileId here (public events
+      // can't reveal concealed hands); their handCount toggles between two
+      // values across a draw/discard cycle, which is enough to tell "this
+      // draw" from "last draw" apart across the one render transition that
+      // matters, even though the same numeric value recurs turn after turn.
       const drawnSlotKey =
         direction === "bottom"
           ? extras.justDrawn !== undefined
             ? `own-${extras.justDrawn}`
             : "none"
           : godHand
-            ? "none"
+            ? godDrawnTile !== undefined
+              ? `god-${seat}-${godDrawnTile}`
+              : "none"
             : drawnVisible
               ? `opp-${seat}-${data.handCount}`
               : "none";
@@ -225,6 +244,7 @@ export function useTablePresentation({
         }),
         handTiles,
         revealed,
+        reflow: direction === "bottom" || godReflow,
         info: player?.nickname ?? `Seat ${seat + 1}`,
         isDealer: seat === dealer,
         drawnSlotKey,

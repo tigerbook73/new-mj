@@ -22,6 +22,7 @@ const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatCo
   handTiles,
   melds,
   revealed: info === "Tigerbook73",
+  reflow: info === "Tigerbook73",
   drawnSlotKey: `${info}-drawn`,
   drawnSlotLedgerKey: `${info}-drawn-ledger`,
   highlightCaishen: false,

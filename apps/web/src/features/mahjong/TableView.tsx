@@ -101,12 +101,9 @@ export function TableView() {
   const [error, setError] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
-  const [debugView, setDebugView] = useState<DebugOmniscientView | null>(null);
   // God mode (dev-only, protocol-shared.md §7): renders every seat's real
   // hand + anGang tiles with the same face-up treatment the bottom seat
-  // gets — see useTablePresentation's `godView` param. Separate from
-  // `debugView` above (the raw-JSON dump), which stays untouched for
-  // debugging this feature itself.
+  // gets — see useTablePresentation's `godView` param.
   const [godMode, setGodMode] = useState(false);
   const [godView, setGodView] = useState<DebugOmniscientView | null>(null);
   // Pure geometry for the discard-flying-out ghost (see DiscardFlipGhost.tsx
@@ -283,20 +280,6 @@ export function TableView() {
     if (!result.ok) {
       setError(result.code);
     }
-  };
-
-  // Dev/test-only escape hatch (protocol-shared.md §7) — raw TileIds, shown
-  // as JSON below (see godMode above for the rendered tile-face variant);
-  // server rejects unless ALLOW_DEBUG_OMNISCIENT is set, so this is a no-op
-  // against a normal deploy.
-  const fetchDebugOmniscientView = async () => {
-    setError(null);
-    const result = await ack<DebugOmniscientView>(activeSocket, "debug:omniscientView", {});
-    if (!result.ok) {
-      setError(result.code);
-      return;
-    }
-    setDebugView(result.data);
   };
 
   const leave = async () => {
@@ -593,19 +576,6 @@ export function TableView() {
               <h2 className="font-medium">Debug: omniscient view (dev-only)</h2>
               <Button
                 className="mt-1"
-                variant="outline"
-                size="sm"
-                onClick={() => void fetchDebugOmniscientView()}
-              >
-                Show all hands + wall
-              </Button>
-              {debugView && (
-                <pre className="mt-2 max-w-full overflow-x-auto text-muted-foreground">
-                  {JSON.stringify(debugView, null, 2)}
-                </pre>
-              )}
-              <Button
-                className="mt-2"
                 variant={godMode ? "default" : "outline"}
                 size="sm"
                 onClick={() => setGodMode((current) => !current)}

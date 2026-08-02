@@ -23,6 +23,9 @@ interface HandRowProps {
   /** See SeatContent.handTiles (components/mahjong/TableBoard.tsx) for the slot layout. */
   handTiles: number[];
   revealed: boolean;
+  /** See SeatContent.reflow (components/mahjong/TableBoard.tsx) — usually
+   * equals `revealed`, except forced false for a god-mode left/right seat. */
+  reflow: boolean;
   interactive?: boolean | undefined;
   /**
    * `originRect` is this tile's own `getBoundingClientRect()`, captured
@@ -53,6 +56,7 @@ export function HandRow({
   direction,
   handTiles,
   revealed,
+  reflow,
   interactive,
   onDiscard,
   tileHeight: tileHeight,
@@ -79,6 +83,7 @@ export function HandRow({
               tileId={tileId}
               isReal={isReal}
               revealed={revealed}
+              reflow={reflow}
               interactive={interactive}
               onDiscard={onDiscard}
               tileHeight={tileHeight}
@@ -112,12 +117,14 @@ export function HandRow({
             // Lets the remaining hand tiles glide into their closed-up
             // positions when one is discarded and unmounts (tileId-keyed
             // above) — motion's `layout` (see Tile.tsx's `reflow` doc).
-            // Scoped to `revealed` (my own row) only: an opponent's "rest"
-            // slots are anonymous filler keyed by position, so when their
-            // handCount shrinks, `layout` would read as their whole hand
-            // sliding as one block — nothing there represents an
-            // identifiable gap closing, so it's off for them.
-            reflow={revealed}
+            // Off whenever `reflow` is false: a non-revealed opponent's
+            // "rest" slots are anonymous filler keyed by position, so
+            // `layout` would read as their whole hand sliding as one block
+            // (nothing identifiable closing a gap); a revealed god-mode
+            // left/right seat has real per-tile keys but sits under a
+            // rotated ancestor Zone that breaks Motion's FLIP math — see
+            // useTablePresentation.ts's `godReflow` doc.
+            reflow={reflow}
             caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
             {...(interactive && isReal
               ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
@@ -143,6 +150,7 @@ function DrawnSlotTile({
   tileId,
   isReal,
   revealed,
+  reflow,
   interactive,
   onDiscard,
   tileHeight,
@@ -153,6 +161,7 @@ function DrawnSlotTile({
   tileId: number;
   isReal: boolean;
   revealed: boolean;
+  reflow: boolean;
   interactive?: boolean | undefined;
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
@@ -188,10 +197,10 @@ function DrawnSlotTile({
             // "opacityOnly": DrawFlipGhost already sells the arrival's
             // physical motion on its own path — see resolveTileMotion.ts.
             entering={entering ? "opacityOnly" : false}
-            // Same scoping as the plain hand tiles above, kept consistent
+            // Same `reflow` as the plain hand tiles above, kept consistent
             // for clarity — this slot always remounts fresh on a new draw,
             // so `layout` never actually has a prior instance to FLIP from.
-            reflow={revealed}
+            reflow={reflow}
             testId={`hand-track-drawn-${direction}`}
             caishen={caishen}
             {...(interactive && isReal
