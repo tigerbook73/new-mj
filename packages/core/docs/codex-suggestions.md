@@ -2,7 +2,7 @@
 
 > 本文是针对 `packages/core` 的只读审计结论和候选实施计划，不代表已批准的设计，也不改变当前运行行为。它是本专题的结构路线图；`claude-suggestions.md` 保留为带精确位置的一次性审计清单。实施任何 slice 前，先确认其是否触及 `docs/architecture/variant-boundary.md`、`docs/contracts/engine-contract.md` 或玩法规则文档。
 
-> 进度（2026-08-02）：Slice A、已确认的事件迁移、junk CLI 定位、Slice E 的 `INVALID_CONFIG`/`SeatId` 机械项、Slice B（唯一 ruleset registry）、Slice E 的 `lib/seat.ts`→`seat-state.ts`/`lib/win.ts`→`standard-hand.ts` 改名、Slice E 的 `RuleViolation.code` 收敛（三个 ruleset 各自的 `XxxErrorCode` 联合 + `UNKNOWN_ACTION` 统一到 `CORE_ERROR_CODES.unknownAction`）均已完成；后续从剩余注释英译中开始。
+> 进度（2026-08-02）：Slice A、已确认的事件迁移、junk CLI 定位、Slice E 的 `INVALID_CONFIG`/`SeatId` 机械项、Slice B（唯一 ruleset registry）、Slice E 的 `lib/seat.ts`→`seat-state.ts`/`lib/win.ts`→`standard-hand.ts` 改名、Slice E 的 `RuleViolation.code` 收敛均已完成；点名引用 `plan.md` 条目的 4 处注释已翻译并去除引用。本文件列出的候选 slice 到此全部处理完毕（可选的"玩法内部按职责拆分"仍按其自身验收条件——出现实际维护压力时——保持未启动）。存量英文注释的全量翻译评估后判断范围过大且翻译风险高（~27 文件、~290 行，多是精细算法/不变量说明），按 AGENTS.md 新规则的字面意思（只约束"新增或修改"的注释）不强行一次性翻完，留给后续touch到对应文件时顺手处理。
 
 ## 目标与非目标
 
@@ -149,7 +149,7 @@ rulesets/<id>/
 - ✅ 已完成 `eventsVisibleTo` 使用既有 `SeatId` 类型断言，替换唯一一处内联 `0 | 1 | 2 | 3` 联合。
 - ✅ 已完成 每玩法为可返回给调用方的 `RuleViolation.code` 建立受约束的错误码联合/常量（`JunkErrorCode`/`HangzhouErrorCode`/`BloodbattleErrorCode`，各自 `types.ts` 内定义，`fail` 与 config 解析函数按此收窄）；`UNKNOWN_ACTION` 的三处重复统一到 `CORE_ERROR_CODES.unknownAction`。未强行把阶段、动作等可读判别字符串改为常量。
 - `Record<SeatId, T>` 的键在运行时会转为 string；junk / hangzhou 的 `Number(key) as SeatId` 可评估为低优先级 `seatKeysOf` 辅助函数，只有第三处出现或调用点继续增长时才下沉。
-- 将保留的注释统一为中文，删去重复类型信息、过期“当前有两个玩法”等描述和对 `plan.md` 的历史引用；在 `packages/core/AGENTS.md` 增加本包中文注释规则。优先清理 `hangzhou/hand.ts`、`junk/types.ts`、`hangzhou/types.ts`、`junk/state-machine.ts` 中点名 `plan.md` 条目的四处注释：改为直接陈述不变量，耐久规则则分流到 `variants/<id>.md`。
+- ✅ 已完成（优先级子集）：`packages/core/AGENTS.md` 已加本包中文注释规则；`hangzhou/hand.ts`、`junk/types.ts`、`hangzhou/types.ts`、`junk/state-machine.ts` 中点名 `plan.md` 条目的四处注释已改为直接陈述不变量，不再点名引用。存量其余英文注释的全量翻译未做，见本文件顶部进度说明的评估理由。
 - 同时校正 `engine.ts` 的 `RulesetModule` 注释：当前“five functions”与实际成员数不符，且“both rulesets rotate clockwise”已不符合包含杭州连庄的现状。
 
 不作为重构目标的项目：

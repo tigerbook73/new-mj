@@ -101,16 +101,13 @@ export const isStandardWinningHandWithWild = (
   return canComplete(countsOf(real), wild, meldsNeeded, true);
 };
 
-// Witness ("decompose") version of canComplete: only called once, at the
-// moment a win is actually declared, to reveal the specific melds/pair used
-// (see docs/process/plan.md 胡牌结算展示最终赢牌组合). Never called from the
-// isTingpai/isWinningHand hot path (those probe hypothetical kinds with no
-// physical tile behind them), so a second, independent backtracking
-// implementation is an acceptable tradeoff — branch order mirrors
-// canComplete exactly so it explores the same decision tree. A wild slot
-// used to complete a group is represented by CAISHEN_KIND itself, since a
-// caishen substituting for a gap is a real physical caishen tile sitting in
-// that position — no separate "what it stood in for" bookkeeping is needed.
+// canComplete 的"见证"（拆分）版本：只在胡牌真正宣告的那一刻调用一次，
+// 用于揭示实际用到的具体面子/对子组合，供结算展示最终赢牌拆解。
+// 绝不会出现在 isTingpai/isWinningHand 的高频路径上（那些只是试探假设的牌型，
+// 背后并无实体牌），所以维护第二份独立的回溯实现是可接受的取舍——
+// 分支顺序与 canComplete 完全一致，保证探索同一棵决策树。
+// 用来补全一组的癞子槽位直接用 CAISHEN_KIND 本身表示，因为替补空缺的癞子
+// 本来就是一张实体财神牌摆在那个位置——不需要额外记录"它替代了什么"。
 const decomposeComplete = (
   counts: readonly number[],
   wild: number,

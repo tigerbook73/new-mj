@@ -78,10 +78,10 @@ export type HangzhouGameResult =
       scoreDeltas: [number, number, number, number];
     };
 
-/** Revealed at the moment of a hu, mirrors bloodbattle's WinSnapshot/PublicWinSnapshot
- * split (see docs/process/plan.md 胡牌结算展示最终赢牌组合). `groups` is the concealed
- * decomposition actually used for scoring (melds+pair, or seven pair-groups) — already
- * kind-level so it needs no public/private conversion, unlike `hand`/`winTile`. */
+/** 胡牌那一刻揭示，仿照血战到底 WinSnapshot/PublicWinSnapshot 的公开-隐藏拆分模式，
+ * 用于结算时展示最终赢牌的面子拆解。`groups` 是实际用于算番的暗牌拆分结果
+ * （面子+将牌，或七对的七组）——本身已经是种类级别，不像 `hand`/`winTile`
+ * 那样需要区分公开/隐藏两种表示。 */
 export type HangzhouWinSnapshot = {
   hand: TileId[];
   winTile: TileId;

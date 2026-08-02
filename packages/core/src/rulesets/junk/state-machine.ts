@@ -87,15 +87,14 @@ export const tileRank = (tile: TileId): number => Number(STANDARD_TILE_SET.kindO
 export const tileSuit = (tile: TileId): string => STANDARD_TILE_SET.kindOf(tile)[1] as string;
 
 /**
- * Concealed-hand-only, matching isStandardWinningHand's own contract ("exposed
- * melds are excluded by callers"). A declared meld is already a complete,
- * validated group regardless of its physical tile count — a gang always
- * pairs its extra tile with an immediate replacement draw (see
- * applyDrawAction), so `own.hand`'s length alone already accounts for
- * however many melds (of any kind) are open; concatenating meld tiles back
- * in used to make a real gang permanently break isStandardWinningHand's
- * `tiles.length % 3 === 2` check (4 physical tiles, not the 3 the check
- * assumes per meld) — see docs/process/plan.md's "junk 报过杠后永远胡不了" entry.
+ * 只返回暗手（不含已声明的副露），与 isStandardWinningHand 自身的约定一致
+ * （"副露由调用方排除在外"）。已声明的副露本身就是一组完整、已验证过的组合，
+ * 不管它物理上有几张牌——杠总是会立刻搭配一次补牌（见 applyDrawAction），
+ * 所以 `own.hand` 的长度本身已经把手里开出的杠/碰/吃全部算进去了；
+ * 如果把副露的牌重新拼回来传给 isStandardWinningHand 判定，会永久打破它的
+ * `tiles.length % 3 === 2` 检查（杠是 4 张实体牌，不是这个检查按每副面子
+ * 假设的 3 张）——这正是"junk 报过杠后永远胡不了"那个真实 bug 的根源，
+ * 已通过只检查暗手来修复。
  */
 export const winningTiles = (state: JunkState, seat: SeatId, extra?: TileId): TileId[] => {
   const own = state.seats[seat] as SeatState;
