@@ -18,6 +18,7 @@ import type {
   JunkApplyResult,
   JunkClaimOption,
   JunkConfig,
+  JunkErrorCode,
   JunkEventPayload,
   JunkGameResult,
   JunkPendingClaims,
@@ -58,7 +59,7 @@ export const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-export const fail = (code: string): JunkApplyResult => ({ error: { code } });
+export const fail = (code: JunkErrorCode): JunkApplyResult => ({ error: { code } });
 
 export const configOf = (state: JunkState): JunkConfig => ({
   ...DEFAULT_JUNK_CONFIG,

@@ -15,6 +15,7 @@ import type {
   HangzhouApplyResult,
   HangzhouClaimOption,
   HangzhouConfig,
+  HangzhouErrorCode,
   HangzhouEventPayload,
   HangzhouGameResult,
   HangzhouPendingClaims,
@@ -59,7 +60,7 @@ export const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-export const fail = (code: string): HangzhouApplyResult => ({ error: { code } });
+export const fail = (code: HangzhouErrorCode): HangzhouApplyResult => ({ error: { code } });
 
 export const configOf = (state: HangzhouState): HangzhouConfig => ({
   ...DEFAULT_HANGZHOU_CONFIG,

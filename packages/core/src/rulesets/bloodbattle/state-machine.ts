@@ -1,5 +1,6 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
 import { type Meld, type SeatState } from "../../lib/seat-state.ts";
 import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
@@ -10,13 +11,14 @@ import { settleBloodbattleDraw } from "./settlement.ts";
 import type {
   BloodbattleAction,
   BloodbattleApplyResult,
+  BloodbattleErrorCode,
   BloodbattleEventPayload,
   BloodbattleState,
 } from "./types.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 const seats = SEAT_IDS;
-const fail = (code: string): BloodbattleApplyResult => ({ error: { code } });
+const fail = (code: BloodbattleErrorCode): BloodbattleApplyResult => ({ error: { code } });
 const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
   wall: [...state.wall],
@@ -584,7 +586,7 @@ export const applyAction = (
       return checked(drawNext(state, events, seat));
     return checked({ state, events });
   }
-  return fail("UNKNOWN_ACTION");
+  return fail(CORE_ERROR_CODES.unknownAction);
 };
 const checked = (result: BloodbattleApplyResult): BloodbattleApplyResult => {
   if ("state" in result) assertTileConservation(result.state, BLOODBATTLE_TILE_SET, extraTiles);

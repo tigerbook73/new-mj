@@ -9,6 +9,7 @@ import type { SeatState } from "../../lib/seat-state.ts";
 import type {
   BloodbattleApplyResult,
   BloodbattleConfig,
+  BloodbattleErrorCode,
   BloodbattleEventPayload,
   BloodbattleState,
 } from "./types.ts";
@@ -43,7 +44,7 @@ const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-const fail = (code: string): BloodbattleApplyResult => ({ error: { code } });
+const fail = (code: BloodbattleErrorCode): BloodbattleApplyResult => ({ error: { code } });
 
 const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[] | undefined => {
   const remaining = [...hand];

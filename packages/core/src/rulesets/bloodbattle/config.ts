@@ -1,5 +1,5 @@
 import { CORE_ERROR_CODES } from "../../errors.ts";
-import type { BloodbattleConfig } from "./types.ts";
+import type { BloodbattleConfig, BloodbattleErrorCode } from "./types.ts";
 
 export const DEFAULT_BLOODBATTLE_CONFIG: BloodbattleConfig = {
   rulesetId: "bloodbattle",
@@ -16,7 +16,7 @@ export const DEFAULT_BLOODBATTLE_CONFIG: BloodbattleConfig = {
 
 export const parseBloodbattleConfig = (
   input: unknown = {},
-): { config: BloodbattleConfig } | { error: { code: string } } => {
+): { config: BloodbattleConfig } | { error: { code: BloodbattleErrorCode } } => {
   if (typeof input !== "object" || input === null)
     return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   const value = input as Record<string, unknown>;

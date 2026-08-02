@@ -1,5 +1,5 @@
 import { CORE_ERROR_CODES } from "../../errors.ts";
-import type { JunkConfig } from "./types.ts";
+import type { JunkConfig, JunkErrorCode } from "./types.ts";
 import { JUNK_MULTI_HU_POLICIES } from "./constants.ts";
 
 export const DEFAULT_JUNK_CONFIG: JunkConfig = {
@@ -11,7 +11,7 @@ export const DEFAULT_JUNK_CONFIG: JunkConfig = {
 
 export const parseJunkConfig = (
   input: unknown,
-): { config: JunkConfig } | { error: { code: string } } => {
+): { config: JunkConfig } | { error: { code: JunkErrorCode } } => {
   if (input === undefined) return { config: { ...DEFAULT_JUNK_CONFIG } };
   if (!input || typeof input !== "object" || Array.isArray(input))
     return { error: { code: CORE_ERROR_CODES.invalidConfig } };

@@ -3,6 +3,7 @@ import type { Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
 import type { GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { BloodbattleScoringResult } from "./scoring.ts";
 import {
   BLOODBATTLE_DRAW_BONUSES,
@@ -15,6 +16,26 @@ import {
 import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type BloodbattlePhase = (typeof BLOODBATTLE_PHASES)[number];
+
+/** bloodbattle 的 applyAction/createGame 能返回给调用方的完整错误码集合；`fail`/config 解析都按这个联合收窄，防止拼写漂移。 */
+export type BloodbattleErrorCode =
+  | typeof CORE_ERROR_CODES.invalidConfig
+  | typeof CORE_ERROR_CODES.unknownAction
+  | "ACTION_NOT_AVAILABLE"
+  | "ALREADY_SUBMITTED"
+  | "CLAIM_NOT_AVAILABLE"
+  | "DISCARD_NOT_AVAILABLE"
+  | "DRAW_NOT_AVAILABLE"
+  | "EXCHANGE_NOT_OPEN"
+  | "EXCHANGE_TILES_NOT_SAME_SUIT"
+  | "GANG_NOT_AVAILABLE"
+  | "HUAZHU_REQUIRES_CAP_FAN"
+  | "INVALID_EXCHANGE_TILES"
+  | "LACK_NOT_OPEN"
+  | "MUST_DISCARD_LACK"
+  | "MUST_HU"
+  | "SUIT_NOT_HELD"
+  | "TILE_NOT_IN_HAND";
 export type BloodbattleSuit = (typeof BLOODBATTLE_SUITS)[number];
 export type BloodbattleStatus = (typeof BLOODBATTLE_STATUSES)[number];
 export type BloodbattleEndReason = (typeof BLOODBATTLE_END_REASONS)[number];

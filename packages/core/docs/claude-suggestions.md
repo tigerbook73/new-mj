@@ -61,7 +61,7 @@ junk 和 hangzhou 改为引用；bloodbattle 的方向版本保持不变（语�
 
 **建议**：三处全部替换为 `CORE_ERROR_CODES.invalidConfig`。
 
-### A4. `"UNKNOWN_ACTION"` 魔术字重复 3 次、无统一来源
+### A4. ✅ 已完成 `"UNKNOWN_ACTION"` 魔术字重复 3 次、无统一来源
 
 `junk/index.ts:92`、`hangzhou/index.ts:108`、`bloodbattle/state-machine.ts:585` 各自手写相同字符串。
 不确定是否要提升到 `CORE_ERROR_CODES`（语义上更像 ruleset 内部 catch-all），

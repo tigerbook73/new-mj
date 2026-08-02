@@ -3,11 +3,24 @@ import type { DiscardEntry, Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
 import type { GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import { HANGZHOU_MULTI_HU_POLICIES, HANGZHOU_PHASES } from "./constants.ts";
 import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type HangzhouPhase = (typeof HANGZHOU_PHASES)[number];
 export type HangzhouMultiHuPolicy = (typeof HANGZHOU_MULTI_HU_POLICIES)[number];
+
+/** hangzhou 的 applyAction/createGame 能返回给调用方的完整错误码集合；`fail`/config 解析都按这个联合收窄，防止拼写漂移。 */
+export type HangzhouErrorCode =
+  | typeof CORE_ERROR_CODES.invalidConfig
+  | typeof CORE_ERROR_CODES.unknownAction
+  | "CLAIM_NOT_AVAILABLE"
+  | "CLAIM_WINDOW_NOT_OPEN"
+  | "DRAW_NOT_AVAILABLE"
+  | "GANG_NOT_AVAILABLE"
+  | "NOT_YOUR_TURN"
+  | "TILE_NOT_IN_HAND"
+  | "ZIMO_NOT_AVAILABLE";
 
 export type HangzhouAction =
   | { type: "discard"; tile: TileId }
