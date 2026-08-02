@@ -78,11 +78,12 @@ B ← game:event TurnStarted(B)（B 碰后出牌）
 
 ## 7. 调试专用消息（dev-only，不属于正式产品面）
 
-| 消息                         | payload          | data（`DebugOmniscientViewSchema`）     | 说明                                                                                                                                                                             |
-| ---------------------------- | ---------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `debug:omniscientView`       | `{}`             | `{ wall: number[], hands: number[][] }` | 查询式 ack；返回原始 TileId，不做牌面渲染。仅用于本地调试/测试，不出现在任何正式产品 UI 入口。                                                                                   |
-| `debug:replayOmniscientView` | `{ gameNumber }` | `{ wall: number[], hands: number[][] }` | 明牌 replay（阶段 4.5），只支持局终；`gameNumber` 指当前连接所在房间已归档的某一局，无 `roomId`（约定同 `debug:omniscientView`，不是 `replay:get` 那种"离开房间也能查"的模型）。 |
+| 消息                         | payload          | data（`DebugOmniscientViewSchema`）                             | 说明                                                                                                                                                                             |
+| ---------------------------- | ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `debug:omniscientView`       | `{}`             | `{ wall: number[], hands: number[][], melds: number[][][] }`     | 查询式 ack；返回原始 TileId。web 的 dev-only "god mode" 用它把对手手牌+暗杠渲染成和自己手牌一样的真实牌面动画，仅用于本地调试/测试，不出现在任何正式产品 UI 入口。               |
+| `debug:replayOmniscientView` | `{ gameNumber }` | `{ wall: number[], hands: number[][], melds: number[][][] }`     | 明牌 replay（阶段 4.5），只支持局终；`gameNumber` 指当前连接所在房间已归档的某一局，无 `roomId`（约定同 `debug:omniscientView`，不是 `replay:get` 那种"离开房间也能查"的模型）。 |
 
+- `melds[seat][meldIndex]` 与该座位真实（脱敏）`melds` 数组一一对应，只用来补齐 `anGang` 被脱敏成 `[]` 的 `tiles`——正常吃/碰/明杠在 `getPlayerView` 里对所有座位都已是真实 TileId，不需要靠这个字段补。
 - 门控：server 侧 `ConfigService.allowDebugOmniscient`（读环境变量 `ALLOW_DEBUG_OMNISCIENT`，默认 `false`）关闭时一律拒绝，两条消息共用同一个开关。
 - 鉴权/成员校验复用现有机制，不新增错误码：开关关闭或请求者不是该房间已入座玩家 → `UNAUTHORIZED`（座位未找到细化为 `NOT_IN_ROOM`）；游戏未开始 → `GAME_NOT_STARTED`；`debug:replayOmniscientView` 的 `gameNumber` 未归档 → `GAME_NOT_FOUND`。
-- 故意绕开 core `getPlayerView` 的可见性过滤，直接读取隐藏手牌与未摸牌墙——这是显式受控的例外，不是"public 事件携带隐藏牌 id"（本消息不是 public 事件，是按需查询的单播 ack），不违反第 1 节以外的可见性铁律。core 侧契约说明见 `engine-contract.md` §8。`debug:replayOmniscientView` 直接读取归档的 `finalState`（阶段 4.5，见 `session-mechanics.md` §10），不经过任何事件重放。
+- 故意绕开 core `getPlayerView` 的可见性过滤，直接读取隐藏手牌、未摸牌墙与被脱敏的暗杠——这是显式受控的例外，不是"public 事件携带隐藏牌 id"（本消息不是 public 事件，是按需查询的单播 ack），不违反第 1 节以外的可见性铁律。core 侧契约说明见 `engine-contract.md` §8。`debug:replayOmniscientView` 直接读取归档的 `finalState`（阶段 4.5，见 `session-mechanics.md` §10），不经过任何事件重放，因此只能在局终一次性明牌，不支持逐步动画回放——这个能力缺口需要新的 core 能力（按步归档 god 状态，或反转"replay 从不重跑 applyAction"的既有设计），属架构级决定，未纳入本次范围。

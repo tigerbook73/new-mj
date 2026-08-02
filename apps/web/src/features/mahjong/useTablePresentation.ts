@@ -1,4 +1,4 @@
-import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
+import type { DebugOmniscientView, PlayerViewBase, SeatId } from "@new-mj/protocol";
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
@@ -81,6 +81,7 @@ export function useTablePresentation({
   gameNumber = 1,
   rulesetId,
   dealer,
+  godView,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
@@ -94,6 +95,14 @@ export function useTablePresentation({
   rulesetId?: string | undefined;
   /** RoomInfo.dealer — which seat gets InfoSlot's crown badge. */
   dealer?: SeatId | undefined;
+  /**
+   * Dev-only "god mode" (protocol-shared.md §7): when present, every seat
+   * renders with the same real-tile-face treatment the bottom seat already
+   * gets, sourced from `debug:omniscientView`'s unredacted hands/melds
+   * instead of the normal per-viewer redaction. Absent in every non-dev/
+   * non-`ALLOW_DEBUG_OMNISCIENT` session.
+   */
+  godView?: DebugOmniscientView | undefined;
 }) {
   if (!view) {
     return undefined;
@@ -115,6 +124,14 @@ export function useTablePresentation({
       const data = seatData(seat);
       const player = players?.[seat];
       const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
+      // God mode (see godView doc above): an opponent seat with real hand
+      // data available renders like the bottom seat — full sorted block,
+      // no separate pinned "just drawn" slot (the drawn tile is simply part
+      // of the hand array debug:omniscientView returns, so there's nothing
+      // to distinguish it with; a dev-only simplification, not a fidelity
+      // goal).
+      const godHand = direction !== "bottom" ? godView?.hands[seat] : undefined;
+      const revealed = direction === "bottom" || godHand !== undefined;
       // Render order: hangzhou's caishen (financial) first, set off by an empty
       // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
       // §2 — it's never chi/peng/gang-able, so keeping it visually apart from
@@ -133,6 +150,12 @@ export function useTablePresentation({
       const nonCaishenTiles = highlightCaishen
         ? restOfHand.filter((tile) => !isCaishenTile(tile))
         : restOfHand;
+      const godCaishenTiles = highlightCaishen ? (godHand?.filter(isCaishenTile) ?? []) : [];
+      const godNonCaishenTiles = godHand
+        ? highlightCaishen
+          ? godHand.filter((tile) => !isCaishenTile(tile))
+          : godHand
+        : [];
       const handTiles: number[] =
         direction === "bottom"
           ? [
@@ -142,26 +165,38 @@ export function useTablePresentation({
               -1,
               extras.justDrawn ?? -1,
             ]
-          : [
-              ...Array<number>(drawnVisible ? data.handCount - 1 : data.handCount).fill(0),
-              -1,
-              drawnVisible ? 0 : -1,
-            ];
+          : godHand
+            ? [
+                ...sortTilesForDisplay(godCaishenTiles),
+                ...(godCaishenTiles.length > 0 ? [-1] : []),
+                ...sortTilesForDisplay(godNonCaishenTiles),
+                -1,
+                -1,
+              ]
+            : [
+                ...Array<number>(drawnVisible ? data.handCount - 1 : data.handCount).fill(0),
+                -1,
+                drawnVisible ? 0 : -1,
+              ];
       // A real TileId is globally unique (see docs/architecture/frontend-
       // layout.md §5), so keying my own drawn slot by it already changes on
       // every new draw. Opponents never expose a real TileId here (public
       // events can't reveal concealed hands); their handCount toggles between two values
       // across a draw/discard cycle, which is enough to tell "this draw" from
       // "last draw" apart across the one render transition that matters, even
-      // though the same numeric value recurs turn after turn.
+      // though the same numeric value recurs turn after turn. God mode never
+      // uses this slot at all (see handTiles above), so it's always "none"
+      // there regardless of drawnVisible.
       const drawnSlotKey =
         direction === "bottom"
           ? extras.justDrawn !== undefined
             ? `own-${extras.justDrawn}`
             : "none"
-          : drawnVisible
-            ? `opp-${seat}-${data.handCount}`
-            : "none";
+          : godHand
+            ? "none"
+            : drawnVisible
+              ? `opp-${seat}-${data.handCount}`
+              : "none";
       // animationLedger's key for this seat's draw lane — unlike drawnSlotKey
       // (a React key that must change on every new draw so the slot remounts),
       // this stays fixed per seat: only one draw can be "in flight" per seat
@@ -169,19 +204,27 @@ export function useTablePresentation({
       // draws is exactly what lets a structural conflict resolve to skip — see
       // animationLedger.ts.
       const drawnSlotLedgerKey = `g${gameNumber}:draw:${direction === "bottom" ? "own" : "opp"}:${seat}`;
+      const godMeldTiles = godView?.melds[seat];
       const content: SeatContent = {
-        melds: data.melds.map((meld, meldIndex) => ({
-          ...meld,
-          ...(meld.from !== undefined
-            ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
-            : {}),
-          // Must match diffPlayerView's meld:<seat>:<index>:<tileCount> key
-          // exactly — the trailing tile count disambiguates buGang's
-          // in-place growth of an existing meldIndex from a brand-new one.
-          meldLedgerKey: `g${gameNumber}:meld:${seat}:${meldIndex}:${meld.tiles.length}`,
-        })),
+        melds: data.melds.map((meld, meldIndex) => {
+          // God mode fills in anGang's otherwise-empty (redacted) tiles —
+          // see debug.ts's DebugOmniscientViewSchema doc. Every other meld
+          // type is already real TileIds in the normal per-viewer view.
+          const godTiles = meld.type === "anGang" ? godMeldTiles?.[meldIndex] : undefined;
+          return {
+            ...meld,
+            ...(godTiles ? { tiles: godTiles } : {}),
+            ...(meld.from !== undefined
+              ? { fromDirection: directionOf(view.seat, meld.from as SeatId) }
+              : {}),
+            // Must match diffPlayerView's meld:<seat>:<index>:<tileCount> key
+            // exactly — the trailing tile count disambiguates buGang's
+            // in-place growth of an existing meldIndex from a brand-new one.
+            meldLedgerKey: `g${gameNumber}:meld:${seat}:${meldIndex}:${meld.tiles.length}`,
+          };
+        }),
         handTiles,
-        revealed: direction === "bottom",
+        revealed,
         info: player?.nickname ?? `Seat ${seat + 1}`,
         isDealer: seat === dealer,
         drawnSlotKey,

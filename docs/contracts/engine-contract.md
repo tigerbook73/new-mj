@@ -67,4 +67,4 @@
 
 ## 8. 调试/测试专用逃生舱（不属于本契约）
 
-`packages/core/src/lib/omniscient.ts` 的 `getOmniscientView(state)` **不是**第 3 节四签名的一部分，也不是第 4 节 `RulesetModule` 的 dispatch 方法——它是一个跨玩法通用的结构化纯函数（对 `{ wall, seats }` 形状的泛型约束，做法与 `lib/invariants.ts` 的 `assertContainerUniqueness` 相同），故意暴露隐藏手牌与未摸牌墙的 TileId，仅供 server 侧的调试/测试通道使用。新增玩法若破坏 `{ wall, seats }` 这个结构假设，该函数会编译失败，与 `assertContainerUniqueness` 承担的是同一类技术债，不是本契约新增的风险面。
+`packages/core/src/lib/omniscient.ts` 的 `getOmniscientView(state)` **不是**第 3 节四签名的一部分，也不是第 4 节 `RulesetModule` 的 dispatch 方法——它是一个跨玩法通用的结构化纯函数（对 `{ wall, seats }` 形状的泛型约束，做法与 `lib/invariants.ts` 的 `assertContainerUniqueness` 相同），故意暴露隐藏手牌、未摸牌墙、以及每座位每个副露的未脱敏 TileId（含 `anGang`——`getPlayerView` 对非本人座位的暗杠会把 `tiles` 脱敏成 `[]`，这里不脱敏），仅供 server 侧的调试/测试通道使用。新增玩法若破坏 `{ wall, seats }` 这个结构假设，该函数会编译失败，与 `assertContainerUniqueness` 承担的是同一类技术债，不是本契约新增的风险面。

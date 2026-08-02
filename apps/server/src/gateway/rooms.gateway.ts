@@ -437,7 +437,11 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       const info = this.requireConnection(client);
       this.seatOf(info);
       const view = this.roomService.getOmniscientView(info.roomId);
-      return { wall: [...view.wall], hands: view.hands.map((hand) => [...hand]) };
+      return {
+        wall: [...view.wall],
+        hands: view.hands.map((hand) => [...hand]),
+        melds: view.melds.map((seatMelds) => seatMelds.map((tiles) => [...tiles])),
+      };
     });
   }
 
@@ -475,7 +479,11 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
       this.seatOf(info);
       const parsed = DebugReplayOmniscientViewRequestSchema.parse(payload);
       const view = await this.roomService.getReplayOmniscientView(info.roomId, parsed.gameNumber);
-      return { wall: [...view.wall], hands: view.hands.map((hand) => [...hand]) };
+      return {
+        wall: [...view.wall],
+        hands: view.hands.map((hand) => [...hand]),
+        melds: view.melds.map((seatMelds) => seatMelds.map((tiles) => [...tiles])),
+      };
     });
   }
 

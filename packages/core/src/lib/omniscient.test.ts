@@ -25,6 +25,23 @@ test("returns the wall and each seat's hand as a defensive copy", () => {
   expect(view.hands[0]).toEqual([0, 1]);
 });
 
+test("exposes anGang tiles for every seat, unlike getPlayerView's per-seat redaction", () => {
+  const state = {
+    wall: [],
+    seats: [
+      { hand: [], melds: [{ type: "anGang" as const, tiles: [20, 21, 22, 23] }], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+  };
+  const view = getOmniscientView(state);
+  expect(view.melds[0]).toEqual([[20, 21, 22, 23]]);
+
+  state.seats[0]!.melds[0]!.tiles.push(99);
+  expect(view.melds[0]![0]).toEqual([20, 21, 22, 23]);
+});
+
 test("empty wall (drawn out) still returns all four hands", () => {
   const state = { wall: [], seats: emptySeats([[1], [2], [3], [4]]) };
   const view = getOmniscientView(state);
