@@ -12,9 +12,7 @@ describe("DebugOmniscientViewSchema", () => {
   });
 
   it("rejects non-numeric tile ids", () => {
-    expect(() =>
-      DebugOmniscientViewSchema.parse({ wall: ["1m"], hands: [], melds: [] }),
-    ).toThrow();
+    expect(() => DebugOmniscientViewSchema.parse({ wall: ["1m"], hands: [], melds: [] })).toThrow();
   });
 
   it("rejects a missing melds field", () => {
