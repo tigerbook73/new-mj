@@ -91,6 +91,7 @@ export const resolveClaimWindow = (
   state.seats[seat]!.hand = remaining;
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
+  if (action.type === "minGang") state.gangChain[seat] += 1;
   const eventType =
     action.type === "chi"
       ? EVENT_TYPES.chiMade

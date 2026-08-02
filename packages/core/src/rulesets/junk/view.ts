@@ -9,6 +9,7 @@ export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView =>
   const view: JunkPlayerView = {
     seat,
     hand: [...state.seats[seat]!.hand],
+    dealer: state.dealer,
     seats: state.seats.map((entry, index) => ({
       melds: entry.melds.map((meld) => ({
         ...meld,
@@ -83,6 +84,7 @@ export const rebuildPlayerView = (
       view = {
         seat,
         hand: [],
+        dealer,
         seats: payload.handCounts.map((handCount, index) => ({
           handCount,
           melds: [],

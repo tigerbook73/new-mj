@@ -1,6 +1,6 @@
 # 垃圾胡规则（rulesetId: `junk`）
 
-> 状态：v2 定稿，已实现并测试通过（`packages/core/src/rulesets/junk/`）
+> 状态：v3 定稿，已实现并测试通过（`packages/core/src/rulesets/junk/`）
 > 定位：最简玩法，用于验证 core 基建/插件分层
 > 本文件内聚了垃圾胡的全部知识：规则、专属类型、专属事件、跨局规则。公共契约见 `contracts/engine-contract.md`；即使某节内容和 `bloodbattle.md` 恰好一样，也各写一份，不互相链接（见 `architecture/variant-boundary.md`）。
 
@@ -22,16 +22,27 @@
 
 ## 3. 胡牌与结算
 
-- 胡牌型 = 4 面子 + 1 对（基本型），无任何番种/起胡要求
+- 胡牌型 = 4 面子 + 1 对（基本型），或 7 对（仅 `sevenPairs=true` 时，见 §8）；起胡无番种门槛
 - 可点炮胡（别家打出成胡即可胡），可自摸；一人胡牌，本局立即结束
-- 不记番。固定分：点炮胡——点炮者付 1 分给胡家；自摸——三家各付 1 分给胡家
-- 杠不计分（简化）
+- 记番，倍数制、可叠加（基础分 1 分 × 命中番型的倍数连乘）：
+
+  | 番型   | 倍数                              | 说明                                                                                                        |
+  | ------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+  | 杠开   | ×2（连续杠开按 2^连杠数翻倍） | 仅自摸生效：这回合的自摸牌本身就是"杠后立即补摸"的替补牌；若中途没打出过牌、连续多次杠，倍数按 2 的幂连乘（2 连杠 ×4，3 连杠 ×8……）。点炮胡不计此项 |
+  | 混一色 | ×2                                | 手牌（含副露与胡的那张）只有一种花色 + 字牌，且至少含一张字牌                                              |
+  | 清一色 | ×4                                | 手牌只有一种花色，不含字牌；与混一色互斥，互斥性由各自的判定条件本身保证，不需要额外排他逻辑              |
+  | 7 对   | ×2                                | 仅 `sevenPairs=true` 且实际以 7 对型胡牌时生效                                                             |
+  | 碰碰胡 | ×2                                | 4 副面子全部是刻子/杠（无吃、无顺子）                                                                      |
+  | 门清   | ×2                                | 没有吃/碰/被吃的明杠等已声明副露；暗杠不破门清                                                             |
+
+  以上 6 项均硬编码生效，不提供 config 开关；`sevenPairs` 仍是唯一控制"7 对是否算合法胡牌型"的开关（见 §8），一旦以 7 对型判定胡牌，其 ×2 倍数就跟着生效，不是独立开关。
+- 庄家倍率固定为 2，不随连庄局数递增（与杭州"三牢"那种随连庄数递增的倍率机制是两回事，见 §4）：任意一笔涉及庄家的收付——庄家胡牌时别人付给庄家的钱，或庄家点炮/自摸付钱给别家时庄家付的钱——在番型倍数算完后再整体 ×2；这一规则同样硬编码生效，不提供 config 开关
 - 流局：牌墙摸完无人胡 → 流局，不计分
 
 ## 4. 跨局规则
 
-- **不记连庄**：本局结束即完结，无庄家延续概念。
-- **庄家轮换公式**（对应 `contracts/engine-contract.md` §4 的 `computeNextDealer` 契约）：不看上一局结果，顺时针轮转。这是当前实现，不是永久假设——如果以后垃圾胡要加连庄玩法，只改这里的实现，不动契约签名或房间编排代码。
+- **庄家轮换公式**（对应 `contracts/engine-contract.md` §4 的 `computeNextDealer` 契约）：胡牌者坐下一局庄（不论其是否为原庄家、也不论自摸/点炮；`multiHuPolicy="all"` 多家同时点炮胡时取 `JunkGameResult.winner`——即既有的"头跳"优先座位）；流局则轮转到当前庄家的逆时针下一位（与摸牌方向一致，即 `nextSeat`）。首局庄家仍由 seed 随机决定（见 §1）
+- **庄家倍率不是"连庄"意义上的递增倍数**：见 §3，固定 ×2，不随庄家连续坐庄的局数增加而变化——这与杭州麻将"三牢"那种随连庄数递增的倍率机制是两个不同的设计，垃圾胡这里刻意选择了更简单的常数倍率，因此也不需要类似 `dealerStreak` 那样的跨局计数
 - **会话排名**：当前复用房间层的通用实现（纯分数从高到低排序），见 `contracts/session-mechanics.md` §4 的现状说明与警示——这不是垃圾胡自己的排名逻辑，只是暂时共用。
 
 ## 5. Phase 与 Action（私有类型）
@@ -44,6 +55,7 @@
   - `finished`：有人胡或流局
 - `JunkAction`（`packages/core/src/rulesets/junk/types.ts`）：discard/anGang/buGang/zimo/chi/peng/minGang/hu/pass/draw
 - `JunkState`/`JunkPendingClaims` 见 `packages/core/src/rulesets/junk/types.ts`；不存在跨玩法共享的全局 `GameState`
+- `JunkState` 另有两个私有字段专供 §3 计分使用：`dealer`（本局庄家座位，整局固定不变；跨局延续是 `computeNextJunkDealer` 的职责，不由这个字段本身表达）与 `gangChain`（每座位的连续杠计数器，供"杠开"倍数用：暗杠/补杠/被碰后又补杠都 `+1`，该座位自己打出一张牌就清零——判定逻辑与杭州 `gangChain` 同构，见 `hangzhou.md` §6）
 
 `source='robKong'` 仅在 `robKong=true` 时出现：补杠第四张在声明窗口结束前仍留在补杠者手牌，不创建牌河条目；只有全员 pass 后才转入 `buGang` 副露并尾部补摸；若有人胡，该牌仍归补杠者手牌，胡牌事件亮出它但不制造容器重复。
 
@@ -65,7 +77,7 @@
 | 10  | PengMade             | public                                       | seat, tile, from                                                                                 |
 | 11  | GangMade             | public（暗杠不露牌面，双版本）               | seat, type, tile?, from?                                                                         |
 | 12  | GangReplacementDrawn | 双版本（同 TileDrawn）                       | seat, tile?                                                                                      |
-| 13  | HuDeclared           | public                                       | seat, 胡型（点炮/自摸）, 亮出的完整手牌(`hand`), `winTile`, `groups`（实际拆分，见 §7）, 点炮者? |
+| 13  | HuDeclared           | public                                       | seat, 胡型（点炮/自摸）, 亮出的完整手牌(`hand`), `winTile`, `groups`（实际拆分，见 §7）, `fanTypes`（命中的番型 id 列表，见 §3）, `multiplier`（§3 番型倍数的连乘结果，不含庄家倍率——庄家倍率只体现在 `Settled` 的 `scoreDeltas` 里，不重复写进这里）, 点炮者? |
 | 14  | Settled              | public                                       | 分数变动明细                                                                                     |
 | 15  | WallExhausted        | public                                       | —                                                                                                |
 | 16  | GameEnded            | public                                       | result 摘要                                                                                      |
@@ -75,7 +87,7 @@
 
 ## 7. PlayerView 私有字段
 
-`JunkPlayerView`（`packages/core/src/rulesets/junk/types.ts`）在 `PlayerViewBase` 之上扩展：`phase`/`myActionOptions`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`justDrawn`/`result`，以及 `TileId` 形式的 `melds`/`discards`（垃圾胡选择用 TileId，不是 TileKind——不同玩法可以有不同选择，见 `contracts/engine-contract.md` §5）。`myActionOptions` 是自己的完整可执行列表；`awaiting-claims` 时其中含可声明动作及 `pass`，而 `myClaimOptions` 继续只表示声明选项。#17 在每个成功的状态转换后为每个座位发送，保证事件重建与直接派生一致。
+`JunkPlayerView`（`packages/core/src/rulesets/junk/types.ts`）在 `PlayerViewBase` 之上扩展：`phase`/`myActionOptions`/`myClaimOptions`/`myClaimResponse`/`lastDiscard`/`justDrawn`/`result`/`dealer`，以及 `TileId` 形式的 `melds`/`discards`（垃圾胡选择用 TileId，不是 TileKind——不同玩法可以有不同选择，见 `contracts/engine-contract.md` §5）。`dealer` 是**公开**字段（本局庄家座位，整局固定，供客户端展示"庄家倍率"提示用），仿杭州 `dealerStreak` 的公开方式。`myActionOptions` 是自己的完整可执行列表；`awaiting-claims` 时其中含可声明动作及 `pass`，而 `myClaimOptions` 继续只表示声明选项。#17 在每个成功的状态转换后为每个座位发送，保证事件重建与直接派生一致。
 
 `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除），仿血战到底 `WinSnapshot`/`PublicWinSnapshot` 的公开揭示模式：`hand`/`winTile` 在私有状态（`TileId`）与 `PlayerView`（转换成 `TileKind`）之间做边界转换，`groups` 是实际用来判定胡牌的拆分（4 面子+1 将，或七对型的 7 组），本来就是 kind 级别不需要转换。`groups` 的家族优先级（先试基本型再试七对，`own.melds.length===0` 时）与 `isWin` 逐字复刻，保证与实际判定一致，不存在多解歧义。见 `docs/process/plan.md`「胡牌结算展示最终赢牌组合」。
 
@@ -91,10 +103,12 @@
 
 第一版三项全取默认（最简），使垃圾胡 RuleSet 体量最小；config 解析与 fuzz 随机化已覆盖三项。
 
+§3 新增的 6 个番型倍数与庄家倍率是本次新增的固定规则，均不提供 config 开关（不同于上表这三个既有开关）——一旦实现即对所有房间恒定生效，不需要额外的 fuzz 组合覆盖它们的"关闭"分支。
+
 ## 9. 已知信息泄漏（记录，不处理）
 
 声明窗口的存在/时长可能向他家暗示"有人能碰/杠/胡"。非商用项目不做混淆处理，记录备查。
 
 ## 10. 状态
 
-v2 定稿，已实现并测试通过；fuzz 1000 局通过。
+v3 定稿（新增 §3 记番计分与 §4 胡牌者坐庄），已实现并测试通过；fuzz 1000 局通过。

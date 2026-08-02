@@ -14,6 +14,7 @@ import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat-state.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
+import { scoreJunkHand } from "./scoring.ts";
 import type {
   JunkApplyResult,
   JunkClaimOption,
@@ -30,6 +31,7 @@ export const cloneState = (state: JunkState): JunkState => {
   const cloned: JunkState = {
     ...state,
     wall: [...state.wall],
+    gangChain: [...state.gangChain] as JunkState["gangChain"],
     seats: state.seats.map((seat) => ({
       hand: [...seat.hand],
       melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
@@ -119,15 +121,15 @@ const decomposeJunkWin = (
   state: JunkState,
   seat: SeatId,
   tiles: readonly TileId[],
-): TileKind[][] => {
+): { family: "standard" | "sevenPairs"; groups: TileKind[][] } => {
   const own = state.seats[seat]!;
   const standard = decomposeStandardWinningHand(tiles, STANDARD_TILE_SET);
-  if (standard) return standard;
+  if (standard) return { family: "standard", groups: standard };
   if (configOf(state).sevenPairs && own.melds.length === 0) {
     const sevenPairs = decomposeSevenPairsWinningHand(tiles, STANDARD_TILE_SET);
-    if (sevenPairs) return sevenPairs;
+    if (sevenPairs) return { family: "sevenPairs", groups: sevenPairs };
   }
-  return []; // unreachable: isWin() already gated this
+  return { family: "standard", groups: [] }; // unreachable: isWin() already gated this
 };
 
 /**
@@ -264,27 +266,39 @@ export const applyDrawAction = (
   return { state, events };
 };
 
+/** A payment involving the dealer on either side (payer or receiver) is flat
+ * ×2 on top of the hand's own fan multiplier — junk.md §3. This doesn't
+ * compound when both sides happen to be the dealer (impossible: a seat never
+ * pays itself), so a simple either-side check is exactly the rule. */
+const edgeAmount = (state: JunkState, payer: SeatId, receiver: SeatId, multiplier: number): number =>
+  payer === state.dealer || receiver === state.dealer ? multiplier * 2 : multiplier;
+
 export const settleWins = (
-  winners: SeatId[],
+  state: JunkState,
+  winners: Array<{ seat: SeatId; multiplier: number }>,
   winType: "zimo" | "ron",
   from?: SeatId,
 ): JunkGameResult => {
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
   if (winType === "zimo") {
+    const { seat: winner, multiplier } = winners[0]!;
     for (const seat of SEAT_IDS) {
-      if (seat === winners[0]) continue;
-      scoreDeltas[seat] -= 1;
-      scoreDeltas[winners[0]!] += 1;
+      if (seat === winner) continue;
+      const amount = edgeAmount(state, seat, winner, multiplier);
+      scoreDeltas[seat] -= amount;
+      scoreDeltas[winner] += amount;
     }
   } else if (from !== undefined) {
-    for (const winner of winners) {
-      scoreDeltas[from] -= 1;
-      scoreDeltas[winner] += 1;
+    for (const { seat: winner, multiplier } of winners) {
+      const amount = edgeAmount(state, from, winner, multiplier);
+      scoreDeltas[from] -= amount;
+      scoreDeltas[winner] += amount;
     }
   }
+  const winnerSeats = winners.map(({ seat }) => seat);
   return from === undefined
-    ? { type: "win", winner: winners[0]!, winners, winType, scoreDeltas }
-    : { type: "win", winner: winners[0]!, winners, winType, from, scoreDeltas };
+    ? { type: "win", winner: winnerSeats[0]!, winners: winnerSeats, winType, scoreDeltas }
+    : { type: "win", winner: winnerSeats[0]!, winners: winnerSeats, winType, from, scoreDeltas };
 };
 
 export const finishWin = (
@@ -295,19 +309,38 @@ export const finishWin = (
   from?: SeatId,
   winningTile?: TileId,
 ): void => {
-  const result = settleWins([winner], winType, from);
-  state.phase = "finished";
-  state.result = result;
   const revealedHand =
     winningTile === undefined
       ? [...state.seats[winner]!.hand]
       : [...state.seats[winner]!.hand, winningTile];
   const winTile = winningTile ?? state.justDrawn!.tile;
-  const groups = decomposeJunkWin(state, winner, revealedHand);
+  const { family, groups } = decomposeJunkWin(state, winner, revealedHand);
+  const scored = scoreJunkHand({
+    family,
+    groups,
+    melds: state.seats[winner]!.melds.map((meld) => ({
+      type: meld.type,
+      tiles: meld.tiles.map((tile) => STANDARD_TILE_SET.kindOf(tile)),
+    })),
+    win: { by: winType },
+    gangChainLength: state.gangChain[winner],
+  });
+  const result = settleWins(state, [{ seat: winner, multiplier: scored.multiplier }], winType, from);
+  state.phase = "finished";
+  state.result = result;
   state.wins = { ...state.wins, [winner]: { hand: revealedHand, winTile, groups } };
   const payload =
     from === undefined
-      ? { type: EVENT_TYPES.huDeclared, seat: winner, winType, hand: revealedHand, winTile, groups }
+      ? {
+          type: EVENT_TYPES.huDeclared,
+          seat: winner,
+          winType,
+          hand: revealedHand,
+          winTile,
+          groups,
+          fanTypes: scored.fanTypes,
+          multiplier: scored.multiplier,
+        }
       : {
           type: EVENT_TYPES.huDeclared,
           seat: winner,
@@ -315,6 +348,8 @@ export const finishWin = (
           hand: revealedHand,
           winTile,
           groups,
+          fanTypes: scored.fanTypes,
+          multiplier: scored.multiplier,
           from,
         };
   appendEvent(state, events, publicVisibility, payload);
@@ -332,12 +367,30 @@ export const finishRonWins = (
   from: SeatId,
   tile: TileId,
 ): void => {
-  const result = settleWins(winners, "ron", from);
+  const scoredWinners = winners.map((winner) => {
+    const concealedTiles = [...state.seats[winner]!.hand, tile];
+    const { family, groups } = decomposeJunkWin(state, winner, concealedTiles);
+    const scored = scoreJunkHand({
+      family,
+      groups,
+      melds: state.seats[winner]!.melds.map((meld) => ({
+        type: meld.type,
+        tiles: meld.tiles.map((meldTile) => STANDARD_TILE_SET.kindOf(meldTile)),
+      })),
+      win: { by: "ron" },
+      gangChainLength: state.gangChain[winner],
+    });
+    return { winner, concealedTiles, groups, scored };
+  });
+  const result = settleWins(
+    state,
+    scoredWinners.map(({ winner, scored }) => ({ seat: winner, multiplier: scored.multiplier })),
+    "ron",
+    from,
+  );
   state.phase = "finished";
   state.result = result;
-  for (const winner of winners) {
-    const concealedTiles = [...state.seats[winner]!.hand, tile];
-    const groups = decomposeJunkWin(state, winner, concealedTiles);
+  for (const { winner, concealedTiles, groups, scored } of scoredWinners) {
     state.wins = { ...state.wins, [winner]: { hand: concealedTiles, winTile: tile, groups } };
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.huDeclared,
@@ -346,6 +399,8 @@ export const finishRonWins = (
       hand: concealedTiles,
       winTile: tile,
       groups,
+      fanTypes: scored.fanTypes,
+      multiplier: scored.multiplier,
       from,
     });
   }
@@ -369,6 +424,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPa
     meld.type = "buGang";
     meld.tiles.push(tile);
     delete state.justDrawn;
+    state.gangChain[seat] += 1;
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
       result: "unclaimed",
@@ -408,6 +464,8 @@ export const applyDiscard = (
   state.seats[seat]!.discards.push({ tile });
   state.lastDiscard = { seat, tile };
   delete state.justDrawn;
+  // A discard always breaks this seat's consecutive-gang chain (junk.md §3/§6).
+  state.gangChain[seat] = 0;
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
@@ -444,6 +502,7 @@ export const applyAnGang = (
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
   delete state.justDrawn;
+  state.gangChain[seat] += 1;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -500,6 +559,7 @@ export const applyBuGang = (
   meld.type = "buGang";
   meld.tiles.push(tile);
   delete state.justDrawn;
+  state.gangChain[seat] += 1;
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -524,6 +584,8 @@ export const createJunkGame = (
     wall: shuffled.wall,
     seats: seats(),
     currentSeat: dealer,
+    dealer,
+    gangChain: [0, 0, 0, 0],
     seq: 0,
     prng: shuffled.prng,
   };
@@ -553,6 +615,10 @@ export const createJunkGame = (
   return { state, events };
 };
 
-// docs/variants/junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
-export const computeNextJunkDealer = (_finished: JunkState, currentDealer: SeatId): SeatId =>
-  nextSeat(currentDealer);
+// docs/variants/junk.md §4「庄家轮换公式」：胡牌者坐下一局庄（不论是否为原庄家）；
+// 流局则轮转到当前庄家的逆时针下一位。
+export const computeNextJunkDealer = (finished: JunkState, currentDealer: SeatId): SeatId => {
+  const result = finished.result;
+  if (result?.type === "win") return result.winner;
+  return nextSeat(currentDealer);
+};

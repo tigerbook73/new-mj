@@ -87,6 +87,13 @@ export type JunkState = {
   wall: TileId[];
   seats: SeatState[];
   currentSeat: SeatId;
+  /** Fixed for the whole game — who dealt this hand; feeds the flat dealer-double
+   * payout rule (junk.md §3). Cross-game continuity (who deals the NEXT game) is
+   * computeNextJunkDealer's job and isn't tracked by this field. */
+  dealer: SeatId;
+  /** Per-seat consecutive-gang counter feeding the 杠开 bonus (junk.md §3/§6):
+   * anGang/buGang/a claimed minGang each +1, that seat's own discard resets to 0. */
+  gangChain: [number, number, number, number];
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };
@@ -101,6 +108,8 @@ export type JunkState = {
 };
 
 export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
+  /** Public: this game's dealer seat, fixed for the whole game (junk.md §7). */
+  dealer: SeatId;
   seats: Array<{
     melds: Meld[];
     discards: DiscardEntry[];
@@ -204,6 +213,10 @@ export type JunkHuDeclaredPayload = {
   hand: TileId[];
   winTile: TileId;
   groups: TileKind[][];
+  /** Fan types hit and their combined multiplier (junk.md §3) — excludes the
+   * dealer's flat ×2, which only shows up in Settled's scoreDeltas. */
+  fanTypes: string[];
+  multiplier: number;
   from?: SeatId;
 };
 

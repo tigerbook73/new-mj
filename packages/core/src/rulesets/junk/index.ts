@@ -28,6 +28,8 @@ import type { JunkAction, JunkApplyResult, JunkEventPayload, JunkState } from ".
 export { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
 export { computeNextJunkDealer, createJunkGame } from "./state-machine.ts";
 export { getPlayerView } from "./view.ts";
+export { scoreJunkHand } from "./scoring.ts";
+export type { JunkScoringInput, JunkScoringMeld, JunkScoringResult } from "./scoring.ts";
 export type {
   JunkAction,
   JunkApplyResult,

@@ -82,6 +82,14 @@ const checkWinSnapshotInvariant = (state: JunkState): string | undefined => {
   return undefined;
 };
 
+/** Every payout is a zero-sum transfer between seats — a bug in the dealer's
+ * flat ×2 (double-counting or dropping an edge) would break this. */
+const checkScoreDeltasInvariant = (state: JunkState): string | undefined => {
+  if (!state.result) return undefined;
+  const sum = state.result.scoreDeltas.reduce((total, delta) => total + delta, 0);
+  return sum === 0 ? undefined : "SCORE_DELTAS_NOT_ZERO_SUM";
+};
+
 // --ruleset-parameterized fuzz entry point is future work — only junk has a
 // full applyAction/getLegalActions/createGame trio today (see rulesets/junk/index.ts).
 export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined => {
@@ -100,7 +108,8 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
     };
     const result = playJunkGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
-    const invariantError = checkWinSnapshotInvariant(result.state);
+    const invariantError =
+      checkWinSnapshotInvariant(result.state) ?? checkScoreDeltasInvariant(result.state);
     if (invariantError) {
       return { seed: gameSeed.value, config, actions: result.actions, error: invariantError };
     }
