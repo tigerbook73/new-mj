@@ -7,7 +7,6 @@ import {
   type GameConfig,
   type GameEvent,
   type JunkAction,
-  type JunkConfig,
   type JunkPlayerView,
   type OmniscientView,
   type PlayerViewBase,
@@ -386,11 +385,7 @@ export class RoomService {
     const actions = [...this.gameService.getLegalActions(room.gameState, seat)];
     const recommended =
       room.rulesetId === "junk" && "phase" in view && "dealer" in view
-        ? recommendJunkAction(
-            view as JunkPlayerView,
-            actions as JunkAction[],
-            room.config as JunkConfig,
-          )
+        ? recommendJunkAction(view as JunkPlayerView, actions as JunkAction[])
         : recommendAction(view, actions);
     const recommendedActionIndex =
       recommended === undefined ? undefined : actions.indexOf(recommended);
@@ -528,11 +523,7 @@ export class RoomService {
         const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
         const action =
           room.rulesetId === "junk" && view && "phase" in view && "dealer" in view
-            ? chooseJunkAction(
-                view as JunkPlayerView,
-                legalActions as JunkAction[],
-                room.config as JunkConfig,
-              )
+            ? chooseJunkAction(view as JunkPlayerView, legalActions as JunkAction[])
             : chooseAction(legalActions);
         return { seat: seat as SeatId, action };
       }

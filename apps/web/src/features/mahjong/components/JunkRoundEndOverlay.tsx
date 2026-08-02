@@ -8,10 +8,9 @@ import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
  * junk's `JunkGameResult` shape (packages/core/src/rulesets/junk/types.ts),
  * read loosely off `view.result` the same way TableView reads `phase`/
  * `myClaimOptions` — not imported from @new-mj/core (architecture rule 6).
- * `winners` is always a per-winner fan breakdown (junk v3 always scores fan
- * payouts) — see RoundEndOverlay.tsx for bloodbattle's plain seat-number
- * shape, which is why junk needs its own component rather than reusing that
- * generic one.
+ * `winners` stays a numeric seat list for room/session compatibility, while
+ * `winnerDetails` is the stable per-winner settlement snapshot used by this
+ * panel after reconnect as well as on the first render.
  */
 export type JunkWinDetail = {
   seat: number;
@@ -25,7 +24,8 @@ export type JunkGameResultLike =
   | {
       type: "win";
       winner: number;
-      winners: JunkWinDetail[];
+      winners: number[];
+      winnerDetails: JunkWinDetail[];
       winType: "zimo" | "ron";
       from?: number;
       scoreDeltas: [number, number, number, number];
@@ -64,9 +64,9 @@ const CARD_EXIT = { opacity: 0, scale: 0.9, y: 16 };
 const JUNK_FAN_LABELS: Record<string, string> = {
   dealer: "庄家胡",
   gangkai: "杠开",
-  hunYise: "混一色",
-  qingYise: "清一色",
-  qixiaodui: "七小对",
+  hunyise: "混一色",
+  qingyise: "清一色",
+  qidui: "七小对",
   pengpenghu: "碰碰胡",
   menqing: "门清",
 };
@@ -74,7 +74,7 @@ const JUNK_FAN_LABELS: Record<string, string> = {
 const describeResult = (result: JunkGameResultLike, players: RoomInfo["players"]): string => {
   const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
   if (result.type === "draw") return "Round drawn — the wall ran out.";
-  const winners = result.winners.map((winner) => nameOf(winner.seat)).join(", ");
+  const winners = result.winners.map(nameOf).join(", ");
   return result.winType === "zimo"
     ? `${winners} won by self-draw.`
     : `${winners} won off ${nameOf(result.from!)}'s discard.`;
@@ -127,7 +127,7 @@ export function JunkRoundEndOverlay({
         <p className="text-sm">{describeResult(result, players)}</p>
         {result.type === "win" && (
           <ul className="text-sm text-muted-foreground">
-            {result.winners.map((winner) => (
+            {result.winnerDetails.map((winner) => (
               <li key={winner.seat}>
                 {players[winner.seat]?.nickname ?? `Seat ${winner.seat + 1}`}:{" "}
                 {winner.fanTypes.map((fan) => JUNK_FAN_LABELS[fan] ?? fan).join(" · ")} ×
@@ -138,7 +138,6 @@ export function JunkRoundEndOverlay({
         )}
         {result.type === "win" &&
           result.winners
-            .map((winner) => winner.seat)
             .filter((seat) => winningHands[seat])
             .map((seat) => <WinningHandReveal key={seat} groups={winningHands[seat]!} />)}
         <ul className="text-sm text-muted-foreground">

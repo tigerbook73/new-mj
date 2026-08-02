@@ -68,8 +68,9 @@ describe("JunkRoundEndOverlay", () => {
         result: {
           type: "win",
           winner: 0,
-          winners: [
-            { seat: 0, fanTypes: ["dealer", "qingYise", "menqing"], multiplier: 16, payout: 16 },
+          winners: [0],
+          winnerDetails: [
+            { seat: 0, fanTypes: ["dealer", "qingyise", "menqing"], multiplier: 16, payout: 48 },
           ],
           winType: "zimo",
           scoreDeltas: [48, -16, -16, -16],
@@ -88,7 +89,8 @@ describe("JunkRoundEndOverlay", () => {
         result: {
           type: "win",
           winner: 1,
-          winners: [{ seat: 1, fanTypes: ["pengpenghu"], multiplier: 2, payout: 2 }],
+          winners: [1],
+          winnerDetails: [{ seat: 1, fanTypes: ["pengpenghu"], multiplier: 2, payout: 2 }],
           winType: "ron",
           from: 0,
           scoreDeltas: [-2, 2, 0, 0],
@@ -97,5 +99,25 @@ describe("JunkRoundEndOverlay", () => {
     );
     expect(markup).toContain("Bob won off Alice&#x27;s discard.");
     expect(markup).toContain("碰碰胡 ×2");
+  });
+
+  it("uses the scorer's fixed-rule fan IDs for Chinese labels", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JunkRoundEndOverlay, {
+        ...baseProps,
+        myConfirmed: false,
+        result: {
+          type: "win",
+          winner: 0,
+          winners: [0],
+          winnerDetails: [
+            { seat: 0, fanTypes: ["hunyise", "qingyise", "qidui"], multiplier: 16, payout: 16 },
+          ],
+          winType: "zimo",
+          scoreDeltas: [16, -8, -4, -4],
+        },
+      }),
+    );
+    expect(markup).toContain("混一色 · 清一色 · 七小对 ×16");
   });
 });

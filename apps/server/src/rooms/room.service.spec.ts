@@ -566,7 +566,7 @@ describe("RoomService — winSnapshot exposure (胡牌结算展示最终赢牌�
     if (!winningGame || "error" in winningGame) throw new Error("no winning junk game found");
     const result = winningGame.state.result;
     if (result?.type !== "win") throw new Error("expected a win result");
-    for (const detail of result.winners) {
+    for (const detail of result.winnerDetails) {
       const view = gameService.getPlayerView(winningGame.state, detail.seat) as {
         seats: Array<{ winSnapshot?: { hand: string[]; groups: string[][] } }>;
       };

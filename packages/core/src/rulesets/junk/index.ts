@@ -42,6 +42,7 @@ export type {
   JunkClaimOption,
   JunkConfig,
   JunkGameResult,
+  JunkWinnerDetail,
   JunkPendingClaims,
   JunkPhase,
   JunkPlayerView,

@@ -50,12 +50,23 @@ export type JunkPendingClaims = {
   responses: Partial<Record<SeatId, JunkAction>>;
 };
 
+export type JunkWinnerDetail = {
+  seat: SeatId;
+  fanTypes: string[];
+  multiplier: number;
+  /** Total points this winner receives in this settlement. */
+  payout: number;
+};
+
 export type JunkGameResult =
   | { type: "draw"; scoreDeltas: [number, number, number, number] }
   | {
       type: "win";
       winner: SeatId;
       winners: SeatId[];
+      /** Stable settlement detail for snapshots/reconnect, without changing the
+       * shared numeric winner-seat list consumed by room/session code. */
+      winnerDetails: JunkWinnerDetail[];
       winType: "zimo" | "ron";
       from?: SeatId;
       scoreDeltas: [number, number, number, number];

@@ -466,8 +466,8 @@ export function TableView() {
                 <JunkRoundEndOverlay
                   key="round-end-overlay"
                   result={
-                    // junk v3 always scores a fan-detail winners array — see
-                    // JunkRoundEndOverlay.tsx, same reasoning as hangzhou above.
+                    // junk keeps numeric winner seats for the shared room
+                    // contract and exposes fan data separately as winnerDetails.
                     extras.result as unknown as JunkGameResultLike
                   }
                   gameNumber={room.gameNumber}

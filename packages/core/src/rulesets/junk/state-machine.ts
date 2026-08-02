@@ -274,7 +274,7 @@ const edgeAmount = (
 
 export const settleWins = (
   state: JunkState,
-  winners: Array<{ seat: SeatId; multiplier: number }>,
+  winners: Array<{ seat: SeatId; fanTypes: string[]; multiplier: number }>,
   winType: "zimo" | "ron",
   from?: SeatId,
 ): JunkGameResult => {
@@ -295,9 +295,30 @@ export const settleWins = (
     }
   }
   const winnerSeats = winners.map(({ seat }) => seat);
+  const winnerDetails = winners.map(({ seat, fanTypes, multiplier }) => ({
+    seat,
+    fanTypes,
+    multiplier,
+    payout: scoreDeltas[seat],
+  }));
   return from === undefined
-    ? { type: "win", winner: winnerSeats[0]!, winners: winnerSeats, winType, scoreDeltas }
-    : { type: "win", winner: winnerSeats[0]!, winners: winnerSeats, winType, from, scoreDeltas };
+    ? {
+        type: "win",
+        winner: winnerSeats[0]!,
+        winners: winnerSeats,
+        winnerDetails,
+        winType,
+        scoreDeltas,
+      }
+    : {
+        type: "win",
+        winner: winnerSeats[0]!,
+        winners: winnerSeats,
+        winnerDetails,
+        winType,
+        from,
+        scoreDeltas,
+      };
 };
 
 export const finishWin = (
@@ -326,7 +347,7 @@ export const finishWin = (
   });
   const result = settleWins(
     state,
-    [{ seat: winner, multiplier: scored.multiplier }],
+    [{ seat: winner, fanTypes: scored.fanTypes, multiplier: scored.multiplier }],
     winType,
     from,
   );
@@ -388,7 +409,11 @@ export const finishRonWins = (
   });
   const result = settleWins(
     state,
-    scoredWinners.map(({ winner, scored }) => ({ seat: winner, multiplier: scored.multiplier })),
+    scoredWinners.map(({ winner, scored }) => ({
+      seat: winner,
+      fanTypes: scored.fanTypes,
+      multiplier: scored.multiplier,
+    })),
     "ron",
     from,
   );

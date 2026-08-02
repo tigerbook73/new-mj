@@ -91,6 +91,7 @@ test("junk's dealer rotation formula: the winner sits next dealer (docs/variants
           type: "win",
           winner,
           winners: [winner],
+          winnerDetails: [{ seat: winner, fanTypes: [], multiplier: 1, payout: 0 }],
           winType: "zimo",
           scoreDeltas: [0, 0, 0, 0],
         },
@@ -453,8 +454,9 @@ test("multi-ron always head-jumps deterministically", () => {
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
   expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-8, 8, 0, 0] });
-
-  expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-8, 8, 0, 0] });
+  expect(state.result).toMatchObject({
+    winnerDetails: [{ seat: 1, fanTypes: ["menqing", "qingyise"], multiplier: 8, payout: 8 }],
+  });
   assertTileConservation(state);
 });
 

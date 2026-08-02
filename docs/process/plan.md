@@ -4,9 +4,10 @@
 
 ## 当前任务
 
-当前暂无进行中专题。最近完成：junk AI 出牌质量提升（向听数驱动规则 bot）：为 junk 新增通用向听数/进张计算和表驱动 bot 策略，RoomService 仅向真实 junk 视图分流；其他玩法保持随机 baseline。策略以向听数、临近听牌时的进张、番型潜力和公开安全牌评分；完成 `@new-mj/ai verify`、replay-get/replay-omniscient 7 条 E2E，以及 1 万局 junk fuzz。
+当前专题：修复 Junk v3 PR review。
 
-- 下一步第一个具体动作：从 Backlog 选择下一个专题并建立其一页 brief。
+- 进度：Junk 终局结果保留兼容的数字 `winners`，并新增可重连结算快照 `winnerDetails`（seat、fanTypes、multiplier、payout）；Web 结算面板改读详情，番型 id 已与 scorer 对齐。AI 已移除旧 config 依赖，七小对与抢杠按固定规则评估；core、Web、AI 回归测试与完整 `pnpm verify` 均已通过。
+- 下一步第一个具体动作：推送本次 review 修复至 PR #6，等待下一轮 review。
 
 ## 阻塞与遗留问题
 
