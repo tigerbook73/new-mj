@@ -5,6 +5,12 @@ import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import {
+  createGangChain,
+  incrementGangChain,
+  resetGangChain,
+  type GangChain,
+} from "../../lib/gang-chain.ts";
+import {
   decomposeSevenPairsWinningHand,
   decomposeStandardWinningHand,
   isSevenPairsWinningHand,
@@ -14,7 +20,7 @@ import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat-state.ts";
 import { parseJunkConfig } from "./config.ts";
 import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
-import { scoreJunkHand } from "./scoring.ts";
+import { scoreJunkHand, type JunkFanType } from "./scoring.ts";
 import type {
   JunkApplyResult,
   JunkClaimOption,
@@ -34,7 +40,7 @@ export const cloneState = (state: JunkState): JunkState => {
   const cloned: JunkState = {
     ...state,
     wall: [...state.wall],
-    gangChain: [...state.gangChain] as JunkState["gangChain"],
+    gangChain: [...state.gangChain] as GangChain,
     seats: state.seats.map((seat) => ({
       hand: [...seat.hand],
       melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
@@ -274,7 +280,7 @@ const edgeAmount = (
 
 export const settleWins = (
   state: JunkState,
-  winners: Array<{ seat: SeatId; fanTypes: string[]; multiplier: number }>,
+  winners: Array<{ seat: SeatId; fanTypes: JunkFanType[]; multiplier: number }>,
   winType: "zimo" | "ron",
   from?: SeatId,
 ): JunkGameResult => {
@@ -453,7 +459,7 @@ export const resolveUnclaimed = (state: JunkState, events: GameEvent<JunkEventPa
     meld.type = "buGang";
     meld.tiles.push(tile);
     delete state.justDrawn;
-    state.gangChain[seat] += 1;
+    incrementGangChain(state.gangChain, seat);
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.claimWindowResolved,
       result: "unclaimed",
@@ -494,7 +500,7 @@ export const applyDiscard = (
   state.lastDiscard = { seat, tile };
   delete state.justDrawn;
   // A discard always breaks this seat's consecutive-gang chain (junk.md §3/§6).
-  state.gangChain[seat] = 0;
+  resetGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const options: JunkPendingClaims = {
     discard: { seat, tile },
@@ -531,7 +537,7 @@ export const applyAnGang = (
   state.seats[seat]!.hand = removeTiles(state.seats[seat]!.hand, tiles)!;
   state.seats[seat]!.melds.push({ type: "anGang", tiles });
   delete state.justDrawn;
-  state.gangChain[seat] += 1;
+  incrementGangChain(state.gangChain, seat);
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.gangMade,
     seat,
@@ -599,7 +605,7 @@ export const createJunkGame = (
     seats: seats(),
     currentSeat: dealer,
     dealer,
-    gangChain: [0, 0, 0, 0],
+    gangChain: createGangChain(),
     seq: 0,
     prng: shuffled.prng,
   };

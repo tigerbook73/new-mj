@@ -1,4 +1,5 @@
 import type { GameEvent } from "../../events.ts";
+import { incrementGangChain } from "../../lib/gang-chain.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { seatDistance } from "../../lib/seats.ts";
 import type { SeatId } from "../../lib/ids.ts";
@@ -87,7 +88,7 @@ export const resolveClaimWindow = (
   state.seats[seat]!.hand = remaining;
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
-  if (action.type === "minGang") state.gangChain[seat] += 1;
+  if (action.type === "minGang") incrementGangChain(state.gangChain, seat);
   const eventType =
     action.type === "chi"
       ? EVENT_TYPES.chiMade

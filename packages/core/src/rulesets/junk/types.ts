@@ -1,3 +1,4 @@
+import type { GangChain } from "../../lib/gang-chain.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
@@ -6,6 +7,7 @@ import type { GameEvent } from "../../events.ts";
 import { CORE_ERROR_CODES } from "../../errors.ts";
 import { JUNK_PHASES } from "./constants.ts";
 import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
+import type { JunkFanType } from "./scoring.ts";
 
 export type JunkPhase = (typeof JUNK_PHASES)[number];
 
@@ -52,9 +54,9 @@ export type JunkPendingClaims = {
 
 export type JunkWinnerDetail = {
   seat: SeatId;
-  fanTypes: string[];
+  fanTypes: JunkFanType[];
   multiplier: number;
-  /** Total points this winner receives in this settlement. */
+  /** 该赢家本次结算实收的总分（含庄家 ×2 后的 scoreDeltas[seat]）。 */
   payout: number;
 };
 
@@ -64,8 +66,8 @@ export type JunkGameResult =
       type: "win";
       winner: SeatId;
       winners: SeatId[];
-      /** Stable settlement detail for snapshots/reconnect, without changing the
-       * shared numeric winner-seat list consumed by room/session code. */
+      /** 供快照/重连使用的稳定结算明细；数字 winners 座位列表保持不变，
+       * 房间/会话层的既有消费方不受影响。 */
       winnerDetails: JunkWinnerDetail[];
       winType: "zimo" | "ron";
       from?: SeatId;
@@ -100,7 +102,7 @@ export type JunkState = {
   dealer: SeatId;
   /** Per-seat consecutive-gang counter feeding the 杠开 bonus (junk.md §3/§6):
    * anGang/buGang/a claimed minGang each +1, that seat's own discard resets to 0. */
-  gangChain: [number, number, number, number];
+  gangChain: GangChain;
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };

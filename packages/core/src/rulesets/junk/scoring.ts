@@ -19,7 +19,10 @@ export type JunkScoringInput = {
   gangChainLength: number;
 };
 
-export type JunkScoringResult = { fanTypes: string[]; multiplier: number };
+/** junk.md §3 的 6 个固定番型 id 全集；庄家 ×2 不是番型，只体现在 scoreDeltas 里。 */
+export type JunkFanType = "gangkai" | "hunyise" | "qingyise" | "qidui" | "pengpenghu" | "menqing";
+
+export type JunkScoringResult = { fanTypes: JunkFanType[]; multiplier: number };
 
 const isTripletGroup = (group: readonly TileKind[]): boolean =>
   group.length === 3 && group[0] === group[1] && group[1] === group[2];
@@ -50,7 +53,7 @@ const isMenqing = (melds: readonly JunkScoringMeld[]): boolean =>
  */
 export const scoreJunkHand = (input: JunkScoringInput): JunkScoringResult => {
   const { family, groups, melds, win, gangChainLength } = input;
-  const fanTypes: string[] = [];
+  const fanTypes: JunkFanType[] = [];
   let multiplier = 1;
 
   if (family === "sevenPairs") {

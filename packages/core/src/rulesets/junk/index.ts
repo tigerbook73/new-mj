@@ -34,7 +34,12 @@ export {
 } from "./state-machine.ts";
 export { getPlayerView } from "./view.ts";
 export { scoreJunkHand } from "./scoring.ts";
-export type { JunkScoringInput, JunkScoringMeld, JunkScoringResult } from "./scoring.ts";
+export type {
+  JunkFanType,
+  JunkScoringInput,
+  JunkScoringMeld,
+  JunkScoringResult,
+} from "./scoring.ts";
 export type {
   JunkAction,
   JunkApplyResult,

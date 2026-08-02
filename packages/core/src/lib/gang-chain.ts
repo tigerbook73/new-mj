@@ -1,10 +1,9 @@
 import type { SeatId } from "./ids.ts";
 
 /**
- * Per-seat consecutive-gang counter shared by junk (docs/variants/junk.md §3) and
- * hangzhou (docs/variants/hangzhou.md §6): every gang (an/ming/bu) increments the
- * acting seat's own count by 1; that seat's next discard resets it to 0. Only the
- * winning seat's own count at the moment of a zimo feeds gangkai/gangshang scoring.
+ * junk（docs/variants/junk.md §3）与 hangzhou（docs/variants/hangzhou.md §6）共用的
+ * 每座位连续杠计数：任一种杠（暗/明/补）给行动座位自己 +1，该座位下一次打出牌清零；
+ * 自摸时只有赢家自己的计数参与杠开/杠上开花计分。
  */
 export type GangChain = [number, number, number, number];
 
