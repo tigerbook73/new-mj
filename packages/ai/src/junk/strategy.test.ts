@@ -72,6 +72,9 @@ describe("junk strategy", () => {
   });
 
   it("always evaluates seven-pairs potential under Junk's fixed rules", () => {
+    // 6 对 + 7z + 9m：打掉孤张 9m 后按七对听 7z（向听 0）；拆一对 1z 则退回
+    // 向听 1。两者分差主要来自向听 ×100——若七对不再参与向听评估，两个弃牌
+    // 的标准型向听相同，分差会塌缩到个位数，本断言即失败。
     const player = view([
       "1z",
       "1z",
@@ -86,11 +89,14 @@ describe("junk strategy", () => {
       "6z",
       "6z",
       "7z",
-      "7z",
+      "9m",
     ]);
-    expect(
-      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, player.hand[0]!),
-    ).toBeGreaterThan(Number.NEGATIVE_INFINITY);
+    const keepPairs = scoreHandShapeAfterDiscard(
+      { hand: player.hand, melds: [] },
+      player.hand[13]!,
+    );
+    const breakPair = scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, player.hand[0]!);
+    expect(keepPairs - breakPair).toBeGreaterThan(50);
   });
 
   it("keeps the fixed rob-kong risk when comparing gang actions", () => {
