@@ -7,9 +7,19 @@ import { useSessionStore } from "@/shared/store/session";
 
 /**
  * MVP step-through player (phase 4.5 step 4): no real tile-face
- * rendering and no per-step state reconstruction (same scope decision as
- * D19's live debug view) — just the raw event at each step plus the final
- * reconstructed view, both shown as JSON.
+ * rendering and no per-step state reconstruction — just the raw event at
+ * each step plus the final reconstructed view, both shown as JSON.
+ *
+ * Unlike the live table (TableView.tsx's godMode), this can't get the same
+ * animated god-mode treatment: only the single end-of-game `finalState` is
+ * archived (see room.ts), so there's no per-step omniscient state to
+ * animate through. Bridging that gap needs a new core/session-mechanics
+ * capability — either archiving per-step god state, or archiving
+ * deterministic replay inputs and re-running `applyAction`, which reverses
+ * `room.ts`'s explicit "replay never re-runs applyAction" design — an
+ * architecture-level decision (root AGENTS.md's "架构级问题...标 TODO 提回
+ * Claude Project"), not scoped as a client task. TODO(tigerbook73): revisit
+ * with Claude Project if step-through god replay is worth the cost.
  */
 export function ReplayView() {
   const { roomId, gameNumber } = useParams<{ roomId: string; gameNumber: string }>();

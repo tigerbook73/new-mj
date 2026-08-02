@@ -32,8 +32,18 @@ export interface SeatContent {
    * regardless (see Tile.tsx).
    */
   handTiles: number[];
-  /** True only for my own seat — opponents' handTiles entries render face-down. */
+  /** True for my own seat, and for any seat god mode has real hand data for
+   * — opponents otherwise render handTiles entries face-down. */
   revealed: boolean;
+  /**
+   * Whether HandRow plays Motion's `layout` FLIP when handTiles reorders.
+   * Same as `revealed` for the bottom seat and non-god opponents; forced
+   * false for a god-mode left/right seat regardless of `revealed` — see
+   * useTablePresentation.ts's `godReflow` doc for why (Motion's FLIP delta
+   * doesn't compose correctly under the ancestor Zone's plain-CSS rotation
+   * those seats sit under).
+   */
+  reflow: boolean;
   /** True only when the active ruleset has a caishen tile (currently only
    * hangzhou) — gates whether `handTiles` entries get Tile's `caishen`
    * highlight; see mahjongTiles.ts's `isCaishenTile`. */

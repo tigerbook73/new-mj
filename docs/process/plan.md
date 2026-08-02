@@ -19,6 +19,6 @@
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 规划并实现 mobile 横屏/竖屏布局与 Expo 路线。
 - 日麻立项时复审 `architecture/variant-boundary.md`。
-- Junk Table UX：Replay 牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 E2E。
+- Junk Table UX：Replay 牌面渲染（含逐步 god 动画——阻塞点是归档只有局终 `finalState`，需要新 core 能力按步归档 god 状态或反转"replay 从不重跑 applyAction"的既有设计，属架构级决定，见 `apps/web/src/app/views/ReplayView.tsx` 顶部注释）、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 E2E。live TableView 的 god mode（对手真实牌面+动画）已实现，见 `useTablePresentation.ts`/`TableView.tsx`。
 - 评估是否以 immer 替代 ruleset 手写 `cloneState`；先验证性能不会拖慢 fuzz。
 - 当第三个同构玩法出现，或下次实际改动 `hangzhou/view.ts`/`junk/view.ts` 时，评估将其约 100 行重复的 PlayerView 回放逻辑下沉到 `lib/`。

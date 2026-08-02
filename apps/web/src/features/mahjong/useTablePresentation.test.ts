@@ -1,4 +1,4 @@
-import type { PlayerViewBase } from "@new-mj/protocol";
+import type { DebugOmniscientView, PlayerViewBase } from "@new-mj/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { useTablePresentation } from "./useTablePresentation";
 
@@ -247,6 +247,99 @@ describe("useTablePresentation", () => {
     if (!presentation) throw new Error("missing presentation");
 
     expect(presentation.hasDockActions).toBe(false);
+  });
+
+  describe("god mode (godView)", () => {
+    const baseView = {
+      seat: 0,
+      hand: [1, 2],
+      wallCount: 80,
+      currentSeat: 0,
+      phase: "playing",
+      myActionOptions: [],
+      seats: [
+        { handCount: 2, melds: [], discards: [], justDrawn: false },
+        // seat 1 -> "right": just drew, has a redacted anGang (tiles: []).
+        { handCount: 4, melds: [{ type: "anGang", tiles: [] }], discards: [], justDrawn: true },
+        // seat 2 -> "top", seat 3 -> "left": neither just drew.
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+        { handCount: 3, melds: [], discards: [], justDrawn: false },
+      ],
+    } as unknown as PlayerViewBase;
+
+    const godView: DebugOmniscientView = {
+      wall: [],
+      hands: [
+        [],
+        [0, 4, 8, 12], // seat 1: hand.push() puts the just-drawn tile (12) last.
+        [16, 20, 24],
+        [28, 32, 36],
+      ],
+      melds: [[], [[100, 101, 102, 103]], [], []],
+    };
+
+    it("reveals an opponent seat and pins the last god-hand entry as the drawn tile, like bottom's own justDrawn", () => {
+      const presentation = useTablePresentation({
+        view: baseView,
+        players: [{ nickname: "Me" }, null, null, null],
+        onDiscard: vi.fn(),
+        godView,
+      });
+      if (!presentation) throw new Error("missing presentation");
+
+      expect(presentation.seats.right.revealed).toBe(true);
+      // Rest of the god hand sorted, gap, then the pinned last (most recently
+      // pushed) tile — same shape as bottom's own handTiles.
+      expect(presentation.seats.right.handTiles).toEqual([0, 4, 8, -1, 12]);
+      expect(presentation.seats.right.drawnSlotKey).toBe("god-1-12");
+    });
+
+    it("fills in an anGang's redacted tiles from godView.melds, keyed by the original (pre-fill) tile count", () => {
+      const presentation = useTablePresentation({
+        view: baseView,
+        players: [{ nickname: "Me" }, null, null, null],
+        onDiscard: vi.fn(),
+        godView,
+        gameNumber: 1,
+      });
+      if (!presentation) throw new Error("missing presentation");
+
+      expect(presentation.seats.right.melds[0]).toMatchObject({
+        tiles: [100, 101, 102, 103],
+        meldLedgerKey: "g1:meld:1:0:0",
+      });
+    });
+
+    it("disables reflow for a revealed left/right god-mode seat, but not top/bottom", () => {
+      const presentation = useTablePresentation({
+        view: baseView,
+        players: [{ nickname: "Me" }, null, null, null],
+        onDiscard: vi.fn(),
+        godView,
+      });
+      if (!presentation) throw new Error("missing presentation");
+
+      expect(presentation.seats.bottom.reflow).toBe(true);
+      expect(presentation.seats.top.revealed).toBe(true);
+      expect(presentation.seats.top.reflow).toBe(true);
+      expect(presentation.seats.right.revealed).toBe(true);
+      expect(presentation.seats.right.reflow).toBe(false);
+      expect(presentation.seats.left.revealed).toBe(true);
+      expect(presentation.seats.left.reflow).toBe(false);
+    });
+
+    it("leaves every seat unrevealed and reflow-false when godView is absent, except bottom", () => {
+      const presentation = useTablePresentation({
+        view: baseView,
+        players: [{ nickname: "Me" }, null, null, null],
+        onDiscard: vi.fn(),
+      });
+      if (!presentation) throw new Error("missing presentation");
+
+      expect(presentation.seats.bottom.reflow).toBe(true);
+      expect(presentation.seats.right.revealed).toBe(false);
+      expect(presentation.seats.right.reflow).toBe(false);
+    });
   });
 
   it("marks only the dealer's own seat direction as isDealer, regardless of viewing seat", () => {

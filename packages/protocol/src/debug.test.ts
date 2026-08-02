@@ -2,13 +2,23 @@ import { describe, expect, it } from "vitest";
 import { DebugOmniscientViewSchema, DebugReplayOmniscientViewRequestSchema } from "./debug.ts";
 
 describe("DebugOmniscientViewSchema", () => {
-  it("accepts a wall and per-seat hands as raw TileId arrays", () => {
-    const data = { wall: [1, 2, 3], hands: [[4, 5], [], [6], [7, 8, 9]] };
+  it("accepts a wall, per-seat hands, and per-seat-per-meld tiles as raw TileId arrays", () => {
+    const data = {
+      wall: [1, 2, 3],
+      hands: [[4, 5], [], [6], [7, 8, 9]],
+      melds: [[[10, 11, 12, 13]], [], [], []],
+    };
     expect(DebugOmniscientViewSchema.parse(data)).toEqual(data);
   });
 
   it("rejects non-numeric tile ids", () => {
-    expect(() => DebugOmniscientViewSchema.parse({ wall: ["1m"], hands: [] })).toThrow();
+    expect(() =>
+      DebugOmniscientViewSchema.parse({ wall: ["1m"], hands: [], melds: [] }),
+    ).toThrow();
+  });
+
+  it("rejects a missing melds field", () => {
+    expect(() => DebugOmniscientViewSchema.parse({ wall: [], hands: [] })).toThrow();
   });
 });
 

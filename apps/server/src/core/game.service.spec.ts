@@ -54,5 +54,6 @@ describe("GameService", () => {
 
     expect(Array.isArray(view.wall)).toBe(true);
     expect(view.hands).toHaveLength(4);
+    expect(view.melds).toHaveLength(4);
   });
 });
