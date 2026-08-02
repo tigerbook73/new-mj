@@ -53,4 +53,4 @@
 
 - 单人 trunk-based：日常直接 main；仅预期失败的实验或接口探索开短命分支。main 提交前满足 DoD；坏提交 revert，不 force push。
 - commit 是可独立描述的变更，使用 conventional message；代码与对应 docs 同 commit；秘密只进 `.env`，提供 `.env.example`。
-- 专题完成：可运行产物 + 所需验证 + 文档分流完成。收尾时压缩 `plan.md` 完成摘要、更新下一步、审计 docs/代码漂移，并复审 `variant-boundary.md`（若玩法边界有变化）。
+- 专题完成：可运行产物 + 所需验证 + 文档分流完成。收尾时清除 `plan.md` 中该专题的状态记录（仍未解决的问题转入遗留问题或 Backlog）、更新下一步、审计 docs/代码漂移，并复审 `variant-boundary.md`（若玩法边界有变化）。

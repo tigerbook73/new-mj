@@ -73,8 +73,7 @@ export const BaotouZimo: Story = {
       scoreDeltas: [12, -4, -4, -4],
     },
     // Exercises WinningHandReveal, including a caishen (5z) filling a run gap
-    // and a caishen completing the pair — see docs/process/plan.md
-    // 胡牌结算展示最终赢牌组合.
+    // and a caishen completing the pair.
     winningHands: [
       [
         ["1m", "2m", "3m"],

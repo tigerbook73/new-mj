@@ -17,8 +17,8 @@ interface TableHudProps {
   onLeave: () => void;
 }
 
-/** Left-docked sidebar, toggled by clicking the game-info logo (TableHudTrigger below) —
- * see docs/process/plan.md's HUD redesign entry. Renders as shadcn/ui's Sidebar, which
+/** Left-docked sidebar, toggled by clicking the game-info logo (TableHudTrigger below).
+ * Renders as shadcn/ui's Sidebar, which
  * already collapses to a Sheet on narrow (mobile) viewports; wiring an actual edge-swipe
  * gesture is deliberately deferred, this only covers the click-triggered interaction. */
 export function TableHud(props: TableHudProps) {

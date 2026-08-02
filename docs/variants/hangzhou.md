@@ -133,7 +133,7 @@
 - `isTingpai: boolean`、`isBaotou: boolean`、`isCaipiao: boolean`——**私有**，仅本人可见，每次状态转换后重算，通过既有的 `LegalActionsUpdated` 同步机制一并下发，不新开事件类型
 - `dealerStreak: number`——**公开**，所有座位的 view 都带同一个值；这是全桌可推导的信息（点炮是否开放本就不是秘密，见 §5），不像上面三个是私有派生状态。整局固定不变，`getPlayerView`/`rebuildPlayerView` 都从 `state.config.dealerStreak` 取值
 - `dealer: SeatId`——**公开**，本局庄家座位，整局固定，供客户端展示"庄家倍率"提示用；仿 junk.md §7 的同名公开字段
-- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared` 一行与 `docs/process/plan.md`「胡牌结算展示最终赢牌组合」
+- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared`。
 
 ## 12. Config 清单
 
@@ -163,4 +163,4 @@ Slice 0 需要确认的问题均已拍板：一炮多响策略（头跳）、点
 
 ## 15. 状态
 
-v3 定稿（新增 §7 庄家连庄倍率），已实现；`packages/core` 单测/fixture/跨玩法不变量测试全绿，fuzz 1000 局（`pnpm test` 内置回归）与 10000 局（收尾一次性验证）均无失败，含 `dealerStreak` 随机化覆盖三牢开/关与庄家倍率各档位。`apps/server` 的 `RoomService` 已实现通用 `dealerStreak` 跨局传递并有专门测试。`apps/web` 的 `GamePickerView` 已能创建杭州房间，走与血战到底相同的公共桌面骨架，专属 UI（财神高亮、爆头/财飘展示）留在 `plan.md` Backlog。
+v3 定稿（新增 §7 庄家连庄倍率），已实现；`packages/core` 单测/fixture/跨玩法不变量测试全绿，fuzz 1000 局（`pnpm test` 内置回归）与 10000 局（收尾一次性验证）均无失败，含 `dealerStreak` 随机化覆盖三牢开/关与庄家倍率各档位。`apps/server` 的 `RoomService` 已实现通用 `dealerStreak` 跨局传递并有专门测试。`apps/web` 的 `GamePickerView` 已能创建杭州房间，走与血战到底相同的公共桌面骨架。

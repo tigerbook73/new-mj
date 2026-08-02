@@ -109,7 +109,7 @@ export const tileImageSrc = (tileId: number, theme: TileTheme = "Regular"): stri
 
 /** Same mapping as tileImageSrc, but for callers that already have a TileKind
  * string (e.g. a hu's revealed winSnapshot, which PlayerView sends as kinds,
- * not TileIds — see docs/process/plan.md 胡牌结算展示最终赢牌组合). */
+ * not TileIds). */
 export const tileImageSrcForKind = (kind: TileKind, theme: TileTheme = "Regular"): string =>
   `/tiles/${theme}/${TILE_KIND_TO_FILE[kind]}.svg`;
 

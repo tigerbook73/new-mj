@@ -50,7 +50,7 @@ interface RoundEndOverlayProps {
    * Per-seat final hand (already-declared open melds + the concealed
    * decomposition actually used), indexed by seat — undefined for a seat that
    * didn't win. Assembled by TableView.tsx from `view.seats` (melds +
-   * winSnapshot.groups), see docs/process/plan.md 胡牌结算展示最终赢牌组合.
+   * winSnapshot.groups).
    * bloodbattle has no winSnapshot wiring yet, so this is always empty there.
    * Optional so callers that don't care about the reveal (stories/tests)
    * don't need to pass it.
