@@ -7,8 +7,8 @@ import {
 import { useTableLayoutStore } from "@/features/mahjong/tableLayout.store";
 
 interface WinningHandRevealProps {
-  /** Tile-kind groups to render as clusters (melds/pair, or seven pair-groups) — see
-   * docs/process/plan.md 胡牌结算展示最终赢牌组合. Read loosely off a seat's
+  /** Tile-kind groups to render as clusters (melds/pair, or seven pair-groups).
+   * Read loosely off a seat's
    * `winSnapshot.groups` (protocol is intentionally untyped for ruleset-specific
    * fields), not imported from @new-mj/core (architecture rule 6). */
   groups: TileKind[][];

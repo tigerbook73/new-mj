@@ -1,6 +1,9 @@
 import type { TileId, TileKind } from "./ids.ts";
 import type { TileSet } from "./tiles.ts";
 
+// 假设标准中国麻将花色编码（m/p/s/z）与"四组面子+一对"/七对规则；
+// 虽然签名接受任意 TileSet，但不是通用算法——hangzhou 的癞子版本见
+// rulesets/hangzhou/hand.ts，血战按花色计分的版本见 rulesets/bloodbattle/scoring.ts。
 const isSuit = (kind: string): boolean =>
   kind.endsWith("m") || kind.endsWith("p") || kind.endsWith("s");
 

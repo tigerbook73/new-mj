@@ -1,14 +1,9 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { Meld, SeatState } from "../../lib/seat.ts";
+import type { Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
-import {
-  EVENT_TYPES,
-  type GameEvent,
-  type TileDiscardedPayload,
-  type TurnStartedPayload,
-  type WallExhaustedPayload,
-} from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { BloodbattleScoringResult } from "./scoring.ts";
 import {
   BLOODBATTLE_DRAW_BONUSES,
@@ -18,8 +13,29 @@ import {
   BLOODBATTLE_SUITS,
   BLOODBATTLE_WIN_TYPES,
 } from "./constants.ts";
+import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type BloodbattlePhase = (typeof BLOODBATTLE_PHASES)[number];
+
+/** bloodbattle 的 applyAction/createGame 能返回给调用方的完整错误码集合；`fail`/config 解析都按这个联合收窄，防止拼写漂移。 */
+export type BloodbattleErrorCode =
+  | typeof CORE_ERROR_CODES.invalidConfig
+  | typeof CORE_ERROR_CODES.unknownAction
+  | "ACTION_NOT_AVAILABLE"
+  | "ALREADY_SUBMITTED"
+  | "CLAIM_NOT_AVAILABLE"
+  | "DISCARD_NOT_AVAILABLE"
+  | "DRAW_NOT_AVAILABLE"
+  | "EXCHANGE_NOT_OPEN"
+  | "EXCHANGE_TILES_NOT_SAME_SUIT"
+  | "GANG_NOT_AVAILABLE"
+  | "HUAZHU_REQUIRES_CAP_FAN"
+  | "INVALID_EXCHANGE_TILES"
+  | "LACK_NOT_OPEN"
+  | "MUST_DISCARD_LACK"
+  | "MUST_HU"
+  | "SUIT_NOT_HELD"
+  | "TILE_NOT_IN_HAND";
 export type BloodbattleSuit = (typeof BLOODBATTLE_SUITS)[number];
 export type BloodbattleStatus = (typeof BLOODBATTLE_STATUSES)[number];
 export type BloodbattleEndReason = (typeof BLOODBATTLE_END_REASONS)[number];
@@ -184,9 +200,8 @@ export type BloodbattleTileDrawnPrivatePayload = {
   tile: TileId;
 };
 
-/** TileDiscarded is public (matches junk/hangzhou's shared TileDiscardedPayload);
- * TileDiscardedPrivate is bloodbattle's own redundant seat-visible duplicate of
- * the same {seat,tile} pair — see applyDiscard. */
+/** TileDiscarded 是 public 事件，payload 形状与 junk/hangzhou 一致；
+ * TileDiscardedPrivate 是 bloodbattle 自己对同一 {seat,tile} 的座位可见冗余副本，见 applyDiscard。 */
 export type BloodbattleTileDiscardedPrivatePayload = {
   type: typeof EVENT_TYPES.tileDiscardedPrivate;
   seat: SeatId;
@@ -236,7 +251,7 @@ export type BloodbattleGangMadePayload =
     };
 
 export type BloodbattlePengMadePayload = {
-  type: "PengMade";
+  type: typeof EVENT_TYPES.pengMade;
   seat: SeatId;
   from: SeatId;
   tile: TileId;
@@ -280,10 +295,10 @@ export type BloodbattleEventPayload =
   | BloodbattleTilesReceivedPayload
   | BloodbattleExchangeCompletedPayload
   | BloodbattleLackChosenPayload
-  | TurnStartedPayload
+  | { type: typeof EVENT_TYPES.turnStarted; seat: SeatId }
   | BloodbattleTileDrawnPayload
   | BloodbattleTileDrawnPrivatePayload
-  | TileDiscardedPayload
+  | { type: typeof EVENT_TYPES.tileDiscarded; seat: SeatId; tile: TileId }
   | BloodbattleTileDiscardedPrivatePayload
   | BloodbattleClaimWindowOpenedPayload
   | BloodbattleClaimRespondedPayload
@@ -293,7 +308,7 @@ export type BloodbattleEventPayload =
   | BloodbattleHuDeclaredPayload
   | BloodbattleSettledPayload
   | BloodbattleGameEndedPayload
-  | WallExhaustedPayload;
+  | { type: typeof EVENT_TYPES.wallExhausted };
 
 export type BloodbattleApplyResult =
   | { state: BloodbattleState; events: GameEvent<BloodbattleEventPayload>[] }

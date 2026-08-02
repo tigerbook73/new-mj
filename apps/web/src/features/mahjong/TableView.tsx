@@ -45,7 +45,7 @@ import { useSessionStore } from "@/shared/store/session";
 import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
 import { useTablePresentation } from "./useTablePresentation";
 
-// Sound-effect scope (see docs/process/plan.md 可选沉浸体验), matching the actual
+// Sound-effect scope, matching the actual
 // clip set provided: 8 action clips (chi/peng/gang/angang/bugang/hu/zimo/pass) plus
 // a full 34-kind tile-name voice set (public/sounds/{1m,...,7z}.m4a, same naming as
 // TileKind) — a discard announces the discarded tile's name instead of a generic
@@ -366,7 +366,7 @@ export function TableView() {
   // drops the arrow, rather than looking like a live turn for that seat.
   // Per-seat final hand for the settlement panel — already-declared open melds
   // (converted TileId→TileKind) plus the concealed decomposition actually used,
-  // undefined for a seat that didn't win. See docs/process/plan.md 胡牌结算展示最终赢牌组合.
+  // undefined for a seat that didn't win.
   const winningHands: Array<TileKind[][] | undefined> = (extras.seats ?? []).map((seat) => {
     if (!seat.winSnapshot) return undefined;
     const openMeldGroups = seat.melds.map((meld) => meld.tiles.map((tile) => tileKindOf(tile)));

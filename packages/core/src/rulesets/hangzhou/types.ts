@@ -1,19 +1,26 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { GangChain } from "../../lib/gang-chain.ts";
-import type { DiscardEntry, Meld, SeatState } from "../../lib/seat.ts";
+import type { DiscardEntry, Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
-import {
-  EVENT_TYPES,
-  type GameEvent,
-  type TileDiscardedPayload,
-  type TurnStartedPayload,
-  type WallExhaustedPayload,
-} from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import { HANGZHOU_MULTI_HU_POLICIES, HANGZHOU_PHASES } from "./constants.ts";
+import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type HangzhouPhase = (typeof HANGZHOU_PHASES)[number];
 export type HangzhouMultiHuPolicy = (typeof HANGZHOU_MULTI_HU_POLICIES)[number];
+
+/** hangzhou 的 applyAction/createGame 能返回给调用方的完整错误码集合；`fail`/config 解析都按这个联合收窄，防止拼写漂移。 */
+export type HangzhouErrorCode =
+  | typeof CORE_ERROR_CODES.invalidConfig
+  | typeof CORE_ERROR_CODES.unknownAction
+  | "CLAIM_NOT_AVAILABLE"
+  | "CLAIM_WINDOW_NOT_OPEN"
+  | "DRAW_NOT_AVAILABLE"
+  | "GANG_NOT_AVAILABLE"
+  | "NOT_YOUR_TURN"
+  | "TILE_NOT_IN_HAND"
+  | "ZIMO_NOT_AVAILABLE";
 
 export type HangzhouAction =
   | { type: "discard"; tile: TileId }
@@ -71,10 +78,10 @@ export type HangzhouGameResult =
       scoreDeltas: [number, number, number, number];
     };
 
-/** Revealed at the moment of a hu, mirrors bloodbattle's WinSnapshot/PublicWinSnapshot
- * split (see docs/process/plan.md 胡牌结算展示最终赢牌组合). `groups` is the concealed
- * decomposition actually used for scoring (melds+pair, or seven pair-groups) — already
- * kind-level so it needs no public/private conversion, unlike `hand`/`winTile`. */
+/** 胡牌那一刻揭示，仿照血战到底 WinSnapshot/PublicWinSnapshot 的公开-隐藏拆分模式，
+ * 用于结算时展示最终赢牌的面子拆解。`groups` 是实际用于算番的暗牌拆分结果
+ * （面子+将牌，或七对的七组）——本身已经是种类级别，不像 `hand`/`winTile`
+ * 那样需要区分公开/隐藏两种表示。 */
 export type HangzhouWinSnapshot = {
   hand: TileId[];
   winTile: TileId;
@@ -93,6 +100,10 @@ export type HangzhouState = {
   wall: TileId[];
   seats: SeatState[];
   currentSeat: SeatId;
+  /** Fixed for the whole game — who dealt this hand; feeds the dealerStreak-tiered
+   * payout multiplier (hangzhou.md §7). Cross-game continuity (who deals the NEXT
+   * game) is computeNextHangzhouDealer's job and isn't tracked by this field. */
+  dealer: SeatId;
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };
@@ -107,7 +118,7 @@ export type HangzhouState = {
   caiPiaoCount: [number, number, number, number];
   /** Length of the current seat's unbroken consecutive-gang chain, see
    * docs/variants/hangzhou.md §6. Reset to 0 on that seat's next discard. */
-  gangChain: GangChain;
+  gangChain: [number, number, number, number];
   /** Set for each winner right when their hu is declared; never cleared mid-hand. */
   wins?: Partial<Record<SeatId, HangzhouWinSnapshot>>;
 };
@@ -134,6 +145,8 @@ export type HangzhouPlayerView = Omit<PlayerViewBase, "seats"> & {
   /** Public: whether ron is currently allowed (dealerStreak >= 3), see
    * hangzhou.md §5/§11 — santiao is table-wide, not a per-seat secret. */
   dealerStreak: number;
+  /** Public: this game's dealer seat, fixed for the whole game (hangzhou.md §11). */
+  dealer: SeatId;
 };
 
 export type HangzhouGameStartedPayload = {
@@ -200,14 +213,14 @@ export type HangzhouGangMadePayload =
   | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; tiles: TileId[]; from: SeatId };
 
 export type HangzhouChiMadePayload = {
-  type: "ChiMade";
+  type: typeof EVENT_TYPES.chiMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
 };
 
 export type HangzhouPengMadePayload = {
-  type: "PengMade";
+  type: typeof EVENT_TYPES.pengMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
@@ -238,9 +251,9 @@ export type HangzhouGameEndedPayload = {
 export type HangzhouEventPayload =
   | HangzhouGameStartedPayload
   | HangzhouHandDealtPayload
-  | TurnStartedPayload
+  | { type: typeof EVENT_TYPES.turnStarted; seat: SeatId }
   | HangzhouTileDrawnPayload
-  | TileDiscardedPayload
+  | { type: typeof EVENT_TYPES.tileDiscarded; seat: SeatId; tile: TileId }
   | HangzhouClaimWindowOpenedPayload
   | HangzhouClaimRespondedPayload
   | HangzhouClaimWindowResolvedPayload
@@ -251,7 +264,7 @@ export type HangzhouEventPayload =
   | HangzhouHuDeclaredPayload
   | HangzhouSettledPayload
   | HangzhouGameEndedPayload
-  | WallExhaustedPayload;
+  | { type: typeof EVENT_TYPES.wallExhausted };
 
 export type HangzhouApplyResult =
   { state: HangzhouState; events: GameEvent<HangzhouEventPayload>[] } | { error: RuleViolation };

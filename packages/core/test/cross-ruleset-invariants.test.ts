@@ -5,6 +5,12 @@ import { REGISTERED_RULESETS_FOR_TESTING } from "../src/support/registered-rules
 // junk-specific one — parameterized so a second ruleset
 // only needs to be added to the registry, not re-authored here.
 for (const ruleset of REGISTERED_RULESETS_FOR_TESTING) {
+  test(`${ruleset.id}: registry key matches the ruleset's own config.rulesetId`, () => {
+    const started = ruleset.createGame(1);
+    if ("error" in started) throw new Error(started.error.code);
+    expect(started.state.config.rulesetId).toBe(ruleset.id);
+  });
+
   test(`${ruleset.id}: filtered events rebuild the same initial player view as direct derivation`, () => {
     const started = ruleset.createGame(19);
     if ("error" in started) throw new Error(started.error.code);

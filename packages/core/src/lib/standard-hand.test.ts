@@ -7,7 +7,7 @@ import {
   decomposeStandardWinningHand,
   isSevenPairsWinningHand,
   isStandardWinningHand,
-} from "./win.ts";
+} from "./standard-hand.ts";
 
 const sortedKinds = (list: readonly (typeof TILE_KINDS)[number][]) => [...list].sort();
 

@@ -6,58 +6,82 @@ export type JunkScoringMeld = {
 };
 
 export type JunkScoringInput = {
-  /** Winner's complete concealed hand, including the winning tile. */
-  hand: TileKind[];
+  /** Which family the winning hand matched, and its concealed decomposition — both
+   * already computed by isWin/decomposeJunkWin, which own all shape validation.
+   * This function only turns an already-validated win into a fan multiplier, so
+   * unlike hangzhou/bloodbattle's scoring functions there is no hu:true/false
+   * discriminant to return. */
+  family: "standard" | "sevenPairs";
+  groups: TileKind[][];
   melds: JunkScoringMeld[];
-  isDealer: boolean;
-  winType: "zimo" | "ron";
-  /** Consecutive gangs immediately preceding this self-draw. */
+  win: { by: "zimo" | "ron" };
+  /** Winner's own gangChain length at the moment of winning; ignored unless by==="zimo" (junk.md §3). */
   gangChainLength: number;
 };
 
 export type JunkScoringResult = { fanTypes: string[]; multiplier: number };
 
-const countKinds = (tiles: readonly TileKind[]): Map<TileKind, number> => {
-  const counts = new Map<TileKind, number>();
-  for (const tile of tiles) counts.set(tile, (counts.get(tile) ?? 0) + 1);
-  return counts;
-};
+const isTripletGroup = (group: readonly TileKind[]): boolean =>
+  group.length === 3 && group[0] === group[1] && group[1] === group[2];
 
-// Mirrors lib/win.ts's isSevenPairsWinningHand strict count===2 definition (docs/variants/junk.md
-// §3 "门前 14 张牌恰为七个对子") — kept as a separate TileKind-level check since scoring only ever
-// sees the already-decomposed kind multiset, not TileId/TileSet; if either changes, check the other.
-const isSevenPairs = (hand: readonly TileKind[], melds: readonly JunkScoringMeld[]): boolean =>
-  melds.length === 0 &&
-  hand.length === 14 &&
-  [...countKinds(hand).values()].every((count) => count === 2);
+// Only the standard family (4 melds + 1 pair) can be 碰碰胡; sevenPairs is a
+// structurally different shape. A single chi meld rules it out immediately;
+// otherwise every concealed 3-tile group (the pair is length 2 and skipped)
+// must be a triplet — decomposeJunkWin never leaves a kong's 4th tile in
+// `groups` (kongs always live in `melds`), so length 3 is the only case to check.
+const isPengPengHu = (
+  family: "standard" | "sevenPairs",
+  groups: readonly TileKind[][],
+  melds: readonly JunkScoringMeld[],
+): boolean =>
+  family === "standard" &&
+  !melds.some((meld) => meld.type === "chi") &&
+  groups.filter((group) => group.length === 3).every(isTripletGroup);
 
-const isPengpenghu = (hand: readonly TileKind[], melds: readonly JunkScoringMeld[]): boolean => {
-  if (melds.some((meld) => meld.type === "chi")) return false;
-  const remainders = [...countKinds(hand).values()].map((count) => count % 3);
-  return (
-    remainders.filter((count) => count === 2).length === 1 &&
-    remainders.every((count) => count === 0 || count === 2)
-  );
-};
+// anGang is a concealed kong, so it doesn't break 门清; any other declared meld does.
+const isMenqing = (melds: readonly JunkScoringMeld[]): boolean =>
+  melds.every((meld) => meld.type === "anGang");
 
+/**
+ * Scores a completed junk hand per docs/variants/junk.md §3. All six fan types
+ * stack multiplicatively (the doc's "所有翻倍可以叠加"); the dealer's flat ×2
+ * is a separate per-payment rule applied by the caller (settleWins), not part
+ * of this hand-only multiplier.
+ */
 export const scoreJunkHand = (input: JunkScoringInput): JunkScoringResult => {
-  const allTiles = [...input.hand, ...input.melds.flatMap((meld) => meld.tiles)];
-  const suits = new Set(allTiles.filter((tile) => !tile.endsWith("z")).map((tile) => tile[1]));
-  const hasHonors = allTiles.some((tile) => tile.endsWith("z"));
+  const { family, groups, melds, win, gangChainLength } = input;
   const fanTypes: string[] = [];
   let multiplier = 1;
-  const add = (fanType: string, factor: number) => {
-    fanTypes.push(fanType);
-    multiplier *= factor;
-  };
 
-  if (input.isDealer) add("dealer", 2);
-  if (input.winType === "zimo" && input.gangChainLength > 0)
-    add("gangkai", 2 ** input.gangChainLength);
-  if (suits.size === 1 && hasHonors) add("hunYise", 2);
-  if (suits.size === 1 && !hasHonors) add("qingYise", 4);
-  if (isSevenPairs(input.hand, input.melds)) add("qixiaodui", 2);
-  else if (isPengpenghu(input.hand, input.melds)) add("pengpenghu", 2);
-  if (input.melds.every((meld) => meld.type === "anGang")) add("menqing", 2);
+  if (family === "sevenPairs") {
+    fanTypes.push("qidui");
+    multiplier *= 2;
+  }
+  if (isPengPengHu(family, groups, melds)) {
+    fanTypes.push("pengpenghu");
+    multiplier *= 2;
+  }
+  if (isMenqing(melds)) {
+    fanTypes.push("menqing");
+    multiplier *= 2;
+  }
+
+  const allTiles = [...groups.flat(), ...melds.flatMap((meld) => meld.tiles)];
+  const hasHonor = allTiles.some((kind) => kind.endsWith("z"));
+  const suits = new Set(allTiles.filter((kind) => !kind.endsWith("z")).map((kind) => kind[1]));
+  if (!hasHonor && suits.size === 1) {
+    fanTypes.push("qingyise");
+    multiplier *= 4;
+  } else if (hasHonor && suits.size === 1) {
+    fanTypes.push("hunyise");
+    multiplier *= 2;
+  }
+
+  const gangChain = win.by === "zimo" ? gangChainLength : 0;
+  if (gangChain > 0) {
+    fanTypes.push("gangkai");
+    multiplier *= 2 ** gangChain;
+  }
+
   return { fanTypes, multiplier };
 };

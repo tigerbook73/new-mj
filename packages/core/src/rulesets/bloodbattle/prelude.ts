@@ -1,28 +1,37 @@
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng, nextInt } from "../../lib/prng.ts";
 import { createWall } from "../../lib/wall.ts";
+import { SEAT_COUNT, SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { parseBloodbattleConfig } from "./config.ts";
+import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import type { SeatState } from "../../lib/seat-state.ts";
 import type {
   BloodbattleApplyResult,
   BloodbattleConfig,
+  BloodbattleErrorCode,
   BloodbattleEventPayload,
   BloodbattleState,
 } from "./types.ts";
-import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
+import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 export { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
 const publicVisibility = { type: "public" } as const;
 const seatVisibility = (seat: SeatId) => ({ type: "seat" as const, seats: [seat] });
 
-const seats = (): SeatState[] =>
-  BLOODBATTLE_SEATS.map(() => ({ hand: [], melds: [], discards: [] }));
+const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], discards: [] }));
 
-const cloneState = (state: BloodbattleState): BloodbattleState => ({
+// Shared with state-machine.ts: applyAction clones once per call, so this needs
+// to stay a hand-rolled shallow-where-safe clone rather than a generic deep
+// clone (structuredClone benchmarks ~30x slower on this shape, which would show
+// up in the 1000/10000-game fuzz smoke).
+export const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
   wall: [...state.wall],
+  scores: [...state.scores] as BloodbattleState["scores"],
+  status: [...state.status] as BloodbattleState["status"],
+  gangPayments: state.gangPayments.map((payment) => ({ ...payment })),
   seats: state.seats.map((seat) => ({
     hand: [...seat.hand],
     melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
@@ -30,6 +39,17 @@ const cloneState = (state: BloodbattleState): BloodbattleState => ({
   })),
   ...(state.exchange ? { exchange: { selections: { ...state.exchange.selections } } } : {}),
   ...(state.lack ? { lack: { ...state.lack } } : {}),
+  ...(state.wins ? { wins: { ...state.wins } } : {}),
+  ...(state.lastDiscard ? { lastDiscard: { ...state.lastDiscard } } : {}),
+  ...(state.pendingClaims
+    ? {
+        pendingClaims: {
+          ...state.pendingClaims,
+          options: { ...state.pendingClaims.options },
+          responses: { ...state.pendingClaims.responses },
+        },
+      }
+    : {}),
 });
 
 const appendEvent = (
@@ -42,7 +62,7 @@ const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-const fail = (code: string): BloodbattleApplyResult => ({ error: { code } });
+const fail = (code: BloodbattleErrorCode): BloodbattleApplyResult => ({ error: { code } });
 
 const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[] | undefined => {
   const remaining = [...hand];
@@ -57,8 +77,8 @@ const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[
 // direction 0 = pass right (to nextSeat), 1 = pass left (to previous seat),
 // 2 = pass across; matches rules-bloodbattle.md §1's "均匀决定向左、向右或对家交换".
 const receiverOf = (seat: SeatId, direction: 0 | 1 | 2): SeatId => {
-  if (direction === 2) return ((seat + 2) % 4) as SeatId;
-  return ((seat + (direction === 0 ? 1 : 3)) % 4) as SeatId;
+  if (direction === 2) return SEAT_IDS[(seat + 2) % SEAT_COUNT]!;
+  return SEAT_IDS[(seat + (direction === 0 ? 1 : 3)) % SEAT_COUNT]!;
 };
 
 export const createBloodbattlePrelude = (
@@ -88,10 +108,10 @@ export const createBloodbattlePrelude = (
     type: EVENT_TYPES.gameStarted,
     config: state.config,
     dealer,
-    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
+    handCounts: SEAT_IDS.map((seat) => (seat === dealer ? 14 : 13)),
     wallCount: state.wall.length - 53,
   });
-  for (const seat of [0, 1, 2, 3] as SeatId[]) {
+  for (const seat of SEAT_IDS) {
     const count = seat === dealer ? 14 : 13;
     for (let index = 0; index < count; index += 1)
       state.seats[seat]!.hand.push(state.wall.shift()!);
@@ -108,7 +128,7 @@ export const createBloodbattlePrelude = (
 export const computeNextBloodbattleDealer = (
   _finished: BloodbattleState,
   currentDealer: SeatId,
-): SeatId => ((currentDealer + 1) % 4) as SeatId;
+): SeatId => nextSeat(currentDealer);
 
 export const applyExchangeThree = (
   state: BloodbattleState,
@@ -134,16 +154,16 @@ export const applyExchangeThree = (
   });
 
   const selections = clonedState.exchange.selections;
-  const allSubmitted = ([0, 1, 2, 3] as SeatId[]).every((candidate) => selections[candidate]);
+  const allSubmitted = SEAT_IDS.every((candidate) => selections[candidate]);
   if (!allSubmitted) return { state: clonedState, events };
 
   const direction = nextInt(clonedState.prng, 3);
   clonedState.prng = direction.prng;
-  for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+  for (const candidate of SEAT_IDS) {
     const outgoing = selections[candidate]!;
     clonedState.seats[candidate]!.hand = removeTiles(clonedState.seats[candidate]!.hand, outgoing)!;
   }
-  for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+  for (const candidate of SEAT_IDS) {
     const receiver = receiverOf(candidate, direction.value as 0 | 1 | 2);
     const incoming = selections[candidate]!;
     clonedState.seats[receiver]!.hand.push(...incoming);
@@ -179,7 +199,7 @@ export const applyChooseLack = (
   appendEvent(clonedState, events, seatVisibility(seat), { type: EVENT_TYPES.lackChosen, suit });
 
   const lack = clonedState.lack;
-  const allSubmitted = ([0, 1, 2, 3] as SeatId[]).every((candidate) => lack[candidate]);
+  const allSubmitted = SEAT_IDS.every((candidate) => lack[candidate]);
   if (!allSubmitted) return { state: clonedState, events };
 
   clonedState.phase = "playing";

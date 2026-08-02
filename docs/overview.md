@@ -16,7 +16,7 @@
 6. 架构可扩展即可，允许边界重构
 7. 非商用，不做数据兼容（可清对局表，保用户表，单向引用 userId）
 
-完整阶段路线与当前进度见 `process/plan.md`。
+当前任务状态与待完成任务见 `process/plan.md`。
 
 ## 现状
 
@@ -50,7 +50,7 @@ variants/
   bloodbattle.md                血战到底：同上
 testing-strategy.md             测试策略（先定后做）
 process/
-  plan.md                       阶段路线与状态（过程文档）
+  plan.md                       当前任务状态与待完成任务（过程文档）
   workflow.md                   流程细则（过程文档）
 ```
 

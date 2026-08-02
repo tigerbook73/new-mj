@@ -1,4 +1,5 @@
-import type { HangzhouConfig } from "./types.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
+import type { HangzhouConfig, HangzhouErrorCode } from "./types.ts";
 import { HANGZHOU_MULTI_HU_POLICIES } from "./constants.ts";
 
 // docs/variants/hangzhou.md §7/§12: baseScore=1, multiHuPolicy defaults to
@@ -14,10 +15,10 @@ export const DEFAULT_HANGZHOU_CONFIG: HangzhouConfig = {
 
 export const parseHangzhouConfig = (
   input: unknown,
-): { config: HangzhouConfig } | { error: { code: string } } => {
+): { config: HangzhouConfig } | { error: { code: HangzhouErrorCode } } => {
   if (input === undefined) return { config: { ...DEFAULT_HANGZHOU_CONFIG } };
   if (!input || typeof input !== "object" || Array.isArray(input))
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   const candidate = input as Record<string, unknown>;
   if (
     (candidate.rulesetId !== undefined && candidate.rulesetId !== "hangzhou") ||
@@ -34,7 +35,7 @@ export const parseHangzhouConfig = (
         !Number.isInteger(candidate.dealerStreak) ||
         candidate.dealerStreak < 1))
   ) {
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   }
   return {
     config: {

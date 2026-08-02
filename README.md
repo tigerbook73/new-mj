@@ -13,11 +13,11 @@ pnpm lint
 pnpm test
 pnpm format          # 写入格式
 pnpm format:check    # 仅校验格式
-pnpm cli:play --seed 47
-pnpm fuzz --seed 47 --games 10000
+pnpm cli:junk:play --seed 47
+pnpm fuzz:junk --seed 47 --games 10000
 ```
 
-`cli:play` 输出可重放的 seed、config 与 action log；可用 `--config '<json>'` 和 `--actions '<json>'` 覆盖输入。`fuzz` 随机覆盖 junk config；失败时输出固化为回归用例所需的 seed/config/action log。
+`cli:junk:play` 输出可重放的 seed、config 与 action log；可用 `--config '<json>'` 和 `--actions '<json>'` 覆盖输入。`fuzz:junk` 随机覆盖 junk config；失败时输出固化为回归用例所需的 seed/config/action log。这两个命令是 junk 的 core 开发/诊断工具，不是通用多玩法 CLI。
 
 ## 文档阅读路径
 

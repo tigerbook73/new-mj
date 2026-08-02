@@ -2,8 +2,7 @@ import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
 import { useAudioStore } from "@/shared/store/audio.store";
 
 // Action clips are hand-authored (public/sounds/{chi,peng,...}.m4a); tile-kind
-// clips are the full 34-kind voice set (public/sounds/{1m,...,7z}.m4a) — see
-// docs/process/plan.md 可选沉浸体验. Both live in the same flat directory and
+// clips are the full 34-kind voice set (public/sounds/{1m,...,7z}.m4a). Both live in the same flat directory and
 // share the same playback path, so one union covers both.
 export type SoundName =
   "chi" | "peng" | "gang" | "angang" | "bugang" | "hu" | "zimo" | "pass" | TileKind;

@@ -1,5 +1,6 @@
 import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
 import type { SeatId } from "../../lib/ids.ts";
+import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
 import type { GameEvent } from "../../events.ts";
 import { hangzhouRuleSet } from "./index.ts";
 import { kindsOf } from "./state-machine.ts";
@@ -18,15 +19,16 @@ export type HangzhouFuzzFailure = {
   error: string;
 };
 
+// dealerStreak 的上限与座位数无关，只是巧合同为 4；用独立常量避免误读成 SEAT_COUNT。
+const MAX_DEALER_STREAK = 4;
+
 const nextAction = (
   state: HangzhouState,
   prng: PrngState,
 ): { seat: SeatId; action: HangzhouAction; prng: PrngState } | undefined => {
   const eligible =
     state.phase === "awaiting-claims"
-      ? ([0, 1, 2, 3] as SeatId[]).filter(
-          (seat) => hangzhouRuleSet.getLegalActions(state, seat).length > 0,
-        )
+      ? SEAT_IDS.filter((seat) => hangzhouRuleSet.getLegalActions(state, seat).length > 0)
       : [state.currentSeat];
   if (eligible.length === 0) return undefined;
   const seatPick = nextInt(prng, eligible.length);
@@ -80,6 +82,14 @@ const checkWinSnapshotInvariant = (state: HangzhouState): string | undefined => 
   return undefined;
 };
 
+/** Every payout is a zero-sum transfer between seats — a bug in the dealer's
+ * streak-tiered multiplier (double-counting or dropping an edge) would break this. */
+const checkScoreDeltasInvariant = (state: HangzhouState): string | undefined => {
+  if (!state.result) return undefined;
+  const sum = state.result.scoreDeltas.reduce((total, delta) => total + delta, 0);
+  return sum === 0 ? undefined : "SCORE_DELTAS_NOT_ZERO_SUM";
+};
+
 export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure | undefined => {
   let prng = createPrng(seed);
   for (let index = 0; index < games; index += 1) {
@@ -87,11 +97,11 @@ export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure 
     prng = gameSeed.prng;
     const switches = nextInt(prng, 2);
     prng = switches.prng;
-    const dealerPick = nextInt(prng, 4);
+    const dealerPick = nextInt(prng, SEAT_COUNT);
     prng = dealerPick.prng;
     // dealerStreak randomized across [1,4] so both the santiao-blocked (<3)
     // and unlocked (>=3) ron paths get fuzzed — see hangzhou.md §5.
-    const streakPick = nextInt(prng, 4);
+    const streakPick = nextInt(prng, MAX_DEALER_STREAK);
     prng = streakPick.prng;
     const config = {
       multiHuPolicy: (switches.value & 1) !== 0 ? ("all" as const) : ("headJump" as const),
@@ -99,7 +109,8 @@ export const fuzzHangzhouGames = (games: number, seed = 1): HangzhouFuzzFailure 
     };
     const result = playHangzhouGame(gameSeed.value, config, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
-    const invariantError = checkWinSnapshotInvariant(result.state);
+    const invariantError =
+      checkWinSnapshotInvariant(result.state) ?? checkScoreDeltasInvariant(result.state);
     if (invariantError) {
       return { seed: gameSeed.value, config, actions: result.actions, error: invariantError };
     }

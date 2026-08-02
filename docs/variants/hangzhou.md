@@ -1,6 +1,6 @@
 # 杭州麻将规则（rulesetId: `hangzhou`）
 
-> 状态：v2 定稿，已实现并测试通过（`packages/core/src/rulesets/hangzhou/`）。规则来源为用户提供的"边锋杭州麻将规则总结"；原始规则里未给出的细节已与用户逐条确认，拍板记录见 §14。
+> 状态：v3 定稿，已实现并测试通过（`packages/core/src/rulesets/hangzhou/`）。规则来源为用户提供的"边锋杭州麻将规则总结"；原始规则里未给出的细节已与用户逐条确认，拍板记录见 §14。
 > 本文件内聚杭州麻将的全部知识：规则、专属类型、专属事件、跨局规则。公共契约见 `contracts/engine-contract.md`；即使某节与 `junk.md`/`bloodbattle.md` 恰好一样，也各写一份，不互相链接（见 `architecture/variant-boundary.md`）。
 > v2 补上三牢点炮限制与连庄坐庄（§5/§8）：需要一个跨局状态传递的契约（`dealerStreak`），已在 Room 层落地为通用机制，见 `contracts/session-mechanics.md` §5。
 
@@ -96,6 +96,16 @@
 
 **底分（已确认）**：`baseScore = 1`，与 junk 一致，不做成可配置项（除非以后有需求再加）。
 
+**庄家连庄倍率（已确认）**：任意一笔涉及庄家的收付——庄家胡牌时别人付给庄家的钱，或庄家点炮/自摸付钱给别家时庄家付的钱——在 §6 番型倍数算完后再乘一档庄家倍率，按 `dealerStreak`（当前庄家已连续坐了几局，含本局）取值：
+
+| `dealerStreak` | 倍率 |
+| -------------- | ---: |
+| 1              |    2 |
+| 2              |    4 |
+| ≥3             |    8 |
+
+这是 `dealerStreak` 这一个字段的**第二个独立效果**，与 §5"三牢"（`dealerStreak>=3` 才解锁点炮）是两条不同阈值、不同作用的规则，不要混为一谈：三牢管的是"点炮这个动作合不合法"，这里管的是"钱付多少"，`dealerStreak` 从 1 开始就已经生效庄家倍率（不像三牢要等到第 3 局才生效）。这条倍率与庄家是否胡牌无关——庄家点炮/被自摸时一样要多付。计算上是一笔笔"收付边"各自判断（付款方或收款方只要有一方是庄家就整笔乘倍率），不是对整局分数统一乘——一炮多响时，点炮者如果是庄家，付给每个赢家的那一笔都各自乘倍率；自摸时如果赢家不是庄家、三个付款人里恰好有一个是庄家，只有庄家那一笔翻倍，其余两笔不受影响。`HuDeclared` 事件的 `fanTypes`/`multiplier` 只反映番型本身的倍数，不包含这条庄家倍率（与 `docs/variants/junk.md` §3/§6 的约定一致）；实际到账金额只体现在 `Settled` 的 `scoreDeltas` 里。
+
 ## 8. 跨局规则
 
 - **庄家轮换公式**（对应 `contracts/engine-contract.md` §4 的 `computeNextDealer` 契约，已确认）：庄家胡牌（自摸或点炮，包括一炮多响里庄家是其中一个赢家的情况）或流局都连庄；只有别家胡牌（庄家不在赢家之列）时才轮到下一位（逆时针下一座，`nextSeat`）。这与 junk/bloodbattle"不管结果一律顺时针轮转"的实现不同，是本项目第一个连庄玩法——已按 `architecture/variant-boundary.md` §2 的门槛把"庄家轮换公式"这一行转正判定为**确认私有**（junk/bloodbattle 恰好一样只是巧合，杭州证明了差异，因此永久保持各玩法自己实现，不提取公共代码）
@@ -107,6 +117,7 @@
 - `HangzhouPhase`：`dealing → playing ⇄ awaiting-claims ⇄ awaiting-draw → finished`（结构与 junk 相同，见 `junk.md` §5），无前置阶段
 - `HangzhouAction`：discard/chi/peng/anGang/buGang/minGang（响应态）/zimo/hu/pass/draw——与 junk 同构，实现时在 `applyAction` 层收紧财神相关的合法性（不可吃/碰/杠财神）
 - `HangzhouState` 不需要 junk/bloodbattle 都没有的额外前置阶段字段；需要为 §4 的派生状态在内部状态与 PlayerView 之间维护
+- `HangzhouState` 新增私有字段 `dealer`（本局庄家座位，整局固定不变，供 §7 庄家倍率判断"这笔收付是否涉及庄家"用；跨局延续是 `computeNextHangzhouDealer` 的职责，不由这个字段本身表达）——与 `junk.md` §5 新增的同名字段同构
 
 ## 10. 事件清单
 
@@ -121,7 +132,8 @@
 
 - `isTingpai: boolean`、`isBaotou: boolean`、`isCaipiao: boolean`——**私有**，仅本人可见，每次状态转换后重算，通过既有的 `LegalActionsUpdated` 同步机制一并下发，不新开事件类型
 - `dealerStreak: number`——**公开**，所有座位的 view 都带同一个值；这是全桌可推导的信息（点炮是否开放本就不是秘密，见 §5），不像上面三个是私有派生状态。整局固定不变，`getPlayerView`/`rebuildPlayerView` 都从 `state.config.dealerStreak` 取值
-- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared` 一行与 `docs/process/plan.md`「胡牌结算展示最终赢牌组合」
+- `dealer: SeatId`——**公开**，本局庄家座位，整局固定，供客户端展示"庄家倍率"提示用；仿 junk.md §7 的同名公开字段
+- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared`。
 
 ## 12. Config 清单
 
@@ -142,6 +154,8 @@ Slice 0 需要确认的问题均已拍板：一炮多响策略（头跳）、点
 
 三牢/连庄专题需要确认的问题也已拍板：跨局状态传递架构（Room 层通用比较前后两局庄家座位，结果写进下一局 `GameConfig` 的 `dealerStreak`，不改 `computeNextDealer` 签名）、庄家连庄触发条件（庄家胡牌或流局都连庄，别家胡牌才轮庄）。
 
+庄家连庄倍率专题（v3）已拍板：适用范围是"任意涉及庄家的收付都翻倍"（不只是庄家胡牌那一种情况）；倍率按 `dealerStreak` 取值 1→×2、2→×4、3 及以上→×8 封顶；与 §6 的番型倍数是乘法叠加关系。
+
 剩余两处是不阻塞定稿的实现细节，留到写 fixture 时按文中标注的默认处理，如与你的预期不符再改：
 
 - 财神在手可同时替代多个位置，上限仅为牌墙总共 4 张白板（§2，未逐字确认但风险低）
@@ -149,4 +163,4 @@ Slice 0 需要确认的问题均已拍板：一炮多响策略（头跳）、点
 
 ## 15. 状态
 
-v2 定稿，已实现；`packages/core` 单测/fixture/跨玩法不变量测试全绿，fuzz 1000 局（`pnpm test` 内置回归）与 10000 局（收尾一次性验证）均无失败，含 `dealerStreak` 随机化覆盖三牢开/关两种路径。`apps/server` 的 `RoomService` 已实现通用 `dealerStreak` 跨局传递并有专门测试。`apps/web` 的 `GamePickerView` 已能创建杭州房间，走与血战到底相同的公共桌面骨架，专属 UI（财神高亮、爆头/财飘展示）留在 `plan.md` Backlog。
+v3 定稿（新增 §7 庄家连庄倍率），已实现；`packages/core` 单测/fixture/跨玩法不变量测试全绿，fuzz 1000 局（`pnpm test` 内置回归）与 10000 局（收尾一次性验证）均无失败，含 `dealerStreak` 随机化覆盖三牢开/关与庄家倍率各档位。`apps/server` 的 `RoomService` 已实现通用 `dealerStreak` 跨局传递并有专门测试。`apps/web` 的 `GamePickerView` 已能创建杭州房间，走与血战到底相同的公共桌面骨架。

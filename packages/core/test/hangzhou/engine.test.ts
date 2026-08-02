@@ -128,6 +128,7 @@ test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 2,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -154,6 +155,7 @@ test("caishen is never offered as a concealed-gang kind, even holding all four",
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 1,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -182,6 +184,7 @@ test("bug repro: zimo is not offered right after peng, even if the leftover conc
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 1,
+    dealer: 2,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -226,6 +229,7 @@ test("minGang (claimed open kong) requires the replacement draw before zimo — 
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 1,
+    dealer: 2,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -266,6 +270,7 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 1,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -284,12 +289,64 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   assertTileConservation(won);
 });
 
+// Same 杠开 zimo shape as the test above (pinghu x gangkai = payout 2, see
+// hz-013 in scoring.test.ts), parameterized on dealer/dealerStreak so the §7
+// bonus tiers can be exercised without santiao (which blocks ron, not zimo,
+// below dealerStreak=3 — zimo lets us reach the x2/x4 tiers too).
+const gangkaiZimoState = (dealer: 0 | 1 | 2 | 3, dealerStreak: number): HangzhouState => {
+  const seat0Hand = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 16, 17];
+  const REPLACEMENT_TILE = 14;
+  const physical = new Set([...seat0Hand, REPLACEMENT_TILE]);
+  const restOfWall = allTileIds().filter((tile) => !physical.has(tile));
+  return {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak },
+    phase: "playing",
+    wall: [...restOfWall, REPLACEMENT_TILE],
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    dealer,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [0, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+  };
+};
+
+const playGangkaiZimo = (dealer: 0 | 1 | 2 | 3, dealerStreak: number): HangzhouState => {
+  const ganged = unwrap(
+    hangzhouRuleSet.applyAction(gangkaiZimoState(dealer, dealerStreak), 0, {
+      type: "anGang",
+      kind: "1m",
+    }),
+  );
+  const drawn = unwrap(hangzhouRuleSet.applyAction(ganged, 0, { type: "draw" }));
+  return unwrap(hangzhouRuleSet.applyAction(drawn, 0, { type: "zimo" }));
+};
+
+test("dealer's streak-tiered bonus (§7) on zimo: x2 at streak 1, x4 at streak 2, only the dealer's own payment scales", () => {
+  // dealer=0 is also the winner here — every payer's edge scales.
+  expect(playGangkaiZimo(0, 1).result).toMatchObject({ scoreDeltas: [12, -4, -4, -4] });
+  expect(playGangkaiZimo(0, 2).result).toMatchObject({ scoreDeltas: [24, -8, -8, -8] });
+
+  // dealer=1 is one of the three payers, not the winner — only seat 1's
+  // payment scales; seats 2/3 stay at the unscaled payout (2 each).
+  expect(playGangkaiZimo(1, 2).result).toMatchObject({ scoreDeltas: [12, -8, -2, -2] });
+});
+
 // 1m,2m,3m runs (0,4,8/12,16,20/24,28,32) + 1p pair (36,37) waiting on 1s/2s/3s
 // (76,80) to complete a fourth run — same shape as scoring.test.ts's hz-001/013.
 const santiaoSeat1Hand = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 37, 76, 80];
 const SANTIAO_WIN_TILE = 72; // 1s
 
-const santiaoState = (dealerStreak: number): HangzhouState => {
+// `dealer` defaults to a seat uninvolved in the discard/ron pair (0 and 1)
+// so the existing santiao tests below aren't affected by §7's dealer bonus;
+// the dedicated dealer-bonus tests further down pass an explicit dealer.
+const santiaoState = (dealerStreak: number, dealer: 0 | 1 | 2 | 3 = 3): HangzhouState => {
   const physical = new Set([SANTIAO_WIN_TILE, ...santiaoSeat1Hand]);
   return {
     config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak },
@@ -302,6 +359,7 @@ const santiaoState = (dealerStreak: number): HangzhouState => {
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -336,6 +394,31 @@ test("santiao: ron is allowed once dealerStreak reaches 3", () => {
   expect(hangzhouRuleSet.getLegalActions(discarded, 1)).toContainEqual({ type: "hu" });
   const ended = unwrap(hangzhouRuleSet.applyAction(discarded, 1, { type: "hu" }));
   expect(ended.result).toMatchObject({ type: "win", winner: 1, winType: "ron", from: 0 });
+});
+
+test("dealer's streak-tiered bonus (§7) applies to ron whichever side is the dealer, and stacks on the hand's own multiplier", () => {
+  // Plain pinghu at dealerStreak=3 (payout=1, see hz-001/013 in scoring.test.ts):
+  // a neutral dealer (seat 3, uninvolved) leaves the payment unscaled...
+  const neutral = unwrap(
+    hangzhouRuleSet.applyAction(santiaoState(3, 3), 0, { type: "discard", tile: SANTIAO_WIN_TILE }),
+  );
+  const neutralEnded = unwrap(hangzhouRuleSet.applyAction(neutral, 1, { type: "hu" }));
+  expect(neutralEnded.result).toMatchObject({ scoreDeltas: [-1, 1, 0, 0] });
+
+  // ...but dealerStreak=3 -> x8 applies once the discarder (payer) is the dealer...
+  const payerIsDealer = unwrap(
+    hangzhouRuleSet.applyAction(santiaoState(3, 0), 0, { type: "discard", tile: SANTIAO_WIN_TILE }),
+  );
+  const payerEnded = unwrap(hangzhouRuleSet.applyAction(payerIsDealer, 1, { type: "hu" }));
+  expect(payerEnded.result).toMatchObject({ scoreDeltas: [-8, 8, 0, 0] });
+
+  // ...and identically once the winner is the dealer instead — either side
+  // triggers the same tier, it doesn't compound when both would (impossible anyway).
+  const winnerIsDealer = unwrap(
+    hangzhouRuleSet.applyAction(santiaoState(3, 1), 0, { type: "discard", tile: SANTIAO_WIN_TILE }),
+  );
+  const winnerEnded = unwrap(hangzhouRuleSet.applyAction(winnerIsDealer, 1, { type: "hu" }));
+  expect(winnerEnded.result).toMatchObject({ scoreDeltas: [-8, 8, 0, 0] });
 });
 
 test("santiao: dealerStreak is public in every seat's view, not just seat 0's", () => {
@@ -402,6 +485,7 @@ test("caiPiaoCount increments when a baotou hand discards caishen and stays baot
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 1,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -435,6 +519,7 @@ test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag",
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 1,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],
@@ -490,6 +575,7 @@ test("gang-chain tiers: two consecutive concealed gangs extend gangChain", () =>
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 1,
     seq: 0,
     prng: createPrng(1),
     caiPiaoCount: [0, 0, 0, 0],

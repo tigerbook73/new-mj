@@ -1,52 +1,24 @@
-# 项目状态与当前工作
+# 待完成任务与当前状态
 
-> 工作台，不是项目年表。只保留当前专题、会阻塞它的风险和有序 Backlog；完成专题压成一行，耐久结论分流到 contracts 或 architecture。
+> 本文件是待完成任务列表与当前任务状态记录，不是项目年表。只保留当前专题、其仍有参考价值的已完成前序片段、阻塞/遗留问题和有序 Backlog；专题完成后删除其状态与完成记录，将耐久结论分流到 contracts、architecture 或 variants。
 
-## 当前工作
+## 当前任务
 
-**专题：等待下一个需求**
+当前暂无进行中专题。最近完成：junk AI 出牌质量提升（向听数驱动规则 bot）：为 junk 新增通用向听数/进张计算和表驱动 bot 策略，RoomService 仅向真实 junk 视图分流；其他玩法保持随机 baseline。策略以向听数、临近听牌时的进张、番型潜力和公开安全牌评分；完成 `@new-mj/ai verify`、replay-get/replay-omniscient 7 条 E2E，以及 1 万局 junk fuzz。
 
-- 进度：垃圾胡扩展规则已完成：首局庄家由 RuleSet 基于 seed 确定，胡牌赢家连庄、流局由庄家的打牌下家坐庄；庄家胡、连续杠开、混一色、清一色、七小对、碰碰胡和门清均已按规则叠乘结算，并已在 Web 结算面板展示。
-- 下一步第一个具体动作：从 Backlog 选择并确认下一个专题。
+- 下一步第一个具体动作：从 Backlog 选择下一个专题并建立其一页 brief。
 
-## 当前风险 / 开放问题
+## 阻塞与遗留问题
 
-- 配置项若会改变规则、算分或 AI 算法，必须排除在此功能范围外；这类需求应另行立项并先更新契约/设计文档。
-- 已发现（与本次改动无关，未修复）：`apps/web/test/lobby.e2e-spec.ts` 的 "leaving an in-game room keeps the other human in the match" 与 "force exiting an in-game room ends the session for every player" 两个用例在跑完整 `test/lobby.e2e-spec.ts` 套件时容易超时（等待对话框里的 "Hand off to AI"/"Force exit" 按钮），单独跑或小范围跑均能稳定通过；已在纯净 main（无本次任何改动）上复现，确认是套件层面的既有抖动，不是本次引入的回归。谁下次碰 leave-room/force-exit 相关代码时应该顺手看一眼。
-- `hangzhou.md` §14 记录了两处不阻塞定稿的实现细节假设（财神替代数量上限、`caiPiaoCount` 中途清零与否），已按文档默认值实现并写入 fixture；如果和你的预期不符，后续只需改一行。
-- 已修复：`CenterStatus` 的裁切问题——`CenterStatus` 已经整个重排为图标化卡片（状态徽标/剩余牌数英雄数字/连庄 chip/徽标行），不再用逐行 `ScaleText` 长句，原来的裁切场景不复存在；`error` 那一行仍用 `ScaleText`，长错误信息理论上还会有同样的裁切风险，但范围比之前小很多，不再单独跟踪。
-- 已发现且已修复（杭州 + junk）：`getLegalActions`/`applyAction` 里的 `zimo` 合法性判定原来只检查 `isWin(state, seat)`，没检查"这一家是不是刚摸完牌"——碰/吃之后剩余的手牌恰好已经自成一手（比如碰之前手里已经是 3 副刻子+一对+一副多余的对子）时，会在没摸牌的情况下错误地把自摸也列为合法动作。两个玩法都已加 `canZimo`（要求 `state.justDrawn?.seat===seat`）修正，配套复现用例（含明杠必须先摸牌、暗杠补牌后自摸合法两条边界）均已入库；junk 是我写杭州时照抄骨架带过来的既有 bug，这次一并修了。
-- 已发现且已修复（仅 junk）：junk 的 `isWin` 原来把手牌+所有副露牌铺平后交给 `lib/win.ts` 的 `isStandardWinningHand` 判定，这个函数要求铺平后的总张数严格等于"副露数×3+2"；但任何一种杠（暗杠/明杠/补杠）在副露里都是 4 张实体牌而不是 3 张，一旦手里报过杠，这个总数再也凑不出"能整除"的形状，`isWin` 会永远返回 false——即**junk 里报过杠之后，那一手牌不管自摸还是点炮都再也胡不了**。血战到底和杭州都不会中招，因为它们的 `isWin` 复用的是"副露数量记 1 个字，不管物理张数"的番型判定（血战 `scoreBloodbattleHand`、杭州 `hand.ts`），junk 走的是更老的、按物理张数铺平判定的 `lib/win.ts`。修法：`isWin` 只检查手里剩下的牌（副露本身已经是验证过的完整组合，不需要重新验证），跟血战/杭州的做法看齐；配套加了"暗杠补牌自摸"复现用例（改之前先跑过一次确认真的失败），核对过 10000 局 fuzz 无异常。
-- 已发现且已修复（环境问题，非代码 bug）：`packages/protocol`/`packages/core` 的编译产物 `dist/` 早于最近一次 src 改动就已过期（`PROTOCOL_VERSION` dist 里还是 "1.1"、src 已是 "1.2"）；单独跑 `apps/server` 的 `test:e2e`（不经过根 `pnpm verify` 的 `build` 步骤）会直接暴露这个陈旧产物，表现为两类看似无关的失败——所有 web e2e 登录报 `VERSION_MISMATCH`，以及 `rooms.gateway.e2e-spec.ts` 两个用例断言 `totalGames: 8` 被接受、实际收到 `4`（大概率是陈旧 protocol schema 校验拒绝了 8 这个新增选项后静默回退默认值）。根目录 `pnpm verify` 自带的 `build` 步骤会重新编译所有包，跑起来不会碰到这个问题；本次已手动 `pnpm --filter @new-mj/protocol build`/`--filter @new-mj/core build` 验证过修复，且完整跑过一次根 `pnpm verify` 全绿确认。谁本地单独跑某个 package 的 `test:e2e` 之前，先确认 `packages/*/dist` 是新的。
-- 已发现（与本次改动无关，未修复）：`apps/web/test/table.e2e-spec.ts` 的 "a claimed tile FLIPs from the discard pile into the meld via a ghost clone" 在多 worker 并发跑整套 `test:e2e` 时偶发超时等不到 `claim-flip-ghost`，单独跑稳定通过；大概率是动画计时用例对并发 CPU 争用敏感，同类的既有抖动见上面 lobby 那条。谁下次碰这条动画相关代码时顺手看一眼。
-- 已发现且已修复（打事件 payload 类型时顺带发现）：`bloodbattle/view.ts` 的 `rebuildPlayerView` 里 `GangMade` 分支原来对 anGang/buGang/minGang 统一读 `payload.tiles`，但生产端（`state-machine.ts`）anGang/buGang 只带 `kinds`（`TileKind[]`，没有 `tiles` 字段），只有被吃的 minGang 才带 `tiles`——结果是通过事件重放（reconnect/replay 路径）复原出的视图里，anGang/buGang 副露的 tiles 会是空数组、且手牌里的杠牌也不会被正确移除（`removeKind` 拿到的 `tileKind` 是空字符串）；直接从 state 渲染的 `getPlayerView`（实时对局路径）不受影响。已改成按 `"kinds" in payload`/`"tiles" in payload` 分别取值；复现用例（`test/bloodbattle/playing.test.ts` "anGang meld tiles survive event-replay..."）改前跑过一次确认真的失败，改后连同 10000 局 fuzz 一起全绿。
+- `apps/web/test/lobby.e2e-spec.ts` 中 “leaving an in-game room keeps the other human in the match” 与 “force exiting an in-game room ends the session for every player” 在完整套件中偶发超时（等待 “Hand off to AI”/“Force exit”）；单独或小范围运行稳定通过。下次改动 leave-room/force-exit 时处理。
+- `apps/web/test/table.e2e-spec.ts` 中 “a claimed tile FLIPs from the discard pile into the meld via a ghost clone” 在多 worker 全量 E2E 中偶发等待 `claim-flip-ghost` 超时，单独运行稳定；下次改动动画时处理。
+- 杭州规则仍有两处已实现但待产品确认的假设：财神替代数量上限，以及 `caiPiaoCount` 是否在牌局中途清零；当前按 `docs/variants/hangzhou.md` 默认值执行。
 
 ## Backlog
 
-- `junk/view.ts`（以及同构的 hangzhou/bloodbattle `view.ts`）给事件 payload 补判别联合类型定稿后单文件行数偏长（`rebuildPlayerView` 一个大 switch），可能需要拆分重构（如按事件类型拆出独立 handler 或分发表）；具体拆法待分析，暂不动。
-- Bot 功能增强：提升 AI 补位/断线托管的出牌质量（杭州财神策略大概率是新的痛点来源）。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
-- 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
-- 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行——庄家轮换公式行已由杭州三牢专题验证完毕，见该文档 §4/§5）。
-- Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
-- 创建房间时总局数（`totalGames`）选择下拉框在暗黑模式下 theme 不正确，需修。
-
-## 已完成摘要
-
-- 垃圾胡 v3 扩展规则：`computeInitialDealer(seed)` 已成为 RuleSet 扩展点，Junk 首局随机且可复现，血战/杭州保持原有首局庄家；Room 只编排首局与跨局庄家，不按玩法特判。Junk 已支持赢家连庄、流局向庄家的打牌下家轮庄，以及庄家胡、连续杠开、混一色、清一色、固定七小对、碰碰胡、门清的相乘番型和结算明细；Web 已显示中文番型和倍率，并保持血战旧赢家结果兼容。core 1000 局 fuzz、server 单测/E2E、Web 单测/E2E 和构建均已验证。
-- Review 配置功能：已完成首个安全会话配置 `totalGames`：创建房间可选 1、4、8 局（默认 4），严格拒绝客户端传入的规则 config；该字段只由 Room 使用，不进入 core、计分或 AI。
-- 核心与服务端：junk/bloodbattle RuleSet、CLI/replay/fuzz、多房间、AI 补位/断线托管、归档与持久化已落地。
-- Web 与认证：登录、大厅、房间、Junk 可玩牌桌、Replay、主题与 Supabase Google/GitHub OAuth 已完成；房主在等待房间 ready 时客户端会以已 ready 的 AI 自动补满空座位；OAuth 已在本地 Supabase 以真实账号端到端验证。
-- Junk Table UX 与 Layout Sketch：桌面 Zone/LayoutPreset、操作 Dock、CSS 布局、事件/跨区域动画、布局编辑与保存读取均已完成并经 e2e/Storybook 验收；bloodbattle 仍只有公共桌面骨架。
-- Layout Lab 真实 Preview：`desktop.table-layout.json` 已统一 Zone 几何与展示 Config，Config Panel 可保存草稿；正式桌面与多样例 Preview 复用同一渲染场景，`pnpm verify` 全绿。
-- 摸牌显式化：junk/bloodbattle 的摸牌从 core 内联副作用变成显式 `{type:"draw"}` 动作，server 按 `drawRevealDelayMs` 自动代提交，为 UI 留出真实的摸牌停顿窗口；零协议改动，三个 slice（core/server/web）均已验证并合入 main。
-- Web 牌桌动画重构：Tile 三层拆分（Slot/Motion/Face）+ 全桌动画调度架构（`diffPlayerView`/`animationLedger`/`useSlotEntering`，含对手弃牌飞行 ghost）已完成并合入本分支，`pnpm --filter @new-mj/web verify` 全绿；耐久结论已分流到 `architecture/frontend-layout.md` §5，专题 brief 已删除。
-- 文档体系：已取消独立 decisions 文档；架构取舍归入 architecture/contracts，局部实现理由归代码注释或 package AGENTS。
-- 开发流程：slot 化 worktree 现由私有 `@new-mj/devtools` 统一供根创建器、Vite 与 Playwright 使用；创建时自动分配空闲 slot、链接主 worktree 中全部被忽略的根 `.env.*`，并提供 status/doctor。标准 `pnpm dev`、`pnpm test:e2e` 与 `pnpm verify` 自动使用当前 slot，E2E 每 worktree 单 worker。
-- 牌局 UI/结算功能：牌局中隐藏 Sign out；Leave room 改为始终确认，二选一"托管"（原有行为）/"强制退出"（新增 `room:end` 消息 + `RoomService.endSession`/`finishSession`，任意在座玩家可立即结束整场对局进入结算，无需他人确认）；局间确认界面新增"结束"按钮复用同一能力；`InfoLabel` 改名 `ScaleText` 并用于 `CenterStatus`；新房间默认每人 1000 积分，结算画面重写为正式 UI（排名/最终积分/冠军标记/局数/Replay 链接）。`session-mechanics.md` 已同步；server/web 均已补测试。
-- 杭州麻将 RuleSet：`packages/core/src/rulesets/hangzhou/` 完整实现四签名 + 财神代打胡牌（基本型/七对+豪华判定）、爆头/财飘派生状态、杠链番组、三牢点炮限制与连庄坐庄，`registered-rulesets.ts` 已登记进跨玩法不变量测试；`docs/variants/hangzhou.md` v2 定稿。跨局状态传递用了一个新的通用机制——`Room` 层比较前后两局庄家座位算出 `dealerStreak`，合入下一局 `GameConfig`，不改四签名/`computeNextDealer` 签名，junk/bloodbattle 直接忽略该字段；`architecture/variant-boundary.md`"庄家轮换公式"行据此确认为永久私有（hangzhou 连庄证伪了"顺时针是通用真理"）。单测/fixture/1000 局回归 fuzz 随 `pnpm test` 跑（含 `dealerStreak` 随机化），另跑过一次 10000 局收尾验证均无失败；`apps/server` 补了专门测试；`apps/web` 的 `GamePickerView` 已能创建杭州房间（公共桌面骨架，同血战到底现状；专属 UI 留 Backlog）。
-- 杭州麻将专属桌面体验：核心补了 `HangzhouPlayerView.dealerStreak`（公开字段）；web 侧财神高亮（`TileFace` 新 `caishen` variant，web 独立的 `isCaishenTile` 镜像 core 的 `CAISHEN_KIND`）、听牌/爆头/财飘私有徽标（`CenterStatus`）、三牢状态公开提示（同上）、`HangzhouRoundEndOverlay`（专属结算面板，番型中文对照 + 倍数，`TableView` 按 `room.rulesetId` 分流——这是该文件第一处 rulesetId 分支）均已实现，Storybook 故事与 `table.e2e-spec.ts` 杭州用例均已补齐，`pnpm --filter @new-mj/web verify` 全绿并用 Playwright 截图人工确认过财神高亮与三牢提示真实渲染。过程中顺手修了一个真 bug：财神种类原来错标成 `7z`（对应"中"），已更正为 `5z`（对应"白板"），并顺带发现（未修）上面记的 `CenterStatus` 裁切问题。
-- 最近一次根目录 `pnpm verify`：2026-07-31 全绿（含 format、typecheck、lint、build、unit、e2e；core junk 1000 局与 bloodbattle 10000 局 fuzz）；本次杭州收尾时 `pnpm verify` 除 §当前风险 记录的既有 e2e 抖动外全绿。
-- 胡牌结算展示最终赢牌组合（杭州/junk）：仿照血战到底 `WinSnapshot`/`PublicWinSnapshot` 的公开揭示模式，`state.wins[seat]`/`PlayerView.seats[i].winSnapshot` 落地并做面子级完整拆分（不只是摊平手牌）。核心新增的是拆分能力本身——`isWin`/`canComplete`/`canFormMelds` 一直只返回布尔值，从未保留过具体拆分；新增的 `decomposeXxx` 系列函数与既有布尔判定分支顺序逐字复刻但物理上是独立实现（性能热路径 `isTingpai` 不能碰，拆分只在实际胡牌那一刻调用一次），用等价性 property test（`lib/win.test.ts`、`hangzhou/hand.test.ts`）+ fuzz 不变量（`hangzhou/junk` 的 `fuzz.ts` 各加了一条"拆分后多重集合必须等于原手牌"断言，随 1000/10000 局回归跑）兜底一致性。财神拆分组直接用 `CAISHEN_KIND` 占位，不记录"替代了哪张牌"，因为财神本身就是物理牌。Web 侧新增 `WinningHandReveal` 纯展示组件（`tileImageSrcForKind`/`isCaishenKind` 是 `mahjongTiles.ts` 新增的 kind-级镜像），接入两个结算面板；Storybook 截图确认财神高亮与分组渲染正确。过程中顺带发现并修复一处与本次改动无关的环境问题（详见上面「当前风险」）：`packages/core`/`packages/protocol` 的编译产物 `dist/` 陈旧，单独跑某个 package 的 `test:e2e` 会暴露成两类看似无关的失败（web 登录 VERSION_MISMATCH、`totalGames:8` 会话配置被静默回退成 4）；根 `pnpm verify` 自带的 `build` 步骤本身不受影响，本次已完整跑通一次根 `pnpm verify` 全绿收尾。
-- 可选沉浸体验：音效、音量与静音设置。项目此前完全没有音频基础设施，纯 client 端从零搭建，不涉及 protocol/core/server。用户提供了 8 个真实音效文件（`apps/web/public/sounds/{chi,peng,gang,angang,bugang,hu,zimo,pass}.m4a`），按实际字段精确映射：`ChiMade`→chi、`PengMade`→peng、`GangMade`（`gangType` 缺省=claimed 明杠→gang，`"anGang"`→angang，`"buGang"`→bugang，取值规则见 `junk/claims.ts` 的 `applyClaimResponse`，`anGang`/`buGang` 才显式带 `gangType`）、`HuDeclared`（按 `winType` 区分：`"zimo"`→zimo，否则→hu）、`ClaimResponded` 且 `action.type==="pass"`→pass（这个事件是 seat-only 可见，天然只会是"我自己"的过牌）。用户后续又补了完整 34 种牌名语音（`apps/web/public/sounds/{1m..7z}.m4a`，命名与 core/web 共享的 `TileKind` 字面量完全一致），改成弃牌（`TileDiscarded`）时报牌名而不是通用点击声——`SoundName` 类型从纯 8 个动作名扩成 `... | TileKind`（`sounds.ts` 因此对 `@/features/mahjong/lib/mahjongTiles` 有一个 type-only import，编译期擦除无运行时耦合，是 shared→feature 方向上一个刻意的小例外）。框架：`shared/store/audio.store.ts`（zustand + 官方 `persist`，注意 zustand 默认 storage 读的是 `window.localStorage` 不是裸 `localStorage`，这次显式传了 `createJSONStorage(() => localStorage)` 以便在纯 Node 测试环境里可测）、`shared/lib/sounds.ts`（`playSound` 静默降级 + `unlockAudioPlayback` 解决浏览器自动播放策略——首次 `.play()` 必须在用户手势调用栈内，而 `TableView.tsx` 的 `onEvent` 是异步 socket 回调天然脱离手势栈，用一次性 `pointerdown`/`keydown` 监听播放静音 data-URI 解锁整个页面会话）、`TableHudPanel`/`TableHud` 侧边栏新增音量条+静音按钮。文件缺失/播放被拦截时 `.catch(() => {})` 静默吞掉，不刷 console。Playwright 实测确认全部 8 个文件都能正常加载播放（206 Partial Content，媒体 Range 请求的正常响应）、侧边栏交互正常、无 JS 报错；`pnpm --filter @new-mj/web verify` 与根 `pnpm verify` 均全绿。
-- core 事件 payload 补类型：`junk`/`hangzhou`/`bloodbattle` 三个 ruleset 的 `GameEvent.payload` 原来全是 `unknown`，`view.ts` 的 `rebuildPlayerView` 靠一层 `EventPayload = {type:string; [k:string]:unknown}` + 逐字段 `as` 断言硬解，生产端（`state-machine.ts`/`claims.ts`/`prelude.ts`/`settlement.ts`）拼字面量也完全不受类型约束。三个 ruleset 各自补了判别联合 `XxxEventPayload`（`GangMade`/`ClaimWindowResolved` 等"同一 type 对应几种不同形状"的事件用 `"字段" in payload` 窄化而不是断言），`events.ts` 新增 3 个三家形状完全一致的共享 payload 类型（`TurnStarted`/`WallExhausted`/`TileDiscarded`）；`RulesetModule.rebuildPlayerView` 接口边界仍是 untyped `GameEvent[]`（引擎要跨 ruleset 异构派发），每个 ruleset 的 `index.ts` 在这一个边界点做唯一一次 `as` 收窄（同 `engine.ts` 已有的 registry `any` 一个风格）。顺带发现两处：bloodbattle 有 4 个事件类型名（`ExchangeThreeSelected`/`TilesReceived`/`ExchangeCompleted`/`LackChosen`）此前是裸字符串没进 `EVENT_TYPES`，已补齐；`Settled.reason` 此前是裸 `string`，已收窄成 `BloodbattleSettledReason` 5 值联合。上面「当前风险」记的 bloodbattle GangMade 重放 bug 也是这次顺带发现的，已一并修复（配套复现用例）。三个 ruleset 各自 `pnpm --filter @new-mj/core verify` 全绿（含 junk 1000 局、bloodbattle 10000 局 fuzz）；除这一处 bug 修复外均为纯类型改动，未涉及 protocol/server/web。
+- 规划并实现 mobile 横屏/竖屏布局与 Expo 路线。
+- 日麻立项时复审 `architecture/variant-boundary.md`。
+- Junk Table UX：Replay 牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 E2E。
+- 评估是否以 immer 替代 ruleset 手写 `cloneState`；先验证性能不会拖慢 fuzz。
+- 当第三个同构玩法出现，或下次实际改动 `hangzhou/view.ts`/`junk/view.ts` 时，评估将其约 100 行重复的 PlayerView 回放逻辑下沉到 `lib/`。

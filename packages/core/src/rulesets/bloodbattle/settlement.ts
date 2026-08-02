@@ -1,7 +1,9 @@
 import type { GameEvent } from "../../events.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq } from "../../events.ts";
+import { createEvent, nextEventSeq } from "../../events.ts";
 import type { SeatId, TileKind } from "../../lib/ids.ts";
-import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
+import { SEAT_IDS } from "../../lib/seats.ts";
+import { BLOODBATTLE_TILE_SET } from "./constants.ts";
+import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { ronCandidates } from "./tingpai.ts";
 import type {
   BloodbattleEventPayload,
@@ -10,7 +12,7 @@ import type {
 } from "./types.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 
-const seats = BLOODBATTLE_SEATS;
+const seats = SEAT_IDS;
 type ScoreDeltas = [number, number, number, number];
 
 const append = (

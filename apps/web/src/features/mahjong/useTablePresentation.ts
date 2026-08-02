@@ -20,8 +20,8 @@ type JunkSeatExtra = {
   discards: DiscardEntry[];
   /** Public: this seat just drew and hasn't acted yet — see docs/variants/junk.md §7. */
   justDrawn: boolean;
-  /** Public, present only for a seat that just won this round (hangzhou/junk) — see
-   * docs/process/plan.md 胡牌结算展示最终赢牌组合. `groups` is already TileKind-level
+  /** Public, present only for a seat that just won this round (hangzhou/junk).
+   * `groups` is already TileKind-level
    * (the concealed decomposition actually used), so it needs no id→kind conversion. */
   winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] };
 };

@@ -6,7 +6,7 @@
 
 ## 1. 基础类型
 
-- `TileKind`/`TileId`/`SeatId` 见 `packages/core/src/lib/ids.ts`；`MeldType`/`Meld` 见 `packages/core/src/lib/seat.ts`
+- `TileKind`/`TileId`/`SeatId` 与唯一的 `SEAT_IDS` 值来源见 `packages/core/src/lib/ids.ts`；座位环运算见 `packages/core/src/lib/seats.ts`；`MeldType`/`Meld`/`SeatState` 见 `packages/core/src/lib/seat-state.ts`
 - 牌面记法：`m/p/s/z` 分别对应万/筒/条/字牌（东南西北白发中）
 - `SeatId` 只是 0-3，core 不认识用户，userId ↔ SeatId 映射由 server 维护
 - 状态与事件存 `TileId`；规则逻辑（胡牌判定、碰杠匹配）经 `kindOf(id)` 按种类运算
@@ -27,7 +27,7 @@
 - `PlayerViewBase`（见 §5）
 - `ApplyResult<TState>`：`{ state: TState; events: GameEvent[] } | { error: RuleViolation }`
 
-每个 ruleset 在 `rulesets/<id>/types.ts` 定义自己完整的 `<Id>State`，没有跨玩法共享的全局 `GameState`；公共子结构 `SeatState`/`Meld`/`DiscardEntry` 来自 `lib/seat.ts`，玩法都可以用，但玩法私有状态形状互不相同。
+每个 ruleset 在 `rulesets/<id>/types.ts` 定义自己完整的 `<Id>State`，没有跨玩法共享的全局 `GameState`；公共子结构 `SeatState`/`Meld`/`DiscardEntry` 来自 `lib/seat-state.ts`，玩法都可以用，但玩法私有状态形状互不相同。
 
 ## 3. 四签名（唯一冻结契约）
 
@@ -55,7 +55,7 @@
 
 ## 6. 事件信封（公共部分）
 
-信封结构（`GameEvent`/`EventVisibility`/`EVENT_TYPES` 常量）见 `packages/core/src/events.ts`——这是跨玩法共用的壳（seq、visibility 字段与语义），具体每个玩法有哪些事件、payload 长什么样，一律在各 `variants/*.md` 的事件清单里，不在本文件重复。
+信封结构（`GameEvent`/`EventVisibility`、序号与可见性过滤）见 `packages/core/src/events.ts`——这是跨玩法共用的壳（seq、visibility 字段与语义）。事件名及其 payload 判别联合是玩法私有实现，见各 `rulesets/<id>/events.ts` 与 `variants/*.md` 的事件清单；core 不维护全玩法事件名全集。
 
 非法动作不进事件日志（不改变状态），仅作为 `applyAction` 的错误返回：server 以 ack 拒绝该客户端，并记入 server 侧错误日志。
 

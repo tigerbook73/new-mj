@@ -1,4 +1,5 @@
-import type { BloodbattleConfig } from "./types.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
+import type { BloodbattleConfig, BloodbattleErrorCode } from "./types.ts";
 
 export const DEFAULT_BLOODBATTLE_CONFIG: BloodbattleConfig = {
   rulesetId: "bloodbattle",
@@ -15,14 +16,15 @@ export const DEFAULT_BLOODBATTLE_CONFIG: BloodbattleConfig = {
 
 export const parseBloodbattleConfig = (
   input: unknown = {},
-): { config: BloodbattleConfig } | { error: { code: string } } => {
-  if (typeof input !== "object" || input === null) return { error: { code: "INVALID_CONFIG" } };
+): { config: BloodbattleConfig } | { error: { code: BloodbattleErrorCode } } => {
+  if (typeof input !== "object" || input === null)
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   const value = input as Record<string, unknown>;
   const config = { ...DEFAULT_BLOODBATTLE_CONFIG, ...value, rulesetId: "bloodbattle" as const };
   if (typeof config.exchangeThree !== "boolean" || typeof config.multiWinOnDiscard !== "boolean")
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   if (config.capFan !== null && (!Number.isInteger(config.capFan) || config.capFan < 0))
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   if (config.checkHuaZhu && config.capFan === null)
     return { error: { code: "HUAZHU_REQUIRES_CAP_FAN" } };
   if (
@@ -33,6 +35,6 @@ export const parseBloodbattleConfig = (
     (config.selfDrawBonus !== "addFan" && config.selfDrawBonus !== "addBase") ||
     typeof config.mustHuOnLastFour !== "boolean"
   )
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   return { config };
 };

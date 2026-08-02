@@ -8,7 +8,7 @@ const BADGE_ICON_CLASS = "size-[6.2cqmin]";
  * Hangzhou-only today (docs/variants/hangzhou.md §4) — junk/bloodbattle simply never set
  * these extras fields, so this always returns []. Kept generic (StatusBadge[], not three
  * named booleans) so a ruleset can add more private badges later without CenterStatus or
- * this function's shape changing — see docs/process/plan.md's CenterStatus redesign entry.
+ * this function's shape changing.
  */
 export function buildStatusBadges(extras: TableViewExtras): StatusBadge[] {
   const badges: StatusBadge[] = [];

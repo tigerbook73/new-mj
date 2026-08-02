@@ -89,7 +89,8 @@ test("host can choose an allowed total-rounds session setting", async ({ browser
   await openVariant(page, "Junk Hu");
   await page.getByRole("button", { name: "Create room" }).last().click();
   await page.getByLabel("Room name").fill("Eight rounds");
-  await page.getByLabel("Total rounds").selectOption("8");
+  await page.getByLabel("Total rounds").click();
+  await page.getByRole("option", { name: "8" }).click();
   await page.getByRole("button", { name: "Create room" }).click();
   await expect(page.getByText("Rounds: 0 / 8")).toBeVisible();
   await page.context().close();

@@ -1,5 +1,6 @@
-export const SEATS = [0, 1, 2, 3] as const;
-export type SeatId = (typeof SEATS)[number];
+/** 四人麻将唯一的座位值来源。 */
+export const SEAT_IDS = [0, 1, 2, 3] as const;
+export type SeatId = (typeof SEAT_IDS)[number];
 
 export type TileId = number;
 export type TileKind =

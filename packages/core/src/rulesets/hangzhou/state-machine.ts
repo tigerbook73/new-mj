@@ -1,6 +1,7 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng } from "../../lib/prng.ts";
+import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import {
@@ -10,15 +11,17 @@ import {
   type GangChain,
 } from "../../lib/gang-chain.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { SeatState } from "../../lib/seat.ts";
+import type { SeatState } from "../../lib/seat-state.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { DEFAULT_HANGZHOU_CONFIG, parseHangzhouConfig } from "./config.ts";
+import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { decomposeWinningShape, isBaotou, isWinningHand } from "./hand.ts";
 import { scoreHangzhouHand, type HangzhouScoringInput } from "./scoring.ts";
 import type {
   HangzhouApplyResult,
   HangzhouClaimOption,
   HangzhouConfig,
+  HangzhouErrorCode,
   HangzhouEventPayload,
   HangzhouGameResult,
   HangzhouPendingClaims,
@@ -26,9 +29,7 @@ import type {
   HangzhouWinDetail,
 } from "./types.ts";
 
-export const seats = (): SeatState[] =>
-  [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
-export const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
+export const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], discards: [] }));
 
 export const cloneState = (state: HangzhouState): HangzhouState => {
   const cloned: HangzhouState = {
@@ -65,7 +66,7 @@ export const appendEvent = (
   events.push(createEvent(state.seq, visibility, payload));
 };
 
-export const fail = (code: string): HangzhouApplyResult => ({ error: { code } });
+export const fail = (code: HangzhouErrorCode): HangzhouApplyResult => ({ error: { code } });
 
 export const configOf = (state: HangzhouState): HangzhouConfig => ({
   ...DEFAULT_HANGZHOU_CONFIG,
@@ -235,6 +236,27 @@ export const applyDrawAction = (
   return { state, events };
 };
 
+// hangzhou.md §7: a second, independent effect of `dealerStreak` (distinct from
+// §5's ron-block threshold) — the dealer's payout tier scales with how many
+// consecutive terms they've held, starting from their very first term.
+const DEALER_STREAK_MULTIPLIERS = [2, 4, 8] as const;
+const dealerBonusMultiplier = (dealerStreak: number): number =>
+  DEALER_STREAK_MULTIPLIERS[Math.min(dealerStreak, DEALER_STREAK_MULTIPLIERS.length) - 1]!;
+
+/** A payment involving the dealer on either side (payer or receiver) gets the
+ * dealerStreak-tiered multiplier on top of the hand's own fan multiplier —
+ * hangzhou.md §7. Doesn't compound when both sides are the dealer (impossible:
+ * a seat never pays itself), so a simple either-side check is exactly the rule. */
+const edgeAmount = (
+  state: HangzhouState,
+  payer: SeatId,
+  receiver: SeatId,
+  payout: number,
+): number =>
+  payer === state.dealer || receiver === state.dealer
+    ? payout * dealerBonusMultiplier(configOf(state).dealerStreak)
+    : payout;
+
 const buildScoringInput = (
   state: HangzhouState,
   seat: SeatId,
@@ -276,10 +298,11 @@ export const finishWin = (
       }
     : { seat: winner, fanTypes: [], multiplier: 0, payout: 0 };
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
-  for (const seat of [0, 1, 2, 3] as SeatId[]) {
+  for (const seat of SEAT_IDS) {
     if (seat === winner) continue;
-    scoreDeltas[seat] -= winDetail.payout;
-    scoreDeltas[winner] += winDetail.payout;
+    const amount = edgeAmount(state, seat, winner, winDetail.payout);
+    scoreDeltas[seat] -= amount;
+    scoreDeltas[winner] += amount;
   }
   const result: HangzhouGameResult = {
     type: "win",
@@ -326,8 +349,9 @@ export const finishRonWins = (
       multiplier: scored.multiplier,
       payout: scored.payout,
     });
-    scoreDeltas[from] -= scored.payout;
-    scoreDeltas[winner] += scored.payout;
+    const amount = edgeAmount(state, from, winner, scored.payout);
+    scoreDeltas[from] -= amount;
+    scoreDeltas[winner] += amount;
   }
   const result: HangzhouGameResult = {
     type: "win",
@@ -408,7 +432,7 @@ export const applyDiscard = (
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const pending: HangzhouPendingClaims = { discard: { seat, tile }, options: {}, responses: {} };
   state.pendingClaims = pending;
-  for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+  for (const candidate of SEAT_IDS) {
     const candidateOptions = claimOptions(state, candidate);
     if (candidateOptions.length === 0) continue;
     pending.options[candidate] = candidateOptions;
@@ -497,6 +521,7 @@ export const createHangzhouGame = (
     wall: shuffled.wall,
     seats: seats(),
     currentSeat: dealer,
+    dealer,
     seq: 0,
     prng: shuffled.prng,
     caiPiaoCount: [0, 0, 0, 0],
@@ -507,10 +532,10 @@ export const createHangzhouGame = (
     type: EVENT_TYPES.gameStarted,
     config: state.config,
     dealer,
-    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
+    handCounts: SEAT_IDS.map((seat) => (seat === dealer ? 14 : 13)),
     wallCount: state.wall.length - 53,
   });
-  for (const seat of [0, 1, 2, 3] as SeatId[]) {
+  for (const seat of SEAT_IDS) {
     const count = seat === dealer ? 14 : 13;
     for (let index = 0; index < count; index += 1)
       state.seats[seat]!.hand.push(state.wall.shift()!);

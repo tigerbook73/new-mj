@@ -1,8 +1,8 @@
-import { EVENT_TYPES, type GameEvent } from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import { incrementGangChain } from "../../lib/gang-chain.ts";
+import { seatDistance } from "../../lib/seats.ts";
 import type { SeatId } from "../../lib/ids.ts";
-import type { Meld } from "../../lib/seat.ts";
+import type { Meld } from "../../lib/seat-state.ts";
 import type {
   JunkAction,
   JunkApplyResult,
@@ -10,6 +10,7 @@ import type {
   JunkEventPayload,
   JunkState,
 } from "./types.ts";
+import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import {
   appendEvent,
   beginTurn,
@@ -25,7 +26,7 @@ import {
 export const priority = (action: JunkClaimAction): number =>
   ({ hu: 4, minGang: 3, peng: 2, chi: 1 })[action.type];
 export const distanceFromDiscarder = (discarder: SeatId, seat: SeatId): number =>
-  (seat - discarder + 4) % 4;
+  seatDistance(discarder, seat);
 
 export const chooseClaims = (
   state: JunkState,
@@ -34,9 +35,6 @@ export const chooseClaims = (
   const choices = Object.entries(pending.responses)
     .filter((entry): entry is [string, JunkClaimAction] => entry[1].type !== "pass")
     .map(([seat, action]) => ({ seat: Number(seat) as SeatId, action: action as JunkClaimAction }));
-  // Head jump (docs/variants/junk.md §4/§8): among simultaneous claimants, higher
-  // action priority wins first, ties broken by closeness to the discarder — so a
-  // single winner is always well-defined even when several seats could hu.
   const sorted = choices.sort((left, right) => {
     const priorityDiff = priority(right.action) - priority(left.action);
     return priorityDiff !== 0
@@ -89,11 +87,13 @@ export const resolveClaimWindow = (
   state.seats[seat]!.hand = remaining;
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
-  if (action.type === "minGang") {
-    incrementGangChain(state.gangChain, seat);
-  }
+  if (action.type === "minGang") state.gangChain[seat] += 1;
   const eventType =
-    action.type === "chi" ? "ChiMade" : action.type === "peng" ? "PengMade" : "GangMade";
+    action.type === "chi"
+      ? EVENT_TYPES.chiMade
+      : action.type === "peng"
+        ? EVENT_TYPES.pengMade
+        : EVENT_TYPES.gangMade;
   appendEvent(state, events, publicVisibility, {
     type: eventType,
     seat,

@@ -1,8 +1,11 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import { EVENT_TYPES, type GameEvent } from "../../events.ts";
+import { SEAT_IDS } from "../../lib/seats.ts";
+import type { GameEvent } from "../../events.ts";
 import type { RulesetModule } from "../../engine.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import { CAISHEN_KIND } from "./constants.ts";
+import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { parseHangzhouConfig } from "./config.ts";
 import {
   applyAnGang,
@@ -106,7 +109,7 @@ export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
               finishWin(state, events, seat);
               return { state, events };
             })();
-    } else result = fail("UNKNOWN_ACTION");
+    } else result = fail(CORE_ERROR_CODES.unknownAction);
     if ("state" in result) {
       appendLegalActions(result.state, result.events);
       assertTileConservation(result.state);
@@ -125,7 +128,7 @@ export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
 };
 
 function appendLegalActions(state: HangzhouState, events: GameEvent<HangzhouEventPayload>[]): void {
-  for (const seat of [0, 1, 2, 3] as const) {
+  for (const seat of SEAT_IDS) {
     appendEvent(state, events, seatVisibility(seat), {
       type: EVENT_TYPES.legalActionsUpdated,
       actions: hangzhouRuleSet.getLegalActions(state, seat),

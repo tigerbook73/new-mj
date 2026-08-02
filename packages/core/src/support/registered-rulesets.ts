@@ -1,9 +1,7 @@
-import { bloodbattleRuleSet } from "../rulesets/bloodbattle/index.ts";
-import { hangzhouRuleSet } from "../rulesets/hangzhou/index.ts";
-import { junkRuleSet } from "../rulesets/junk/index.ts";
+import { RULESETS } from "../ruleset-registry.ts";
 import type { GameEvent } from "../events.ts";
 import type { SeatId } from "../lib/ids.ts";
-import type { ApplyResult } from "../types.ts";
+import type { ApplyResult, GameConfig } from "../types.ts";
 
 type RegisteredRuleset = {
   id: string;
@@ -15,81 +13,26 @@ type RegisteredRuleset = {
   computeNextDealer: (state: ReplayState, currentDealer: SeatId) => SeatId;
 };
 
-type ReplayState = { phase: string; currentSeat: SeatId };
+type ReplayState = { phase: string; currentSeat: SeatId; config: GameConfig };
 
-// Test-only registry: cross-ruleset invariants (event reconstruction ≡
-// direct derivation, etc.) walk this list instead of hardcoding a ruleset.
-export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = [
-  {
-    id: "junk",
-    createGame: (seed) => junkRuleSet.createGame(seed, 0) as ApplyResult<ReplayState>,
-    applyAction: (state, seat, action) =>
-      junkRuleSet.applyAction(
-        state as Parameters<typeof junkRuleSet.applyAction>[0],
-        seat,
-        action as never,
-      ) as ApplyResult<ReplayState>,
-    getLegalActions: (state, seat) =>
-      junkRuleSet.getLegalActions(state as Parameters<typeof junkRuleSet.getLegalActions>[0], seat),
-    getPlayerView: (state, seat) =>
-      junkRuleSet.getPlayerView(state as Parameters<typeof junkRuleSet.getPlayerView>[0], seat),
-    rebuildPlayerView: junkRuleSet.rebuildPlayerView,
-    computeNextDealer: (state, currentDealer) =>
-      junkRuleSet.computeNextDealer(
-        state as Parameters<typeof junkRuleSet.computeNextDealer>[0],
-        currentDealer,
-      ),
-  },
-  {
-    id: "bloodbattle",
-    createGame: (seed) => bloodbattleRuleSet.createGame(seed, 0) as ApplyResult<ReplayState>,
-    applyAction: (state, seat, action) =>
-      bloodbattleRuleSet.applyAction(
-        state as Parameters<typeof bloodbattleRuleSet.applyAction>[0],
-        seat,
-        action as never,
-      ) as ApplyResult<ReplayState>,
-    getLegalActions: (state, seat) =>
-      bloodbattleRuleSet.getLegalActions(
-        state as Parameters<typeof bloodbattleRuleSet.getLegalActions>[0],
-        seat,
-      ),
-    getPlayerView: (state, seat) =>
-      bloodbattleRuleSet.getPlayerView(
-        state as Parameters<typeof bloodbattleRuleSet.getPlayerView>[0],
-        seat,
-      ),
-    rebuildPlayerView: bloodbattleRuleSet.rebuildPlayerView,
-    computeNextDealer: (state, currentDealer) =>
-      bloodbattleRuleSet.computeNextDealer(
-        state as Parameters<typeof bloodbattleRuleSet.computeNextDealer>[0],
-        currentDealer,
-      ),
-  },
-  {
-    id: "hangzhou",
-    createGame: (seed) => hangzhouRuleSet.createGame(seed, 0) as ApplyResult<ReplayState>,
-    applyAction: (state, seat, action) =>
-      hangzhouRuleSet.applyAction(
-        state as Parameters<typeof hangzhouRuleSet.applyAction>[0],
-        seat,
-        action as never,
-      ) as ApplyResult<ReplayState>,
-    getLegalActions: (state, seat) =>
-      hangzhouRuleSet.getLegalActions(
-        state as Parameters<typeof hangzhouRuleSet.getLegalActions>[0],
-        seat,
-      ),
-    getPlayerView: (state, seat) =>
-      hangzhouRuleSet.getPlayerView(
-        state as Parameters<typeof hangzhouRuleSet.getPlayerView>[0],
-        seat,
-      ),
-    rebuildPlayerView: hangzhouRuleSet.rebuildPlayerView,
-    computeNextDealer: (state, currentDealer) =>
-      hangzhouRuleSet.computeNextDealer(
-        state as Parameters<typeof hangzhouRuleSet.computeNextDealer>[0],
-        currentDealer,
-      ),
-  },
-] as const;
+// Test-only registry, derived from the single runtime RULESETS registry
+// (ruleset-registry.ts): cross-ruleset invariants (event reconstruction ≡
+// direct derivation, registry id ≡ config.rulesetId, etc.) walk this list
+// instead of hardcoding a ruleset. Adding a ruleset to RULESETS is now the
+// only edit needed — it enrolls here automatically. Each RulesetModule entry
+// is already `any`-typed at the registry boundary, so no per-ruleset casts
+// are needed to fit the narrower ReplayState-based shape below.
+export const REGISTERED_RULESETS_FOR_TESTING: readonly RegisteredRuleset[] = Object.entries(
+  RULESETS,
+).map(([id, ruleset]) => ({
+  id,
+  createGame: (seed: number) => ruleset.createGame(seed, 0) as ApplyResult<ReplayState>,
+  applyAction: (state: ReplayState, seat: SeatId, action: unknown) =>
+    ruleset.applyAction(state, seat, action) as ApplyResult<ReplayState>,
+  getLegalActions: (state: ReplayState, seat: SeatId) => ruleset.getLegalActions(state, seat),
+  getPlayerView: (state: unknown, seat: SeatId) => ruleset.getPlayerView(state, seat),
+  rebuildPlayerView: (events: readonly GameEvent[], seat: SeatId) =>
+    ruleset.rebuildPlayerView(events, seat),
+  computeNextDealer: (state: ReplayState, currentDealer: SeatId) =>
+    ruleset.computeNextDealer(state, currentDealer),
+}));

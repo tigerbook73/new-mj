@@ -1,6 +1,7 @@
 import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
+import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
 import type { GameEvent } from "../../events.ts";
 import { junkRuleSet } from "./index.ts";
 import type { JunkAction, JunkConfig, JunkState } from "./index.ts";
@@ -24,9 +25,7 @@ const nextAction = (
 ): { seat: SeatId; action: JunkAction; prng: PrngState } | undefined => {
   const eligible =
     state.phase === "awaiting-claims"
-      ? ([0, 1, 2, 3] as SeatId[]).filter(
-          (seat) => junkRuleSet.getLegalActions(state, seat).length > 0,
-        )
+      ? SEAT_IDS.filter((seat) => junkRuleSet.getLegalActions(state, seat).length > 0)
       : [state.currentSeat];
   if (eligible.length === 0) return undefined;
   const seatPick = nextInt(prng, eligible.length);
@@ -71,7 +70,7 @@ export const playJunkGame = (
 const checkWinSnapshotInvariant = (state: JunkState): string | undefined => {
   if (state.result?.type !== "win") return undefined;
   for (const winner of state.result.winners) {
-    const snapshot = state.wins?.[winner.seat];
+    const snapshot = state.wins?.[winner];
     if (!snapshot) return "WIN_SNAPSHOT_MISSING";
     const flatGroups = [...snapshot.groups.flat()].sort().join(",");
     const flatHand = snapshot.hand
@@ -83,6 +82,14 @@ const checkWinSnapshotInvariant = (state: JunkState): string | undefined => {
   return undefined;
 };
 
+/** Every payout is a zero-sum transfer between seats — a bug in the dealer's
+ * flat ×2 (double-counting or dropping an edge) would break this. */
+const checkScoreDeltasInvariant = (state: JunkState): string | undefined => {
+  if (!state.result) return undefined;
+  const sum = state.result.scoreDeltas.reduce((total, delta) => total + delta, 0);
+  return sum === 0 ? undefined : "SCORE_DELTAS_NOT_ZERO_SUM";
+};
+
 // --ruleset-parameterized fuzz entry point is future work — only junk has a
 // full applyAction/getLegalActions/createGame trio today (see rulesets/junk/index.ts).
 export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined => {
@@ -90,14 +97,14 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
   for (let index = 0; index < games; index += 1) {
     const gameSeed = nextInt(prng, 0x1_0000_0000);
     prng = gameSeed.prng;
-    const dealerPick = nextInt(prng, 4);
+    const dealerPick = nextInt(prng, SEAT_COUNT);
     prng = dealerPick.prng;
-    const config = {};
-    const result = playJunkGame(gameSeed.value, config, [], dealerPick.value as SeatId);
+    const result = playJunkGame(gameSeed.value, {}, [], dealerPick.value as SeatId);
     if ("error" in result) return result;
-    const invariantError = checkWinSnapshotInvariant(result.state);
+    const invariantError =
+      checkWinSnapshotInvariant(result.state) ?? checkScoreDeltasInvariant(result.state);
     if (invariantError) {
-      return { seed: gameSeed.value, config, actions: result.actions, error: invariantError };
+      return { seed: gameSeed.value, config: {}, actions: result.actions, error: invariantError };
     }
   }
   return undefined;

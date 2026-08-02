@@ -1,4 +1,5 @@
-import type { JunkConfig } from "./types.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
+import type { JunkConfig, JunkErrorCode } from "./types.ts";
 
 export const DEFAULT_JUNK_CONFIG: JunkConfig = {
   rulesetId: "junk",
@@ -6,10 +7,10 @@ export const DEFAULT_JUNK_CONFIG: JunkConfig = {
 
 export const parseJunkConfig = (
   input: unknown,
-): { config: JunkConfig } | { error: { code: string } } => {
+): { config: JunkConfig } | { error: { code: JunkErrorCode } } => {
   if (input === undefined) return { config: { ...DEFAULT_JUNK_CONFIG } };
   if (!input || typeof input !== "object" || Array.isArray(input))
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   const candidate = input as Record<string, unknown>;
   if (
     (candidate.rulesetId !== undefined && candidate.rulesetId !== "junk") ||
@@ -17,7 +18,7 @@ export const parseJunkConfig = (
     candidate.robKong !== undefined ||
     candidate.multiHuPolicy !== undefined
   ) {
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   }
   return { config: { ...DEFAULT_JUNK_CONFIG } };
 };

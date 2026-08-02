@@ -38,6 +38,7 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
     isBaotou: isBaotou(kindsOf(own.hand), own.melds.length),
     isCaipiao: state.caiPiaoCount[seat] >= 1,
     dealerStreak: configOf(state).dealerStreak,
+    dealer: state.dealer,
   };
   if (state.lastDiscard) view.lastDiscard = { ...state.lastDiscard };
   if (state.justDrawn?.seat === seat) view.justDrawn = state.justDrawn.tile;
@@ -46,20 +47,6 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
   if (ownResponse) view.myClaimResponse = ownResponse;
   return view;
 };
-
-const cloneView = (view: HangzhouPlayerView): HangzhouPlayerView => ({
-  ...view,
-  hand: [...view.hand],
-  seats: view.seats.map((seat) => ({
-    handCount: seat.handCount,
-    melds: seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
-    discards: seat.discards.map((discard) => ({ ...discard })),
-    justDrawn: seat.justDrawn,
-    ...(seat.winSnapshot ? { winSnapshot: seat.winSnapshot } : {}),
-  })),
-  ...(view.lastDiscard ? { lastDiscard: { ...view.lastDiscard } } : {}),
-  ...(view.result ? { result: view.result } : {}),
-});
 
 const updateMeld = (
   view: HangzhouPlayerView,
@@ -108,11 +95,12 @@ export const rebuildPlayerView = (
         // dealerStreak is fixed for the whole game, set once here from
         // GameStarted's config and carried through every cloneView spread.
         dealerStreak: payload.config.dealerStreak,
+        dealer,
       };
       continue;
     }
     if (!view) throw new Error("MISSING_GAME_STARTED");
-    view = cloneView(view);
+    view = structuredClone(view);
     switch (payload.type) {
       case "HandDealt": {
         if (payload.seat === seat) {

@@ -1,18 +1,25 @@
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
-import type { GangChain } from "../../lib/gang-chain.ts";
-import type { DiscardEntry, Meld, SeatState } from "../../lib/seat.ts";
+import type { DiscardEntry, Meld, SeatState } from "../../lib/seat-state.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
-import {
-  EVENT_TYPES,
-  type GameEvent,
-  type TileDiscardedPayload,
-  type TurnStartedPayload,
-  type WallExhaustedPayload,
-} from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import { JUNK_PHASES } from "./constants.ts";
+import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type JunkPhase = (typeof JUNK_PHASES)[number];
+
+/** junk 的 applyAction/createGame 能返回给调用方的完整错误码集合；`fail`/config 解析都按这个联合收窄，防止拼写漂移。 */
+export type JunkErrorCode =
+  | typeof CORE_ERROR_CODES.invalidConfig
+  | typeof CORE_ERROR_CODES.unknownAction
+  | "CLAIM_NOT_AVAILABLE"
+  | "CLAIM_WINDOW_NOT_OPEN"
+  | "DRAW_NOT_AVAILABLE"
+  | "GANG_NOT_AVAILABLE"
+  | "NOT_YOUR_TURN"
+  | "TILE_NOT_IN_HAND"
+  | "ZIMO_NOT_AVAILABLE";
 
 export type JunkAction =
   | { type: "discard"; tile: TileId }
@@ -34,8 +41,6 @@ export type JunkClaimOption = {
 
 export type JunkConfig = GameConfig & {
   rulesetId: "junk";
-  /** Legacy fixture compatibility only; v3 always enables seven pairs. */
-  sevenPairs?: boolean;
 };
 
 export type JunkPendingClaims = {
@@ -50,16 +55,16 @@ export type JunkGameResult =
   | {
       type: "win";
       winner: SeatId;
-      winners: Array<{ seat: SeatId; fanTypes: string[]; multiplier: number; payout: number }>;
+      winners: SeatId[];
       winType: "zimo" | "ron";
       from?: SeatId;
       scoreDeltas: [number, number, number, number];
     };
 
-/** Revealed at the moment of a hu, mirrors bloodbattle's WinSnapshot/PublicWinSnapshot
- * split (see docs/process/plan.md 胡牌结算展示最终赢牌组合). `groups` is the concealed
- * decomposition actually used (melds+pair, or seven pair-groups) — already kind-level
- * so it needs no public/private conversion, unlike `hand`/`winTile`. */
+/** 胡牌那一刻揭示，仿照血战到底 WinSnapshot/PublicWinSnapshot 的公开-隐藏拆分模式，
+ * 用于结算时展示最终赢牌的面子拆解。`groups` 是实际用到的暗牌拆分结果
+ * （面子+将牌，或七对的七组）——本身已经是种类级别，不像 `hand`/`winTile`
+ * 那样需要区分公开/隐藏两种表示。 */
 export type JunkWinSnapshot = {
   hand: TileId[];
   winTile: TileId;
@@ -78,7 +83,13 @@ export type JunkState = {
   wall: TileId[];
   seats: SeatState[];
   currentSeat: SeatId;
-  dealer?: SeatId;
+  /** Fixed for the whole game — who dealt this hand; feeds the flat dealer-double
+   * payout rule (junk.md §3). Cross-game continuity (who deals the NEXT game) is
+   * computeNextJunkDealer's job and isn't tracked by this field. */
+  dealer: SeatId;
+  /** Per-seat consecutive-gang counter feeding the 杠开 bonus (junk.md §3/§6):
+   * anGang/buGang/a claimed minGang each +1, that seat's own discard resets to 0. */
+  gangChain: [number, number, number, number];
   lastDiscard?: { seat: SeatId; tile: TileId };
   /** Set right after a draw, cleared once that seat acts (discard/anGang/buGang). */
   justDrawn?: { seat: SeatId; tile: TileId };
@@ -88,14 +99,13 @@ export type JunkState = {
   seq: number;
   prng: PrngState;
   result?: JunkGameResult;
-  /** Length of the current seat's unbroken consecutive-gang chain, see
-   * docs/variants/junk.md §3. Reset to 0 on that seat's next discard. */
-  gangChain: GangChain;
   /** Set for each winner right when their hu is declared; never cleared mid-hand. */
   wins?: Partial<Record<SeatId, JunkWinSnapshot>>;
 };
 
 export type JunkPlayerView = Omit<PlayerViewBase, "seats"> & {
+  /** Public: this game's dealer seat, fixed for the whole game (junk.md §7). */
+  dealer: SeatId;
   seats: Array<{
     melds: Meld[];
     discards: DiscardEntry[];
@@ -179,14 +189,14 @@ export type JunkGangMadePayload =
   | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; tiles: TileId[]; from: SeatId };
 
 export type JunkChiMadePayload = {
-  type: "ChiMade";
+  type: typeof EVENT_TYPES.chiMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
 };
 
 export type JunkPengMadePayload = {
-  type: "PengMade";
+  type: typeof EVENT_TYPES.pengMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
@@ -199,6 +209,10 @@ export type JunkHuDeclaredPayload = {
   hand: TileId[];
   winTile: TileId;
   groups: TileKind[][];
+  /** Fan types hit and their combined multiplier (junk.md §3) — excludes the
+   * dealer's flat ×2, which only shows up in Settled's scoreDeltas. */
+  fanTypes: string[];
+  multiplier: number;
   from?: SeatId;
 };
 
@@ -215,9 +229,9 @@ export type JunkGameEndedPayload = {
 export type JunkEventPayload =
   | JunkGameStartedPayload
   | JunkHandDealtPayload
-  | TurnStartedPayload
+  | { type: typeof EVENT_TYPES.turnStarted; seat: SeatId }
   | JunkTileDrawnPayload
-  | TileDiscardedPayload
+  | { type: typeof EVENT_TYPES.tileDiscarded; seat: SeatId; tile: TileId }
   | JunkClaimWindowOpenedPayload
   | JunkClaimRespondedPayload
   | JunkClaimWindowResolvedPayload
@@ -228,7 +242,7 @@ export type JunkEventPayload =
   | JunkHuDeclaredPayload
   | JunkSettledPayload
   | JunkGameEndedPayload
-  | WallExhaustedPayload;
+  | { type: typeof EVENT_TYPES.wallExhausted };
 
 export type JunkApplyResult =
   { state: JunkState; events: GameEvent<JunkEventPayload>[] } | { error: RuleViolation };

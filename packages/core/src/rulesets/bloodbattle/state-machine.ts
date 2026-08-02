@@ -1,44 +1,29 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
-import { type Meld, type SeatState } from "../../lib/seat.ts";
-import { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
+import { type Meld, type SeatState } from "../../lib/seat-state.ts";
+import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
+import {
+  applyChooseLack,
+  applyExchangeThree,
+  cloneState,
+  createBloodbattlePrelude,
+} from "./prelude.ts";
+import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 import { settleBloodbattleDraw } from "./settlement.ts";
 import type {
   BloodbattleAction,
   BloodbattleApplyResult,
+  BloodbattleErrorCode,
   BloodbattleEventPayload,
   BloodbattleState,
 } from "./types.ts";
-import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
+import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
-const seats = BLOODBATTLE_SEATS;
-const fail = (code: string): BloodbattleApplyResult => ({ error: { code } });
-const cloneState = (state: BloodbattleState): BloodbattleState => ({
-  ...state,
-  wall: [...state.wall],
-  scores: [...state.scores] as BloodbattleState["scores"],
-  status: [...state.status] as BloodbattleState["status"],
-  gangPayments: state.gangPayments.map((payment) => ({ ...payment })),
-  seats: state.seats.map((seat) => ({
-    hand: [...seat.hand],
-    melds: seat.melds.map((m) => ({ ...m, tiles: [...m.tiles] })),
-    discards: seat.discards.map((d) => ({ ...d })),
-  })),
-  ...(state.lack ? { lack: { ...state.lack } } : {}),
-  ...(state.wins ? { wins: { ...state.wins } } : {}),
-  ...(state.lastDiscard ? { lastDiscard: { ...state.lastDiscard } } : {}),
-  ...(state.pendingClaims
-    ? {
-        pendingClaims: {
-          ...state.pendingClaims,
-          options: { ...state.pendingClaims.options },
-          responses: { ...state.pendingClaims.responses },
-        },
-      }
-    : {}),
-});
+const seats = SEAT_IDS;
+const fail = (code: BloodbattleErrorCode): BloodbattleApplyResult => ({ error: { code } });
 const append = (
   state: BloodbattleState,
   events: GameEvent<BloodbattleEventPayload>[],
@@ -64,7 +49,7 @@ const remove = (hand: readonly TileId[], tile: TileId): TileId[] => {
 };
 const nextActive = (state: BloodbattleState, seat: SeatId): SeatId | undefined => {
   for (let i = 1; i <= 4; i += 1) {
-    const candidate = ((seat + i) % 4) as SeatId;
+    const candidate = SEAT_IDS[(seat + i) % SEAT_COUNT]!;
     if (state.status[candidate] === "active") return candidate;
   }
   return undefined;
@@ -515,7 +500,7 @@ export const resolveClaims = (
       events,
       { type: "public" },
       {
-        type: "PengMade",
+        type: EVENT_TYPES.pengMade,
         seat: peng,
         from: pending.discard.seat,
         tile,
@@ -582,7 +567,7 @@ export const applyAction = (
       return checked(drawNext(state, events, seat));
     return checked({ state, events });
   }
-  return fail("UNKNOWN_ACTION");
+  return fail(CORE_ERROR_CODES.unknownAction);
 };
 const checked = (result: BloodbattleApplyResult): BloodbattleApplyResult => {
   if ("state" in result) assertTileConservation(result.state, BLOODBATTLE_TILE_SET, extraTiles);

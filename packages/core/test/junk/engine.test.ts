@@ -3,7 +3,6 @@ import {
   assertTileConservation,
   applyAction as engineApplyAction,
   computeNextJunkDealer,
-  computeInitialDealer,
   createGame as engineCreateGame,
   createJunkGame,
   eventsVisibleTo,
@@ -18,6 +17,7 @@ import {
   playJunkGame,
   type JunkPlayerView,
   type JunkState,
+  type SeatId,
 } from "../../src/index.ts";
 
 const unwrap = (result: ReturnType<typeof junkRuleSet.applyAction>): JunkState => {
@@ -70,31 +70,46 @@ test("junk opens a deterministic complete game with private hands", () => {
   ).toHaveLength(4);
 });
 
-test("junk config has no switches left: sevenPairs/robKong/multiHuPolicy are all retired and rejected", () => {
+test("junk config has no switches left", () => {
   expect(parseJunkConfig(undefined)).toEqual({ config: { rulesetId: "junk" } });
   expect(parseJunkConfig({})).toEqual({ config: { rulesetId: "junk" } });
   expect(parseJunkConfig({ sevenPairs: true })).toEqual({ error: { code: "INVALID_CONFIG" } });
   expect(parseJunkConfig({ robKong: false })).toEqual({ error: { code: "INVALID_CONFIG" } });
   expect(parseJunkConfig({ multiHuPolicy: "all" })).toEqual({ error: { code: "INVALID_CONFIG" } });
-  expect(createJunkGame(1, 0, { multiHuPolicy: "invalid" })).toEqual({
-    error: { code: "INVALID_CONFIG" },
-  });
 });
 
-test("junk's draw dealer rotation is clockwise (docs/variants/junk.md §4)", () => {
+test("junk's dealer rotation formula: the winner sits next dealer (docs/variants/junk.md §4)", () => {
   const started = createJunkGame(19, 0);
   if ("error" in started) throw new Error(started.error.code);
   for (const currentDealer of [0, 1, 2, 3] as const) {
-    expect(computeNextJunkDealer(started.state, currentDealer)).toBe((currentDealer + 1) % 4);
+    // Winner becomes next dealer regardless of who was dealer this game — even
+    // when they're the same seat, which trivially reproduces "dealer continues".
+    for (const winner of [0, 1, 2, 3] as const) {
+      const finished: JunkState = {
+        ...started.state,
+        result: {
+          type: "win",
+          winner,
+          winners: [winner],
+          winType: "zimo",
+          scoreDeltas: [0, 0, 0, 0],
+        },
+      };
+      expect(computeNextJunkDealer(finished, currentDealer)).toBe(winner);
+    }
   }
 });
 
-test("junk's first dealer is seed-deterministic while existing rulesets keep seat zero", () => {
-  expect(computeInitialDealer({ rulesetId: "junk" }, 19)).toBe(
-    computeInitialDealer({ rulesetId: "junk" }, 19),
-  );
-  expect(computeInitialDealer({ rulesetId: "bloodbattle" }, 19)).toBe(0);
-  expect(computeInitialDealer({ rulesetId: "hangzhou" }, 19)).toBe(0);
+test("junk's dealer rotation formula: a draw rotates to the current dealer's counterclockwise next seat", () => {
+  const started = createJunkGame(19, 0);
+  if ("error" in started) throw new Error(started.error.code);
+  for (const currentDealer of [0, 1, 2, 3] as const) {
+    const finished: JunkState = {
+      ...started.state,
+      result: { type: "draw", scoreDeltas: [0, 0, 0, 0] },
+    };
+    expect(computeNextJunkDealer(finished, currentDealer)).toBe((currentDealer + 1) % 4);
+  }
 });
 
 test("junk accepts a legal discard and preserves the caller state", () => {
@@ -225,8 +240,7 @@ test("robKong opens a hu-only claim window and preserves the fourth tile on ron"
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const physical = new Set([4, 5, 6, 7, ...seat1Hand]);
   const state: JunkState = {
-    config: { rulesetId: "junk" },
-    gangChain: [0, 0, 0, 0],
+    config: { rulesetId: "junk", sevenPairs: false, robKong: true, multiHuPolicy: "headJump" },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -236,6 +250,8 @@ test("robKong opens a hu-only claim window and preserves the fourth tile on ron"
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 3,
+    gangChain: [0, 0, 0, 0],
     seq: 0,
     prng: createPrng(1),
   };
@@ -258,8 +274,7 @@ test("bug repro: zimo is not offered right after peng, even if the leftover conc
   const DISCARD_TILE = 106; // 9s, matches the spare pair (104, 105)
   const physical = new Set([DISCARD_TILE, ...seat0Hand]);
   const state: JunkState = {
-    config: { rulesetId: "junk" },
-    gangChain: [0, 0, 0, 0],
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -269,6 +284,8 @@ test("bug repro: zimo is not offered right after peng, even if the leftover conc
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 1,
+    dealer: 2,
+    gangChain: [0, 0, 0, 0],
     seq: 0,
     prng: createPrng(1),
   };
@@ -293,8 +310,7 @@ test("minGang (claimed open kong) requires the replacement draw before zimo — 
   const DISCARD_TILE = 3; // the 4th 1m
   const physical = new Set([DISCARD_TILE, ...seat0Hand]);
   const state: JunkState = {
-    config: { rulesetId: "junk" },
-    gangChain: [0, 0, 0, 0],
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -304,6 +320,8 @@ test("minGang (claimed open kong) requires the replacement draw before zimo — 
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 1,
+    dealer: 2,
+    gangChain: [0, 0, 0, 0],
     seq: 0,
     prng: createPrng(1),
   };
@@ -314,6 +332,8 @@ test("minGang (claimed open kong) requires the replacement draw before zimo — 
   const ganged = unwrap(junkRuleSet.applyAction(discarded, 0, { type: "minGang" }));
   expect(ganged.phase).toBe("awaiting-draw");
   expect(junkRuleSet.getLegalActions(ganged, 0)).toEqual([{ type: "draw" }]);
+  // Claimed minGang counts toward the gangkai chain the same as a self-declared gang.
+  expect(ganged.gangChain[0]).toBe(1);
   assertTileConservation(ganged);
 });
 
@@ -324,7 +344,7 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   // the hand. The wall's tail is rigged so the replacement draw is exactly
   // that tile, completing the hand via a genuine self-draw right after the
   // gang. This is also the repro for a separate, previously-unfixed bug:
-  // isWin() used to flatten hand+meld tiles through lib/win.ts's
+  // isWin() used to flatten hand+meld tiles through lib/standard-hand.ts's
   // isStandardWinningHand, which requires the flat multiset to be exactly
   // (melds*3+2) tiles — any real gang contributes 4 physical tiles instead
   // of 3, so a hand containing one could never satisfy that count and
@@ -339,8 +359,7 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   const physical = new Set([...seat0Hand, REPLACEMENT_TILE]);
   const restOfWall = allTileIds().filter((tile) => !physical.has(tile));
   const state: JunkState = {
-    config: { rulesetId: "junk" },
-    gangChain: [0, 0, 0, 0],
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
     phase: "playing",
     // drawFromTail pops the *last* element — put the rigged tile there.
     wall: [...restOfWall, REPLACEMENT_TILE],
@@ -351,11 +370,15 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer: 1,
+    gangChain: [0, 0, 0, 0],
     seq: 0,
     prng: createPrng(1),
   };
   const ganged = unwrap(junkRuleSet.applyAction(state, 0, { type: "anGang", kind: "1m" }));
   expect(ganged.phase).toBe("awaiting-draw");
+  // Feeds the gangkai bonus once the replacement draw completes a zimo (junk.md §3).
+  expect(ganged.gangChain[0]).toBe(1);
   // Not legal yet — the replacement hasn't been drawn.
   expect(junkRuleSet.getLegalActions(ganged, 0)).toEqual([{ type: "draw" }]);
   const drawn = unwrap(junkRuleSet.applyAction(ganged, 0, { type: "draw" }));
@@ -367,13 +390,48 @@ test("杠上自摸 (self-draw off a gang's replacement tile) is legal once the d
   assertTileConservation(won);
 });
 
-const multiHuState = (): JunkState => {
+test("a discard resets gangChain to 0 even after building one up", () => {
+  const seat0Hand = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 16, 17];
+  const REPLACEMENT_TILE = 14;
+  const physical = new Set([...seat0Hand, REPLACEMENT_TILE]);
+  const restOfWall = allTileIds().filter((tile) => !physical.has(tile));
+  const state: JunkState = {
+    config: { rulesetId: "junk", sevenPairs: false, robKong: false, multiHuPolicy: "headJump" },
+    phase: "playing",
+    wall: [...restOfWall, REPLACEMENT_TILE],
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    dealer: 1,
+    gangChain: [0, 0, 0, 0],
+    seq: 0,
+    prng: createPrng(1),
+  };
+  const ganged = unwrap(junkRuleSet.applyAction(state, 0, { type: "anGang", kind: "1m" }));
+  const drawn = unwrap(junkRuleSet.applyAction(ganged, 0, { type: "draw" }));
+  expect(drawn.gangChain[0]).toBe(1);
+  const discarded = unwrap(junkRuleSet.applyAction(drawn, 0, { type: "discard", tile: 16 }));
+  expect(discarded.gangChain[0]).toBe(0);
+});
+
+// Both hands happen to complete on the shared discard's kind (2m). seat1's
+// full hand (1m2m3m run + 4m4m4m/5m5m5m/6m6m6m triplets + 7m7m pair) is
+// entirely "m" suit and fully concealed => qingyise(x4) * menqing(x2) = x8.
+// seat2's hand (1m2m3m run + 8m8m8m/9m9m9m/1p1p1p triplets + 2p2p pair) mixes
+// m and p => no qingyise/hunyise, just menqing(x2) = x2. `dealer` defaults to
+// a seat uninvolved in either payment so these multipliers show up unscaled;
+// the dedicated dealer-doubling tests below reuse this same fixture with
+// dealer set to the payer or a winner instead.
+const multiHuState = (dealer: SeatId = 3): JunkState => {
   const seat1Hand = [0, 8, 12, 13, 14, 16, 17, 18, 20, 21, 22, 24, 25];
   const seat2Hand = [1, 9, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41];
   const physical = new Set([7, ...seat1Hand, ...seat2Hand]);
   return {
     config: { rulesetId: "junk" },
-    gangChain: [0, 0, 0, 0],
     phase: "playing",
     wall: allTileIds().filter((tile) => !physical.has(tile)),
     seats: [
@@ -383,21 +441,35 @@ const multiHuState = (): JunkState => {
       { hand: [], melds: [], discards: [] },
     ],
     currentSeat: 0,
+    dealer,
+    gangChain: [0, 0, 0, 0],
     seq: 0,
     prng: createPrng(1),
   };
 };
 
-test("multi-ron always head-jumps: the discarder's nearest counterclockwise claimant wins alone", () => {
+test("multi-ron always head-jumps deterministically", () => {
   let state = unwrap(junkRuleSet.applyAction(multiHuState(), 0, { type: "discard", tile: 7 }));
   state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
   state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
-  expect(state.result).toMatchObject({
-    winner: 1,
-    winners: [{ seat: 1, multiplier: 8, payout: 8 }],
-    scoreDeltas: [-8, 8, 0, 0],
-  });
+  expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-8, 8, 0, 0] });
+
+  expect(state.result).toMatchObject({ winner: 1, winners: [1], scoreDeltas: [-8, 8, 0, 0] });
   assertTileConservation(state);
+});
+
+test("dealer's flat x2 applies to a payment involving either the payer or the winner (junk.md §3)", () => {
+  // dealer=0: the discarder/payer is the dealer.
+  let state = unwrap(junkRuleSet.applyAction(multiHuState(0), 0, { type: "discard", tile: 7 }));
+  state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
+  state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
+  expect(state.result).toMatchObject({ scoreDeltas: [-16, 16, 0, 0] });
+
+  // dealer=1: the winner is the dealer — same doubling, not a compounding x4.
+  state = unwrap(junkRuleSet.applyAction(multiHuState(1), 0, { type: "discard", tile: 7 }));
+  state = unwrap(junkRuleSet.applyAction(state, 1, { type: "hu" }));
+  state = unwrap(junkRuleSet.applyAction(state, 2, { type: "hu" }));
+  expect(state.result).toMatchObject({ scoreDeltas: [-16, 16, 0, 0] });
 });
 
 test("1000 seeded games finish while preserving tile conservation", () => {

@@ -1,11 +1,14 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { chooseAction, recommendAction } from "@new-mj/ai";
+import { chooseAction, chooseJunkAction, recommendAction, recommendJunkAction } from "@new-mj/ai";
 import {
   eventsVisibleTo,
   type ApplyResult,
   type GameConfig,
   type GameEvent,
+  type JunkAction,
+  type JunkConfig,
+  type JunkPlayerView,
   type OmniscientView,
   type PlayerViewBase,
   type SeatId,
@@ -381,7 +384,14 @@ export class RoomService {
     const view = this.gameService.getPlayerView(room.gameState, seat);
     if (!view) throw new RoomServiceError("NOT_IN_ROOM");
     const actions = [...this.gameService.getLegalActions(room.gameState, seat)];
-    const recommended = recommendAction(view, actions);
+    const recommended =
+      room.rulesetId === "junk" && "phase" in view && "dealer" in view
+        ? recommendJunkAction(
+            view as JunkPlayerView,
+            actions as JunkAction[],
+            room.config as JunkConfig,
+          )
+        : recommendAction(view, actions);
     const recommendedActionIndex =
       recommended === undefined ? undefined : actions.indexOf(recommended);
     const deadline = this.claimDeadline(roomId, seat);
@@ -515,7 +525,16 @@ export class RoomService {
       if (legalActions.length === 1 && isRecord(legalActions[0]) && legalActions[0].type === "draw")
         continue;
       if (legalActions.length > 0) {
-        return { seat: seat as SeatId, action: chooseAction(legalActions) };
+        const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
+        const action =
+          room.rulesetId === "junk" && view && "phase" in view && "dealer" in view
+            ? chooseJunkAction(
+                view as JunkPlayerView,
+                legalActions as JunkAction[],
+                room.config as JunkConfig,
+              )
+            : chooseAction(legalActions);
+        return { seat: seat as SeatId, action };
       }
     }
     return undefined;

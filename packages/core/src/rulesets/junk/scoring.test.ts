@@ -1,29 +1,43 @@
 import { expect, test } from "vitest";
 import { scoreJunkHand } from "./scoring.ts";
 
-test("junk scoring stacks dealer, gangkai, qingyise, pengpenghu and menqing", () => {
+test("junk scoring stacks gangkai, qingyise, pengpenghu and menqing", () => {
   expect(
     scoreJunkHand({
-      hand: ["1m", "1m", "1m", "2m", "2m", "2m", "3m", "3m", "3m", "4m", "4m", "4m", "5m", "5m"],
+      family: "standard",
+      groups: [
+        ["1m", "1m", "1m"],
+        ["2m", "2m", "2m"],
+        ["3m", "3m", "3m"],
+        ["4m", "4m", "4m"],
+        ["5m", "5m"],
+      ],
       melds: [],
-      isDealer: true,
-      winType: "zimo",
+      win: { by: "zimo" },
       gangChainLength: 2,
     }),
   ).toEqual({
-    fanTypes: ["dealer", "gangkai", "qingYise", "pengpenghu", "menqing"],
-    multiplier: 128,
+    fanTypes: ["pengpenghu", "menqing", "qingyise", "gangkai"],
+    multiplier: 64,
   });
 });
 
 test("junk scoring distinguishes hunyise and seven pairs", () => {
   expect(
     scoreJunkHand({
-      hand: ["1m", "1m", "2m", "2m", "3m", "3m", "4m", "4m", "5m", "5m", "1z", "1z", "2z", "2z"],
+      family: "sevenPairs",
+      groups: [
+        ["1m", "1m"],
+        ["2m", "2m"],
+        ["3m", "3m"],
+        ["4m", "4m"],
+        ["5m", "5m"],
+        ["1z", "1z"],
+        ["2z", "2z"],
+      ],
       melds: [],
-      isDealer: false,
-      winType: "ron",
+      win: { by: "ron" },
       gangChainLength: 3,
     }),
-  ).toEqual({ fanTypes: ["hunYise", "qixiaodui", "menqing"], multiplier: 8 });
+  ).toEqual({ fanTypes: ["qidui", "menqing", "hunyise"], multiplier: 8 });
 });

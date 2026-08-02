@@ -140,7 +140,7 @@ test("anGang records a meld, pays active seats, and draws a replacement tile", (
   }
 });
 
-test("anGang meld tiles survive event-replay, not just live getPlayerView (see plan.md known bug)", () => {
+test("anGang meld tiles survive event-replay, not just live getPlayerView", () => {
   // Regression for a bug the payload-typing pass surfaced: rebuildPlayerView's
   // GangMade branch used to read `payload.tiles` unconditionally, but
   // anGang/buGang only ever carry kind-level `kinds` (never `tiles`) — so a

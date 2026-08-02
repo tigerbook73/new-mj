@@ -133,11 +133,19 @@ export function DiscardTrack({
 }
 
 /** Which edge of the center box faces each seat direction — same side the arrow sits on. */
-const EDGE_BORDER_CLASS: Record<SeatDirection, string> = {
-  top: "border-t-4",
-  bottom: "border-b-4",
-  left: "border-l-4",
-  right: "border-r-4",
+const EDGE_BORDER_COLOR_CLASS: Record<TurnHighlight["tone"], Record<SeatDirection, string>> = {
+  active: {
+    top: "border-t-amber-400",
+    bottom: "border-b-amber-400",
+    left: "border-l-amber-400",
+    right: "border-r-amber-400",
+  },
+  pending: {
+    top: "border-t-slate-400",
+    bottom: "border-b-slate-400",
+    left: "border-l-slate-400",
+    right: "border-r-slate-400",
+  },
 };
 
 /** Desktop-only center surface; highlights the edge facing whoever currentSeat is,
@@ -152,10 +160,8 @@ export function DesktopCenterSlot({
   return (
     <div
       className={cn(
-        "relative grid h-full w-full place-items-center overflow-hidden rounded-md border-transparent bg-green-950/50 dark:bg-black/50",
-        turnHighlight && EDGE_BORDER_CLASS[turnHighlight.direction],
-        turnHighlight?.tone === "active" && "border-amber-400",
-        turnHighlight?.tone === "pending" && "border-slate-400",
+        "relative grid h-full w-full place-items-center overflow-hidden rounded-md border-4 border-transparent bg-green-950/50 dark:bg-black/50",
+        turnHighlight && EDGE_BORDER_COLOR_CLASS[turnHighlight.tone][turnHighlight.direction],
       )}
     >
       {center}
