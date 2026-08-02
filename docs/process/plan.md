@@ -27,11 +27,11 @@
 - 基于 Zone/LayoutPreset 规划手机横屏/竖屏；mobile 路线与 Expo 实现。
 - 日麻立项时复审 `architecture/variant-boundary.md`（会话排名策略行——庄家轮换公式行已由杭州三牢专题验证完毕，见该文档 §4/§5）。
 - Junk Table UX 的非紧急缺口：Replay 的牌面渲染、慢网络反馈、声明超时归零时的 `DeadlineCountdown` 行为及相应 e2e。
-- 创建房间时总局数（`totalGames`）选择下拉框在暗黑模式下 theme 不正确，需修。
 - core 评估是否引入 immer 替代三个 ruleset 手写的 `cloneState`（`applyAction` 每次调用都会跑一次的克隆-再修改样板代码，写字段时容易漏克隆——`AGENTS.md` 明确允许"内部可用 class/immer"但目前未采用）；需先验证性能（手写版本比 `structuredClone` 快约 30 倍，是这类克隆的实际下限，immer 的 Proxy 结构共享理论上接近但未实测）不会拖慢 1000/10000 局 fuzz 冒烟。
 
 ## 已完成摘要
 
+- 创建房间 `totalGames` 下拉框暗黑模式修复：根因是原生 `<select>` 展开的选项列表由浏览器/OS 渲染，不受页面 CSS 控制，项目此前从未设置 `color-scheme`；加了标准的 `color-scheme` CSS 属性后，用 Playwright 截图核实发现这个项目实际打包出的完整 Tailwind v4 样式表（92KB）体量下，原生 select 弹出列表在 Chromium（headless 与 headed 皆然）里仍不跟随变暗——二分排查定位到需要 `theme`+`utilities` 两个 Tailwind 层同时存在才触发，但没能收敛到具体某条冲突规则，判断是浏览器对复杂样式表下原生弹层渲染的引擎级局限，CSS 内容层面已经无法再修。因此改为用 `shadcn add select`（`base-nova`/Base UI 风格）生成 `shared/ui/select.tsx`，把 `GamePickerView.tsx` 的原生 `<select>` 换成完全由 DOM+CSS 渲染的自定义下拉，从机制上绕开原生弹层，light/dark 两种模式截图确认均正确；`lobby.e2e-spec.ts` 里唯一依赖原生 `<select>` 的 `selectOption("8")` 改成点击 trigger + 点击 `role=option` 的等价写法。`pnpm --filter @new-mj/web verify` 全绿（38 e2e + build + storybook build）。
 - core `cloneView`/`cloneState` 去重：三个 ruleset 手写的 `cloneView`（冷路径，仅断线重连/测试调用）统一换成内置 `structuredClone`；bloodbattle 内部两份重复的 `cloneState`（`state-machine.ts`/`prelude.ts`）合并成 `prelude.ts` 导出的唯一一份。`cloneState` 本身因是 `applyAction` 热路径（`structuredClone` 实测比手写版本慢约 30 倍，会拖慢 fuzz 冒烟）未一并替换，评估是否上 immer 留在 Backlog。`pnpm --filter @new-mj/core verify` 全绿（161 测试 + junk 1000 局/bloodbattle 10000 局 fuzz）。
 - 核心与服务端：junk/bloodbattle RuleSet、CLI/replay/fuzz、多房间、AI 补位/断线托管、归档与持久化已落地。
 - Web 与认证：登录、大厅、房间、Junk 可玩牌桌、Replay、主题与 Supabase Google/GitHub OAuth 已完成；房主在等待房间 ready 时客户端会以已 ready 的 AI 自动补满空座位；OAuth 已在本地 Supabase 以真实账号端到端验证。

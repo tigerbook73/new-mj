@@ -10,6 +10,7 @@ import {
 } from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { ack } from "@/shared/lib/socket";
 import { useSessionStore } from "@/shared/store/session";
@@ -172,20 +173,21 @@ export function GamePickerView() {
                             htmlFor="total-games"
                           >
                             Total rounds
-                            <select
-                              id="total-games"
+                            <Select
                               value={totalGames}
-                              onChange={(event) =>
-                                setTotalGames(Number(event.target.value) as SessionTotalGames)
-                              }
-                              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                              onValueChange={(value) => setTotalGames(value as SessionTotalGames)}
                             >
-                              {SESSION_TOTAL_GAMES.map((games) => (
-                                <option key={games} value={games}>
-                                  {games}
-                                </option>
-                              ))}
-                            </select>
+                              <SelectTrigger id="total-games" className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {SESSION_TOTAL_GAMES.map((games) => (
+                                  <SelectItem key={games} value={games}>
+                                    {games}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </label>
                           {error && <p className="text-sm text-destructive">{error}</p>}
                           <div className="flex justify-end gap-2">
