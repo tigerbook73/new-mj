@@ -1,3 +1,4 @@
+import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { JunkConfig } from "./types.ts";
 import { JUNK_MULTI_HU_POLICIES } from "./constants.ts";
 
@@ -13,7 +14,7 @@ export const parseJunkConfig = (
 ): { config: JunkConfig } | { error: { code: string } } => {
   if (input === undefined) return { config: { ...DEFAULT_JUNK_CONFIG } };
   if (!input || typeof input !== "object" || Array.isArray(input))
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   const candidate = input as Record<string, unknown>;
   if (
     (candidate.rulesetId !== undefined && candidate.rulesetId !== "junk") ||
@@ -22,7 +23,7 @@ export const parseJunkConfig = (
     (candidate.multiHuPolicy !== undefined &&
       !JUNK_MULTI_HU_POLICIES.includes(candidate.multiHuPolicy as JunkConfig["multiHuPolicy"]))
   ) {
-    return { error: { code: "INVALID_CONFIG" } };
+    return { error: { code: CORE_ERROR_CODES.invalidConfig } };
   }
   const multiHuPolicy =
     candidate.multiHuPolicy === undefined

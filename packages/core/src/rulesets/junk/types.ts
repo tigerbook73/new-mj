@@ -2,14 +2,9 @@ import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
-import {
-  EVENT_TYPES,
-  type GameEvent,
-  type TileDiscardedPayload,
-  type TurnStartedPayload,
-  type WallExhaustedPayload,
-} from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
 import { JUNK_MULTI_HU_POLICIES, JUNK_PHASES } from "./constants.ts";
+import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type JunkPhase = (typeof JUNK_PHASES)[number];
 export type JunkMultiHuPolicy = (typeof JUNK_MULTI_HU_POLICIES)[number];
@@ -176,14 +171,14 @@ export type JunkGangMadePayload =
   | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; tiles: TileId[]; from: SeatId };
 
 export type JunkChiMadePayload = {
-  type: "ChiMade";
+  type: typeof EVENT_TYPES.chiMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
 };
 
 export type JunkPengMadePayload = {
-  type: "PengMade";
+  type: typeof EVENT_TYPES.pengMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
@@ -212,9 +207,9 @@ export type JunkGameEndedPayload = {
 export type JunkEventPayload =
   | JunkGameStartedPayload
   | JunkHandDealtPayload
-  | TurnStartedPayload
+  | { type: typeof EVENT_TYPES.turnStarted; seat: SeatId }
   | JunkTileDrawnPayload
-  | TileDiscardedPayload
+  | { type: typeof EVENT_TYPES.tileDiscarded; seat: SeatId; tile: TileId }
   | JunkClaimWindowOpenedPayload
   | JunkClaimRespondedPayload
   | JunkClaimWindowResolvedPayload
@@ -225,7 +220,7 @@ export type JunkEventPayload =
   | JunkHuDeclaredPayload
   | JunkSettledPayload
   | JunkGameEndedPayload
-  | WallExhaustedPayload;
+  | { type: typeof EVENT_TYPES.wallExhausted };
 
 export type JunkApplyResult =
   { state: JunkState; events: GameEvent<JunkEventPayload>[] } | { error: RuleViolation };

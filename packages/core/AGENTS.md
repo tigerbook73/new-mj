@@ -18,14 +18,15 @@
 - 已导出的领域状态、事件和跨模块结果优先定义专门的 `type`/`interface`；这样可复用、可被契约引用，并减少后续接口调整时的漂移。
 - 仅在模块内部使用、语义一次性且不会成为跨包契约的简单结果，允许使用内联返回类型；不为形式统一而制造无意义类型名。
 - 注释只补充代码无法表达的算法、不变量、敏感性或边界语义；契约和规则正文仍以 `contracts/`、`variants/` 为准，不在代码注释中复制整段规格。
+- 本包新增或修改的代码注释统一使用中文；不引用会被清理的 `docs/process/plan.md`，稳定规则分流到契约或玩法文档。
 
 ## 代码地图
 
-- `src/engine.ts`：engine API 五签名与 ruleset 静态注册表。
-- `src/lib/`：tiles、prng、wall、win、invariants、ids、seat 等通用积木。
+- `src/engine.ts`：engine API 六个 dispatch 签名与 ruleset 静态注册表。
+- `src/lib/`：tiles、prng、wall、win、invariants、ids、seats、seat 等通用积木。
 - `src/rulesets/junk/`：完整 junk 状态机、结算、PlayerView 与 fuzz。
 - `src/rulesets/bloodbattle/`：血战前置、playing、番型、杠分/抢杠胡/呼叫转移、流局结算和 1000 局 fuzz。
-- `src/events.ts`：事件信封与事件类型常量；`src/cli.ts`：CLI 薄壳。
+- `src/events.ts`：事件信封与可见性工具；`rulesets/<id>/events.ts`：玩法事件名；`rulesets/junk/cli.ts`：junk 开发/诊断 CLI。
 
 ## core DoD
 

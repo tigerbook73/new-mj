@@ -1,5 +1,6 @@
-import { EVENT_TYPES, type GameEvent } from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import { seatDistance } from "../../lib/seats.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { Meld } from "../../lib/seat.ts";
 import type {
@@ -9,6 +10,7 @@ import type {
   JunkEventPayload,
   JunkState,
 } from "./types.ts";
+import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import {
   appendEvent,
   beginTurn,
@@ -25,7 +27,7 @@ import {
 export const priority = (action: JunkClaimAction): number =>
   ({ hu: 4, minGang: 3, peng: 2, chi: 1 })[action.type];
 export const distanceFromDiscarder = (discarder: SeatId, seat: SeatId): number =>
-  (seat - discarder + 4) % 4;
+  seatDistance(discarder, seat);
 
 export const chooseClaims = (
   state: JunkState,
@@ -90,7 +92,11 @@ export const resolveClaimWindow = (
   const meld: Meld = { type: action.type, tiles: [...useTiles, discard.tile], from: discard.seat };
   state.seats[seat]!.melds.push(meld);
   const eventType =
-    action.type === "chi" ? "ChiMade" : action.type === "peng" ? "PengMade" : "GangMade";
+    action.type === "chi"
+      ? EVENT_TYPES.chiMade
+      : action.type === "peng"
+        ? EVENT_TYPES.pengMade
+        : EVENT_TYPES.gangMade;
   appendEvent(state, events, publicVisibility, {
     type: eventType,
     seat,

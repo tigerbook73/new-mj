@@ -6,35 +6,15 @@ import { hangzhouRuleSet } from "./rulesets/hangzhou/index.ts";
 import type { ApplyResult, GameConfig, PlayerViewBase } from "./types.ts";
 import { CORE_ERROR_CODES } from "./errors.ts";
 
-/**
- * Consumer-defined minimal contract: only the five functions the engine-api
- * boundary actually dispatches. A ruleset module is free to expose whatever
- * else it wants (e.g. junkRuleSet.getPlayerView is reused directly by junk
- * tests) — nothing beyond this shape is a public contract.
- */
+/** engine-api 分发的六个规则集能力；除此之外的玩法导出不构成公共契约。 */
 export type RulesetModule<TState, TAction, TView = PlayerViewBase> = {
   createGame: (seed: number, dealer: SeatId, config?: unknown) => ApplyResult<TState>;
   applyAction: (state: TState, seat: SeatId, action: TAction) => ApplyResult<TState>;
   getLegalActions: (state: TState, seat: SeatId) => readonly TAction[];
   getPlayerView: (state: TState, seat: SeatId) => TView;
-  /**
-   * Given a just-finished game's own final state and the dealer who played
-   * it, returns the dealer for the next game. Ruleset-owned mahjong rule —
-   * today both rulesets ignore `finishedState` and simply rotate clockwise,
-   * but the signature is the extension point for future variants (e.g.
-   * dealer continuation) without touching server orchestration.
-   */
+  /** 根据刚结束的一局决定下一局庄家；公式属于玩法规则，不能由房间层假定顺时针。 */
   computeNextDealer: (finishedState: TState, currentDealer: SeatId) => SeatId;
-  /**
-   * Reconstructs a seat's view by replaying a stored event stream instead of
-   * deriving it from live state — same event-reconstruction-equals-direct-
-   * derivation invariant getPlayerView's caller would see live, just fed
-   * historical events. Ruleset-owned (payload interpretation is
-   * ruleset-private), unlike getOmniscientView which is generic because it
-   * only reads the common `{ wall, seats }` shape — replaying events
-   * requires understanding what each event type means, so this can't be a
-   * single cross-ruleset function. Used by phase 4.5.
-   */
+  /** 从历史事件重建座位视图；事件 payload 的解释是玩法私有的，故必须按 ruleset 分发。 */
   rebuildPlayerView: (events: readonly GameEvent[], seat: SeatId) => TView;
 };
 

@@ -2,14 +2,9 @@ import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { DiscardEntry, Meld, SeatState } from "../../lib/seat.ts";
 import type { PrngState } from "../../lib/prng.ts";
 import type { GameConfig, PlayerViewBase, RuleViolation } from "../../types.ts";
-import {
-  EVENT_TYPES,
-  type GameEvent,
-  type TileDiscardedPayload,
-  type TurnStartedPayload,
-  type WallExhaustedPayload,
-} from "../../events.ts";
+import type { GameEvent } from "../../events.ts";
 import { HANGZHOU_MULTI_HU_POLICIES, HANGZHOU_PHASES } from "./constants.ts";
+import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 
 export type HangzhouPhase = (typeof HANGZHOU_PHASES)[number];
 export type HangzhouMultiHuPolicy = (typeof HANGZHOU_MULTI_HU_POLICIES)[number];
@@ -199,14 +194,14 @@ export type HangzhouGangMadePayload =
   | { type: typeof EVENT_TYPES.gangMade; seat: SeatId; tiles: TileId[]; from: SeatId };
 
 export type HangzhouChiMadePayload = {
-  type: "ChiMade";
+  type: typeof EVENT_TYPES.chiMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
 };
 
 export type HangzhouPengMadePayload = {
-  type: "PengMade";
+  type: typeof EVENT_TYPES.pengMade;
   seat: SeatId;
   tiles: TileId[];
   from: SeatId;
@@ -237,9 +232,9 @@ export type HangzhouGameEndedPayload = {
 export type HangzhouEventPayload =
   | HangzhouGameStartedPayload
   | HangzhouHandDealtPayload
-  | TurnStartedPayload
+  | { type: typeof EVENT_TYPES.turnStarted; seat: SeatId }
   | HangzhouTileDrawnPayload
-  | TileDiscardedPayload
+  | { type: typeof EVENT_TYPES.tileDiscarded; seat: SeatId; tile: TileId }
   | HangzhouClaimWindowOpenedPayload
   | HangzhouClaimRespondedPayload
   | HangzhouClaimWindowResolvedPayload
@@ -250,7 +245,7 @@ export type HangzhouEventPayload =
   | HangzhouHuDeclaredPayload
   | HangzhouSettledPayload
   | HangzhouGameEndedPayload
-  | WallExhaustedPayload;
+  | { type: typeof EVENT_TYPES.wallExhausted };
 
 export type HangzhouApplyResult =
   { state: HangzhouState; events: GameEvent<HangzhouEventPayload>[] } | { error: RuleViolation };

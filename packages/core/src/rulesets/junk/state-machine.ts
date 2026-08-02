@@ -1,6 +1,7 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng } from "../../lib/prng.ts";
+import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import {
@@ -12,6 +13,7 @@ import {
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { DEFAULT_JUNK_CONFIG, parseJunkConfig } from "./config.ts";
+import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import type {
   JunkApplyResult,
   JunkClaimOption,
@@ -22,9 +24,7 @@ import type {
   JunkState,
 } from "./types.ts";
 
-export const seats = (): SeatState[] =>
-  [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
-export const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
+export const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], discards: [] }));
 export const cloneState = (state: JunkState): JunkState => {
   const cloned: JunkState = {
     ...state,
@@ -271,7 +271,7 @@ export const settleWins = (
 ): JunkGameResult => {
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
   if (winType === "zimo") {
-    for (const seat of [0, 1, 2, 3] as SeatId[]) {
+    for (const seat of SEAT_IDS) {
       if (seat === winners[0]) continue;
       scoreDeltas[seat] -= 1;
       scoreDeltas[winners[0]!] += 1;
@@ -415,7 +415,7 @@ export const applyDiscard = (
     responses: {},
   };
   state.pendingClaims = options;
-  for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+  for (const candidate of SEAT_IDS) {
     const candidateOptions = claimOptions(state, candidate);
     if (candidateOptions.length === 0) continue;
     options.options[candidate] = candidateOptions;
@@ -480,7 +480,7 @@ export const applyBuGang = (
       options: {},
       responses: {},
     };
-    for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+    for (const candidate of SEAT_IDS) {
       const candidateOptions = claimOptions(state, candidate);
       if (candidateOptions.length === 0) continue;
       state.pendingClaims.options[candidate] = candidateOptions;
@@ -532,10 +532,10 @@ export const createJunkGame = (
     type: EVENT_TYPES.gameStarted,
     config: state.config,
     dealer,
-    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
+    handCounts: SEAT_IDS.map((seat) => (seat === dealer ? 14 : 13)),
     wallCount: state.wall.length - 53,
   });
-  for (const seat of [0, 1, 2, 3] as SeatId[]) {
+  for (const seat of SEAT_IDS) {
     const count = seat === dealer ? 14 : 13;
     for (let index = 0; index < count; index += 1)
       state.seats[seat]!.hand.push(state.wall.shift()!);
@@ -555,4 +555,4 @@ export const createJunkGame = (
 
 // docs/variants/junk.md "不记连庄"：结果不影响庄家，纯顺时针轮转（D15）。
 export const computeNextJunkDealer = (_finished: JunkState, currentDealer: SeatId): SeatId =>
-  ((currentDealer + 1) % 4) as SeatId;
+  nextSeat(currentDealer);

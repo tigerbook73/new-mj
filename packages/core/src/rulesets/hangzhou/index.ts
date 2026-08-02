@@ -1,8 +1,10 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import { EVENT_TYPES, type GameEvent } from "../../events.ts";
+import { SEAT_IDS } from "../../lib/seats.ts";
+import type { GameEvent } from "../../events.ts";
 import type { RulesetModule } from "../../engine.ts";
 import { CAISHEN_KIND } from "./constants.ts";
+import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { parseHangzhouConfig } from "./config.ts";
 import {
   applyAnGang,
@@ -124,7 +126,7 @@ export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
 };
 
 function appendLegalActions(state: HangzhouState, events: GameEvent<HangzhouEventPayload>[]): void {
-  for (const seat of [0, 1, 2, 3] as const) {
+  for (const seat of SEAT_IDS) {
     appendEvent(state, events, seatVisibility(seat), {
       type: EVENT_TYPES.legalActionsUpdated,
       actions: hangzhouRuleSet.getLegalActions(state, seat),

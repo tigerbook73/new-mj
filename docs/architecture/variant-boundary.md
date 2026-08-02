@@ -22,6 +22,7 @@
 | 连接鉴权（握手 JWT）                         | 公共                                                  | 3/3                 | 是                                                                                  | 已达标                             | 与麻将规则无关                                                                                                                                 |
 | 房间生命周期骨架（waiting/in-game/finished） | 公共                                                  | 3/3                 | 是                                                                                  | 已达标                             | 纯编排，见 `session-mechanics.md`                                                                                                              |
 | 事件信封（seq/visibility）                   | 公共                                                  | 3/3                 | 是                                                                                  | 已达标                             | 见 `engine-contract.md`                                                                                                                        |
+| 事件名与 payload 判别联合                    | 私有                                                  | 3/3                 | 否（血战有换三张/定缺，摸牌与声明可见性也不同）                                     | —                                  | 公共层只提供事件信封与可见性；每个 ruleset 在自身 `events.ts` 定义事件名和 payload，不维护全玩法枚举                                           |
 | engine-api 四签名                            | 公共                                                  | 3/3                 | 是                                                                                  | 已达标                             | 见 `engine-contract.md`                                                                                                                        |
 | PlayerViewBase 最小骨架                      | 公共                                                  | 3/3                 | 是                                                                                  | 已达标                             | 玩法可各自扩展，见 `engine-contract.md`                                                                                                        |
 | 声明窗口机制（仅合法响应者进入）             | 公共（机制层面）                                      | 3/3                 | 是（机制一致，优先级顺序不同）                                                      | 已达标（机制部分）                 | 优先级表本身是私有的，见各 `variants/*.md`                                                                                                     |
@@ -34,6 +35,7 @@
 ## 4. 变更记录（转正与边界调整历史）
 
 - 杭州麻将（第三个玩法）落地：`跨局座位连续次数计数（dealerStreak）`新增为公共机制（纯编排，Room 层通用实现，见 `session-mechanics.md` §5）。`庄家轮换公式`完成验证——hangzhou 的连庄逻辑与 junk/bloodbattle 的顺时针轮转不同，确认结论为**保持私有**，不提取公共代码；台账里"需要连庄玩法验证"的备注已解除。
+- core 结构整理：事件信封继续保持公共；玩法事件名与 payload 判别联合确认为私有，迁入各 `rulesets/<id>/events.ts`。此前 `events.ts` 的全玩法 `EventType` 不构成跨包稳定协议，予以移除。
 
 ## 5. 已知的下一次检验点
 

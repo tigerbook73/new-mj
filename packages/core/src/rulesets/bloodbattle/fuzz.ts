@@ -2,6 +2,7 @@ import type { GameEvent } from "../../events.ts";
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
+import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 import { applyAction, createBloodbattleGame, getLegalActions } from "./state-machine.ts";
 import type {
@@ -24,7 +25,7 @@ export type BloodbattleFuzzFailure = {
   error: string;
 };
 
-const seats = [0, 1, 2, 3] as const;
+const seats = SEAT_IDS;
 const extraTiles = (state: BloodbattleState): readonly TileId[] =>
   Object.values(state.wins ?? {}).flatMap((win) => win!.hand);
 
@@ -146,7 +147,7 @@ export const fuzzBloodbattleGames = (
     prng = gameSeed.prng;
     const switches = nextInt(prng, 256);
     prng = switches.prng;
-    const dealerPick = nextInt(prng, 4);
+    const dealerPick = nextInt(prng, SEAT_COUNT);
     prng = dealerPick.prng;
     const config = {
       exchangeThree: (switches.value & 1) !== 0,

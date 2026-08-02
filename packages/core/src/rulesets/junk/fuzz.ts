@@ -1,6 +1,7 @@
 import { createPrng, nextInt, type PrngState } from "../../lib/prng.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
+import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
 import type { GameEvent } from "../../events.ts";
 import { junkRuleSet } from "./index.ts";
 import type { JunkAction, JunkConfig, JunkState } from "./index.ts";
@@ -24,9 +25,7 @@ const nextAction = (
 ): { seat: SeatId; action: JunkAction; prng: PrngState } | undefined => {
   const eligible =
     state.phase === "awaiting-claims"
-      ? ([0, 1, 2, 3] as SeatId[]).filter(
-          (seat) => junkRuleSet.getLegalActions(state, seat).length > 0,
-        )
+      ? SEAT_IDS.filter((seat) => junkRuleSet.getLegalActions(state, seat).length > 0)
       : [state.currentSeat];
   if (eligible.length === 0) return undefined;
   const seatPick = nextInt(prng, eligible.length);
@@ -92,7 +91,7 @@ export const fuzzJunkGames = (games: number, seed = 1): FuzzFailure | undefined 
     prng = gameSeed.prng;
     const switches = nextInt(prng, 8);
     prng = switches.prng;
-    const dealerPick = nextInt(prng, 4);
+    const dealerPick = nextInt(prng, SEAT_COUNT);
     prng = dealerPick.prng;
     const config = {
       sevenPairs: (switches.value & 1) !== 0,

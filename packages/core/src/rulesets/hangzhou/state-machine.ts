@@ -1,12 +1,14 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng } from "../../lib/prng.ts";
+import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import type { SeatId, TileId, TileKind } from "../../lib/ids.ts";
 import type { SeatState } from "../../lib/seat.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { DEFAULT_HANGZHOU_CONFIG, parseHangzhouConfig } from "./config.ts";
+import { HANGZHOU_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { decomposeWinningShape, isBaotou, isWinningHand } from "./hand.ts";
 import { scoreHangzhouHand, type HangzhouScoringInput } from "./scoring.ts";
 import type {
@@ -20,9 +22,7 @@ import type {
   HangzhouWinDetail,
 } from "./types.ts";
 
-export const seats = (): SeatState[] =>
-  [0, 1, 2, 3].map(() => ({ hand: [], melds: [], discards: [] }));
-export const nextSeat = (seat: SeatId): SeatId => ((seat + 1) % 4) as SeatId;
+export const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], discards: [] }));
 
 export const cloneState = (state: HangzhouState): HangzhouState => {
   const cloned: HangzhouState = {
@@ -270,7 +270,7 @@ export const finishWin = (
       }
     : { seat: winner, fanTypes: [], multiplier: 0, payout: 0 };
   const scoreDeltas: [number, number, number, number] = [0, 0, 0, 0];
-  for (const seat of [0, 1, 2, 3] as SeatId[]) {
+  for (const seat of SEAT_IDS) {
     if (seat === winner) continue;
     scoreDeltas[seat] -= winDetail.payout;
     scoreDeltas[winner] += winDetail.payout;
@@ -402,7 +402,7 @@ export const applyDiscard = (
   appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.tileDiscarded, seat, tile });
   const pending: HangzhouPendingClaims = { discard: { seat, tile }, options: {}, responses: {} };
   state.pendingClaims = pending;
-  for (const candidate of [0, 1, 2, 3] as SeatId[]) {
+  for (const candidate of SEAT_IDS) {
     const candidateOptions = claimOptions(state, candidate);
     if (candidateOptions.length === 0) continue;
     pending.options[candidate] = candidateOptions;
@@ -501,10 +501,10 @@ export const createHangzhouGame = (
     type: EVENT_TYPES.gameStarted,
     config: state.config,
     dealer,
-    handCounts: ([0, 1, 2, 3] as SeatId[]).map((seat) => (seat === dealer ? 14 : 13)),
+    handCounts: SEAT_IDS.map((seat) => (seat === dealer ? 14 : 13)),
     wallCount: state.wall.length - 53,
   });
-  for (const seat of [0, 1, 2, 3] as SeatId[]) {
+  for (const seat of SEAT_IDS) {
     const count = seat === dealer ? 14 : 13;
     for (let index = 0; index < count; index += 1)
       state.seats[seat]!.hand.push(state.wall.shift()!);

@@ -1,6 +1,6 @@
-import { fuzzJunkGames, playJunkGame } from "./rulesets/junk/fuzz.ts";
-import type { SeatId } from "./lib/ids.ts";
-import type { JunkAction, JunkConfig } from "./rulesets/junk/index.ts";
+import { fuzzJunkGames, playJunkGame } from "./fuzz.ts";
+import type { SeatId } from "../../lib/ids.ts";
+import type { JunkAction, JunkConfig } from "./index.ts";
 
 type Arguments = {
   command: "play" | "fuzz";
@@ -11,7 +11,7 @@ type Arguments = {
 };
 
 const usage =
-  "Usage: cli.ts <play|fuzz> [--seed <integer>] [--games <integer>] [--config <json>] [--actions <json>]\n";
+  "Usage: junk/cli.ts <play|fuzz> [--seed <integer>] [--games <integer>] [--config <json>] [--actions <json>]\n";
 
 const parseJson = <T>(value: string, name: string): T => {
   try {
@@ -43,7 +43,7 @@ const parseArguments = (argv: string[]): Arguments => {
   return result;
 };
 
-export const runCli = (argv: string[]): { exitCode: number; output: string } => {
+export const runJunkCli = (argv: string[]): { exitCode: number; output: string } => {
   try {
     const args = parseArguments(argv);
     if (args.command === "fuzz") {
@@ -78,6 +78,6 @@ export const runCli = (argv: string[]): { exitCode: number; output: string } => 
   }
 };
 
-const output = runCli(process.argv.slice(2));
+const output = runJunkCli(process.argv.slice(2));
 process.stdout.write(output.output);
 process.exitCode = output.exitCode;

@@ -1,8 +1,10 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
-import { createEvent, EVENT_TYPES, nextEventSeq, type GameEvent } from "../../events.ts";
+import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
 import { type Meld, type SeatState } from "../../lib/seat.ts";
+import { SEAT_COUNT, SEAT_IDS } from "../../lib/seats.ts";
 import { applyChooseLack, applyExchangeThree, createBloodbattlePrelude } from "./prelude.ts";
+import { BLOODBATTLE_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import { scoreBloodbattleHand } from "./scoring.ts";
 import { settleBloodbattleDraw } from "./settlement.ts";
 import type {
@@ -11,9 +13,9 @@ import type {
   BloodbattleEventPayload,
   BloodbattleState,
 } from "./types.ts";
-import { BLOODBATTLE_SEATS, BLOODBATTLE_TILE_SET } from "./constants.ts";
+import { BLOODBATTLE_TILE_SET } from "./constants.ts";
 
-const seats = BLOODBATTLE_SEATS;
+const seats = SEAT_IDS;
 const fail = (code: string): BloodbattleApplyResult => ({ error: { code } });
 const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
@@ -64,7 +66,7 @@ const remove = (hand: readonly TileId[], tile: TileId): TileId[] => {
 };
 const nextActive = (state: BloodbattleState, seat: SeatId): SeatId | undefined => {
   for (let i = 1; i <= 4; i += 1) {
-    const candidate = ((seat + i) % 4) as SeatId;
+    const candidate = SEAT_IDS[(seat + i) % SEAT_COUNT]!;
     if (state.status[candidate] === "active") return candidate;
   }
   return undefined;
@@ -515,7 +517,7 @@ export const resolveClaims = (
       events,
       { type: "public" },
       {
-        type: "PengMade",
+        type: EVENT_TYPES.pengMade,
         seat: peng,
         from: pending.discard.seat,
         tile,

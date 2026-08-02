@@ -1,8 +1,10 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
 import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
-import { EVENT_TYPES, type GameEvent } from "../../events.ts";
+import { SEAT_IDS } from "../../lib/seats.ts";
+import type { GameEvent } from "../../events.ts";
 import type { RulesetModule } from "../../engine.ts";
 import { parseJunkConfig } from "./config.ts";
+import { JUNK_EVENT_TYPES as EVENT_TYPES } from "./events.ts";
 import {
   applyAnGang,
   applyBuGang,
@@ -108,7 +110,7 @@ export const junkRuleSet: RulesetModule<JunkState, JunkAction> = {
 };
 
 function appendLegalActions(state: JunkState, events: GameEvent<JunkEventPayload>[]): void {
-  for (const seat of [0, 1, 2, 3] as const) {
+  for (const seat of SEAT_IDS) {
     appendEvent(state, events, seatVisibility(seat), {
       type: EVENT_TYPES.legalActionsUpdated,
       actions: junkRuleSet.getLegalActions(state, seat),
