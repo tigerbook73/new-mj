@@ -1,6 +1,9 @@
 import { type RefObject } from "react";
 import { TileFlightPortal } from "@/features/mahjong/animation/components/TileFlightPortal";
-import { CLAIM_FLIGHT_DURATION, TILE_MOTION_EASE } from "@/features/mahjong/animation/components/tileMotionTiming";
+import {
+  CLAIM_FLIGHT_DURATION,
+  TILE_MOTION_EASE,
+} from "@/features/mahjong/animation/components/tileMotionTiming";
 
 interface ClaimFlipGhostProps {
   tileId: number;
@@ -33,5 +36,20 @@ export function ClaimFlipGhost({
   toRef,
   onAnimationComplete,
 }: ClaimFlipGhostProps) {
-  return <TileFlightPortal testId="claim-flip-ghost" tileId={tileId} resolveFrom={() => document.querySelector(fromSelector)?.getBoundingClientRect()} toRef={toRef} initial={(from, to) => ({ x: from.left - to.left, y: from.top - to.top, scaleX: from.width / to.width, scaleY: from.height / to.height })} transition={GHOST_TRANSITION} onComplete={onAnimationComplete} />;
+  return (
+    <TileFlightPortal
+      testId="claim-flip-ghost"
+      tileId={tileId}
+      resolveFrom={() => document.querySelector(fromSelector)?.getBoundingClientRect()}
+      toRef={toRef}
+      initial={(from, to) => ({
+        x: from.left - to.left,
+        y: from.top - to.top,
+        scaleX: from.width / to.width,
+        scaleY: from.height / to.height,
+      })}
+      transition={GHOST_TRANSITION}
+      onComplete={onAnimationComplete}
+    />
+  );
 }

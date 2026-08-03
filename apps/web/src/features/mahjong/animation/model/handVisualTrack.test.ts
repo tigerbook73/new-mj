@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  initialiseHandVisualTrack,
-  reconcileHandVisualTrack,
-} from "./handVisualTrack";
+import { initialiseHandVisualTrack, reconcileHandVisualTrack } from "./handVisualTrack";
 
 describe("handVisualTrack", () => {
   it("removes a stable hidden token and never reuses it after a later draw", () => {

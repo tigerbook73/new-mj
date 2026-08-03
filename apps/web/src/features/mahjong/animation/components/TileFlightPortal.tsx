@@ -25,7 +25,25 @@ export function TileFlightPortal({
   if (!flight) return null;
   const { from, to } = flight;
   return createPortal(
-    <motion.div data-testid={testId} style={{ position: "fixed", left: to.left, top: to.top, width: to.width, height: to.height, pointerEvents: "none", zIndex: 50 }} initial={initial(from, to)} animate={{ x: 0, y: 0, scaleX: 1, scaleY: 1, opacity: 1 }} transition={transition} onAnimationComplete={() => { clear(); onComplete?.(); }}>
+    <motion.div
+      data-testid={testId}
+      style={{
+        position: "fixed",
+        left: to.left,
+        top: to.top,
+        width: to.width,
+        height: to.height,
+        pointerEvents: "none",
+        zIndex: 50,
+      }}
+      initial={initial(from, to)}
+      animate={{ x: 0, y: 0, scaleX: 1, scaleY: 1, opacity: 1 }}
+      transition={transition}
+      onAnimationComplete={() => {
+        clear();
+        onComplete?.();
+      }}
+    >
       <Tile {...(tileId !== undefined ? { tileId } : {})} height="100%" />
     </motion.div>,
     document.body,

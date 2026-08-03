@@ -1,5 +1,9 @@
 import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
-import { registerSnapshotDiff, resetAnimationLedger, shouldRegisterSnapshotDiff } from "./animationLedger";
+import {
+  registerSnapshotDiff,
+  resetAnimationLedger,
+  shouldRegisterSnapshotDiff,
+} from "./animationLedger";
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
 import {
   handVisualAnimationState,
@@ -43,10 +47,20 @@ export function registerTableSnapshotAnimation({
   const incremental = shouldRegisterSnapshotDiff(previousSeq, nextSeq);
   if (!enabled || (!first && !incremental)) return {};
   if (incremental) registerSnapshotDiff(previousView, nextView, seat, gameNumber);
-  registerHandVisualSnapshot(first ? null : previousView, nextView, seat, gameNumber, previousGodHands, nextGodHands);
+  registerHandVisualSnapshot(
+    first ? null : previousView,
+    nextView,
+    seat,
+    gameNumber,
+    previousGodHands,
+    nextGodHands,
+  );
   if (!incremental || !previousView || typeof document === "undefined") return {};
   const tile = soleDiscardedTile(previousView, nextView);
-  const rect = tile === undefined ? undefined : document.querySelector(`[data-tile-id="${tile}"]`)?.getBoundingClientRect();
+  const rect =
+    tile === undefined
+      ? undefined
+      : document.querySelector(`[data-tile-id="${tile}"]`)?.getBoundingClientRect();
   return tile !== undefined && rect ? { autoDiscardOrigin: { tile, rect } } : {};
 }
 

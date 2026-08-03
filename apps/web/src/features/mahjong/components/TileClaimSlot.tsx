@@ -2,7 +2,10 @@ import { motion } from "motion/react";
 import { SEAT_ROTATION, type SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { DIRECTION_ARROW_ICON } from "./directionArrowIcon";
 import { Tile, type TileProps } from "./Tile";
-import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "@/features/mahjong/animation/components/tileMotionTiming";
+import {
+  TILE_ENTRY_DURATION,
+  TILE_MOTION_EASE,
+} from "@/features/mahjong/animation/components/tileMotionTiming";
 
 const BADGE_ENTER_TRANSITION = { duration: TILE_ENTRY_DURATION, ease: TILE_MOTION_EASE } as const;
 

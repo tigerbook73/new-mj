@@ -144,7 +144,15 @@ export function TableView() {
     // without visual tokens, making its first discard fall back to the whole
     // hand zone. This is initialisation only, never an animation diff.
     if (!prefersReducedMotion && view) {
-      registerTableSnapshotAnimation({ previousSeq: null, nextSeq: 0, previousView: null, nextView: view, seat: view.seat, gameNumber: room?.gameNumber ?? 1, enabled: true });
+      registerTableSnapshotAnimation({
+        previousSeq: null,
+        nextSeq: 0,
+        previousView: null,
+        nextView: view,
+        seat: view.seat,
+        gameNumber: room?.gameNumber ?? 1,
+        enabled: true,
+      });
     }
     // Intentional mount-only snapshot: later snapshots go through the socket
     // handler below, whose seq guard owns all animation registration.
@@ -162,7 +170,17 @@ export function TableView() {
         room: currentRoom,
         debugOmniscient: currentDebugOmniscient,
       } = useSessionStore.getState();
-      const { autoDiscardOrigin } = registerTableSnapshotAnimation({ previousSeq: currentGameSeq, nextSeq: event.seq, previousView: currentView, nextView: event.view, seat: event.view.seat, gameNumber: currentRoom?.gameNumber ?? 1, enabled: !prefersReducedMotion, previousGodHands: isGodModeVisible ? currentDebugOmniscient?.hands : undefined, nextGodHands: isGodModeVisible ? event.debugOmniscient?.hands : undefined });
+      const { autoDiscardOrigin } = registerTableSnapshotAnimation({
+        previousSeq: currentGameSeq,
+        nextSeq: event.seq,
+        previousView: currentView,
+        nextView: event.view,
+        seat: event.view.seat,
+        gameNumber: currentRoom?.gameNumber ?? 1,
+        enabled: !prefersReducedMotion,
+        previousGodHands: isGodModeVisible ? currentDebugOmniscient?.hands : undefined,
+        nextGodHands: isGodModeVisible ? event.debugOmniscient?.hands : undefined,
+      });
       if (autoDiscardOrigin) setPendingDiscardOrigin(autoDiscardOrigin);
       useSessionStore.getState().applyGameSnapshot(event);
     };

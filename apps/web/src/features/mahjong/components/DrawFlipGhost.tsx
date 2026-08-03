@@ -2,7 +2,10 @@ import { type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { Tile } from "./Tile";
-import { DRAW_FLIGHT_DURATION, TILE_MOTION_EASE } from "@/features/mahjong/animation/components/tileMotionTiming";
+import {
+  DRAW_FLIGHT_DURATION,
+  TILE_MOTION_EASE,
+} from "@/features/mahjong/animation/components/tileMotionTiming";
 import { useFlightGhost } from "@/features/mahjong/animation/components/useFlightGhost";
 
 interface DrawFlipGhostProps {

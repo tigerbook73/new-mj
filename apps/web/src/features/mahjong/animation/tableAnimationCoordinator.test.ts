@@ -34,11 +34,17 @@ describe("tableAnimationCoordinator", () => {
     const before = {
       seat: 0,
       hand: [1, 2, 3],
-      seats: [{ handCount: 3, discards: [] }, { handCount: 3, discards: [] }],
+      seats: [
+        { handCount: 3, discards: [] },
+        { handCount: 3, discards: [] },
+      ],
     } as unknown as PlayerViewBase;
     const after = {
       ...before,
-      seats: [{ handCount: 3, discards: [] }, { handCount: 2, discards: [{ tile: 8 }] }],
+      seats: [
+        { handCount: 3, discards: [] },
+        { handCount: 2, discards: [{ tile: 8 }] },
+      ],
     } as unknown as PlayerViewBase;
 
     registerTableSnapshotAnimation({
@@ -65,10 +71,28 @@ describe("tableAnimationCoordinator", () => {
     vi.stubGlobal("document", {
       querySelector: vi.fn(() => ({ getBoundingClientRect: () => rect })),
     });
-    const before = { seat: 0, hand: [7], seats: [{ handCount: 1, discards: [] }] } as unknown as PlayerViewBase;
-    const after = { ...before, hand: [], seats: [{ handCount: 0, discards: [{ tile: 7 }] }] } as unknown as PlayerViewBase;
+    const before = {
+      seat: 0,
+      hand: [7],
+      seats: [{ handCount: 1, discards: [] }],
+    } as unknown as PlayerViewBase;
+    const after = {
+      ...before,
+      hand: [],
+      seats: [{ handCount: 0, discards: [{ tile: 7 }] }],
+    } as unknown as PlayerViewBase;
 
-    expect(registerTableSnapshotAnimation({ previousSeq: 1, nextSeq: 2, previousView: before, nextView: after, seat: 0, gameNumber: 1, enabled: true }).autoDiscardOrigin).toEqual({ tile: 7, rect });
+    expect(
+      registerTableSnapshotAnimation({
+        previousSeq: 1,
+        nextSeq: 2,
+        previousView: before,
+        nextView: after,
+        seat: 0,
+        gameNumber: 1,
+        enabled: true,
+      }).autoDiscardOrigin,
+    ).toEqual({ tile: 7, rect });
     vi.unstubAllGlobals();
   });
 });
