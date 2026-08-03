@@ -35,7 +35,11 @@ export function useFlightGhost(
 
   useLayoutEffect(() => {
     const from = resolveFrom();
-    const toEl = toRef.current;
+    // A freshly discarded tile may have a CSS scale on TileFace (the
+    // just-discarded highlight). Measure that painted face rather than the
+    // normal-sized slot so the ghost ends exactly under the resting tile.
+    const toEl =
+      toRef.current?.querySelector<HTMLElement>('[data-flight-target="true"]') ?? toRef.current;
     if (from && toEl) {
       setFlight({ from, to: toEl.getBoundingClientRect() });
     }

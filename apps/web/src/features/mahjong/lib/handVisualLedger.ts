@@ -5,7 +5,12 @@ type ViewSlice = { seats?: SeatSlice[] };
 
 export type HandVisualToken = { key: string; tileId?: number };
 
-type Track = { mode: "known" | "hidden"; tokens: HandVisualToken[] };
+type Track = {
+  mode: "known" | "hidden";
+  tokens: HandVisualToken[];
+  /** Monotonic only for hidden slots; never derive this from a sparse token array. */
+  nextHiddenSerial: number;
+};
 
 const tracks = new Map<SeatId, Track>();
 const discardOrigins = new Map<string, { rect: DOMRect; concealed: boolean }>();
@@ -41,7 +46,22 @@ export function registerHandVisualSnapshot(
   prevGod?: readonly (readonly number[])[],
   nextGod?: readonly (readonly number[])[],
 ): void {
-  if (!prev) return;
+  // A first/reconnect snapshot must not animate, but it must establish the
+  // same concealed visual-token identities that the first live discard will
+  // later remove and measure. Without this, that first discard falls back to
+  // the whole hand-track rect while every subsequent discard has an origin.
+  if (!prev) {
+    for (const seat of [0, 1, 2, 3] as const satisfies readonly SeatId[]) {
+      const nextKnown = seat === mySeat ? next.hand : nextGod?.[seat];
+      const nextCount = nextKnown?.length ?? seatSlice(next, seat)?.handCount ?? 0;
+      tracks.set(seat, {
+        mode: nextKnown ? "known" : "hidden",
+        tokens: nextKnown ? knownTokens(nextKnown) : hiddenTokens(seat, nextCount),
+        nextHiddenSerial: nextKnown ? 0 : nextCount,
+      });
+    }
+    return;
+  }
   for (const seat of [0, 1, 2, 3] as const satisfies readonly SeatId[]) {
     const prevKnown = seat === mySeat ? prev.hand : prevGod?.[seat];
     const nextKnown = seat === mySeat ? next.hand : nextGod?.[seat];
@@ -53,6 +73,7 @@ export function registerHandVisualSnapshot(
       tracks.set(seat, {
         mode,
         tokens: nextKnown ? knownTokens(nextKnown) : hiddenTokens(seat, nextCount),
+        nextHiddenSerial: nextKnown ? 0 : nextCount,
       });
       continue;
     }
@@ -61,6 +82,7 @@ export function registerHandVisualSnapshot(
     const current = existing ?? {
       mode,
       tokens: prevKnown ? knownTokens(prevKnown) : hiddenTokens(seat, prevCount),
+      nextHiddenSerial: prevKnown ? 0 : prevCount,
     };
     const nextDiscardCount = seatSlice(next, seat)?.discards?.length ?? 0;
     const isPlainDiscard =
@@ -77,30 +99,44 @@ export function registerHandVisualSnapshot(
         removed = current.tokens[discardIndex(seat, nextDiscardCount - 1, current.tokens.length)];
       }
       if (removed) {
-        const rect = document
-          .querySelector(`[data-hand-token="${removed.key}"]`)
-          ?.getBoundingClientRect();
+        // The reflow token sits on a full-height layout wrapper. A flight
+        // must instead start from the nested tile-sized anchor; otherwise a
+        // rotated left/right wrapper's screen rect is not the card's painted
+        // box. Keep the wrapper selector only as a defensive fallback for a
+        // transient legacy DOM during hot reload.
+        const rect =
+          typeof document === "undefined"
+            ? undefined
+            : (document
+                .querySelector(`[data-hand-flight-token="${removed.key}"]`)
+                ?.getBoundingClientRect() ??
+              document
+                .querySelector(`[data-hand-token="${removed.key}"]`)
+                ?.getBoundingClientRect());
         if (rect)
           discardOrigins.set(`g${gameNumber}:discard:${seat}:${nextDiscardCount - 1}`, {
             rect,
             concealed: removed.tileId === undefined,
           });
-        tracks.set(seat, { mode, tokens: current.tokens.filter((token) => token !== removed) });
+        tracks.set(seat, {
+          mode,
+          tokens: current.tokens.filter((token) => token !== removed),
+          nextHiddenSerial: current.nextHiddenSerial,
+        });
         continue;
       }
     }
 
     // Draws and claims do not need a false per-card story. Preserve known
     // identities when possible; concealed rows merely grow/shrink at the end.
-    if (nextKnown) tracks.set(seat, { mode, tokens: knownTokens(nextKnown) });
+    if (nextKnown) tracks.set(seat, { mode, tokens: knownTokens(nextKnown), nextHiddenSerial: 0 });
     else {
       const kept = current.tokens.slice(0, nextCount);
+      const added = hiddenTokens(seat, nextCount - kept.length, current.nextHiddenSerial);
       tracks.set(seat, {
         mode,
-        tokens:
-          kept.length === nextCount
-            ? kept
-            : [...kept, ...hiddenTokens(seat, nextCount - kept.length, current.tokens.length)],
+        tokens: kept.length === nextCount ? kept : [...kept, ...added],
+        nextHiddenSerial: current.nextHiddenSerial + added.length,
       });
     }
   }

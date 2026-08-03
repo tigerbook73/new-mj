@@ -33,6 +33,8 @@ export interface TileProps {
   dimmed?: boolean | undefined;
   /** Persistent larger resting size — see TileFace's `enlarged` variant. */
   enlarged?: boolean | undefined;
+  /** Lets a flight ghost measure TileFace's final visual rect, including scale. */
+  flightTarget?: boolean | undefined;
   /**
    * Smoothly animates this tile's own position/size whenever it changes as a
    * side effect of siblings mounting/unmounting — motion's `layout` (a
@@ -76,6 +78,7 @@ export function Tile({
   dimmed,
   entering,
   enlarged,
+  flightTarget,
   reflow,
   onClick,
   className,
@@ -107,6 +110,7 @@ export function Tile({
           selected={selected}
           justDiscarded={justDiscarded}
           enlarged={enlarged}
+          flightTarget={flightTarget}
           caishen={caishen}
           dimmed={dimmed}
           onClick={onClick}

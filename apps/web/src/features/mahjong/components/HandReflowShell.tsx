@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { screenDeltaToLocal } from "@/features/mahjong/lib/screenReflow";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
-import { TILE_ENTRY_DURATION } from "./tileMotionTiming";
+import { HAND_REFLOW_DURATION } from "./tileMotionTiming";
 
 // Motion accepts its convenient `easeOut` alias; the Web Animations API
 // requires a CSS easing value instead.
@@ -46,7 +46,7 @@ export function HandReflowShell({
     const [x, y] = screenDeltaToLocal(direction, prior.left - next.left, prior.top - next.top);
     animation.current = element.animate(
       [{ transform: `translate(${x}px, ${y}px)` }, { transform: "translate(0, 0)" }],
-      { duration: TILE_ENTRY_DURATION * 1000, easing: REFLOW_EASING, fill: "both" },
+      { duration: HAND_REFLOW_DURATION * 1000, easing: REFLOW_EASING, fill: "both" },
     );
     animation.current.onfinish = () => animation.current?.cancel();
     return () => animation.current?.cancel();

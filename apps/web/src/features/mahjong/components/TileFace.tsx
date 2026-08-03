@@ -73,6 +73,8 @@ export interface TileFaceProps extends VariantProps<typeof tileVariants> {
   isBack: boolean;
   onClick?: (() => void) | undefined;
   dimmed?: boolean | undefined;
+  /** Marks this rendered face as the visual target for a flight ghost. */
+  flightTarget?: boolean | undefined;
 }
 
 /**
@@ -92,6 +94,7 @@ export function TileFace({
   enlarged,
   caishen,
   dimmed,
+  flightTarget,
   onClick,
 }: TileFaceProps) {
   const tileTheme = useTableLayoutStore((state) => state.tileTheme);
@@ -105,6 +108,7 @@ export function TileFace({
         tileTheme === "Black" && "border-neutral-700 bg-neutral-950",
       )}
       style={{ opacity: dimmed ? 0.4 : 1 }}
+      {...(flightTarget ? { "data-flight-target": "true" } : {})}
       onClick={isClickable ? onClick : undefined}
       role={isClickable ? "button" : undefined}
       tabIndex={isClickable ? 0 : undefined}

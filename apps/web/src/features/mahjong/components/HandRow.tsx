@@ -71,6 +71,7 @@ export function HandRow({
   highlightCaishen,
 }: HandRowProps) {
   const drawnIndex = handTiles.length - 1;
+
   return (
     <div
       className="flex h-full w-full flex-nowrap items-center justify-end"
@@ -125,6 +126,7 @@ export function HandRow({
               tileId={tileId}
               back={!revealed && !isPlaceholder}
               tileHeight={tileHeight}
+              flightToken={key}
               clickable={interactive && isReal}
               // Lets the remaining hand tiles glide into their closed-up
               // positions when one is discarded and unmounts (tileId-keyed
@@ -210,18 +212,19 @@ function DrawnSlotTile({
             tileId={tileId}
             back={!revealed && !isPlaceholder}
             tileHeight={tileHeight}
-              clickable={interactive && isReal}
-              // "opacityOnly": DrawFlipGhost already sells the arrival's
-              // physical motion on its own path — see resolveTileMotion.ts.
-              entering={entering ? "opacityOnly" : false}
-              // Same `reflow` as the plain hand tiles above, kept consistent
-              // for clarity — this slot always remounts fresh on a new draw,
-              // so `layout` never actually has a prior instance to FLIP from.
-              testId={`hand-track-drawn-${direction}`}
-              caishen={caishen}
-              {...(interactive && isReal
-                ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
-                : {})}
+            flightToken={token}
+            clickable={interactive && isReal}
+            // "opacityOnly": DrawFlipGhost already sells the arrival's
+            // physical motion on its own path — see resolveTileMotion.ts.
+            entering={entering ? "opacityOnly" : false}
+            // Same `reflow` as the plain hand tiles above, kept consistent
+            // for clarity — this slot always remounts fresh on a new draw,
+            // so `layout` never actually has a prior instance to FLIP from.
+            testId={`hand-track-drawn-${direction}`}
+            caishen={caishen}
+            {...(interactive && isReal
+              ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
+              : {})}
           />
         </div>
       </HandReflowShell>
@@ -241,14 +244,21 @@ function DrawnSlotTile({
 function HandTileSlot({
   anchorRef,
   tileHeight,
+  flightToken,
   ...tileProps
 }: {
   anchorRef?: Ref<HTMLDivElement>;
   tileHeight: number;
+  /** Tile-sized flight source; distinct from HandReflowShell's full-height layout token. */
+  flightToken?: string;
 } & Omit<ComponentProps<typeof Tile>, "height" | "reflow">) {
   return (
     <div className="flex h-full items-center">
-      <div ref={anchorRef} style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}>
+      <div
+        ref={anchorRef}
+        {...(flightToken ? { "data-hand-flight-token": flightToken } : {})}
+        style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}
+      >
         <Tile {...tileProps} height="100%" reflow={false} />
       </div>
     </div>

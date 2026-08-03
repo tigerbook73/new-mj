@@ -126,7 +126,7 @@ function DiscardTileSlot({
   entry: DiscardEntry;
   aspectRatio: number;
 }) {
-  const { entering, ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
+  const { ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
   const [ghostOrigin] = useState<DOMRect | null>(() =>
     ghost && entry.flightOrigin ? entry.flightOrigin : null,
   );
@@ -150,7 +150,13 @@ function DiscardTileSlot({
           // condition `dimmed` above already reacts to on the very same
           // render, so the shrink and the dim-to-tombstone land together.
           enlarged={entry.justDiscarded && entry.claimedBy === undefined}
-          entering={entering}
+          flightTarget
+          // The ghost already carries the physical cross-region flight. A
+          // normal Tile entry adds local `y: 24` at the destination; under
+          // the rotated left/right/top discard zones that reads as a second
+          // sideways/upward move before the flight has settled. Keep only a
+          // fade for ghost-backed discards.
+          entering={false}
           caishen={entry.highlightCaishen && isCaishenTile(entry.tile)}
         />
       </div>
@@ -162,11 +168,11 @@ function DiscardTileSlot({
           onAnimationComplete={onGhostComplete}
         />
       )}
-      {/* An opponent's discard has no click/timeout-captured rect to fly
-          from (only my own does — see DiscardEntry.flightOrigin), so it
-          flies from their whole hand zone instead. */}
+      {/* Opponents use the concealed visual-token rect captured immediately
+          before the snapshot swaps the hand; the zone is only a fallback. */}
       {ghost && direction !== "bottom" && (entry.flightConcealed || !ghostOrigin) && (
         <OpponentDiscardFlipGhost
+          key={entry.discardLedgerKey}
           tileId={entry.tile}
           fromDirection={direction}
           {...(ghostOrigin ? { fromRect: ghostOrigin } : {})}
