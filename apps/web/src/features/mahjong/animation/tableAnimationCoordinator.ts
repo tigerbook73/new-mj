@@ -1,11 +1,11 @@
 import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
-import { registerSnapshotDiff, resetAnimationLedger, shouldRegisterSnapshotDiff } from "@/features/mahjong/lib/animationLedger";
+import { registerSnapshotDiff, resetAnimationLedger, shouldRegisterSnapshotDiff } from "./animationLedger";
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
 import {
   handVisualAnimationState,
   registerHandVisualSnapshot,
   resetHandVisualLedger,
-} from "@/features/mahjong/lib/handVisualLedger";
+} from "./handVisualLedger";
 import type { HandVisualTrack } from "./model/handVisualTrack";
 
 export type TableAnimationMetadata = {

@@ -8,8 +8,8 @@ import {
   OPPONENT_DISCARD_FLIGHT_DURATION,
   OPPONENT_DISCARD_HOLD_DURATION,
   TILE_MOTION_EASE,
-} from "./tileMotionTiming";
-import { useFlightGhost } from "./useFlightGhost";
+} from "@/features/mahjong/animation/components/tileMotionTiming";
+import { useFlightGhost } from "@/features/mahjong/animation/components/useFlightGhost";
 
 interface OpponentDiscardFlipGhostProps {
   /** The now-public discarded TileId — a discard is public the instant it lands, so this is never a concealed-hand privacy concern once it's in the river. */

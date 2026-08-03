@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
-import { screenDeltaToLocal } from "@/features/mahjong/lib/screenReflow";
+import { screenDeltaToLocal } from "@/features/mahjong/animation/model/screenReflow";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { HAND_REFLOW_DURATION } from "./tileMotionTiming";
 

@@ -1,4 +1,4 @@
-import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "./tileMotionTiming";
+import { TILE_ENTRY_DURATION, TILE_MOTION_EASE } from "@/features/mahjong/animation/components/tileMotionTiming";
 
 const TILE_ENTER_TRANSITION = { duration: TILE_ENTRY_DURATION, ease: TILE_MOTION_EASE } as const;
 

@@ -10,8 +10,8 @@
 - 首个 slice 验收：建立 `animation/` 运行时目录与 coordinator 入口；`TableView` 只在 snapshot 落库前注册动画、挂载/换局时 reset；`useTablePresentation` 不再读取动画 singleton；既有 token、飞行与 slot-resolution 单测继续通过。
 - 约束：不修改 `PlayerView`、协议、server 或玩法规则；snapshot 仍是唯一权威；动画状态不进 session store；TileId 只可进入明牌/God mode 的 DOM；跨区域移动仍由独立 ghost 完成。
 - 已知未知项及最早验证：coordinator 必须保留“snapshot 注册先于 apply”的同步顺序，且 metadata 不能触发 React 状态更新；先抽纯 hand-track model 并用单测固定 token/reconnect/God-mode 边界，再迁移 coordinator 与 presentation 消费者。
-- 进度：进行中。已完成合并前架构审视、纯 `animation/model/handVisualTrack` token reconciliation，以及 `animation/tableAnimationCoordinator`。`TableView` 只在 apply 前注册、挂载/换局时 reset；presentation 改为消费 coordinator 的只读 metadata，不再读取 ledger singleton。
-- 下一步第一个具体动作：将 animation ledger、hand ledger、slot hook、flight/reflow 组件迁移进 `animation/` 目录，并补齐 coordinator 的 snapshot/auto-discard 回归。
+- 进度：进行中。已完成合并前架构审视、纯 `animation/model/handVisualTrack` token reconciliation、`animation/tableAnimationCoordinator`，以及 animation 专属 ledger、slot hook、几何、flight/reflow 基础组件的目录收敛。`TableView` 只在 apply 前注册、挂载/换局时 reset；presentation 改为消费 coordinator 的只读 metadata，不再读取 ledger singleton。
+- 下一步第一个具体动作：补齐 coordinator 的增量 snapshot、God mode 与 auto-discard origin 回归，再评估是否抽取普通 tile flight portal。
 
 ## 阻塞与遗留问题
 

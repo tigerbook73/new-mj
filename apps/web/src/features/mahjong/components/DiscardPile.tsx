@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { isCaishenTile } from "@/features/mahjong/lib/mahjongTiles";
-import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
+import { useSlotEntering } from "@/features/mahjong/animation/useSlotEntering";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
 import { DiscardFlipGhost } from "./DiscardFlipGhost";
 import { OpponentDiscardFlipGhost } from "./OpponentDiscardFlipGhost";

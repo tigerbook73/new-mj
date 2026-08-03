@@ -1,5 +1,5 @@
 import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
-import { diffPlayerView, type SlotEvent } from "./diffPlayerView";
+import { diffPlayerView, type SlotEvent } from "@/features/mahjong/lib/diffPlayerView";
 
 export type Resolution = "flight" | "appear" | "skip";
 

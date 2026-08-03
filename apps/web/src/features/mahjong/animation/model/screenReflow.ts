@@ -1,5 +1,5 @@
-import type { SeatDirection } from "./seatLayout";
-import { SEAT_ROTATION } from "./seatLayout";
+import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
+import { SEAT_ROTATION } from "@/features/mahjong/lib/seatLayout";
 
 /** Converts a viewport-space FLIP delta into a rotated seat zone's local axes. */
 export function screenDeltaToLocal(

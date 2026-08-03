@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { sortTilesForDisplay } from "@/features/mahjong/lib/mahjongTiles";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import type { TableLayoutConfig } from "@/features/mahjong/lib/tableLayoutConfig";
-import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
+import { useSlotEntering } from "@/features/mahjong/animation/useSlotEntering";
 import { ClaimFlipGhost } from "./ClaimFlipGhost";
 import { TileClaimSlot } from "./TileClaimSlot";
 

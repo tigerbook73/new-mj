@@ -1,9 +1,9 @@
 import { useRef, type ComponentProps, type Ref } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { isCaishenTile } from "@/features/mahjong/lib/mahjongTiles";
-import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
+import { useSlotEntering } from "@/features/mahjong/animation/useSlotEntering";
 import { DrawFlipGhost } from "./DrawFlipGhost";
-import { HandReflowShell } from "./HandReflowShell";
+import { HandReflowShell } from "@/features/mahjong/animation/components/HandReflowShell";
 import { Tile } from "./Tile";
 
 /**
