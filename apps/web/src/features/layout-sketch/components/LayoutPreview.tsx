@@ -20,6 +20,7 @@ const labels: Record<PreviewCase, string> = {
 const makeSeat = (info: string, handTiles: number[], melds: Meld[] = []): SeatContent => ({
   info,
   handTiles,
+  handTokenKeys: handTiles.map((tile, index) => `preview:${info}:${tile}:${index}`),
   melds,
   revealed: info === "Tigerbook73",
   reflow: info === "Tigerbook73",

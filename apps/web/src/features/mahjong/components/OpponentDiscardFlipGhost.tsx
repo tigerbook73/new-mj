@@ -12,6 +12,8 @@ interface OpponentDiscardFlipGhostProps {
   tileId: number;
   /** The discarding seat's own on-screen direction — both the flight's origin zone and its starting rotation angle. */
   fromDirection: SeatDirection;
+  /** Exact cosmetic back-slot rect when the hand animation coordinator has one. */
+  fromRect?: DOMRect | undefined;
   /** Ref to the real discard-pile tile this ghost flies toward; also this flight's resting box. */
   toRef: RefObject<HTMLElement | null>;
   onAnimationComplete?: (() => void) | undefined;
@@ -46,12 +48,14 @@ const FLIP_TRANSITION = {
 export function OpponentDiscardFlipGhost({
   tileId,
   fromDirection,
+  fromRect,
   toRef,
   onAnimationComplete,
 }: OpponentDiscardFlipGhostProps) {
   const tileTheme = useTableLayoutStore((state) => state.tileTheme);
   const [flight, clear] = useFlightGhost(
     () =>
+      fromRect ??
       document
         .querySelector(`[data-testid="player-track-${fromDirection}"]`)
         ?.getBoundingClientRect(),

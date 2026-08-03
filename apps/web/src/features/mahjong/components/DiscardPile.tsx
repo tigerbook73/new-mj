@@ -42,6 +42,8 @@ export type DiscardEntry = {
    * never needs this field at all.
    */
   flightOrigin?: DOMRect;
+  /** Whether flightOrigin belongs to a cosmetic concealed back-slot. */
+  flightConcealed?: boolean;
 };
 
 interface DiscardPileProps {
@@ -152,7 +154,7 @@ function DiscardTileSlot({
           caishen={entry.highlightCaishen && isCaishenTile(entry.tile)}
         />
       </div>
-      {ghostOrigin && (
+      {ghostOrigin && !entry.flightConcealed && (
         <DiscardFlipGhost
           tileId={entry.tile}
           fromRect={ghostOrigin}
@@ -163,10 +165,11 @@ function DiscardTileSlot({
       {/* An opponent's discard has no click/timeout-captured rect to fly
           from (only my own does — see DiscardEntry.flightOrigin), so it
           flies from their whole hand zone instead. */}
-      {ghost && direction !== "bottom" && !ghostOrigin && (
+      {ghost && direction !== "bottom" && (entry.flightConcealed || !ghostOrigin) && (
         <OpponentDiscardFlipGhost
           tileId={entry.tile}
           fromDirection={direction}
+          {...(ghostOrigin ? { fromRect: ghostOrigin } : {})}
           toRef={toRef}
           onAnimationComplete={onGhostComplete}
         />

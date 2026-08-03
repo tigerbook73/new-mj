@@ -2,6 +2,7 @@ import type { DebugOmniscientSnapshot, PlayerViewBase, SeatId } from "@new-mj/pr
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
+import { discardFlightOrigin, handVisualTokens } from "@/features/mahjong/lib/handVisualLedger";
 import {
   isCaishenTile,
   sortTilesForDisplay,
@@ -142,11 +143,6 @@ export function useTablePresentation({
       // reliably the most recent draw whenever `data.justDrawn` is true.
       const godHand = direction !== "bottom" ? godView?.hands[seat] : undefined;
       const revealed = direction === "bottom" || godHand !== undefined;
-      // Motion's generic FLIP works under the top Zone's 180-degree rotation,
-      // but not the left/right quarter-turn rotations: their projection delta
-      // follows the wrong screen axis. God mode leaves this existing animation
-      // policy intact while revealing the cards themselves.
-      const godReflow = godHand !== undefined && direction !== "left" && direction !== "right";
       // Render order: hangzhou's caishen (financial) first, set off by an empty
       // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
       // §2 — it's never chi/peng/gang-able, so keeping it visually apart from
@@ -197,6 +193,13 @@ export function useTablePresentation({
                 -1,
                 drawnVisible ? 0 : -1,
               ];
+      const visualTokens = handVisualTokens(seat, handTiles, revealed);
+      let hiddenTokenIndex = 0;
+      const handTokenKeys = handTiles.map((tile, index) => {
+        if (tile < 0) return `gap:${seat}:${index}`;
+        if (revealed) return `tile:${tile}`;
+        return visualTokens[hiddenTokenIndex++]?.key ?? `back:${seat}:fallback:${index}`;
+      });
       // A real TileId is globally unique (see docs/architecture/frontend-
       // layout.md §5), so keying my own drawn slot by it already changes on
       // every new draw — god mode reuses the same trick via godDrawnTile.
@@ -244,8 +247,11 @@ export function useTablePresentation({
           };
         }),
         handTiles,
+        handTokenKeys,
         revealed,
-        reflow: direction === "bottom" || godReflow,
+        // HandReflowShell converts screen-space motion back through each
+        // seat's rotation, so every direction can reflow safely.
+        reflow: true,
         animateDraw: true,
         info: player?.nickname ?? `Seat ${seat + 1}`,
         isDealer: seat === dealer,
@@ -264,6 +270,8 @@ export function useTablePresentation({
       const entries = seatData(seat).discards.map((entry, index) => {
         const justDiscarded =
           extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile;
+        const discardLedgerKey = `g${gameNumber}:discard:${seat}:${index}`;
+        const coordinatedOrigin = discardFlightOrigin(discardLedgerKey);
         return {
           ...entry,
           claimedByDirection:
@@ -273,9 +281,13 @@ export function useTablePresentation({
           justDiscarded,
           // animationLedger key for this exact discard entry — see
           // diffPlayerView.ts's discard:<seat>:<index> key scheme.
-          discardLedgerKey: `g${gameNumber}:discard:${seat}:${index}`,
+          discardLedgerKey,
           flightOrigin:
-            pendingDiscardOrigin?.tile === entry.tile ? pendingDiscardOrigin.rect : undefined,
+            pendingDiscardOrigin?.tile === entry.tile
+              ? pendingDiscardOrigin.rect
+              : coordinatedOrigin?.rect,
+          flightConcealed:
+            pendingDiscardOrigin?.tile === entry.tile ? false : coordinatedOrigin?.concealed,
           highlightCaishen,
         };
       });

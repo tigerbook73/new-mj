@@ -34,6 +34,10 @@ import {
   shouldRegisterSnapshotDiff,
 } from "@/features/mahjong/lib/animationLedger";
 import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
+import {
+  registerHandVisualSnapshot,
+  resetHandVisualLedger,
+} from "@/features/mahjong/lib/handVisualLedger";
 import { tileKindOf, type TileKind } from "@/features/mahjong/lib/mahjongTiles";
 import { playSound, type SoundName } from "@/shared/lib/sounds";
 import { buildStatusBadges } from "@/features/mahjong/lib/statusBadges";
@@ -140,6 +144,7 @@ export function TableView() {
   // nothing else clears it when this component first mounts.
   useEffect(() => {
     resetAnimationLedger();
+    resetHandVisualLedger();
   }, []);
 
   useEffect(() => {
@@ -151,6 +156,7 @@ export function TableView() {
         gameSeq: currentGameSeq,
         view: currentView,
         room: currentRoom,
+        debugOmniscient: currentDebugOmniscient,
       } = useSessionStore.getState();
       if (!prefersReducedMotion && shouldRegisterSnapshotDiff(currentGameSeq, event.seq)) {
         registerSnapshotDiff(
@@ -158,6 +164,14 @@ export function TableView() {
           event.view,
           event.view.seat,
           currentRoom?.gameNumber ?? 1,
+        );
+        registerHandVisualSnapshot(
+          currentView,
+          event.view,
+          event.view.seat,
+          currentRoom?.gameNumber ?? 1,
+          currentDebugOmniscient?.hands,
+          event.debugOmniscient?.hands,
         );
         // Closes the gap for an auto-submitted (timeout) discard, which never
         // ran through onDiscard's click-time capture below — measure the
@@ -206,6 +220,7 @@ export function TableView() {
       );
       useSessionStore.getState().resetGameSeq();
       resetAnimationLedger();
+      resetHandVisualLedger();
     };
     const onSessionFinished = (message: { result: SessionResult }) =>
       setSessionResult(message.result);

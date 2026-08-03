@@ -3,6 +3,7 @@ import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { isCaishenTile } from "@/features/mahjong/lib/mahjongTiles";
 import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import { DrawFlipGhost } from "./DrawFlipGhost";
+import { HandReflowShell } from "./HandReflowShell";
 import { Tile } from "./Tile";
 
 /**
@@ -22,6 +23,7 @@ interface HandRowProps {
   direction: SeatDirection;
   /** See SeatContent.handTiles (components/mahjong/TableBoard.tsx) for the slot layout. */
   handTiles: number[];
+  handTokenKeys: string[];
   revealed: boolean;
   /** See SeatContent.reflow (components/mahjong/TableBoard.tsx). */
   reflow: boolean;
@@ -56,6 +58,7 @@ interface HandRowProps {
 export function HandRow({
   direction,
   handTiles,
+  handTokenKeys,
   revealed,
   reflow,
   animateDraw,
@@ -91,6 +94,7 @@ export function HandRow({
               onDiscard={onDiscard}
               tileHeight={tileHeight}
               ledgerKey={drawnSlotLedgerKey}
+              token={handTokenKeys[index] ?? `draw:${direction}`}
               caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
             />
           );
@@ -109,31 +113,37 @@ export function HandRow({
         // TODO(tigerbook73): revisit whether this dual key-space (tileId vs.
         // index, disambiguated only by string prefix) should be redesigned
         // instead of kept as a prefix workaround.
-        const key = isReal ? `tile-${tileId}` : `slot-${index}`;
+        const key = handTokenKeys[index] ?? (isReal ? `tile-${tileId}` : `slot-${index}`);
         return (
-          <Tile
+          <HandReflowShell
             key={key}
-            tileId={tileId}
-            back={!revealed && !isPlaceholder}
-            height={`${tileHeight}%`}
-            clickable={interactive && isReal}
-            // Lets the remaining hand tiles glide into their closed-up
-            // positions when one is discarded and unmounts (tileId-keyed
-            // above) — motion's `layout` (see Tile.tsx's `reflow` doc).
-            // Off whenever `reflow` is false: a non-revealed opponent's
-            // "rest" slots are anonymous filler keyed by position, so
-            // `layout` would read as their whole hand sliding as one block
-            // (nothing identifiable closing a gap); a revealed god-mode
-            // left/right seat has real per-tile keys but sits under a
-            // rotated ancestor Zone that breaks Motion's FLIP math — see
-            // useTablePresentation.ts's `godReflow` doc.
-            reflow={reflow}
-            caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
-            {...(interactive && isReal
-              ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
-              : {})}
-            {...(isReal ? { testId: "hand-tile" } : {})}
-          />
+            direction={direction}
+            token={key}
+            enabled={reflow && !isPlaceholder}
+          >
+            <Tile
+              tileId={tileId}
+              back={!revealed && !isPlaceholder}
+              height={`${tileHeight}%`}
+              clickable={interactive && isReal}
+              // Lets the remaining hand tiles glide into their closed-up
+              // positions when one is discarded and unmounts (tileId-keyed
+              // above) — motion's `layout` (see Tile.tsx's `reflow` doc).
+              // Off whenever `reflow` is false: a non-revealed opponent's
+              // "rest" slots are anonymous filler keyed by position, so
+              // `layout` would read as their whole hand sliding as one block
+              // (nothing identifiable closing a gap); a revealed god-mode
+              // left/right seat has real per-tile keys but sits under a
+              // rotated ancestor Zone that breaks Motion's FLIP math — see
+              // useTablePresentation.ts's `godReflow` doc.
+              reflow={false}
+              caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
+              {...(interactive && isReal
+                ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
+                : {})}
+              {...(isReal ? { testId: "hand-tile" } : {})}
+            />
+          </HandReflowShell>
         );
       })}
     </div>
@@ -159,6 +169,7 @@ function DrawnSlotTile({
   onDiscard,
   tileHeight,
   ledgerKey,
+  token,
   caishen,
 }: {
   direction: SeatDirection;
@@ -171,6 +182,7 @@ function DrawnSlotTile({
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
   ledgerKey: string;
+  token: string;
   caishen: boolean;
 }) {
   const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey, animateDraw);
@@ -192,28 +204,30 @@ function DrawnSlotTile({
        * ghost render visibly oversized (full row height, not the tile's own)
        * for its entire flight.
        */}
-      <div className="flex h-full items-center">
-        <div ref={toRef} style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}>
-          <Tile
-            tileId={tileId}
-            back={!revealed && !isPlaceholder}
-            height="100%"
-            clickable={interactive && isReal}
-            // "opacityOnly": DrawFlipGhost already sells the arrival's
-            // physical motion on its own path — see resolveTileMotion.ts.
-            entering={entering ? "opacityOnly" : false}
-            // Same `reflow` as the plain hand tiles above, kept consistent
-            // for clarity — this slot always remounts fresh on a new draw,
-            // so `layout` never actually has a prior instance to FLIP from.
-            reflow={reflow}
-            testId={`hand-track-drawn-${direction}`}
-            caishen={caishen}
-            {...(interactive && isReal
-              ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
-              : {})}
-          />
+      <HandReflowShell direction={direction} token={token} enabled={reflow && !isPlaceholder}>
+        <div className="flex h-full items-center">
+          <div ref={toRef} style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}>
+            <Tile
+              tileId={tileId}
+              back={!revealed && !isPlaceholder}
+              height="100%"
+              clickable={interactive && isReal}
+              // "opacityOnly": DrawFlipGhost already sells the arrival's
+              // physical motion on its own path — see resolveTileMotion.ts.
+              entering={entering ? "opacityOnly" : false}
+              // Same `reflow` as the plain hand tiles above, kept consistent
+              // for clarity — this slot always remounts fresh on a new draw,
+              // so `layout` never actually has a prior instance to FLIP from.
+              reflow={false}
+              testId={`hand-track-drawn-${direction}`}
+              caishen={caishen}
+              {...(interactive && isReal
+                ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
+                : {})}
+            />
+          </div>
         </div>
-      </div>
+      </HandReflowShell>
       {ghost && (
         <DrawFlipGhost
           {...(isReal ? { tileId } : {})}
