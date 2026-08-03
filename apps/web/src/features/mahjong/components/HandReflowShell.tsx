@@ -53,7 +53,7 @@ export function HandReflowShell({
   });
 
   return (
-    <div ref={ref} data-hand-token={token} className="h-full shrink-0">
+    <div ref={ref} data-hand-token={token} className="flex h-full shrink-0 items-center">
       {children}
     </div>
   );
