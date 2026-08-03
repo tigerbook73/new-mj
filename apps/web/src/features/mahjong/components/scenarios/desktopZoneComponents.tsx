@@ -46,6 +46,7 @@ export function HandSeatRow({
         handTiles={seat.handTiles}
         revealed={seat.revealed}
         reflow={seat.reflow}
+        animateDraw={seat.animateDraw}
         interactive={seat.interactive}
         onDiscard={seat.onDiscard}
         tileHeight={config.handZone.tileHeight}

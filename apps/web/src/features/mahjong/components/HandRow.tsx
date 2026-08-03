@@ -23,9 +23,11 @@ interface HandRowProps {
   /** See SeatContent.handTiles (components/mahjong/TableBoard.tsx) for the slot layout. */
   handTiles: number[];
   revealed: boolean;
-  /** See SeatContent.reflow (components/mahjong/TableBoard.tsx) — usually
-   * equals `revealed`, except forced false for a god-mode left/right seat. */
+  /** See SeatContent.reflow (components/mahjong/TableBoard.tsx) — bottom only. */
   reflow: boolean;
+  /** Bottom-only live draw motion; revealed opponent rows stay visually
+   * stable while their fixed drawn slot receives snapshot data. */
+  animateDraw: boolean;
   interactive?: boolean | undefined;
   /**
    * `originRect` is this tile's own `getBoundingClientRect()`, captured
@@ -57,6 +59,7 @@ export function HandRow({
   handTiles,
   revealed,
   reflow,
+  animateDraw,
   interactive,
   onDiscard,
   tileHeight: tileHeight,
@@ -84,6 +87,7 @@ export function HandRow({
               isReal={isReal}
               revealed={revealed}
               reflow={reflow}
+              animateDraw={animateDraw}
               interactive={interactive}
               onDiscard={onDiscard}
               tileHeight={tileHeight}
@@ -151,6 +155,7 @@ function DrawnSlotTile({
   isReal,
   revealed,
   reflow,
+  animateDraw,
   interactive,
   onDiscard,
   tileHeight,
@@ -162,13 +167,14 @@ function DrawnSlotTile({
   isReal: boolean;
   revealed: boolean;
   reflow: boolean;
+  animateDraw: boolean;
   interactive?: boolean | undefined;
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
   ledgerKey: string;
   caishen: boolean;
 }) {
-  const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey);
+  const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey, animateDraw);
   const toRef = useRef<HTMLDivElement>(null);
   const isPlaceholder = tileId < 0;
 

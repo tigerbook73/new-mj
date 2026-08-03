@@ -124,7 +124,12 @@ function DiscardTileSlot({
   entry: DiscardEntry;
   aspectRatio: number;
 }) {
-  const { entering, ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
+  // Remote rows are snapshot-only even in God mode; see frontend-layout.md
+  // §5. Only bottom keeps the discard arrival/flight treatment.
+  const { entering, ghost, onGhostComplete } = useSlotEntering(
+    entry.discardLedgerKey,
+    direction === "bottom",
+  );
   const [ghostOrigin] = useState<DOMRect | null>(() =>
     ghost && entry.flightOrigin ? entry.flightOrigin : null,
   );

@@ -142,18 +142,6 @@ export function useTablePresentation({
       // reliably the most recent draw whenever `data.justDrawn` is true.
       const godHand = direction !== "bottom" ? godView?.hands[seat] : undefined;
       const revealed = direction === "bottom" || godHand !== undefined;
-      // Framer Motion's `layout` FLIP (HandRow's `reflow`) measures via
-      // getBoundingClientRect() in screen space but computes/composes its
-      // own delta unaware of the ancestor Zone's plain-CSS `rotate()`
-      // (zoneStyle() in layoutPreset.ts) that left/right seats sit under —
-      // the result is tiles visibly sliding left/right instead of up/down.
-      // Fixing that needs Motion's projection tree to know about the
-      // ancestor rotation (e.g. promoting the rotated Zone to a motion
-      // component); until then, left/right god-mode hands reorder with a
-      // plain snap instead of a broken slide. Bottom/top are unaffected —
-      // bottom never rotates, top's 180° rotation preserves the horizontal
-      // axis instead of swapping it.
-      const godReflow = godHand !== undefined && direction !== "left" && direction !== "right";
       // Render order: hangzhou's caishen (financial) first, set off by an empty
       // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
       // §2 — it's never chi/peng/gang-able, so keeping it visually apart from
@@ -252,7 +240,13 @@ export function useTablePresentation({
         }),
         handTiles,
         revealed,
-        reflow: direction === "bottom" || godReflow,
+        // God mode only reveals what a snapshot already contains. It must not
+        // make an opponent row animate/reflow: during a draw that would make
+        // stable face-up tiles visibly flicker, and rotated rows cannot use
+        // Motion's generic FLIP correctly anyway. Bottom remains the sole
+        // live-animation lane.
+        reflow: direction === "bottom",
+        animateDraw: direction === "bottom",
         info: player?.nickname ?? `Seat ${seat + 1}`,
         isDealer: seat === dealer,
         drawnSlotKey,

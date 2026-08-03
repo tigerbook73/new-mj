@@ -18,12 +18,19 @@ export type SlotEntering = {
  * animationLedger.ts) to cover a slot that unmounts before its ghost, if
  * any, ever got to call back.
  */
-export function useSlotEntering(key: string): SlotEntering {
-  const [resolution] = useState(() => resolveSlot(key));
+export function useSlotEntering(key: string, enabled = true): SlotEntering {
+  const [resolution] = useState(() => (enabled ? resolveSlot(key) : "skip"));
 
   useEffect(() => {
+    // A disabled consumer still settles a ledger entry immediately. Otherwise
+    // an opponent's intentionally non-animated draw would keep its lane busy
+    // until that player later discards and unmounts the slot.
+    if (!enabled) {
+      completeSlot(key, laneSeatFromKey(key));
+      return;
+    }
     return () => completeSlot(key, laneSeatFromKey(key));
-  }, [key]);
+  }, [enabled, key]);
 
   return {
     entering: resolution !== "skip",
