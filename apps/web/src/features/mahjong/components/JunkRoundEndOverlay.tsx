@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Button } from "@/shared/ui/button";
 import { WinningHandReveal } from "@/features/mahjong/components/WinningHandReveal";
 import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
+import { playerName, scoreRows, waitingPlayerNames } from "./roundEndPresentation";
 
 /**
  * junk's `JunkGameResult` shape (packages/core/src/rulesets/junk/types.ts),
@@ -36,6 +37,8 @@ interface JunkRoundEndOverlayProps {
   gameNumber: number;
   totalGames: number;
   players: RoomInfo["players"];
+  mySeat?: number;
+  dealer?: number | undefined;
   myConfirmed: boolean;
   onConfirm: () => void;
   /** See RoundEndOverlay.tsx's `onEnd` doc — same room:end capability, same reasoning. */
@@ -72,13 +75,12 @@ const JUNK_FAN_LABELS: Record<string, string> = {
   menqing: "门清",
 };
 
-const describeResult = (result: JunkGameResultLike, players: RoomInfo["players"]): string => {
-  const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
-  if (result.type === "draw") return "Round drawn — the wall ran out.";
-  const winners = result.winners.map(nameOf).join(", ");
-  return result.winType === "zimo"
-    ? `${winners} won by self-draw.`
-    : `${winners} won off ${nameOf(result.from!)}'s discard.`;
+const JUNK_FAN_MULTIPLIERS: Record<string, string> = {
+  hunyise: "×2",
+  qingyise: "×4",
+  qidui: "×2",
+  pengpenghu: "×2",
+  menqing: "×2",
 };
 
 /**
@@ -93,6 +95,8 @@ export function JunkRoundEndOverlay({
   gameNumber,
   totalGames,
   players,
+  mySeat = 0,
+  dealer,
   myConfirmed,
   onConfirm,
   onEnd,
@@ -100,10 +104,8 @@ export function JunkRoundEndOverlay({
   reducedMotion,
   winningHands = [],
 }: JunkRoundEndOverlayProps) {
-  const waitingOn = players
-    .map((player, seat) => ({ player, seat }))
-    .filter(({ player }) => player && !player.isBot && player.isReady !== true)
-    .map(({ player, seat }) => player?.nickname ?? `Seat ${seat + 1}`);
+  const waitingOn = waitingPlayerNames(players, mySeat);
+  const nameOf = (seat: number) => playerName(players, mySeat, seat);
   const transition = { duration: reducedMotion ? 0 : 0.25, ease: "easeOut" } as const;
 
   return (
@@ -122,32 +124,43 @@ export function JunkRoundEndOverlay({
         exit={CARD_EXIT}
         transition={transition}
       >
+        <p className="text-sm text-muted-foreground">
+          第 {gameNumber} / {totalGames} 局
+        </p>
         <h2 className="text-lg font-semibold">
-          Game {gameNumber} of {totalGames} finished
+          {result.type === "draw"
+            ? "流局"
+            : `${result.winners.map(nameOf).join("、")}${result.winType === "zimo" ? " 自摸" : " 胡牌"}`}
+          {result.type === "win" && result.winType === "ron"
+            ? `（${nameOf(result.from!)} 点炮）`
+            : ""}
         </h2>
-        <p className="text-sm">{describeResult(result, players)}</p>
-        {result.type === "win" && (
-          <ul className="text-sm text-muted-foreground">
-            {result.winnerDetails.map((winner) => (
-              <li key={winner.seat}>
-                {players[winner.seat]?.nickname ?? `Seat ${winner.seat + 1}`}:{" "}
-                {winner.fanTypes.map((fan) => JUNK_FAN_LABELS[fan] ?? fan).join(" · ")} ×
-                {winner.multiplier}
-              </li>
-            ))}
-          </ul>
-        )}
         {result.type === "win" &&
           result.winners
             .filter((seat) => winningHands[seat])
             .map((seat) => <WinningHandReveal key={seat} groups={winningHands[seat]!} />)}
+        {result.type === "win" && (
+          <ul className="text-sm text-muted-foreground">
+            {result.winnerDetails.map((winner) => (
+              <li key={winner.seat}>
+                垃圾胡 · {dealer === undefined ? "庄家 ×2" : `庄家（${nameOf(dealer)}）×2`} ·{" "}
+                {winner.fanTypes
+                  .map((fan) => `${JUNK_FAN_LABELS[fan] ?? fan} ${JUNK_FAN_MULTIPLIERS[fan] ?? ""}`)
+                  .join(" · ")}
+                （合计 ×{winner.multiplier}）
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="text-sm text-muted-foreground">
-          {result.scoreDeltas.map((delta, seat) => (
-            <li key={seat}>
-              {players[seat]?.nickname ?? `Seat ${seat + 1}`}: {delta >= 0 ? "+" : ""}
-              {delta}
-            </li>
-          ))}
+          {scoreRows(result.scoreDeltas, result.type === "win" ? result.winners : []).map(
+            (seat) => (
+              <li key={seat}>
+                {nameOf(seat)}: {result.scoreDeltas[seat]! >= 0 ? "+" : ""}
+                {result.scoreDeltas[seat]}
+              </li>
+            ),
+          )}
         </ul>
         {myConfirmed ? (
           <p className="text-sm text-muted-foreground">
@@ -156,11 +169,20 @@ export function JunkRoundEndOverlay({
               : "Starting next round…"}
           </p>
         ) : (
-          <Button onClick={onConfirm}>Next round</Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={onConfirm}>
+              下一局
+            </Button>
+            <Button className="flex-1" variant="outline" onClick={onEnd}>
+              结束
+            </Button>
+          </div>
         )}
-        <Button variant="outline" onClick={onEnd}>
-          End session
-        </Button>
+        {myConfirmed && (
+          <Button variant="outline" onClick={onEnd}>
+            结束
+          </Button>
+        )}
       </motion.div>
     </motion.div>
   );

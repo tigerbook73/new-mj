@@ -31,6 +31,7 @@ const baseProps = {
   gameNumber: 2,
   totalGames: 4,
   players,
+  mySeat: 0,
   onConfirm: () => undefined,
   onEnd: () => undefined,
   entering: false,
@@ -53,9 +54,8 @@ describe("HangzhouRoundEndOverlay", () => {
       }),
     );
 
-    expect(markup).toContain("Alice won by self-draw");
-    expect(markup).toContain("爆头 + 杠开");
-    expect(markup).toContain("(×4)");
+    expect(markup).toContain("我 自摸");
+    expect(markup).toContain("爆头 ×2 · 杠开 ×2（合计 ×4）");
   });
 
   it("names the discarder for a ron win", () => {
@@ -74,7 +74,7 @@ describe("HangzhouRoundEndOverlay", () => {
       }),
     );
 
-    expect(markup).toContain("Bob won off Alice&#x27;s discard");
+    expect(markup).toContain("Bob 胡牌（我 点炮）");
     expect(markup).toContain("平胡");
   });
 
@@ -87,9 +87,9 @@ describe("HangzhouRoundEndOverlay", () => {
       }),
     );
 
-    expect(markup).toContain("Round drawn");
-    expect(markup).not.toContain("won by self-draw");
-    expect(markup).not.toContain("won off");
+    expect(markup).toContain("流局");
+    expect(markup).not.toContain("自摸");
+    expect(markup).not.toContain("点炮");
   });
 
   it("falls back to the raw code for an unrecognized fanType, instead of hiding it", () => {

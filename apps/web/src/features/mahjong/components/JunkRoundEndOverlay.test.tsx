@@ -32,6 +32,7 @@ const baseProps = {
   gameNumber: 2,
   totalGames: 4,
   players,
+  mySeat: 0,
   onConfirm: () => undefined,
   onEnd: () => undefined,
   entering: false,
@@ -44,8 +45,8 @@ describe("JunkRoundEndOverlay", () => {
       createElement(JunkRoundEndOverlay, { ...baseProps, myConfirmed: false }),
     );
 
-    expect(markup).toContain(">Next round<");
-    expect(markup).toContain(">End session<");
+    expect(markup).toContain(">下一局<");
+    expect(markup).toContain(">结束<");
   });
 
   it("still renders End session once the caller has already confirmed next round", () => {
@@ -56,8 +57,8 @@ describe("JunkRoundEndOverlay", () => {
     // Any seated player may end the session early, confirmed or not
     // (session-mechanics.md §6) — the button must not disappear once this
     // seat has already clicked "Next round".
-    expect(markup).toContain(">End session<");
-    expect(markup).not.toContain(">Next round<");
+    expect(markup).toContain(">结束<");
+    expect(markup).not.toContain(">下一局<");
   });
 
   it("renders Junk v3 fan labels and multiplier from the server result", () => {
@@ -79,8 +80,9 @@ describe("JunkRoundEndOverlay", () => {
         },
       }),
     );
-    expect(markup).toContain("杠开 · 清一色 · 门清 ×16");
-    expect(markup).toContain("Alice won by self-draw.");
+    expect(markup).toContain("我 自摸");
+    expect(markup).toContain("庄家 ×2");
+    expect(markup).toContain("清一色 ×4 · 门清 ×2（合计 ×16）");
   });
 
   it("names the discarder for a ron win", () => {
@@ -99,7 +101,7 @@ describe("JunkRoundEndOverlay", () => {
         },
       }),
     );
-    expect(markup).toContain("Bob won off Alice&#x27;s discard.");
+    expect(markup).toContain("Bob 胡牌（我 点炮）");
     expect(markup).toContain("碰碰胡 ×2");
   });
 
@@ -123,6 +125,25 @@ describe("JunkRoundEndOverlay", () => {
         },
       }),
     );
-    expect(markup).toContain("七小对 · 门清 · 混一色 ×8");
+    expect(markup).toContain("七小对 ×2 · 门清 ×2 · 混一色 ×2（合计 ×8）");
+  });
+
+  it("puts the winner's score first and calls the local player 我", () => {
+    const markup = renderToStaticMarkup(
+      createElement(JunkRoundEndOverlay, {
+        ...baseProps,
+        myConfirmed: false,
+        result: {
+          type: "win",
+          winner: 1,
+          winners: [1],
+          winnerDetails: [{ seat: 1, fanTypes: ["pengpenghu"], multiplier: 2, payout: 2 }],
+          winType: "ron",
+          from: 0,
+          scoreDeltas: [-2, 2, 0, 0],
+        },
+      }),
+    );
+    expect(markup.indexOf("Bob: +2")).toBeLessThan(markup.indexOf("我: -2"));
   });
 });

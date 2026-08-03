@@ -32,6 +32,7 @@ const baseProps = {
   gameNumber: 2,
   totalGames: 4,
   players,
+  mySeat: 0,
   onConfirm: () => undefined,
   onEnd: () => undefined,
   entering: false,
@@ -44,8 +45,8 @@ describe("RoundEndOverlay", () => {
       createElement(RoundEndOverlay, { ...baseProps, myConfirmed: false }),
     );
 
-    expect(markup).toContain(">Next round<");
-    expect(markup).toContain(">End session<");
+    expect(markup).toContain(">下一局<");
+    expect(markup).toContain(">结束<");
   });
 
   it("still renders End session once the caller has already confirmed next round", () => {
@@ -56,8 +57,8 @@ describe("RoundEndOverlay", () => {
     // Any seated player may end the session early, confirmed or not
     // (session-mechanics.md §6) — the button must not disappear once this
     // seat has already clicked "Next round".
-    expect(markup).toContain(">End session<");
-    expect(markup).not.toContain(">Next round<");
+    expect(markup).toContain(">结束<");
+    expect(markup).not.toContain(">下一局<");
   });
 
   it("keeps rendering Bloodbattle's seat-only winners", () => {
@@ -74,6 +75,6 @@ describe("RoundEndOverlay", () => {
         },
       }),
     );
-    expect(markup).toContain("Alice won by self-draw.");
+    expect(markup).toContain("我 自摸");
   });
 });

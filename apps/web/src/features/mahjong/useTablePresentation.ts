@@ -68,6 +68,8 @@ export type TableViewExtras = {
   /** Hangzhou-only, public (hangzhou.md §5/§11): whether ron is currently
    * allowed table-wide. Absent for junk/bloodbattle. */
   dealerStreak?: number;
+  /** Public current-game dealer for junk/hangzhou settlement presentation. */
+  dealer?: number;
 };
 
 type PlayerInfo = { nickname?: string } | null;

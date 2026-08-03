@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Button } from "@/shared/ui/button";
 import { WinningHandReveal } from "@/features/mahjong/components/WinningHandReveal";
 import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
+import { playerName, scoreRows, waitingPlayerNames } from "./roundEndPresentation";
 
 /**
  * bloodbattle's game-result shape (packages/core/src/rulesets/bloodbattle/
@@ -28,6 +29,7 @@ interface RoundEndOverlayProps {
   gameNumber: number;
   totalGames: number;
   players: RoomInfo["players"];
+  mySeat?: number;
   myConfirmed: boolean;
   onConfirm: () => void;
   /**
@@ -68,15 +70,6 @@ const CARD_INITIAL = { opacity: 0, scale: 0.9, y: 16 };
 const CARD_ANIMATE = { opacity: 1, scale: 1, y: 0 };
 const CARD_EXIT = { opacity: 0, scale: 0.9, y: 16 };
 
-const describeResult = (result: GameResultLike, players: RoomInfo["players"]): string => {
-  const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
-  if (result.type === "draw") return "Round drawn — the wall ran out.";
-  const winners = result.winners.map(nameOf).join(", ");
-  return result.winType === "zimo"
-    ? `${winners} won by self-draw.`
-    : `${winners} won off ${nameOf(result.from!)}'s discard.`;
-};
-
 /**
  * Shown while `RoomService.awaitingNextRound` is true (docs/contracts/
  * session-mechanics.md §6 局间确认) — every real seat must confirm via the
@@ -87,6 +80,7 @@ export function RoundEndOverlay({
   gameNumber,
   totalGames,
   players,
+  mySeat = 0,
   myConfirmed,
   onConfirm,
   onEnd,
@@ -94,10 +88,8 @@ export function RoundEndOverlay({
   reducedMotion,
   winningHands = [],
 }: RoundEndOverlayProps) {
-  const waitingOn = players
-    .map((player, seat) => ({ player, seat }))
-    .filter(({ player }) => player && !player.isBot && player.isReady !== true)
-    .map(({ player, seat }) => player?.nickname ?? `Seat ${seat + 1}`);
+  const waitingOn = waitingPlayerNames(players, mySeat);
+  const nameOf = (seat: number) => playerName(players, mySeat, seat);
   const transition = { duration: reducedMotion ? 0 : 0.25, ease: "easeOut" } as const;
 
   return (
@@ -116,21 +108,30 @@ export function RoundEndOverlay({
         exit={CARD_EXIT}
         transition={transition}
       >
+        <p className="text-sm text-muted-foreground">
+          第 {gameNumber} / {totalGames} 局
+        </p>
         <h2 className="text-lg font-semibold">
-          Game {gameNumber} of {totalGames} finished
+          {result.type === "draw"
+            ? "流局"
+            : `${result.winners.map(nameOf).join("、")}${result.winType === "zimo" ? " 自摸" : " 胡牌"}`}
+          {result.type === "win" && result.winType === "ron"
+            ? `（${nameOf(result.from!)} 点炮）`
+            : ""}
         </h2>
-        <p className="text-sm">{describeResult(result, players)}</p>
         {result.type === "win" &&
           result.winners
             .filter((seat) => winningHands[seat])
             .map((seat) => <WinningHandReveal key={seat} groups={winningHands[seat]!} />)}
         <ul className="text-sm text-muted-foreground">
-          {result.scoreDeltas.map((delta, seat) => (
-            <li key={seat}>
-              {players[seat]?.nickname ?? `Seat ${seat + 1}`}: {delta >= 0 ? "+" : ""}
-              {delta}
-            </li>
-          ))}
+          {scoreRows(result.scoreDeltas, result.type === "win" ? result.winners : []).map(
+            (seat) => (
+              <li key={seat}>
+                {nameOf(seat)}: {result.scoreDeltas[seat]! >= 0 ? "+" : ""}
+                {result.scoreDeltas[seat]}
+              </li>
+            ),
+          )}
         </ul>
         {myConfirmed ? (
           <p className="text-sm text-muted-foreground">
@@ -139,11 +140,20 @@ export function RoundEndOverlay({
               : "Starting next round…"}
           </p>
         ) : (
-          <Button onClick={onConfirm}>Next round</Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={onConfirm}>
+              下一局
+            </Button>
+            <Button className="flex-1" variant="outline" onClick={onEnd}>
+              结束
+            </Button>
+          </div>
         )}
-        <Button variant="outline" onClick={onEnd}>
-          End session
-        </Button>
+        {myConfirmed && (
+          <Button variant="outline" onClick={onEnd}>
+            结束
+          </Button>
+        )}
       </motion.div>
     </motion.div>
   );

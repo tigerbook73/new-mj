@@ -470,6 +470,9 @@ export function TableView() {
                   gameNumber={room.gameNumber}
                   totalGames={room.totalGames ?? 1}
                   players={room.players}
+                  mySeat={view.seat}
+                  dealer={extras.dealer}
+                  dealerStreak={extras.dealerStreak}
                   myConfirmed={room.players[view.seat]?.isReady === true}
                   onConfirm={() => void confirmNextRound()}
                   onEnd={() => void endSession()}
@@ -488,6 +491,8 @@ export function TableView() {
                   gameNumber={room.gameNumber}
                   totalGames={room.totalGames ?? 1}
                   players={room.players}
+                  mySeat={view.seat}
+                  dealer={extras.dealer}
                   myConfirmed={room.players[view.seat]?.isReady === true}
                   onConfirm={() => void confirmNextRound()}
                   onEnd={() => void endSession()}
@@ -506,6 +511,7 @@ export function TableView() {
                   gameNumber={room.gameNumber}
                   totalGames={room.totalGames ?? 1}
                   players={room.players}
+                  mySeat={view.seat}
                   myConfirmed={room.players[view.seat]?.isReady === true}
                   onConfirm={() => void confirmNextRound()}
                   onEnd={() => void endSession()}

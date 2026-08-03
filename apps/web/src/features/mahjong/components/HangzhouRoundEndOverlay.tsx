@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Button } from "@/shared/ui/button";
 import { WinningHandReveal } from "@/features/mahjong/components/WinningHandReveal";
 import type { TileKind } from "@/features/mahjong/lib/mahjongTiles";
+import { playerName, scoreRows, waitingPlayerNames } from "./roundEndPresentation";
 
 /**
  * hangzhou's `HangzhouGameResult` shape (packages/core/src/rulesets/hangzhou/
@@ -36,6 +37,9 @@ interface HangzhouRoundEndOverlayProps {
   gameNumber: number;
   totalGames: number;
   players: RoomInfo["players"];
+  mySeat?: number;
+  dealer?: number | undefined;
+  dealerStreak?: number | undefined;
   myConfirmed: boolean;
   onConfirm: () => void;
   /** See RoundEndOverlay.tsx's `onEnd` doc — same room:end capability, same reasoning. */
@@ -80,17 +84,20 @@ const FAN_LABELS: Record<string, string> = {
   siLianGang: "四连杠",
 };
 
-const describeFan = (fanTypes: string[]): string =>
-  fanTypes.map((type) => FAN_LABELS[type] ?? type).join(" + ");
-
-const describeWinner = (
-  detail: HangzhouWinDetail,
-  result: Extract<HangzhouGameResultLike, { type: "win" }>,
-  nameOf: (seat: number) => string,
-): string => {
-  const outcome =
-    result.winType === "zimo" ? "won by self-draw" : `won off ${nameOf(result.from!)}'s discard`;
-  return `${nameOf(detail.seat)} ${outcome} — ${describeFan(detail.fanTypes)} (×${detail.multiplier})`;
+const FAN_MULTIPLIERS: Record<string, number> = {
+  pinghu: 1,
+  baotou: 2,
+  caipiao: 4,
+  shuangCaipiao: 8,
+  sanCaipiao: 16,
+  qiduizi: 2,
+  haohuaQiduizi: 4,
+  shuangHaohuaQiduizi: 8,
+  sanHaohuaQiduizi: 16,
+  gangkai: 2,
+  erLianGang: 4,
+  sanLianGang: 8,
+  siLianGang: 16,
 };
 
 /**
@@ -104,6 +111,9 @@ export function HangzhouRoundEndOverlay({
   gameNumber,
   totalGames,
   players,
+  mySeat = 0,
+  dealer,
+  dealerStreak,
   myConfirmed,
   onConfirm,
   onEnd,
@@ -111,11 +121,9 @@ export function HangzhouRoundEndOverlay({
   reducedMotion,
   winningHands = [],
 }: HangzhouRoundEndOverlayProps) {
-  const nameOf = (seat: number) => players[seat]?.nickname ?? `Seat ${seat + 1}`;
-  const waitingOn = players
-    .map((player, seat) => ({ player, seat }))
-    .filter(({ player }) => player && !player.isBot && player.isReady !== true)
-    .map(({ player, seat }) => player?.nickname ?? `Seat ${seat + 1}`);
+  const nameOf = (seat: number) => playerName(players, mySeat, seat);
+  const waitingOn = waitingPlayerNames(players, mySeat);
+  const dealerMultiplier = dealerStreak === undefined ? 2 : 2 ** Math.min(dealerStreak, 3);
   const transition = { duration: reducedMotion ? 0 : 0.25, ease: "easeOut" } as const;
 
   return (
@@ -134,28 +142,44 @@ export function HangzhouRoundEndOverlay({
         exit={CARD_EXIT}
         transition={transition}
       >
-        <h2 className="text-lg font-semibold">
-          Game {gameNumber} of {totalGames} finished
-        </h2>
+        <p className="text-sm text-muted-foreground">
+          第 {gameNumber} / {totalGames} 局
+        </p>
         {result.type === "draw" ? (
-          <p className="text-sm">Round drawn — the wall ran out.</p>
+          <h2 className="text-lg font-semibold">流局</h2>
         ) : (
-          <ul className="flex flex-col gap-2 text-sm">
-            {result.winners.map((detail) => (
-              <li key={detail.seat} className="flex flex-col items-center gap-1">
-                {describeWinner(detail, result, nameOf)}
-                {winningHands[detail.seat] && (
-                  <WinningHandReveal groups={winningHands[detail.seat]!} />
-                )}
-              </li>
-            ))}
-          </ul>
+          <>
+            <h2 className="text-lg font-semibold">
+              {result.winners.map((detail) => nameOf(detail.seat)).join("、")}
+              {result.winType === "zimo" ? " 自摸" : ` 胡牌（${nameOf(result.from!)} 点炮）`}
+            </h2>
+            <ul className="flex flex-col gap-2 text-sm">
+              {result.winners.map((detail) => (
+                <li key={detail.seat} className="flex flex-col items-center gap-1">
+                  {winningHands[detail.seat] && (
+                    <WinningHandReveal groups={winningHands[detail.seat]!} />
+                  )}
+                  <span className="text-muted-foreground">
+                    杭州麻将 · {dealer === undefined ? "庄家" : `庄家（${nameOf(dealer)}）`} ×
+                    {dealerMultiplier} ·{" "}
+                    {detail.fanTypes
+                      .map((type) => `${FAN_LABELS[type] ?? type} ×${FAN_MULTIPLIERS[type] ?? "?"}`)
+                      .join(" · ")}
+                    （合计 ×{detail.multiplier}）
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
         <ul className="text-sm text-muted-foreground">
-          {result.scoreDeltas.map((delta, seat) => (
+          {scoreRows(
+            result.scoreDeltas,
+            result.type === "win" ? result.winners.map(({ seat }) => seat) : [],
+          ).map((seat) => (
             <li key={seat}>
-              {nameOf(seat)}: {delta >= 0 ? "+" : ""}
-              {delta}
+              {nameOf(seat)}: {result.scoreDeltas[seat]! >= 0 ? "+" : ""}
+              {result.scoreDeltas[seat]}
             </li>
           ))}
         </ul>
@@ -166,11 +190,20 @@ export function HangzhouRoundEndOverlay({
               : "Starting next round…"}
           </p>
         ) : (
-          <Button onClick={onConfirm}>Next round</Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={onConfirm}>
+              下一局
+            </Button>
+            <Button className="flex-1" variant="outline" onClick={onEnd}>
+              结束
+            </Button>
+          </div>
         )}
-        <Button variant="outline" onClick={onEnd}>
-          End session
-        </Button>
+        {myConfirmed && (
+          <Button variant="outline" onClick={onEnd}>
+            结束
+          </Button>
+        )}
       </motion.div>
     </motion.div>
   );
