@@ -10,7 +10,7 @@
 - 首个 slice 验收：正常实时弃牌时，四方幸存手牌都沿正确屏幕方向补位；God mode 追踪真实明牌，普通对手手牌不暴露 TileId；重连与减少动态效果不补播。
 - 约束：不修改 `PlayerView`、协议或玩法规则；snapshot 仍是唯一权威；跨区域移动仍由独立 ghost 完成；docs 先于代码；不合并本分支。
 - 已知未知项及最早验证：四分之一旋转的 DOM rect 到局部位移换算须由纯单测覆盖；先完成 token/几何模块和四座位组件测试，再跑桌面 E2E 观察实际轨迹。
-- 进度：已完成。四方手牌均通过 ScreenReflow 在独立 wrapper 上按屏幕 rect 的逆旋转差值补位；明牌按 TileId、暗牌按稳定 back-slot token 追踪。弃牌源在 snapshot 提交前捕获，暗牌从选中牌背起飞并在途中翻面；reduced motion、重连和非实时快照不补播。Web 单测、定向桌面 E2E、typecheck、lint 与 `pnpm verify` 均通过。
+- 进度：已完成。四方手牌均通过 ScreenReflow 在独立 wrapper 上按屏幕 rect 的逆旋转差值补位；明牌按 TileId、暗牌按稳定 back-slot token 追踪。弃牌源在 snapshot 提交前捕获，暗牌从选中牌背起飞并在途中翻面；普通手牌与固定摸牌槽现共用 `HandTileSlot` 的满高居中和牌尺寸锚点，仅摸牌附加 ghost/ledger，避免基线漂移。reduced motion、重连和非实时快照不补播。Web 单测、定向桌面 E2E、typecheck、lint 与 `pnpm verify` 均通过。
 - 下一步第一个具体动作：提交并推送 `feat/four-seat-hand-reflow`，等待 review；不合并。
 
 ## 阻塞与遗留问题
