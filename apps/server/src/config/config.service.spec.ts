@@ -44,12 +44,12 @@ describe("ConfigService.drawRevealDelayMs", () => {
   });
 
   it.each([undefined, "", "nope", "Infinity", "1.5", "-1"])(
-    "falls back to 600 for %p outside test env",
+    "falls back to 1000 for %p outside test env",
     (value) => {
       process.env["NODE_ENV"] = "production";
       if (value === undefined) delete process.env["DRAW_REVEAL_DELAY_MS"];
       else process.env["DRAW_REVEAL_DELAY_MS"] = value;
-      expect(new ConfigService().drawRevealDelayMs).toBe(600);
+      expect(new ConfigService().drawRevealDelayMs).toBe(1_000);
     },
   );
 

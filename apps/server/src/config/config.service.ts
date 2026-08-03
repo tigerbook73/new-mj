@@ -95,7 +95,7 @@ export class ConfigService {
     if (process.env["NODE_ENV"] === "test") return 0;
     const raw = process.env["DRAW_REVEAL_DELAY_MS"];
     const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= 0 ? parsed : 600;
+    return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed >= 0 ? parsed : 1_000;
   }
 
   /** Deterministic fixture only; production games always receive a random seed. */
