@@ -16,6 +16,7 @@
 ## 阻塞与遗留问题
 
 - 暗杠完成后，副露区域没有显示对应的牌组；下次改动副露展示或暗杠流程时，先补复现用例并修正其 PlayerView 到 `MeldGroup` 的呈现映射。
+- 胡牌展示中的牌型尚未按展示规则排序；下次改动和牌结算展示时，明确排序契约并补对应的组件用例。
 - `apps/web/test/lobby.e2e-spec.ts` 中 “leaving an in-game room keeps the other human in the match” 与 “force exiting an in-game room ends the session for every player” 在完整套件中偶发超时（等待 “Hand off to AI”/“Force exit”）；单独或小范围运行稳定通过。下次改动 leave-room/force-exit 时处理。
 - `apps/web/test/table.e2e-spec.ts` 中 “a claimed tile FLIPs from the discard pile into the meld via a ghost clone” 在多 worker 全量 E2E 中偶发等待 `claim-flip-ghost` 超时，单独运行稳定；下次改动动画时处理。
 - 杭州规则仍有两处已实现但待产品确认的假设：财神替代数量上限，以及 `caiPiaoCount` 是否在牌局中途清零；当前按 `docs/variants/hangzhou.md` 默认值执行。
