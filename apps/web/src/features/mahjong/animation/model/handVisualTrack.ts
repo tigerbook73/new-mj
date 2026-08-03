@@ -41,6 +41,19 @@ export function initialiseHandVisualTrack(
   };
 }
 
+export function handTokensForPresentation(
+  track: HandVisualTrack | undefined,
+  seat: number,
+  fallback: readonly number[],
+  revealed: boolean,
+): HandVisualToken[] {
+  if (!revealed) {
+    if (track?.mode === "hidden") return track.tokens;
+    return hiddenTokens(seat, fallback.filter((tile) => tile >= 0).length);
+  }
+  return track?.tokens ?? knownTokens(fallback.filter((tile) => tile >= 0));
+}
+
 /** A stable, cosmetic choice only: it must never be read as a concealed TileId. */
 const discardIndex = (seat: number, discardCount: number, tokenCount: number): number =>
   tokenCount === 0 ? 0 : ((seat * 17 + discardCount * 31 + tokenCount * 13) >>> 0) % tokenCount;

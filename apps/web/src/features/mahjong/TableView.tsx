@@ -29,15 +29,10 @@ import { TableBoard, type TurnHighlight } from "@/features/mahjong/components/Ta
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud, TableHudTrigger } from "@/features/mahjong/components/TableHud";
 import {
-  registerSnapshotDiff,
-  resetAnimationLedger,
-  shouldRegisterSnapshotDiff,
-} from "@/features/mahjong/lib/animationLedger";
-import { soleDiscardedTile } from "@/features/mahjong/lib/diffPlayerView";
-import {
-  registerHandVisualSnapshot,
-  resetHandVisualLedger,
-} from "@/features/mahjong/lib/handVisualLedger";
+  registerTableSnapshotAnimation,
+  resetTableAnimationRuntime,
+  tableAnimationMetadata,
+} from "@/features/mahjong/animation/tableAnimationCoordinator";
 import { tileKindOf, type TileKind } from "@/features/mahjong/lib/mahjongTiles";
 import { playSound, type SoundName } from "@/shared/lib/sounds";
 import { buildStatusBadges } from "@/features/mahjong/lib/statusBadges";
@@ -143,21 +138,13 @@ export function TableView() {
   // remounts) — the ledger is a module singleton, not component state, so
   // nothing else clears it when this component first mounts.
   useEffect(() => {
-    resetAnimationLedger();
-    resetHandVisualLedger();
+    resetTableAnimationRuntime();
     // A route/reconnect can hydrate the store before TableView mounts. The
     // reset above would otherwise leave that already-rendered first hand
     // without visual tokens, making its first discard fall back to the whole
     // hand zone. This is initialisation only, never an animation diff.
     if (!prefersReducedMotion && view) {
-      registerHandVisualSnapshot(
-        null,
-        view,
-        view.seat,
-        room?.gameNumber ?? 1,
-        undefined,
-        undefined,
-      );
+      registerTableSnapshotAnimation({ previousSeq: null, nextSeq: 0, previousView: null, nextView: view, seat: view.seat, gameNumber: room?.gameNumber ?? 1, enabled: true });
     }
     // Intentional mount-only snapshot: later snapshots go through the socket
     // handler below, whose seq guard owns all animation registration.
@@ -175,40 +162,8 @@ export function TableView() {
         room: currentRoom,
         debugOmniscient: currentDebugOmniscient,
       } = useSessionStore.getState();
-      const isFirstSnapshot = currentGameSeq === null;
-      const isIncremental = shouldRegisterSnapshotDiff(currentGameSeq, event.seq);
-      if (!prefersReducedMotion && (isFirstSnapshot || isIncremental)) {
-        if (isIncremental) {
-          registerSnapshotDiff(
-            currentView,
-            event.view,
-            event.view.seat,
-            currentRoom?.gameNumber ?? 1,
-          );
-        }
-        registerHandVisualSnapshot(
-          // First/reconnect snapshots initialise visual token identities only;
-          // they must not become an animation diff against stale state.
-          isFirstSnapshot ? null : currentView,
-          event.view,
-          event.view.seat,
-          currentRoom?.gameNumber ?? 1,
-          isGodModeVisible ? currentDebugOmniscient?.hands : undefined,
-          isGodModeVisible ? event.debugOmniscient?.hands : undefined,
-        );
-        // Closes the gap for an auto-submitted (timeout) discard, which never
-        // ran through onDiscard's click-time capture below — measure the
-        // departing hand tile's own rect now, before this render swaps it out.
-        if (isIncremental && currentView) {
-          const discardedTile = soleDiscardedTile(currentView, event.view);
-          if (discardedTile !== undefined) {
-            const rect = document
-              .querySelector(`[data-tile-id="${discardedTile}"]`)
-              ?.getBoundingClientRect();
-            if (rect) setPendingDiscardOrigin({ tile: discardedTile, rect });
-          }
-        }
-      }
+      const { autoDiscardOrigin } = registerTableSnapshotAnimation({ previousSeq: currentGameSeq, nextSeq: event.seq, previousView: currentView, nextView: event.view, seat: event.view.seat, gameNumber: currentRoom?.gameNumber ?? 1, enabled: !prefersReducedMotion, previousGodHands: isGodModeVisible ? currentDebugOmniscient?.hands : undefined, nextGodHands: isGodModeVisible ? event.debugOmniscient?.hands : undefined });
+      if (autoDiscardOrigin) setPendingDiscardOrigin(autoDiscardOrigin);
       useSessionStore.getState().applyGameSnapshot(event);
     };
     const onEvent = (message: GameEventEnvelope) => {
@@ -242,8 +197,7 @@ export function TableView() {
           : state,
       );
       useSessionStore.getState().resetGameSeq();
-      resetAnimationLedger();
-      resetHandVisualLedger();
+      resetTableAnimationRuntime();
     };
     const onSessionFinished = (message: { result: SessionResult }) =>
       setSessionResult(message.result);
@@ -359,6 +313,7 @@ export function TableView() {
     rulesetId: room?.rulesetId,
     dealer: room?.dealer,
     godView: isGodModeVisible ? debugOmniscient : undefined,
+    animation: tableAnimationMetadata(),
   });
 
   if (!view) {

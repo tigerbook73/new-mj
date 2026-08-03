@@ -1,6 +1,7 @@
 import type { PlayerViewBase, SeatId } from "@new-mj/protocol";
 import {
   hiddenTokens,
+  handTokensForPresentation,
   initialiseHandVisualTrack,
   knownTokens,
   reconcileHandVisualTrack,
@@ -97,17 +98,14 @@ export function handVisualTokens(
   fallback: readonly number[],
   revealed: boolean,
 ): HandVisualToken[] {
-  const track = tracks.get(seat);
-  // Concealed hand DOM must never carry a TileId, even if a caller
-  // accidentally registered omniscient data while God mode was hidden.
-  // Keep an existing hidden track for stable reflow keys; discard any known
-  // track in favour of fresh cosmetic slots.
-  if (!revealed) {
-    if (track?.mode === "hidden") return track.tokens;
-    return hiddenTokens(seat, fallback.filter((tile) => tile >= 0).length);
-  }
-  if (!track) return knownTokens(fallback.filter((tile) => tile >= 0));
-  return track.tokens;
+  return handTokensForPresentation(tracks.get(seat), seat, fallback, revealed);
+}
+
+export function handVisualAnimationState(): {
+  tracks: ReadonlyMap<SeatId, HandVisualTrack>;
+  discardOrigins: ReadonlyMap<string, { rect: DOMRect; concealed: boolean }>;
+} {
+  return { tracks: new Map(tracks), discardOrigins: new Map(discardOrigins) };
 }
 
 export function discardFlightOrigin(

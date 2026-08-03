@@ -2,7 +2,8 @@ import type { DebugOmniscientSnapshot, PlayerViewBase, SeatId } from "@new-mj/pr
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
-import { discardFlightOrigin, handVisualTokens } from "@/features/mahjong/lib/handVisualLedger";
+import type { TableAnimationMetadata } from "@/features/mahjong/animation/tableAnimationCoordinator";
+import { handTokensForPresentation } from "@/features/mahjong/animation/model/handVisualTrack";
 import {
   isCaishenTile,
   sortTilesForDisplay,
@@ -91,6 +92,7 @@ export function useTablePresentation({
   rulesetId,
   dealer,
   godView,
+  animation,
 }: {
   view: PlayerViewBase | null;
   players: readonly PlayerInfo[] | undefined;
@@ -112,6 +114,7 @@ export function useTablePresentation({
    * non-dev/non-`ALLOW_DEBUG_OMNISCIENT` session.
    */
   godView?: DebugOmniscientSnapshot | undefined;
+  animation?: TableAnimationMetadata | undefined;
 }) {
   if (!view) {
     return undefined;
@@ -193,7 +196,12 @@ export function useTablePresentation({
                 -1,
                 drawnVisible ? 0 : -1,
               ];
-      const visualTokens = handVisualTokens(seat, handTiles, revealed);
+      const visualTokens = handTokensForPresentation(
+        animation?.handTracks.get(seat),
+        seat,
+        handTiles,
+        revealed,
+      );
       let hiddenTokenIndex = 0;
       const handTokenKeys = handTiles.map((tile, index) => {
         if (tile < 0) return `gap:${seat}:${index}`;
@@ -271,7 +279,7 @@ export function useTablePresentation({
         const justDiscarded =
           extras.lastDiscard?.seat === seat && extras.lastDiscard.tile === entry.tile;
         const discardLedgerKey = `g${gameNumber}:discard:${seat}:${index}`;
-        const coordinatedOrigin = discardFlightOrigin(discardLedgerKey);
+        const coordinatedOrigin = animation?.discardOrigins.get(discardLedgerKey);
         return {
           ...entry,
           claimedByDirection:
