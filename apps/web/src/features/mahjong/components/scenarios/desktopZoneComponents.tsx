@@ -176,7 +176,7 @@ export function DesktopCenterSlot({
 /** Desktop-only corner badge for the active ruleset's logo — fills its zone completely. */
 export function DesktopGameInfoSlot({ gameInfo }: { gameInfo: ReactNode | undefined }) {
   return (
-    <div data-testid="game-info" className="h-full w-full">
+    <div data-testid="game-info" className="h-full w-full p-1.5">
       {gameInfo}
     </div>
   );
