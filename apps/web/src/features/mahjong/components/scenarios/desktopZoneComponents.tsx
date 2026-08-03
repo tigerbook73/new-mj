@@ -44,6 +44,7 @@ export function HandSeatRow({
       <HandRow
         direction={direction}
         handTiles={seat.handTiles}
+        handTokenKeys={seat.handTokenKeys}
         revealed={seat.revealed}
         reflow={seat.reflow}
         animateDraw={seat.animateDraw}

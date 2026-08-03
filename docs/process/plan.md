@@ -4,17 +4,19 @@
 
 ## 当前任务
 
-当前专题：开发态同步明牌快照。
+当前专题：四方手牌重排与弃牌飞行动画。
 
-- 目标：在 server 的开发/测试明牌开关开启时，将与 `PlayerView` 同 seq 的对手手牌和暗杠数据随 `game:snapshot`、`room:enter` 一起单播；Web 的 God mode 只切换显示，不再异步查询造成抓牌闪烁。
-- 首个 slice 验收：`GameSnapshot` 与中局 `room:enter` 在门控开启时携带可选 `debugOmniscient`（仅 hands/melds），关闭或生产环境时严格省略；Web 以同一快照原子采用该数据。
-- 约束：不修改 `PlayerView` 或玩法规则；隐藏 TileId 不进入 `game:event`；仅开发/测试、仅已入座连接；docs 先于代码；不合并本分支。
-- 已知未知项及最早验证：现有 reconnect ack 只返回 `view`，需复用同一权威 state 派生 debug 数据；先以 protocol/server 单测覆盖门控和同 seq，再补 Web store/presentation 回归。
-- 进度：已完成。`GameSnapshot`、中局 `room:enter` 与 RoomService snapshot event 都支持可选 `debugOmniscient`；server 从同一权威 state 同步派生一次并在非生产 `ALLOW_DEBUG_OMNISCIENT=true` 时单播，生产环境强制省略。Web 将该字段与 `view` 原子存入 session，God mode 仅切换渲染来源，删除了逐 snapshot 的异步 `debug:omniscientView` 查询。God mode 保留四方抓牌/弃牌 ghost 与入场动画，摸牌只填充固定槽；bottom/top 可 FLIP 重排，left/right 因旋转直接采用最终布局。默认摸牌延时代提交已由 600 ms 调整为 1000 ms（测试环境仍为 0 ms）。protocol/server/web 回归测试覆盖契约、生产门控、实时快照、room:enter 解包与陈旧快照拒绝；Web 定向单测、桌面牌桌 Playwright 和 `pnpm verify` 均通过。
-- 下一步第一个具体动作：提交并推送已确认的四方动画方案，等待 review；不合并。
+- 目标：将手牌重排统一为按屏幕坐标计算的四座位动画；明牌精确从实际 TileId 起飞，暗牌从稳定的本地视觉槽位起飞。
+- 首个 slice 验收：正常实时弃牌时，四方幸存手牌都沿正确屏幕方向补位；God mode 追踪真实明牌，普通对手手牌不暴露 TileId；重连与减少动态效果不补播。
+- 约束：不修改 `PlayerView`、协议或玩法规则；snapshot 仍是唯一权威；跨区域移动仍由独立 ghost 完成；docs 先于代码；不合并本分支。
+- 已知未知项及最早验证：四分之一旋转的 DOM rect 到局部位移换算须由纯单测覆盖；先完成 token/几何模块和四座位组件测试，再跑桌面 E2E 观察实际轨迹。
+- 进度：已完成。四方手牌均通过 ScreenReflow 在独立 wrapper 上按屏幕 rect 的逆旋转差值补位；明牌按 TileId、暗牌按稳定 back-slot token 追踪。暗牌弃牌从内部实际牌尺寸 anchor 捕获屏幕源盒，portal 外盒直接平移/缩放并以牌背→牌面渐变公开；left/right 不在飞行中旋转。隐藏 token 使用单调序号，避免中间弃牌后摸牌复用 React key 而出现重复手牌。review 发现的 dev omniscient TileId DOM 泄露已修复：仅可见 God mode 传入真实手牌，隐藏 token 路径另有不返回 TileId 的防御。reduced motion、首帧、重连和非实时快照不补播。Web 单测、typecheck 与 lint 通过，浏览器暗牌连续实测通过。
+- 下一步第一个具体动作：无；此专题待提交后从当前任务移除，不合并。
 
 ## 阻塞与遗留问题
 
+- 暗杠完成后，副露区域没有显示对应的牌组；下次改动副露展示或暗杠流程时，先补复现用例并修正其 PlayerView 到 `MeldGroup` 的呈现映射。
+- 胡牌展示中的牌型尚未按展示规则排序；下次改动和牌结算展示时，明确排序契约并补对应的组件用例。
 - `apps/web/test/lobby.e2e-spec.ts` 中 “leaving an in-game room keeps the other human in the match” 与 “force exiting an in-game room ends the session for every player” 在完整套件中偶发超时（等待 “Hand off to AI”/“Force exit”）；单独或小范围运行稳定通过。下次改动 leave-room/force-exit 时处理。
 - `apps/web/test/table.e2e-spec.ts` 中 “a claimed tile FLIPs from the discard pile into the meld via a ghost clone” 在多 worker 全量 E2E 中偶发等待 `claim-flip-ghost` 超时，单独运行稳定；下次改动动画时处理。
 - 杭州规则仍有两处已实现但待产品确认的假设：财神替代数量上限，以及 `caiPiaoCount` 是否在牌局中途清零；当前按 `docs/variants/hangzhou.md` 默认值执行。

@@ -1,8 +1,9 @@
-import { useRef } from "react";
+import { useRef, type ComponentProps, type Ref } from "react";
 import type { SeatDirection } from "@/features/mahjong/lib/seatLayout";
 import { isCaishenTile } from "@/features/mahjong/lib/mahjongTiles";
 import { useSlotEntering } from "@/features/mahjong/lib/useSlotEntering";
 import { DrawFlipGhost } from "./DrawFlipGhost";
+import { HandReflowShell } from "./HandReflowShell";
 import { Tile } from "./Tile";
 
 /**
@@ -22,6 +23,7 @@ interface HandRowProps {
   direction: SeatDirection;
   /** See SeatContent.handTiles (components/mahjong/TableBoard.tsx) for the slot layout. */
   handTiles: number[];
+  handTokenKeys: string[];
   revealed: boolean;
   /** See SeatContent.reflow (components/mahjong/TableBoard.tsx). */
   reflow: boolean;
@@ -56,6 +58,7 @@ interface HandRowProps {
 export function HandRow({
   direction,
   handTiles,
+  handTokenKeys,
   revealed,
   reflow,
   animateDraw,
@@ -68,6 +71,10 @@ export function HandRow({
   highlightCaishen,
 }: HandRowProps) {
   const drawnIndex = handTiles.length - 1;
+  // Portal ghost phase changes rerender the table but do not change this row's
+  // geometry. Only a token-sequence change may start or replace its reflow.
+  const reflowKey = handTokenKeys.join(",");
+
   return (
     <div
       className="flex h-full w-full flex-nowrap items-center justify-end"
@@ -91,6 +98,8 @@ export function HandRow({
               onDiscard={onDiscard}
               tileHeight={tileHeight}
               ledgerKey={drawnSlotLedgerKey}
+              token={handTokenKeys[index] ?? `draw:${direction}`}
+              reflowKey={reflowKey}
               caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
             />
           );
@@ -109,31 +118,38 @@ export function HandRow({
         // TODO(tigerbook73): revisit whether this dual key-space (tileId vs.
         // index, disambiguated only by string prefix) should be redesigned
         // instead of kept as a prefix workaround.
-        const key = isReal ? `tile-${tileId}` : `slot-${index}`;
+        const key = handTokenKeys[index] ?? (isReal ? `tile-${tileId}` : `slot-${index}`);
         return (
-          <Tile
+          <HandReflowShell
             key={key}
-            tileId={tileId}
-            back={!revealed && !isPlaceholder}
-            height={`${tileHeight}%`}
-            clickable={interactive && isReal}
-            // Lets the remaining hand tiles glide into their closed-up
-            // positions when one is discarded and unmounts (tileId-keyed
-            // above) — motion's `layout` (see Tile.tsx's `reflow` doc).
-            // Off whenever `reflow` is false: a non-revealed opponent's
-            // "rest" slots are anonymous filler keyed by position, so
-            // `layout` would read as their whole hand sliding as one block
-            // (nothing identifiable closing a gap); a revealed god-mode
-            // left/right seat has real per-tile keys but sits under a
-            // rotated ancestor Zone that breaks Motion's FLIP math — see
-            // useTablePresentation.ts's `godReflow` doc.
-            reflow={reflow}
-            caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
-            {...(interactive && isReal
-              ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
-              : {})}
-            {...(isReal ? { testId: "hand-tile" } : {})}
-          />
+            direction={direction}
+            token={key}
+            reflowKey={reflowKey}
+            enabled={reflow && !isPlaceholder}
+          >
+            <HandTileSlot
+              tileId={tileId}
+              back={!revealed && !isPlaceholder}
+              tileHeight={tileHeight}
+              flightToken={key}
+              clickable={interactive && isReal}
+              // Lets the remaining hand tiles glide into their closed-up
+              // positions when one is discarded and unmounts (tileId-keyed
+              // above) — motion's `layout` (see Tile.tsx's `reflow` doc).
+              // Off whenever `reflow` is false: a non-revealed opponent's
+              // "rest" slots are anonymous filler keyed by position, so
+              // `layout` would read as their whole hand sliding as one block
+              // (nothing identifiable closing a gap); a revealed god-mode
+              // left/right seat has real per-tile keys but sits under a
+              // rotated ancestor Zone that breaks Motion's FLIP math — see
+              // useTablePresentation.ts's `godReflow` doc.
+              caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
+              {...(interactive && isReal
+                ? { onClick: () => onDiscard?.(tileId, captureTileRect(tileId)) }
+                : {})}
+              {...(isReal ? { testId: "hand-tile" } : {})}
+            />
+          </HandReflowShell>
         );
       })}
     </div>
@@ -159,6 +175,8 @@ function DrawnSlotTile({
   onDiscard,
   tileHeight,
   ledgerKey,
+  token,
+  reflowKey,
   caishen,
 }: {
   direction: SeatDirection;
@@ -171,6 +189,8 @@ function DrawnSlotTile({
   onDiscard?: ((tile: number, originRect?: DOMRect) => void) | undefined;
   tileHeight: number;
   ledgerKey: string;
+  token: string;
+  reflowKey: string;
   caishen: boolean;
 }) {
   const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey, animateDraw);
@@ -192,12 +212,19 @@ function DrawnSlotTile({
        * ghost render visibly oversized (full row height, not the tile's own)
        * for its entire flight.
        */}
-      <div className="flex h-full items-center">
-        <div ref={toRef} style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}>
-          <Tile
+      <HandReflowShell
+        direction={direction}
+        token={token}
+        reflowKey={reflowKey}
+        enabled={reflow && !isPlaceholder}
+      >
+        <div className="flex h-full items-center">
+          <HandTileSlot
+            anchorRef={toRef}
             tileId={tileId}
             back={!revealed && !isPlaceholder}
-            height="100%"
+            tileHeight={tileHeight}
+            flightToken={token}
             clickable={interactive && isReal}
             // "opacityOnly": DrawFlipGhost already sells the arrival's
             // physical motion on its own path — see resolveTileMotion.ts.
@@ -205,7 +232,6 @@ function DrawnSlotTile({
             // Same `reflow` as the plain hand tiles above, kept consistent
             // for clarity — this slot always remounts fresh on a new draw,
             // so `layout` never actually has a prior instance to FLIP from.
-            reflow={reflow}
             testId={`hand-track-drawn-${direction}`}
             caishen={caishen}
             {...(interactive && isReal
@@ -213,7 +239,7 @@ function DrawnSlotTile({
               : {})}
           />
         </div>
-      </div>
+      </HandReflowShell>
       {ghost && (
         <DrawFlipGhost
           {...(isReal ? { tileId } : {})}
@@ -222,5 +248,31 @@ function DrawnSlotTile({
         />
       )}
     </>
+  );
+}
+
+/** Shared hand-slot geometry. The drawn slot adds animation props, not a
+ * distinct layout tree, so every hand tile has the same baseline and anchor. */
+function HandTileSlot({
+  anchorRef,
+  tileHeight,
+  flightToken,
+  ...tileProps
+}: {
+  anchorRef?: Ref<HTMLDivElement>;
+  tileHeight: number;
+  /** Tile-sized flight source; distinct from HandReflowShell's full-height layout token. */
+  flightToken?: string;
+} & Omit<ComponentProps<typeof Tile>, "height" | "reflow">) {
+  return (
+    <div className="flex h-full items-center">
+      <div
+        ref={anchorRef}
+        {...(flightToken ? { "data-hand-flight-token": flightToken } : {})}
+        style={{ height: `${tileHeight}%`, aspectRatio: "1 / 1.333" }}
+      >
+        <Tile {...tileProps} height="100%" reflow={false} />
+      </div>
+    </div>
   );
 }

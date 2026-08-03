@@ -202,7 +202,7 @@ test("discarding a hand tile makes the rest glide into the closed-up gap", async
         const values: string[] = [];
         const start = performance.now();
         function tick() {
-          const el = document.querySelector(`[data-testid="hand-tile"][data-tile-id="${tileId}"]`);
+          const el = document.querySelector(`[data-hand-token="tile:${tileId}"]`);
           if (el) values.push(getComputedStyle(el).transform);
           // Generous window: under heavy parallel test load the click→server
           // roundtrip→re-render latency before the transition even starts

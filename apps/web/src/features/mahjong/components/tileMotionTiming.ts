@@ -9,6 +9,9 @@ export const TILE_MOTION_EASE = "easeOut";
 /** Tile.tsx's plain grow/fade-in — also reused by TileClaimSlot's badge fade. */
 export const TILE_ENTRY_DURATION = 0.3;
 
+/** HandReflowShell's post-discard gap closure. */
+export const HAND_REFLOW_DURATION = 0.3;
+
 /** DiscardFlipGhost / ClaimFlipGhost — both travel a short, similar distance. */
 export const DISCARD_FLIGHT_DURATION = 0.3;
 export const CLAIM_FLIGHT_DURATION = 0.3;
@@ -21,9 +24,9 @@ export const CLAIM_FLIGHT_DURATION = 0.3;
 export const DRAW_FLIGHT_DURATION = 0.35;
 
 /**
- * OpponentDiscardFlipGhost — flies from an entire seat's hand zone rather
- * than a specific tile, and includes a back→face crossfade plus a rotation
- * tween; a little slower still than DrawFlipGhost so the flip has room to
- * read clearly mid-flight.
+ * OpponentDiscardFlipGhost — flies from a concealed visual slot (or the
+ * hand zone when no slot was captured) and crossfades from back to face.
+ * It remains slightly slower than ordinary discard flight for readability.
  */
-export const OPPONENT_DISCARD_FLIGHT_DURATION = 0.4;
+export const OPPONENT_DISCARD_FLIGHT_DURATION = 0.65;
+export const OPPONENT_DISCARD_HOLD_DURATION = 0;

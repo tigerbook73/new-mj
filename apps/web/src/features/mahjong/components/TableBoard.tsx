@@ -32,6 +32,9 @@ export interface SeatContent {
    * regardless (see Tile.tsx).
    */
   handTiles: number[];
+  /** Presentation-only identity for each hand slot. Real ids stay inside the
+   * normal Tile contract; concealed slots receive opaque back-slot keys. */
+  handTokenKeys: string[];
   /** True for my own seat, and for any seat god mode has real hand data for
    * — opponents otherwise render handTiles entries face-down. */
   revealed: boolean;
