@@ -4,14 +4,14 @@
 
 ## 当前任务
 
-当前专题：四方手牌重排与弃牌飞行动画。
+当前专题：牌桌动画运行时收敛。
 
-- 目标：将手牌重排统一为按屏幕坐标计算的四座位动画；明牌精确从实际 TileId 起飞，暗牌从稳定的本地视觉槽位起飞。
-- 首个 slice 验收：正常实时弃牌时，四方幸存手牌都沿正确屏幕方向补位；God mode 追踪真实明牌，普通对手手牌不暴露 TileId；重连与减少动态效果不补播。
-- 约束：不修改 `PlayerView`、协议或玩法规则；snapshot 仍是唯一权威；跨区域移动仍由独立 ghost 完成；docs 先于代码；不合并本分支。
-- 已知未知项及最早验证：四分之一旋转的 DOM rect 到局部位移换算须由纯单测覆盖；先完成 token/几何模块和四座位组件测试，再跑桌面 E2E 观察实际轨迹。
-- 进度：已完成。四方手牌均通过 ScreenReflow 在独立 wrapper 上按屏幕 rect 的逆旋转差值补位；明牌按 TileId、暗牌按稳定 back-slot token 追踪。暗牌弃牌从内部实际牌尺寸 anchor 捕获屏幕源盒，portal 外盒直接平移/缩放并以牌背→牌面渐变公开；left/right 不在飞行中旋转。隐藏 token 使用单调序号，避免中间弃牌后摸牌复用 React key 而出现重复手牌。review 发现的 dev omniscient TileId DOM 泄露已修复：仅可见 God mode 传入真实手牌，隐藏 token 路径另有不返回 TileId 的防御。reduced motion、首帧、重连和非实时快照不补播。Web 单测、typecheck 与 lint 通过，浏览器暗牌连续实测通过。
-- 下一步第一个具体动作：无；此专题待提交后从当前任务移除，不合并。
+- 目标：将牌桌动画的 token、snapshot 协调、DOM 测量、portal 飞行与组件消费收敛为清晰的 feature-private runtime，保持现有视觉行为与敏感数据边界。
+- 首个 slice 验收：建立 `animation/` 运行时目录与 coordinator 入口；`TableView` 只在 snapshot 落库前注册动画、挂载/换局时 reset；`useTablePresentation` 不再读取动画 singleton；既有 token、飞行与 slot-resolution 单测继续通过。
+- 约束：不修改 `PlayerView`、协议、server 或玩法规则；snapshot 仍是唯一权威；动画状态不进 session store；TileId 只可进入明牌/God mode 的 DOM；跨区域移动仍由独立 ghost 完成。
+- 已知未知项及最早验证：coordinator 必须保留“snapshot 注册先于 apply”的同步顺序，且 metadata 不能触发 React 状态更新；先抽纯 hand-track model 并用单测固定 token/reconnect/God-mode 边界，再迁移 coordinator 与 presentation 消费者。
+- 进度：进行中。已完成合并前架构审视，并完成首个使能 slice：纯 `animation/model/handVisualTrack` 承担 known/hidden token reconciliation，原 ledger 只保留 snapshot 解包、DOM rect 捕获与 origin 缓存；model 与既有 ledger 回归均已覆盖。下一步将以 coordinator 集中 snapshot 注册和 reset。
+- 下一步第一个具体动作：创建 `animation/tableAnimationCoordinator`，将 `TableView` 的 animation/hand ledger 注册与 reset 移入该单一入口，保持 apply 前同步顺序。
 
 ## 阻塞与遗留问题
 
