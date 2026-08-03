@@ -126,7 +126,7 @@ function DiscardTileSlot({
   entry: DiscardEntry;
   aspectRatio: number;
 }) {
-  const { ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
+  const { entering, ghost, onGhostComplete } = useSlotEntering(entry.discardLedgerKey);
   const [ghostOrigin] = useState<DOMRect | null>(() =>
     ghost && entry.flightOrigin ? entry.flightOrigin : null,
   );
@@ -151,12 +151,10 @@ function DiscardTileSlot({
           // render, so the shrink and the dim-to-tombstone land together.
           enlarged={entry.justDiscarded && entry.claimedBy === undefined}
           flightTarget
-          // The ghost already carries the physical cross-region flight. A
-          // normal Tile entry adds local `y: 24` at the destination; under
-          // the rotated left/right/top discard zones that reads as a second
-          // sideways/upward move before the flight has settled. Keep only a
-          // fade for ghost-backed discards.
-          entering={false}
+          // Keep the real destination tile's one-shot entry state in sync
+          // with its ledger key. The ghost owns the cross-region flight;
+          // this marker also distinguishes live updates from reloads.
+          entering={entering}
           caishen={entry.highlightCaishen && isCaishenTile(entry.tile)}
         />
       </div>
