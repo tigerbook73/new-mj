@@ -127,7 +127,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       return {
         room,
         activeRoomHint: null,
-        ...(changedRoom ? { view: null, debugOmniscient: null } : {}),
+        ...(changedRoom ? { view: null } : {}),
         ...(changedGame
           ? {
               gameSeq: null,
