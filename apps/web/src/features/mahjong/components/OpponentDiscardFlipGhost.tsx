@@ -79,32 +79,43 @@ export function OpponentDiscardFlipGhost({
         pointerEvents: "none",
         zIndex: 50,
       }}
-      initial={{ x: dx, y: dy, opacity: 0, rotate: SEAT_ROTATION[fromDirection] }}
-      animate={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+      // Keep viewport translation separate from seat rotation: composing
+      // `x/y` and `rotate(±90deg)` on this same node rotates the translation
+      // vector too, which makes a left/right discard visibly sidestep before
+      // it heads toward the river.
+      initial={{ x: dx, y: dy, opacity: 0 }}
+      animate={{ x: 0, y: 0, opacity: 1 }}
       transition={GHOST_TRANSITION}
       onAnimationComplete={() => {
         clear();
         onAnimationComplete?.();
       }}
     >
-      <motion.img
-        src={tileBackImageSrc(tileTheme)}
-        alt=""
-        draggable={false}
-        className="absolute inset-0 h-full w-full object-fill"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 0 }}
-        transition={FLIP_TRANSITION}
-      />
-      <motion.img
-        src={tileImageSrc(tileId, tileTheme)}
-        alt={String(tileId)}
-        draggable={false}
-        className="absolute inset-0 h-full w-full object-fill"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={FLIP_TRANSITION}
-      />
+      <motion.div
+        className="absolute inset-0"
+        initial={{ rotate: SEAT_ROTATION[fromDirection] }}
+        animate={{ rotate: 0 }}
+        transition={GHOST_TRANSITION}
+      >
+        <motion.img
+          src={tileBackImageSrc(tileTheme)}
+          alt=""
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-fill"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={FLIP_TRANSITION}
+        />
+        <motion.img
+          src={tileImageSrc(tileId, tileTheme)}
+          alt={String(tileId)}
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-fill"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={FLIP_TRANSITION}
+        />
+      </motion.div>
     </motion.div>,
     document.body,
   );
