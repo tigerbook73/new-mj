@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
-import type { GameAdviceResponse, PlayerViewBase, RoomInfo, SeatId } from "@new-mj/protocol";
+import type {
+  DebugOmniscientSnapshot,
+  GameAdviceResponse,
+  PlayerViewBase,
+  RoomInfo,
+  SeatId,
+} from "@new-mj/protocol";
 import { clearDevSession } from "@/features/auth/devAuth";
 import { ack } from "@/shared/lib/socket";
 import { supabase } from "@/shared/lib/supabase";
@@ -17,6 +23,8 @@ export type SessionState = {
   nickname: string | null;
   room: RoomInfo | null;
   view: PlayerViewBase | null;
+  /** Server-gated development-only data received atomically with `view`. */
+  debugOmniscient: DebugOmniscientSnapshot | null;
   /** Core event seq is scoped to one game and resets when the next game starts. */
   gameSeq: number | null;
   gameDeadline: number | null;
@@ -45,6 +53,7 @@ export type SessionState = {
     view: PlayerViewBase;
     seq: number;
     deadline?: number | undefined;
+    debugOmniscient?: DebugOmniscientSnapshot | undefined;
   }) => void;
   resetGameSeq: () => void;
   applyGameAdvice: (advice: GameAdviceResponse, requestedRevision: number) => void;
@@ -64,6 +73,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   nickname: null,
   room: null,
   view: null,
+  debugOmniscient: null,
   gameSeq: null,
   gameDeadline: null,
   snapshotRevision: 0,
@@ -90,6 +100,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       nickname: null,
       room: null,
       view: null,
+      debugOmniscient: null,
       gameSeq: null,
       gameDeadline: null,
       snapshotRevision: useSessionStore.getState().snapshotRevision + 1,
@@ -104,6 +115,7 @@ export const useSessionStore = create<SessionState>((set) => ({
         return {
           room: null,
           view: null,
+          debugOmniscient: null,
           gameSeq: null,
           gameDeadline: null,
           snapshotRevision: state.snapshotRevision + 1,
@@ -115,22 +127,24 @@ export const useSessionStore = create<SessionState>((set) => ({
       return {
         room,
         activeRoomHint: null,
-        ...(changedRoom ? { view: null } : {}),
+        ...(changedRoom ? { view: null, debugOmniscient: null } : {}),
         ...(changedGame
           ? {
               gameSeq: null,
               gameDeadline: null,
+              debugOmniscient: null,
               snapshotRevision: state.snapshotRevision + 1,
               advice: null,
             }
           : {}),
       };
     }),
-  applyGameSnapshot: ({ view, seq, deadline }) =>
+  applyGameSnapshot: ({ view, seq, deadline, debugOmniscient }) =>
     set((state) =>
       state.gameSeq === null || seq >= state.gameSeq
         ? {
             view,
+            debugOmniscient: debugOmniscient ?? null,
             gameSeq: seq,
             gameDeadline: deadline ?? null,
             snapshotRevision: state.snapshotRevision + 1,
@@ -142,6 +156,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     set((state) => ({
       gameSeq: null,
       gameDeadline: null,
+      debugOmniscient: null,
       snapshotRevision: state.snapshotRevision + 1,
       advice: null,
     })),

@@ -158,7 +158,7 @@ finished: 计算排名，对外公开 result
 
 旧 socket 被踢后走普通断线路径，不触发主动离座托管；`registry.deleteIfSame` 摘除必须比较 socket 引用，避免旧连接延迟清理误删新登记。
 
-**评审点 I【已定：采纳快照优先】**：开局及每个已接受动作都在该连接可见的 events 之后逐座位下发 `game:snapshot`，客户端不根据规则事件重建状态；重连由 `room:enter` ack 直接采用最新 `{view, seq}`，不重播历史动画。core `seq` 以单局为 epoch，切局后重新开始；客户端在同局丢弃更旧 seq，但允许相同 seq 的新快照覆盖（座位可见状态可能变化）。`lastSeq` 增量补发是未来可能的优化项，当前不实现。
+**评审点 I【已定：采纳快照优先】**：开局及每个已接受动作都在该连接可见的 events 之后逐座位下发 `game:snapshot`，客户端不根据规则事件重建状态；重连由 `room:enter` ack 直接采用最新 `{view, seq}`，不重播历史动画。开发/测试明牌门控开启时，同一信封可附带 `debugOmniscient`，它与 `view` 由同一权威 state、同一个 `seq` 同步派生，客户端必须原子采用，绝不在快照之后异步补齐。core `seq` 以单局为 epoch，切局后重新开始；客户端在同局丢弃更旧 seq，但允许相同 seq 的新快照覆盖（座位可见状态可能变化）。`lastSeq` 增量补发是未来可能的优化项，当前不实现。
 
 **为 Best-of-3 预留的设计空间**：`sessionFormat` 配置字段、`gameNumber`/`totalGames?` 局数追踪、`wins?` 字段、不写死的 `phase`——真要实现 best-of-3 时只需要修改 `RoomService.shouldContinue()` 的判断条件、实现 `wins` 跟踪、调整 `computeRanking()` 分支；若"赢家继续当庄"也要落地，改对应 ruleset 的 `computeNextDealer`。不需要改动现有 4-round 的任何实现。
 

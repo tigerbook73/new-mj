@@ -138,11 +138,13 @@ describe("unwrapRoomEnterAck", () => {
       currentSeat: 0,
     } as import("@new-mj/protocol").PlayerViewBase;
 
-    expect(unwrapRoomEnterAck({ room, view, seq: 42, deadline: 1234 })).toEqual({
+    const debugOmniscient = { hands: [[1], [], [], []], melds: [[], [], [], []] };
+    expect(unwrapRoomEnterAck({ room, view, seq: 42, deadline: 1234, debugOmniscient })).toEqual({
       room,
       view,
       seq: 42,
       deadline: 1234,
+      debugOmniscient,
     });
   });
 });

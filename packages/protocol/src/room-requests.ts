@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SeatIdSchema, SessionTotalGamesSchema } from "./common.ts";
+import type { DebugOmniscientSnapshot } from "./debug.ts";
 import type { PlayerViewBase } from "./game.ts";
 import type { RoomInfo } from "./room-models.ts";
 
@@ -52,6 +53,7 @@ export type RoomEnterResponse = {
   view?: PlayerViewBase;
   seq?: number;
   deadline?: number;
+  debugOmniscient?: DebugOmniscientSnapshot;
 };
 
 /** Each ruleset owns its Action union; core is the sole authority on legality. */

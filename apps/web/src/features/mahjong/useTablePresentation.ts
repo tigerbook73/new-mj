@@ -1,4 +1,4 @@
-import type { DebugOmniscientView, PlayerViewBase, SeatId } from "@new-mj/protocol";
+import type { DebugOmniscientSnapshot, PlayerViewBase, SeatId } from "@new-mj/protocol";
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
@@ -106,11 +106,11 @@ export function useTablePresentation({
   /**
    * Dev-only "god mode" (protocol-shared.md §7): when present, every seat
    * renders with the same real-tile-face treatment the bottom seat already
-   * gets, sourced from `debug:omniscientView`'s unredacted hands/melds
-   * instead of the normal per-viewer redaction. Absent in every non-dev/
-   * non-`ALLOW_DEBUG_OMNISCIENT` session.
+   * gets, sourced from the same-snapshot `debugOmniscient` hands/melds
+   * extension instead of the normal per-viewer redaction. Absent in every
+   * non-dev/non-`ALLOW_DEBUG_OMNISCIENT` session.
    */
-  godView?: DebugOmniscientView | undefined;
+  godView?: DebugOmniscientSnapshot | undefined;
 }) {
   if (!view) {
     return undefined;
@@ -235,7 +235,7 @@ export function useTablePresentation({
       const content: SeatContent = {
         melds: data.melds.map((meld, meldIndex) => {
           // God mode fills in anGang's otherwise-empty (redacted) tiles —
-          // see debug.ts's DebugOmniscientViewSchema doc. Every other meld
+          // see debug.ts's DebugOmniscientSnapshotSchema doc. Every other meld
           // type is already real TileIds in the normal per-viewer view.
           const godTiles = meld.type === "anGang" ? godMeldTiles?.[meldIndex] : undefined;
           return {

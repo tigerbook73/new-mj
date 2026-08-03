@@ -49,8 +49,28 @@ describe("GameSnapshotSchema and PlayerViewBaseSchema", () => {
         phase: "playing",
       },
       seq: 5,
+      debugOmniscient: {
+        hands: [[1, 2, 3], [], [], []],
+        melds: [[], [], [], []],
+      },
     };
     expect(GameSnapshotSchema.parse(payload)).toEqual(payload);
     expect(() => PlayerViewBaseSchema.parse({ seat: 0, hand: [] })).toThrow();
+  });
+
+  it("keeps the debug extension on the snapshot envelope, not PlayerView", () => {
+    const snapshot = {
+      view: {
+        seat: 0 as const,
+        hand: [],
+        seats: [{ handCount: 0 }, { handCount: 0 }, { handCount: 0 }, { handCount: 0 }],
+        wallCount: 60,
+        currentSeat: 0 as const,
+      },
+      seq: 1,
+      debugOmniscient: { hands: [[], [], [], []], melds: [[], [], [], []] },
+    };
+    expect(GameSnapshotSchema.parse(snapshot).debugOmniscient).toEqual(snapshot.debugOmniscient);
+    expect(PlayerViewBaseSchema.parse(snapshot.view)).not.toHaveProperty("debugOmniscient");
   });
 });

@@ -31,15 +31,21 @@ export function LobbyView() {
     if (room?.id === roomId) {
       return;
     }
-    void ack<
-      RoomInfo | { room: RoomInfo; view?: import("@new-mj/protocol").PlayerViewBase; seq?: number }
-    >(socket, "room:enter", { roomId }).then((result) => {
+    void ack<RoomInfo | import("@new-mj/protocol").RoomEnterResponse>(socket, "room:enter", {
+      roomId,
+    }).then((result) => {
       if (result.ok) {
-        const { room: enteredRoom, view, seq, deadline } = unwrapRoomEnterAck(result.data);
+        const {
+          room: enteredRoom,
+          view,
+          seq,
+          deadline,
+          debugOmniscient,
+        } = unwrapRoomEnterAck(result.data);
         setPreview(enteredRoom);
         if (view && seq !== undefined) {
           useSessionStore.getState().setRoom(enteredRoom);
-          useSessionStore.getState().applyGameSnapshot({ view, seq, deadline });
+          useSessionStore.getState().applyGameSnapshot({ view, seq, deadline, debugOmniscient });
           void navigate(`/room/${roomId}`);
         }
       } else setError(result.code);

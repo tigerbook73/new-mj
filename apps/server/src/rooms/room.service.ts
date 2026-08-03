@@ -17,6 +17,7 @@ import {
   RankingEntry,
   RoomInfo,
   RoomSummary,
+  type DebugOmniscientSnapshot,
   type SessionFormat,
   type SessionTotalGames,
 } from "@new-mj/protocol";
@@ -571,7 +572,15 @@ export class RoomService {
   reconnect(
     roomId: string,
     userId: string,
-  ): { seat: SeatId; view: PlayerViewBase; seq: number; deadline?: number } | undefined {
+  ):
+    | {
+        seat: SeatId;
+        view: PlayerViewBase;
+        seq: number;
+        deadline?: number;
+        debugOmniscient?: DebugOmniscientSnapshot;
+      }
+    | undefined {
     const room = this.rooms.get(roomId);
     if (!room || room.phase !== "in-game") return undefined;
     const player = room.players.find((candidate) => candidate?.userId === userId);
@@ -583,11 +592,13 @@ export class RoomService {
     const view = this.gameService.getPlayerView(room.gameState, player.seatId);
     if (!view) return undefined;
     const deadline = this.claimDeadline(roomId, player.seatId);
+    const debugOmniscient = this.debugOmniscientSnapshot(room);
     return {
       seat: player.seatId,
       view,
       seq: room.lastEventSeq,
       ...(deadline !== undefined ? { deadline } : {}),
+      ...(debugOmniscient !== undefined ? { debugOmniscient } : {}),
     };
   }
 
@@ -861,6 +872,7 @@ export class RoomService {
   }
 
   private emitSnapshots(room: Room): void {
+    const debugOmniscient = this.debugOmniscientSnapshot(room);
     for (let seat = 0; seat < ROOM_SIZE; seat++) {
       const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
       if (!view) continue;
@@ -871,8 +883,20 @@ export class RoomService {
         view,
         seq: room.lastEventSeq,
         ...(deadline !== undefined ? { deadline } : {}),
+        ...(debugOmniscient !== undefined ? { debugOmniscient } : {}),
       });
     }
+  }
+
+  /** Server-gated debug-only exception to PlayerView redaction; one immutable
+   * snapshot is shared by the four same-state unicast envelopes. */
+  private debugOmniscientSnapshot(room: Room): DebugOmniscientSnapshot | undefined {
+    if (!this.configService.allowDebugOmniscient) return undefined;
+    const omniscient = this.gameService.getOmniscientView(room.gameState);
+    return {
+      hands: omniscient.hands.map((hand) => [...hand]),
+      melds: omniscient.melds.map((seatMelds) => seatMelds.map((tiles) => [...tiles])),
+    };
   }
 
   private handleGameEnd(room: Room): void {

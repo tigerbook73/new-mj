@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SeatIdSchema } from "./common.ts";
+import { DebugOmniscientSnapshotSchema } from "./debug.ts";
 
 /** Mirrors core's EventVisibility without importing core into the transport package. */
 export const EventVisibilitySchema = z.union([
@@ -38,5 +39,7 @@ export const GameSnapshotSchema = z.object({
   view: PlayerViewBaseSchema,
   seq: z.number(),
   deadline: z.number().optional(),
+  /** Dev/test-only, server-gated extension; never part of PlayerView itself. */
+  debugOmniscient: DebugOmniscientSnapshotSchema.optional(),
 });
 export type GameSnapshot = z.infer<typeof GameSnapshotSchema>;

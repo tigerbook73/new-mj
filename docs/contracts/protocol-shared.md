@@ -34,11 +34,11 @@
 | `game:action`   | `GameActionRequestSchema`（action，core 按 rulesetId 判别的 Action 联合原样透传，具体 Action 形状见对应 `variants/*.md`） | ack `{}`；错误码 `NOT_YOUR_TURN` `ILLEGAL_ACTION`（附 core RuleViolation code）`GAME_NOT_STARTED`                    |
 | `game:advice`   | 严格空对象 `{}`                                                                                                           | 查询 ack `{seq, deadline?, actions, recommendedActionIndex?}`；身份/座位只取握手，查询不改变状态                     |
 | `game:event`    | `{ event: GameEvent, deadline?: number }`                                                                                 | core 事件原样转发（已按 visibility 过滤）；若该连接当前可合法 pass，则附 server 计算的绝对 deadline                  |
-| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number }`                                                                    | 开局以及每个已接受动作的可见 events 之后逐座位下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }` |
+| `game:snapshot` | `{ view: PlayerView, seq: number, deadline?: number, debugOmniscient?: DebugOmniscientSnapshot }`                         | 开局以及每个已接受动作的可见 events 之后逐座位下发的权威快照；重连时由 `room:enter` ack 携带同形状的 `{ view, seq }` |
 
 身份一律取 `socket.data.userId`，payload 不含也不信任 userId（架构铁律 3）。`game:action` 的 ack 仅表示"已受理/被拒"，实际结果通过事件流到达——客户端不得依据 ack 更新牌局状态。
 
-`deadline` 是 Unix epoch 毫秒值，只由 server 生成。它只出现在当前具有合法 `{type:"pass"}` 的座位信封中；同一声明窗口内其他玩家先响应不会延长它。客户端本地归零不提交动作，server 到期后通过正常 `game:action` 内部路径代交 pass。中局 `room:enter` 的 `{room,view,seq,deadline?}` 会返回该座位尚未到期的同一个绝对 deadline。
+`deadline` 是 Unix epoch 毫秒值，只由 server 生成。它只出现在当前具有合法 `{type:"pass"}` 的座位信封中；同一声明窗口内其他玩家先响应不会延长它。客户端本地归零不提交动作，server 到期后通过正常 `game:action` 内部路径代交 pass。中局 `room:enter` 的 `{room,view,seq,deadline?,debugOmniscient?}` 会返回该座位尚未到期的同一个绝对 deadline。
 
 `game:advice` 是只读查询：server 从握手绑定座位取得该 seat 的 PlayerView 与 legalActions，推荐只能引用 actions 内的下标；空 actions 时省略推荐。第一版优先 `hu`/`zimo`，否则确定性推荐第一项（普通回合即合法 discard）。客户端只接受与当前 snapshot 的 seq/deadline 匹配且请求期间未换 snapshot revision 的响应。
 
@@ -80,10 +80,11 @@ B ← game:event TurnStarted(B)（B 碰后出牌）
 
 | 消息                         | payload          | data（`DebugOmniscientViewSchema`）                          | 说明                                                                                                                                                                             |
 | ---------------------------- | ---------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `debug:omniscientView`       | `{}`             | `{ wall: number[], hands: number[][], melds: number[][][] }` | 查询式 ack；返回原始 TileId。web 的 dev-only "god mode" 用它把对手手牌+暗杠渲染成和自己手牌一样的真实牌面动画，仅用于本地调试/测试，不出现在任何正式产品 UI 入口。               |
+| `debug:omniscientView`       | `{}`             | `{ wall: number[], hands: number[][], melds: number[][][] }` | 手工诊断用查询式 ack；返回原始 TileId。live Web 的 god mode 不再轮询它，而是消费与 `game:snapshot` 同 seq 的 `debugOmniscient`。                                                 |
 | `debug:replayOmniscientView` | `{ gameNumber }` | `{ wall: number[], hands: number[][], melds: number[][][] }` | 明牌 replay（阶段 4.5），只支持局终；`gameNumber` 指当前连接所在房间已归档的某一局，无 `roomId`（约定同 `debug:omniscientView`，不是 `replay:get` 那种"离开房间也能查"的模型）。 |
 
 - `melds[seat][meldIndex]` 与该座位真实（脱敏）`melds` 数组一一对应，只用来补齐 `anGang` 被脱敏成 `[]` 的 `tiles`——正常吃/碰/明杠在 `getPlayerView` 里对所有座位都已是真实 TileId，不需要靠这个字段补。
-- 门控：server 侧 `ConfigService.allowDebugOmniscient`（读环境变量 `ALLOW_DEBUG_OMNISCIENT`，默认 `false`）关闭时一律拒绝，两条消息共用同一个开关。
+- `debugOmniscient` 是仅开发/测试的快照扩展：形状为 `{ hands: number[][], melds: number[][][] }`，不含牌墙；它与 `view` 由同一局面、同一个 `seq` 同步构造，不能在后续异步请求中补齐。Web 的本地 God mode 开关只决定是否使用该字段渲染，不能请求或改变 server 下发内容。
+- 门控：server 侧 `ConfigService.allowDebugOmniscient` 仅在非生产环境且环境变量 `ALLOW_DEBUG_OMNISCIENT=true` 时为真；否则两条调试查询一律拒绝，所有 `game:snapshot`/`room:enter` 也一律省略 `debugOmniscient`。
 - 鉴权/成员校验复用现有机制，不新增错误码：开关关闭或请求者不是该房间已入座玩家 → `UNAUTHORIZED`（座位未找到细化为 `NOT_IN_ROOM`）；游戏未开始 → `GAME_NOT_STARTED`；`debug:replayOmniscientView` 的 `gameNumber` 未归档 → `GAME_NOT_FOUND`。
-- 故意绕开 core `getPlayerView` 的可见性过滤，直接读取隐藏手牌、未摸牌墙与被脱敏的暗杠——这是显式受控的例外，不是"public 事件携带隐藏牌 id"（本消息不是 public 事件，是按需查询的单播 ack），不违反第 1 节以外的可见性铁律。core 侧契约说明见 `engine-contract.md` §8。`debug:replayOmniscientView` 直接读取归档的 `finalState`（阶段 4.5，见 `session-mechanics.md` §10），不经过任何事件重放，因此只能在局终一次性明牌，不支持逐步动画回放——这个能力缺口需要新的 core 能力（按步归档 god 状态，或反转"replay 从不重跑 applyAction"的既有设计），属架构级决定，未纳入本次范围。
+- 调试查询与 `debugOmniscient` 都故意绕开 core `getPlayerView` 的可见性过滤：前者可读取隐藏手牌、未摸牌墙与被脱敏的暗杠，后者只读取 UI 所需的隐藏手牌与暗杠。这是显式受控的例外，不是"public 事件携带隐藏牌 id"：它们只在开发/测试门控开启时通过已入座 socket 的单播 ack/快照下发，绝不出现在 `game:event`，不违反第 1 节以外的可见性铁律。core 侧契约说明见 `engine-contract.md` §8。`debug:replayOmniscientView` 直接读取归档的 `finalState`（阶段 4.5，见 `session-mechanics.md` §10），不经过任何事件重放，因此只能在局终一次性明牌，不支持逐步动画回放——这个能力缺口需要新的 core 能力（按步归档 god 状态，或反转"replay 从不重跑 applyAction"的既有设计），属架构级决定，未纳入本次范围。

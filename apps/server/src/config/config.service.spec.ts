@@ -62,3 +62,30 @@ describe("ConfigService.drawRevealDelayMs", () => {
     expect(new ConfigService().drawRevealDelayMs).toBe(expected);
   });
 });
+
+describe("ConfigService.allowDebugOmniscient", () => {
+  const originalNodeEnv = process.env["NODE_ENV"];
+  const originalFlag = process.env["ALLOW_DEBUG_OMNISCIENT"];
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) delete process.env["NODE_ENV"];
+    else process.env["NODE_ENV"] = originalNodeEnv;
+    if (originalFlag === undefined) delete process.env["ALLOW_DEBUG_OMNISCIENT"];
+    else process.env["ALLOW_DEBUG_OMNISCIENT"] = originalFlag;
+  });
+
+  it("requires an explicit non-production opt-in", () => {
+    process.env["NODE_ENV"] = "test";
+    delete process.env["ALLOW_DEBUG_OMNISCIENT"];
+    expect(new ConfigService().allowDebugOmniscient).toBe(false);
+
+    process.env["ALLOW_DEBUG_OMNISCIENT"] = "true";
+    expect(new ConfigService().allowDebugOmniscient).toBe(true);
+  });
+
+  it("never enables hidden tile delivery in production", () => {
+    process.env["NODE_ENV"] = "production";
+    process.env["ALLOW_DEBUG_OMNISCIENT"] = "true";
+    expect(new ConfigService().allowDebugOmniscient).toBe(false);
+  });
+});

@@ -1,5 +1,5 @@
 import type { GameEvent, PlayerViewBase, SeatId } from "@new-mj/core";
-import type { SessionResult } from "@new-mj/protocol";
+import type { DebugOmniscientSnapshot, SessionResult } from "@new-mj/protocol";
 
 export interface PlayerJoinedEvent {
   roomId: string;
@@ -56,6 +56,7 @@ export interface GameSnapshotEvent {
   view: PlayerViewBase;
   seq: number;
   deadline?: number;
+  debugOmniscient?: DebugOmniscientSnapshot;
 }
 
 /**

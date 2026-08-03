@@ -4,11 +4,14 @@
 
 ## 当前任务
 
-当前专题：修复 Junk v3 PR review。
+当前专题：开发态同步明牌快照。
 
-- 进度：Junk 终局结果保留兼容的数字 `winners`，并新增可重连结算快照 `winnerDetails`（seat、fanTypes、multiplier、payout）；Web 结算面板改读详情，番型 id 已与 scorer 对齐。AI 已移除旧 config 依赖，七小对与抢杠按固定规则评估。第二轮 review 修复：首局 seed 随机庄家现在在首局快照前广播 `room:dealerChanged`（此前 web 皇冠标记整局指向过期的座位 0）；`fanTypes` 收窄为 `JunkFanType` 字面量联合；junk 迁移到 `lib/gang-chain.ts`（hangzhou/junk 类型统一）；web fixture 改用 scorer 真实可产生的番型组合（删除不存在的 `dealer` 番型标签）；AI 七对测试改为有判别力的分差断言；rebind e2e 不再假设庄家=座位 0（消除随机庄家引入的 ~25% flake）。四包 verify 全绿。
-- 追加：Vitest 慢速用例分层落地——core 6 个 fuzz/property 冒烟用例打一等 `slow` test tag（Vitest 4.1 `test.tags`，timeout 由 tag 统一提供），`test` 以 `--tags-filter '!slow'` 排除（core 单测 48s→1.5s），`test:full` 全量；各 workspace 统一提供 `test:full`（无慢速用例的做别名），根 `verify:full` 改用 `test:full`；docs（testing-strategy §1.2、workflow、双 AGENTS.md）同 commit 更新。
-- 下一步第一个具体动作：commit 并推送本次 review 修复 + 慢速测试分层至 PR #6，等待下一轮 review。
+- 目标：在 server 的开发/测试明牌开关开启时，将与 `PlayerView` 同 seq 的对手手牌和暗杠数据随 `game:snapshot`、`room:enter` 一起单播；Web 的 God mode 只切换显示，不再异步查询造成抓牌闪烁。
+- 首个 slice 验收：`GameSnapshot` 与中局 `room:enter` 在门控开启时携带可选 `debugOmniscient`（仅 hands/melds），关闭或生产环境时严格省略；Web 以同一快照原子采用该数据。
+- 约束：不修改 `PlayerView` 或玩法规则；隐藏 TileId 不进入 `game:event`；仅开发/测试、仅已入座连接；docs 先于代码；不合并本分支。
+- 已知未知项及最早验证：现有 reconnect ack 只返回 `view`，需复用同一权威 state 派生 debug 数据；先以 protocol/server 单测覆盖门控和同 seq，再补 Web store/presentation 回归。
+- 进度：已完成。`GameSnapshot`、中局 `room:enter` 与 RoomService snapshot event 都支持可选 `debugOmniscient`；server 从同一权威 state 同步派生一次并在非生产 `ALLOW_DEBUG_OMNISCIENT=true` 时单播，生产环境强制省略。Web 将该字段与 `view` 原子存入 session，God mode 仅切换渲染来源，删除了逐 snapshot 的异步 `debug:omniscientView` 查询。protocol/server/web 回归测试覆盖契约、生产门控、实时快照、room:enter 解包与陈旧快照拒绝；`pnpm verify` 的 typecheck/lint/build/unit 阶段通过，server E2E 5 套通过、Web E2E 38/38 通过。
+- 下一步第一个具体动作：将 `feat/debug-omniscient-snapshots` 提交并推送，等待 review；不合并。
 
 ## 阻塞与遗留问题
 

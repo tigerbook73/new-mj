@@ -25,11 +25,11 @@ export class ConfigService {
 
   /**
    * Dev/test-only escape hatch (protocol-shared.md §7): gates the
-   * `debug:omniscientView` channel. Defaults off — must be
-   * explicitly opted into, never set in a shipped deployment.
+   * debug query and synchronized snapshot extension. Defaults off; even an
+   * explicit opt-in is ignored in a shipped production deployment.
    */
   get allowDebugOmniscient(): boolean {
-    return process.env["ALLOW_DEBUG_OMNISCIENT"] === "true";
+    return !this.isProduction && process.env["ALLOW_DEBUG_OMNISCIENT"] === "true";
   }
 
   /**

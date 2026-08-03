@@ -10,10 +10,19 @@ import { z } from "zod";
  * live/replay PlayerView, so a caller only needs this to fill in an
  * anGang's otherwise-empty `tiles`.
  */
-export const DebugOmniscientViewSchema = z.object({
-  wall: z.array(z.number()),
+/**
+ * Live `game:snapshot`/`room:enter` debug extension. It intentionally omits
+ * the wall: the Web god-mode table only needs opponents' hands and concealed
+ * meld tiles, and sending less hidden state keeps this exception narrow.
+ */
+export const DebugOmniscientSnapshotSchema = z.object({
   hands: z.array(z.array(z.number())),
   melds: z.array(z.array(z.array(z.number()))),
+});
+export type DebugOmniscientSnapshot = z.infer<typeof DebugOmniscientSnapshotSchema>;
+
+export const DebugOmniscientViewSchema = DebugOmniscientSnapshotSchema.extend({
+  wall: z.array(z.number()),
 });
 export type DebugOmniscientView = z.infer<typeof DebugOmniscientViewSchema>;
 
