@@ -10,8 +10,8 @@
 - 首个 slice 验收：`GameSnapshot` 与中局 `room:enter` 在门控开启时携带可选 `debugOmniscient`（仅 hands/melds），关闭或生产环境时严格省略；Web 以同一快照原子采用该数据。
 - 约束：不修改 `PlayerView` 或玩法规则；隐藏 TileId 不进入 `game:event`；仅开发/测试、仅已入座连接；docs 先于代码；不合并本分支。
 - 已知未知项及最早验证：现有 reconnect ack 只返回 `view`，需复用同一权威 state 派生 debug 数据；先以 protocol/server 单测覆盖门控和同 seq，再补 Web store/presentation 回归。
-- 进度：已完成。`GameSnapshot`、中局 `room:enter` 与 RoomService snapshot event 都支持可选 `debugOmniscient`；server 从同一权威 state 同步派生一次并在非生产 `ALLOW_DEBUG_OMNISCIENT=true` 时单播，生产环境强制省略。Web 将该字段与 `view` 原子存入 session，God mode 仅切换渲染来源，删除了逐 snapshot 的异步 `debug:omniscientView` 查询。God mode 的上、左、右手牌现为纯快照渲染：不播放摸牌/弃牌 ghost、入场或 FLIP，摸牌只填充固定槽；bottom 保留实时动画。默认摸牌延时代提交已由 600 ms 调整为 1000 ms（测试环境仍为 0 ms）。protocol/server/web 回归测试覆盖契约、生产门控、实时快照、room:enter 解包与陈旧快照拒绝；Web 定向单测、桌面牌桌 Playwright 和 `pnpm verify` 均通过。
-- 下一步第一个具体动作：提交并推送 `feat/debug-omniscient-snapshots`，等待 review；不合并。
+- 进度：已完成。`GameSnapshot`、中局 `room:enter` 与 RoomService snapshot event 都支持可选 `debugOmniscient`；server 从同一权威 state 同步派生一次并在非生产 `ALLOW_DEBUG_OMNISCIENT=true` 时单播，生产环境强制省略。Web 将该字段与 `view` 原子存入 session，God mode 仅切换渲染来源，删除了逐 snapshot 的异步 `debug:omniscientView` 查询。God mode 保留四方抓牌/弃牌 ghost 与入场动画，摸牌只填充固定槽；bottom/top 可 FLIP 重排，left/right 因旋转直接采用最终布局。默认摸牌延时代提交已由 600 ms 调整为 1000 ms（测试环境仍为 0 ms）。protocol/server/web 回归测试覆盖契约、生产门控、实时快照、room:enter 解包与陈旧快照拒绝；Web 定向单测、桌面牌桌 Playwright 和 `pnpm verify` 均通过。
+- 下一步第一个具体动作：提交并推送已确认的四方动画方案，等待 review；不合并。
 
 ## 阻塞与遗留问题
 

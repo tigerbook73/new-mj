@@ -23,10 +23,9 @@ interface HandRowProps {
   /** See SeatContent.handTiles (components/mahjong/TableBoard.tsx) for the slot layout. */
   handTiles: number[];
   revealed: boolean;
-  /** See SeatContent.reflow (components/mahjong/TableBoard.tsx) — bottom only. */
+  /** See SeatContent.reflow (components/mahjong/TableBoard.tsx). */
   reflow: boolean;
-  /** Bottom-only live draw motion; revealed opponent rows stay visually
-   * stable while their fixed drawn slot receives snapshot data. */
+  /** Whether this fixed drawn slot plays its live entry/ghost animation. */
   animateDraw: boolean;
   interactive?: boolean | undefined;
   /**

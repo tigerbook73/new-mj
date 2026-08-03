@@ -142,6 +142,11 @@ export function useTablePresentation({
       // reliably the most recent draw whenever `data.justDrawn` is true.
       const godHand = direction !== "bottom" ? godView?.hands[seat] : undefined;
       const revealed = direction === "bottom" || godHand !== undefined;
+      // Motion's generic FLIP works under the top Zone's 180-degree rotation,
+      // but not the left/right quarter-turn rotations: their projection delta
+      // follows the wrong screen axis. God mode leaves this existing animation
+      // policy intact while revealing the cards themselves.
+      const godReflow = godHand !== undefined && direction !== "left" && direction !== "right";
       // Render order: hangzhou's caishen (financial) first, set off by an empty
       // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
       // §2 — it's never chi/peng/gang-able, so keeping it visually apart from
@@ -240,13 +245,8 @@ export function useTablePresentation({
         }),
         handTiles,
         revealed,
-        // God mode only reveals what a snapshot already contains. It must not
-        // make an opponent row animate/reflow: during a draw that would make
-        // stable face-up tiles visibly flicker, and rotated rows cannot use
-        // Motion's generic FLIP correctly anyway. Bottom remains the sole
-        // live-animation lane.
-        reflow: direction === "bottom",
-        animateDraw: direction === "bottom",
+        reflow: direction === "bottom" || godReflow,
+        animateDraw: true,
         info: player?.nickname ?? `Seat ${seat + 1}`,
         isDealer: seat === dealer,
         drawnSlotKey,

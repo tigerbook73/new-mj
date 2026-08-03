@@ -36,12 +36,10 @@ export interface SeatContent {
    * — opponents otherwise render handTiles entries face-down. */
   revealed: boolean;
   /** Whether HandRow plays Motion's `layout` FLIP when handTiles reorders.
-   * The desktop table deliberately confines it to bottom: God mode changes
-   * an opponent's visibility, not its snapshot-only motion policy. */
+   * Bottom and the 180-degree top Zone can use it; quarter-turn left/right
+   * Zones cannot compose Motion's generic projection correctly. */
   reflow: boolean;
-  /** Whether this seat may play the live draw entry/ghost animation. The
-   * desktop table deliberately limits that effect to bottom; God mode reveals
-   * opponents' faces but does not turn their snapshot updates into motion. */
+  /** Whether this seat may play the live draw entry/ghost animation. */
   animateDraw: boolean;
   /** True only when the active ruleset has a caishen tile (currently only
    * hangzhou) — gates whether `handTiles` entries get Tile's `caishen`
