@@ -64,27 +64,26 @@ export function OpponentDiscardFlipGhost({
 
   if (!flight) return null;
   const { from, to } = flight;
-  const dx = from.left + from.width / 2 - (to.left + to.width / 2);
-  const dy = from.top + from.height / 2 - (to.top + to.height / 2);
-
   return createPortal(
     <motion.div
       data-testid="opponent-discard-flip-ghost"
       style={{
         position: "fixed",
-        left: to.left,
-        top: to.top,
-        width: to.width,
-        height: to.height,
         pointerEvents: "none",
         zIndex: 50,
       }}
-      // Keep viewport translation separate from seat rotation: composing
-      // `x/y` and `rotate(±90deg)` on this same node rotates the translation
-      // vector too, which makes a left/right discard visibly sidestep before
-      // it heads toward the river.
-      initial={{ x: dx, y: dy, opacity: 0 }}
-      animate={{ x: 0, y: 0, opacity: 1 }}
+      // Animate the viewport box itself. A rotated left/right source has a
+      // different bounding box from the upright river tile, so using the
+      // target box plus a translated approximation makes it sidestep before
+      // flight. The source rect is the first painted box, exactly.
+      initial={{
+        left: from.left,
+        top: from.top,
+        width: from.width,
+        height: from.height,
+        opacity: 0,
+      }}
+      animate={{ left: to.left, top: to.top, width: to.width, height: to.height, opacity: 1 }}
       transition={GHOST_TRANSITION}
       onAnimationComplete={() => {
         clear();
