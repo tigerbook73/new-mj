@@ -71,6 +71,9 @@ export function HandRow({
   highlightCaishen,
 }: HandRowProps) {
   const drawnIndex = handTiles.length - 1;
+  // Portal ghost phase changes rerender the table but do not change this row's
+  // geometry. Only a token-sequence change may start or replace its reflow.
+  const reflowKey = handTokenKeys.join(",");
 
   return (
     <div
@@ -96,6 +99,7 @@ export function HandRow({
               tileHeight={tileHeight}
               ledgerKey={drawnSlotLedgerKey}
               token={handTokenKeys[index] ?? `draw:${direction}`}
+              reflowKey={reflowKey}
               caishen={isReal && highlightCaishen && isCaishenTile(tileId)}
             />
           );
@@ -120,6 +124,7 @@ export function HandRow({
             key={key}
             direction={direction}
             token={key}
+            reflowKey={reflowKey}
             enabled={reflow && !isPlaceholder}
           >
             <HandTileSlot
@@ -171,6 +176,7 @@ function DrawnSlotTile({
   tileHeight,
   ledgerKey,
   token,
+  reflowKey,
   caishen,
 }: {
   direction: SeatDirection;
@@ -184,6 +190,7 @@ function DrawnSlotTile({
   tileHeight: number;
   ledgerKey: string;
   token: string;
+  reflowKey: string;
   caishen: boolean;
 }) {
   const { entering, ghost, onGhostComplete } = useSlotEntering(ledgerKey, animateDraw);
@@ -205,7 +212,12 @@ function DrawnSlotTile({
        * ghost render visibly oversized (full row height, not the tile's own)
        * for its entire flight.
        */}
-      <HandReflowShell direction={direction} token={token} enabled={reflow && !isPlaceholder}>
+      <HandReflowShell
+        direction={direction}
+        token={token}
+        reflowKey={reflowKey}
+        enabled={reflow && !isPlaceholder}
+      >
         <div className="flex h-full items-center">
           <HandTileSlot
             anchorRef={toRef}

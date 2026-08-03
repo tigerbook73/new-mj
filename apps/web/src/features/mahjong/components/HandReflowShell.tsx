@@ -16,11 +16,14 @@ const REFLOW_EASING = "cubic-bezier(0, 0, 0.58, 1)";
 export function HandReflowShell({
   direction,
   token,
+  reflowKey,
   enabled,
   children,
 }: {
   direction: SeatDirection;
   token: string;
+  /** Changes only when this row's visual token layout changes, not on ghost state updates. */
+  reflowKey: string;
   enabled: boolean;
   children: ReactNode;
 }) {
@@ -50,7 +53,7 @@ export function HandReflowShell({
     );
     animation.current.onfinish = () => animation.current?.cancel();
     return () => animation.current?.cancel();
-  });
+  }, [direction, enabled, prefersReducedMotion, reflowKey]);
 
   return (
     <div ref={ref} data-hand-token={token} className="flex h-full shrink-0 items-center">
