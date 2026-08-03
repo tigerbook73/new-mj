@@ -1,7 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { NestFactory } from "@nestjs/core";
-import type { DebugOmniscientView, Reply, RoomInfo } from "@new-mj/protocol";
+import type { DebugOmniscientView, GameSnapshot, Reply, RoomInfo } from "@new-mj/protocol";
 import { io, type Socket as ClientSocket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { ConfigService } from "../src/config/config.service";
@@ -102,7 +102,19 @@ describe("debug:omniscientView (e2e, socket.io-client — dev/test-only escape h
     for (const client of [a, b, c, d]) {
       expect((await ack<object>(client, "room:ready", { ready: true })).ok).toBe(true);
     }
+    const initialSnapshot = new Promise<GameSnapshot>((resolve) =>
+      a.once("game:snapshot", resolve),
+    );
     expect(await ack<object>(a, "room:start", {})).toEqual({ ok: true, data: {} });
+
+    // The live debug data arrives in the same envelope as the authoritative
+    // PlayerView — no follow-up debug query is required to reveal opponents.
+    const snapshot = await initialSnapshot;
+    expect(snapshot.debugOmniscient).toMatchObject({
+      hands: expect.arrayContaining([expect.any(Array)]),
+      melds: expect.arrayContaining([expect.any(Array)]),
+    });
+    expect(snapshot.debugOmniscient).not.toHaveProperty("wall");
 
     const result = await ack<DebugOmniscientView>(a, "debug:omniscientView", {});
     expect(result.ok).toBe(true);

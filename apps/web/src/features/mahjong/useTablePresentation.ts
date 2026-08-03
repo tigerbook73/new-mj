@@ -1,4 +1,4 @@
-import type { DebugOmniscientView, PlayerViewBase, SeatId } from "@new-mj/protocol";
+import type { DebugOmniscientSnapshot, PlayerViewBase, SeatId } from "@new-mj/protocol";
 import type { DiscardEntry } from "@/features/mahjong/components/DiscardPile";
 import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
@@ -106,11 +106,11 @@ export function useTablePresentation({
   /**
    * Dev-only "god mode" (protocol-shared.md §7): when present, every seat
    * renders with the same real-tile-face treatment the bottom seat already
-   * gets, sourced from `debug:omniscientView`'s unredacted hands/melds
-   * instead of the normal per-viewer redaction. Absent in every non-dev/
-   * non-`ALLOW_DEBUG_OMNISCIENT` session.
+   * gets, sourced from the same-snapshot `debugOmniscient` hands/melds
+   * extension instead of the normal per-viewer redaction. Absent in every
+   * non-dev/non-`ALLOW_DEBUG_OMNISCIENT` session.
    */
-  godView?: DebugOmniscientView | undefined;
+  godView?: DebugOmniscientSnapshot | undefined;
 }) {
   if (!view) {
     return undefined;
@@ -142,17 +142,10 @@ export function useTablePresentation({
       // reliably the most recent draw whenever `data.justDrawn` is true.
       const godHand = direction !== "bottom" ? godView?.hands[seat] : undefined;
       const revealed = direction === "bottom" || godHand !== undefined;
-      // Framer Motion's `layout` FLIP (HandRow's `reflow`) measures via
-      // getBoundingClientRect() in screen space but computes/composes its
-      // own delta unaware of the ancestor Zone's plain-CSS `rotate()`
-      // (zoneStyle() in layoutPreset.ts) that left/right seats sit under —
-      // the result is tiles visibly sliding left/right instead of up/down.
-      // Fixing that needs Motion's projection tree to know about the
-      // ancestor rotation (e.g. promoting the rotated Zone to a motion
-      // component); until then, left/right god-mode hands reorder with a
-      // plain snap instead of a broken slide. Bottom/top are unaffected —
-      // bottom never rotates, top's 180° rotation preserves the horizontal
-      // axis instead of swapping it.
+      // Motion's generic FLIP works under the top Zone's 180-degree rotation,
+      // but not the left/right quarter-turn rotations: their projection delta
+      // follows the wrong screen axis. God mode leaves this existing animation
+      // policy intact while revealing the cards themselves.
       const godReflow = godHand !== undefined && direction !== "left" && direction !== "right";
       // Render order: hangzhou's caishen (financial) first, set off by an empty
       // gap slot from the rest of the concealed hand (docs/variants/hangzhou.md
@@ -235,7 +228,7 @@ export function useTablePresentation({
       const content: SeatContent = {
         melds: data.melds.map((meld, meldIndex) => {
           // God mode fills in anGang's otherwise-empty (redacted) tiles —
-          // see debug.ts's DebugOmniscientViewSchema doc. Every other meld
+          // see debug.ts's DebugOmniscientSnapshotSchema doc. Every other meld
           // type is already real TileIds in the normal per-viewer view.
           const godTiles = meld.type === "anGang" ? godMeldTiles?.[meldIndex] : undefined;
           return {
@@ -253,6 +246,7 @@ export function useTablePresentation({
         handTiles,
         revealed,
         reflow: direction === "bottom" || godReflow,
+        animateDraw: true,
         info: player?.nickname ?? `Seat ${seat + 1}`,
         isDealer: seat === dealer,
         drawnSlotKey,

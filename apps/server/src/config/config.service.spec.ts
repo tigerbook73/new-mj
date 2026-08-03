@@ -44,12 +44,12 @@ describe("ConfigService.drawRevealDelayMs", () => {
   });
 
   it.each([undefined, "", "nope", "Infinity", "1.5", "-1"])(
-    "falls back to 600 for %p outside test env",
+    "falls back to 1000 for %p outside test env",
     (value) => {
       process.env["NODE_ENV"] = "production";
       if (value === undefined) delete process.env["DRAW_REVEAL_DELAY_MS"];
       else process.env["DRAW_REVEAL_DELAY_MS"] = value;
-      expect(new ConfigService().drawRevealDelayMs).toBe(600);
+      expect(new ConfigService().drawRevealDelayMs).toBe(1_000);
     },
   );
 
@@ -60,5 +60,32 @@ describe("ConfigService.drawRevealDelayMs", () => {
     process.env["NODE_ENV"] = "production";
     process.env["DRAW_REVEAL_DELAY_MS"] = value;
     expect(new ConfigService().drawRevealDelayMs).toBe(expected);
+  });
+});
+
+describe("ConfigService.allowDebugOmniscient", () => {
+  const originalNodeEnv = process.env["NODE_ENV"];
+  const originalFlag = process.env["ALLOW_DEBUG_OMNISCIENT"];
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) delete process.env["NODE_ENV"];
+    else process.env["NODE_ENV"] = originalNodeEnv;
+    if (originalFlag === undefined) delete process.env["ALLOW_DEBUG_OMNISCIENT"];
+    else process.env["ALLOW_DEBUG_OMNISCIENT"] = originalFlag;
+  });
+
+  it("requires an explicit non-production opt-in", () => {
+    process.env["NODE_ENV"] = "test";
+    delete process.env["ALLOW_DEBUG_OMNISCIENT"];
+    expect(new ConfigService().allowDebugOmniscient).toBe(false);
+
+    process.env["ALLOW_DEBUG_OMNISCIENT"] = "true";
+    expect(new ConfigService().allowDebugOmniscient).toBe(true);
+  });
+
+  it("never enables hidden tile delivery in production", () => {
+    process.env["NODE_ENV"] = "production";
+    process.env["ALLOW_DEBUG_OMNISCIENT"] = "true";
+    expect(new ConfigService().allowDebugOmniscient).toBe(false);
   });
 });

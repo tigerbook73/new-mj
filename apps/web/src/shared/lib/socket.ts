@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import {
   PROTOCOL_VERSION,
+  type DebugOmniscientSnapshot,
   type PlayerViewBase,
   type Reply,
   type RoomEnterResponse,
@@ -79,6 +80,7 @@ export function unwrapRoomEnterAck(data: RoomEnterResponse | RoomInfo): {
   view?: PlayerViewBase;
   seq?: number;
   deadline?: number;
+  debugOmniscient?: DebugOmniscientSnapshot;
 } {
   if (!("room" in data)) return { room: data };
   return {
@@ -86,6 +88,7 @@ export function unwrapRoomEnterAck(data: RoomEnterResponse | RoomInfo): {
     ...(data.view ? { view: data.view } : {}),
     ...(data.seq !== undefined ? { seq: data.seq } : {}),
     ...(data.deadline !== undefined ? { deadline: data.deadline } : {}),
+    ...(data.debugOmniscient !== undefined ? { debugOmniscient: data.debugOmniscient } : {}),
   };
 }
 

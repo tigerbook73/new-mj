@@ -133,12 +133,18 @@ function protectedLoader(kind: "generic" | "lobby" | "table" | "replay") {
       roomId: params.roomId,
     });
     if (!entered.ok) return redirect(`/games?notice=${encodeURIComponent(entered.code)}`);
-    const { room: enteredRoom, view, seq, deadline } = unwrapRoomEnterAck(entered.data);
+    const {
+      room: enteredRoom,
+      view,
+      seq,
+      deadline,
+      debugOmniscient,
+    } = unwrapRoomEnterAck(entered.data);
     const mySeat = enteredRoom.players.find((player) => player?.userId === userId);
     if (!mySeat) return redirect(`/lobby/${enteredRoom.id}`);
     useSessionStore.getState().setRoom(enteredRoom);
     if (view && seq !== undefined)
-      useSessionStore.getState().applyGameSnapshot({ view, seq, deadline });
+      useSessionStore.getState().applyGameSnapshot({ view, seq, deadline, debugOmniscient });
     if (!view && !mySeat.isAutoPiloted) return redirect(`/lobby/${enteredRoom.id}`);
     return null;
   };

@@ -80,7 +80,7 @@ finished: 计算排名，对外公开 result
 
 **bot 自动出牌**：bot 座位没有对外暴露的"代打"消息。`RoomService` 以 server 内部的单步随机延迟调度：每次仅挑选一个 `isBot`/`isAutoPiloted` 座位的 `chooseAction(getLegalActions(state, seat))`，延迟后走同一条内部执行路径，完成后才重新扫描。因此人类动作后的 AI 回合，以及 AI 对 AI 的连续回合，都会保留可感知停顿。timer 触发时会重新读取合法动作；开新局、结束和关闭无人房会取消待执行 timer。timer 不进入 core、PlayerView 或客户端；声明窗口仍由既有 deadline/超时代 `pass` 控制。bot 拿到的是完整 `state`（同 server 自己的访问权限），不是 `PlayerView`——不做"PlayerView-only 合法性引擎"这层公共契约，因为 AI 是自己人代码、不是玩家可控对手，MVP 阶段这层防作弊契约不是真实需求。技术债：触发条件是日后做 AI 强度分级，或 AI 跑到独立进程/服务、不再共享内存态 `state` 时。
 
-**摸牌延时代提交（draw-reveal）**：core 把摸牌拆成显式 `{type:"draw"}` 动作后，进入 `awaiting-draw` 相位的座位没有对外暴露的"摸牌"消息——`RoomService.scheduleDrawReveal` 在每次 `runAction` 之后检查 `getLegalActions` 是否对当前座位恰好等于 `[{type:"draw"}]`，是则按 `ConfigService.drawRevealDelayMs`（读 `DRAW_REVEAL_DELAY_MS`，默认 `600`；`NODE_ENV=test` 恒为 `0`）延时后走同一条 `runAction` 路径代提交。与 bot 出牌延时的关键区别：**对人类/bot/托管座位一视同仁**——摸牌是离开该相位的唯一合法动作，不是任何座位的决策，纯粹为了让观感上"轮次结算"与"摸到牌"之间留出可感知停顿；`nextBotAction` 因此显式跳过"唯一合法动作是 draw"的座位，避免与这个 timer 抢同一次转场。timer 触发时会重新读取合法动作；开新局、结束和关闭无人房会取消待执行 timer。timer 不进入 core、PlayerView 或客户端，也不产生新的协议 `deadline`（`deadline` 字段的语义仍只对应声明窗口的玩家响应期限，不代表这个 timer）。
+**摸牌延时代提交（draw-reveal）**：core 把摸牌拆成显式 `{type:"draw"}` 动作后，进入 `awaiting-draw` 相位的座位没有对外暴露的"摸牌"消息——`RoomService.scheduleDrawReveal` 在每次 `runAction` 之后检查 `getLegalActions` 是否对当前座位恰好等于 `[{type:"draw"}]`，是则按 `ConfigService.drawRevealDelayMs`（读 `DRAW_REVEAL_DELAY_MS`，默认 `1000`；`NODE_ENV=test` 恒为 `0`）延时后走同一条 `runAction` 路径代提交。与 bot 出牌延时的关键区别：**对人类/bot/托管座位一视同仁**——摸牌是离开该相位的唯一合法动作，不是任何座位的决策，纯粹为了让观感上"轮次结算"与"摸到牌"之间留出可感知停顿；`nextBotAction` 因此显式跳过"唯一合法动作是 draw"的座位，避免与这个 timer 抢同一次转场。timer 触发时会重新读取合法动作；开新局、结束和关闭无人房会取消待执行 timer。timer 不进入 core、PlayerView 或客户端，也不产生新的协议 `deadline`（`deadline` 字段的语义仍只对应声明窗口的玩家响应期限，不代表这个 timer）。
 
 **AI Advice 查询**：`game:advice {}` 不接受 seat/userId，gateway 只从握手连接定位座位。RoomService 对同一时刻的 `getPlayerView(state, seat)` 与 `getLegalActions(state, seat)` 调用 `packages/ai.recommendAction`，返回 `{seq, deadline?, actions, recommendedActionIndex?}`；查询不运行 `applyAction`、不创建或续期 timer、不发事件。recommendation 必须是 actions 的原对象，server 只返回其下标。Web 每次接受 snapshot 都清旧建议并增加本地 revision，只接受 seq/deadline/revision 全匹配的异步响应。
 
@@ -158,7 +158,7 @@ finished: 计算排名，对外公开 result
 
 旧 socket 被踢后走普通断线路径，不触发主动离座托管；`registry.deleteIfSame` 摘除必须比较 socket 引用，避免旧连接延迟清理误删新登记。
 
-**评审点 I【已定：采纳快照优先】**：开局及每个已接受动作都在该连接可见的 events 之后逐座位下发 `game:snapshot`，客户端不根据规则事件重建状态；重连由 `room:enter` ack 直接采用最新 `{view, seq}`，不重播历史动画。core `seq` 以单局为 epoch，切局后重新开始；客户端在同局丢弃更旧 seq，但允许相同 seq 的新快照覆盖（座位可见状态可能变化）。`lastSeq` 增量补发是未来可能的优化项，当前不实现。
+**评审点 I【已定：采纳快照优先】**：开局及每个已接受动作都在该连接可见的 events 之后逐座位下发 `game:snapshot`，客户端不根据规则事件重建状态；重连由 `room:enter` ack 直接采用最新 `{view, seq}`，不重播历史动画。开发/测试明牌门控开启时，同一信封可附带 `debugOmniscient`，它与 `view` 由同一权威 state、同一个 `seq` 同步派生，客户端必须原子采用，绝不在快照之后异步补齐。core `seq` 以单局为 epoch，切局后重新开始；客户端在同局丢弃更旧 seq，但允许相同 seq 的新快照覆盖（座位可见状态可能变化）。`lastSeq` 增量补发是未来可能的优化项，当前不实现。
 
 **为 Best-of-3 预留的设计空间**：`sessionFormat` 配置字段、`gameNumber`/`totalGames?` 局数追踪、`wins?` 字段、不写死的 `phase`——真要实现 best-of-3 时只需要修改 `RoomService.shouldContinue()` 的判断条件、实现 `wins` 跟踪、调整 `computeRanking()` 分支；若"赢家继续当庄"也要落地，改对应 ruleset 的 `computeNextDealer`。不需要改动现有 4-round 的任何实现。
 

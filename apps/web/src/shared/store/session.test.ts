@@ -1,4 +1,9 @@
-import type { GameAdviceResponse, PlayerViewBase, RoomInfo } from "@new-mj/protocol";
+import type {
+  DebugOmniscientSnapshot,
+  GameAdviceResponse,
+  PlayerViewBase,
+  RoomInfo,
+} from "@new-mj/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore } from "./session";
 
@@ -11,12 +16,17 @@ const view = (currentSeat: 0 | 1 | 2 | 3): PlayerViewBase => ({
 });
 
 const room = (id: string, gameNumber: number): RoomInfo => ({ id, gameNumber }) as RoomInfo;
+const debug: DebugOmniscientSnapshot = {
+  hands: [[1], [2], [3], [4]],
+  melds: [[], [], [], []],
+};
 
 describe("session authoritative snapshots", () => {
   beforeEach(() => {
     useSessionStore.setState({
       room: null,
       view: null,
+      debugOmniscient: null,
       gameSeq: null,
       gameDeadline: null,
       snapshotRevision: 0,
@@ -69,6 +79,18 @@ describe("session authoritative snapshots", () => {
 
     store.applyGameSnapshot({ view: view(2), seq: 10 });
     expect(useSessionStore.getState().gameDeadline).toBeNull();
+  });
+
+  it("adopts debug data atomically with an accepted snapshot and rejects stale pairs", () => {
+    const store = useSessionStore.getState();
+    store.applyGameSnapshot({ view: view(0), seq: 10, debugOmniscient: debug });
+    expect(useSessionStore.getState().debugOmniscient).toEqual(debug);
+
+    store.applyGameSnapshot({ view: view(1), seq: 9 });
+    expect(useSessionStore.getState()).toMatchObject({ view: view(0), debugOmniscient: debug });
+
+    store.applyGameSnapshot({ view: view(2), seq: 11 });
+    expect(useSessionStore.getState().debugOmniscient).toBeNull();
   });
 
   it("resets the seq epoch for a new game or room and clears game state on leave", () => {

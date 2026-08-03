@@ -149,6 +149,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         view: event.view,
         seq: event.seq,
         ...(event.deadline !== undefined ? { deadline: event.deadline } : {}),
+        ...(event.debugOmniscient !== undefined ? { debugOmniscient: event.debugOmniscient } : {}),
       });
     });
     this.eventBus.on("game:event", (event) => {
@@ -293,6 +294,9 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
             view: resumed.view,
             seq: resumed.seq,
             ...(resumed.deadline !== undefined ? { deadline: resumed.deadline } : {}),
+            ...(resumed.debugOmniscient !== undefined
+              ? { debugOmniscient: resumed.debugOmniscient }
+              : {}),
           }
         : roomInfo;
     });

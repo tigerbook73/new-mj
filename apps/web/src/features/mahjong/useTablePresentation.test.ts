@@ -310,7 +310,7 @@ describe("useTablePresentation", () => {
       });
     });
 
-    it("disables reflow for a revealed left/right god-mode seat, but not top/bottom", () => {
+    it("keeps opponent draw animation enabled, while only top may reflow", () => {
       const presentation = useTablePresentation({
         view: baseView,
         players: [{ nickname: "Me" }, null, null, null],
@@ -320,12 +320,16 @@ describe("useTablePresentation", () => {
       if (!presentation) throw new Error("missing presentation");
 
       expect(presentation.seats.bottom.reflow).toBe(true);
+      expect(presentation.seats.bottom.animateDraw).toBe(true);
       expect(presentation.seats.top.revealed).toBe(true);
       expect(presentation.seats.top.reflow).toBe(true);
+      expect(presentation.seats.top.animateDraw).toBe(true);
       expect(presentation.seats.right.revealed).toBe(true);
       expect(presentation.seats.right.reflow).toBe(false);
+      expect(presentation.seats.right.animateDraw).toBe(true);
       expect(presentation.seats.left.revealed).toBe(true);
       expect(presentation.seats.left.reflow).toBe(false);
+      expect(presentation.seats.left.animateDraw).toBe(true);
     });
 
     it("leaves every seat unrevealed and reflow-false when godView is absent, except bottom", () => {
