@@ -4,11 +4,8 @@ import type { Meld } from "@/features/mahjong/components/MeldGroup";
 import type { SeatContent } from "@/features/mahjong/components/TableBoard";
 import type { TableAnimationMetadata } from "@/features/mahjong/animation/tableAnimationCoordinator";
 import { handTokensForPresentation } from "@/features/mahjong/animation/model/handVisualTrack";
-import {
-  isCaishenTile,
-  sortTilesForDisplay,
-  type TileKind,
-} from "@/features/mahjong/lib/mahjongTiles";
+import { buildHandTiles } from "@/features/mahjong/lib/buildHandTiles";
+import { type TileKind } from "@/features/mahjong/lib/mahjongTiles";
 import {
   directionOf,
   seatAt,
@@ -137,7 +134,6 @@ export function useTablePresentation({
       const seat = seatAt(view.seat, direction);
       const data = seatData(seat);
       const player = players?.[seat];
-      const drawnVisible = direction === "bottom" ? extras.justDrawn !== undefined : data.justDrawn;
       // God mode (see godView doc above): an opponent seat with real hand
       // data available renders like the bottom seat, including the pinned
       // drawn-tile slot. Identifying *which* tile was just drawn relies on
@@ -158,46 +154,15 @@ export function useTablePresentation({
       // pinned position never shifts the row's total width. Opponents have no
       // real TileIds to show, so their "rest" slots are meaningless filler (0)
       // that HandRow never reads as an id because `revealed` is false.
-      const restOfHand =
-        extras.justDrawn !== undefined
-          ? view.hand.filter((tile) => tile !== extras.justDrawn)
-          : view.hand;
-      const caishenTiles = highlightCaishen ? restOfHand.filter(isCaishenTile) : [];
-      const nonCaishenTiles = highlightCaishen
-        ? restOfHand.filter((tile) => !isCaishenTile(tile))
-        : restOfHand;
-      const godDrawnTile = godHand && drawnVisible ? godHand[godHand.length - 1] : undefined;
-      const godRestOfHand = godHand
-        ? godDrawnTile !== undefined
-          ? godHand.slice(0, -1)
-          : godHand
-        : [];
-      const godCaishenTiles = highlightCaishen ? godRestOfHand.filter(isCaishenTile) : [];
-      const godNonCaishenTiles = highlightCaishen
-        ? godRestOfHand.filter((tile) => !isCaishenTile(tile))
-        : godRestOfHand;
-      const handTiles: number[] =
-        direction === "bottom"
-          ? [
-              ...sortTilesForDisplay(caishenTiles),
-              ...(caishenTiles.length > 0 ? [-1] : []),
-              ...sortTilesForDisplay(nonCaishenTiles),
-              -1,
-              extras.justDrawn ?? -1,
-            ]
-          : godHand
-            ? [
-                ...sortTilesForDisplay(godCaishenTiles),
-                ...(godCaishenTiles.length > 0 ? [-1] : []),
-                ...sortTilesForDisplay(godNonCaishenTiles),
-                -1,
-                godDrawnTile ?? -1,
-              ]
-            : [
-                ...Array<number>(drawnVisible ? data.handCount - 1 : data.handCount).fill(0),
-                -1,
-                drawnVisible ? 0 : -1,
-              ];
+      const { handTiles, drawnVisible, godDrawnTile } = buildHandTiles({
+        direction,
+        hand: view.hand,
+        myJustDrawnTile: extras.justDrawn,
+        godHand,
+        handCount: data.handCount,
+        seatJustDrawn: data.justDrawn,
+        highlightCaishen,
+      });
       const visualTokens = handTokensForPresentation(
         animation?.handTracks.get(seat),
         seat,
