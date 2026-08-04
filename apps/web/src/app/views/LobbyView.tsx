@@ -21,7 +21,16 @@ export function LobbyView() {
   const userId = useSessionStore((state) => state.userId);
   const room = useSessionStore((state) => state.room);
   const setRoom = useSessionStore((state) => state.setRoom);
-  const [preview, setPreview] = useState<RoomInfo | null>(null);
+  // The single source of truth this page renders from — every room:* event
+  // below writes only here, whether or not the caller has taken a seat.
+  // Seeded from `room` when it already matches this route (arriving fresh
+  // from GamePickerView's create-room `setRoom`) since the mount effect
+  // below then skips its own room:enter fetch and nothing else would ever
+  // populate `preview` in that case — this only needs to run once, at
+  // mount, because navigating from `/lobby/:a` straight to `/lobby/:b`
+  // without an intervening route never happens (every entry to this route
+  // comes from a genuine mount elsewhere: /games, a Sit, or room:enter).
+  const [preview, setPreview] = useState<RoomInfo | null>(room?.id === roomId ? room : null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [readyOverride, setReadyOverride] = useState<boolean | null>(null);
@@ -54,9 +63,6 @@ export function LobbyView() {
 
   useEffect(() => {
     const onPlayerJoined = (event: RoomPlayerJoinedEvent) => {
-      useSessionStore
-        .getState()
-        .applyPlayerJoined(event.seat, event.nickname, event.isBot, event.avatar);
       setPreview((current) => {
         if (!current || current.id !== roomId) return current;
         const players = [...current.players] as RoomInfo["players"];
@@ -74,7 +80,6 @@ export function LobbyView() {
       });
     };
     const onReadyChanged = (event: RoomReadyChangedEvent) => {
-      useSessionStore.getState().applyReadyChanged(event.seat, event.ready);
       setPreview((current) => {
         if (!current || current.id !== roomId) return current;
         const player = current.players[event.seat];
@@ -89,19 +94,17 @@ export function LobbyView() {
     }: {
       participant: NonNullable<RoomInfo["participants"]>[number];
     }) => {
-      const update = (current: RoomInfo | null) => {
+      setPreview((current) => {
         if (!current || current.id !== roomId) return current;
         const participants = [...(current.participants ?? [])];
         const index = participants.findIndex((item) => item.userId === participant.userId);
         if (index >= 0) participants[index] = participant;
         else participants.push(participant);
         return { ...current, participants };
-      };
-      useSessionStore.setState((state) => ({ room: update(state.room) }));
-      setPreview(update);
+      });
     };
     const onParticipantLeft = ({ userId: participantUserId }: { userId: string }) => {
-      const update = (current: RoomInfo | null) =>
+      setPreview((current) =>
         current && current.id === roomId
           ? {
               ...current,
@@ -109,21 +112,14 @@ export function LobbyView() {
                 (item) => item.userId !== participantUserId,
               ),
             }
-          : current;
-      useSessionStore.setState((state) => ({ room: update(state.room) }));
-      setPreview(update);
+          : current,
+      );
     };
     const onSnapshot = (event: GameSnapshot) => {
       useSessionStore.getState().applyGameSnapshot(event);
       void navigate(`/room/${roomId}`);
     };
     const onPlayerLeft = ({ seat }: { seat: 0 | 1 | 2 | 3 }) => {
-      useSessionStore.setState((state) => {
-        if (!state.room || state.room.id !== roomId) return state;
-        const players = [...state.room.players] as RoomInfo["players"];
-        players[seat] = null;
-        return { room: { ...state.room, players } };
-      });
       setPreview((current) => {
         if (!current || current.id !== roomId) return current;
         const players = [...current.players] as RoomInfo["players"];
@@ -170,7 +166,7 @@ export function LobbyView() {
     };
   }, [navigate, roomId, setRoom, socket]);
 
-  const shownRoom = room?.id === roomId ? room : preview;
+  const shownRoom = preview;
   const mySeat = shownRoom?.players.findIndex((player) => player?.userId === userId) ?? -1;
   const isHost = shownRoom?.ownerUserId === userId;
   const canStart = shownRoom?.players.every((player) => player?.isReady === true) ?? false;
@@ -178,8 +174,10 @@ export function LobbyView() {
   const joinSeat = async (seat: 0 | 1 | 2 | 3) => {
     setError(null);
     const result = await ack<RoomInfo>(socket, "room:join", { roomId, seat });
-    if (result.ok) setRoom(result.data);
-    else setError(result.code);
+    if (result.ok) {
+      setRoom(result.data);
+      setPreview(result.data);
+    } else setError(result.code);
   };
   const addBot = async (seat: 0 | 1 | 2 | 3) => {
     setError(null);
