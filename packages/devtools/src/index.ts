@@ -36,7 +36,7 @@ export const worktreeEnvironment = (
   VITE_SERVER_URL: `http://localhost:${config.devServerPort}`,
   E2E_SERVER_PORT: String(config.e2eServerPort),
   E2E_WEB_PORT: String(config.e2eWebPort),
-  E2E_WORKERS: "1",
+  E2E_WORKERS: config.slot === 0 ? undefined : "1",
 });
 
 export const firstAvailableWorktreeSlot = (claimedSlots: Iterable<number>): number => {

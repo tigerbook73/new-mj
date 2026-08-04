@@ -30,6 +30,17 @@ test("worktree environment wins over inherited conflicting ports", () => {
   assert.equal(env.KEEP, "yes");
 });
 
+// Slot 0 is always the primary checkout (readConfig/firstAvailableWorktreeSlot
+// in worktree-cli.ts never assign it to a `worktree-cli create`d satellite —
+// the primary's own git-worktree-list entry permanently claims it), so it's
+// the one place safe to leave Playwright's own worker count uncapped;
+// every other slot stays pinned to 1 to avoid oversubscribing the CPU when
+// several worktrees run e2e concurrently.
+test("worktree environment leaves E2E_WORKERS unset for the primary checkout (slot 0)", () => {
+  const env = worktreeEnvironment(worktreeConfigFor(0), { E2E_WORKERS: "9" });
+  assert.equal(env.E2E_WORKERS, undefined);
+});
+
 test("only ignored root .env.* files are selected for linking", () => {
   const names = environmentLinkNames(
     [
