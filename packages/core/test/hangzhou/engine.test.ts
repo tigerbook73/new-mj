@@ -114,7 +114,7 @@ test("illegal actions do not mutate state or consume event sequence", () => {
 // Caishen is 5z (白/Haku), ids 124-127 — see constants.ts.
 const CAISHEN_IDS = [124, 125, 126, 127];
 
-test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
+test("a discarded caishen cannot be chi'd/peng'd/gang'd/hu'd by anyone", () => {
   const seat1Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 125, 126];
   const physical = new Set([124, ...seat1Hand]);
   const state: HangzhouState = {
@@ -135,10 +135,58 @@ test("a discarded caishen cannot be chi'd/peng'd/gang'd, only ron'd", () => {
     gangChain: [0, 0, 0, 0],
   };
   const discarded = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 124 }));
-  const options = hangzhouRuleSet.getLegalActions(discarded, 1);
-  expect(options.some((action) => action.type === "peng" || action.type === "minGang")).toBe(false);
-  expect(options.some((action) => action.type === "chi")).toBe(false);
+  // No claims are offered for discarded caishen, so window resolves immediately to awaiting-draw.
+  expect(discarded.phase).toBe("awaiting-draw");
+  expect(hangzhouRuleSet.getLegalActions(discarded, 1)).toEqual([{ type: "draw" }]);
   assertTileConservation(discarded);
+});
+
+test("caishen discard triggers 1-orbit lockout: restricts claims, buGang, and forces draw-discard (摸打)", () => {
+  const seat0Hand = [124];
+  const seat1Hand = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 16, 17];
+  const seat2Hand = [36, 37, 38, 40, 41, 42, 44, 45, 46, 48, 49, 50, 52];
+  const seat3Hand = [56, 57, 58, 60, 61, 62, 64, 65, 66, 68, 69, 70, 72];
+  const drawnTile = 15;
+  const physical = new Set([...seat0Hand, ...seat1Hand, ...seat2Hand, ...seat3Hand, drawnTile]);
+  const state: HangzhouState = {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
+    phase: "playing",
+    wall: [drawnTile, ...allTileIds().filter((tile) => !physical.has(tile))],
+    seats: [
+      { hand: seat0Hand, melds: [], discards: [] },
+      { hand: seat1Hand, melds: [], discards: [] },
+      { hand: seat2Hand, melds: [], discards: [] },
+      { hand: seat3Hand, melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    dealer: 0,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [0, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+  };
+  const caishenDiscarded = unwrap(
+    hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 124 }),
+  );
+  expect(caishenDiscarded.caishenLockout).toEqual({ discarder: 0 });
+
+  // Seat 1 draws tile 15.
+  const drawn = unwrap(hangzhouRuleSet.applyAction(caishenDiscarded, 1, { type: "draw" }));
+  expect(drawn.justDrawn).toEqual({ seat: 1, tile: 15 });
+
+  // Seat 1 is under lockout: can ONLY discard the justDrawn tile (15), not an old tile (0).
+  const seat1Actions = hangzhouRuleSet.getLegalActions(drawn, 1);
+  const discardActions = seat1Actions.filter((a) => a.type === "discard");
+  expect(discardActions).toEqual([{ type: "discard", tile: 15 }]);
+  const illegalDiscard = hangzhouRuleSet.applyAction(drawn, 1, { type: "discard", tile: 0 });
+  expect(illegalDiscard).toEqual({ error: { code: "TILE_NOT_IN_HAND" } });
+
+  // Seat 1 discards 15.
+  const seat1Discarded = unwrap(
+    hangzhouRuleSet.applyAction(drawn, 1, { type: "discard", tile: 15 }),
+  );
+  // Even though Seat 2 could normally claim tile 15, lockout blocks all claims for non-discarders.
+  expect(hangzhouRuleSet.getLegalActions(seat1Discarded, 2)).toEqual([{ type: "draw" }]);
 });
 
 test("caishen is never offered as a concealed-gang kind, even holding all four", () => {

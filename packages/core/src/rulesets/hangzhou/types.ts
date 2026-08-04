@@ -114,6 +114,9 @@ export type HangzhouState = {
   seq: number;
   prng: PrngState;
   result?: HangzhouGameResult;
+  /** Active when any seat discards caishen; restricts other seats for 1 orbit
+   * (docs/variants/hangzhou.md §2). Cleared when turn returns to discarder. */
+  caishenLockout?: { discarder: SeatId };
   /** Cumulative "discarded caishen while still baotou" successes per seat for
    * this hand, see docs/variants/hangzhou.md §4. Never reset mid-hand. */
   caiPiaoCount: [number, number, number, number];

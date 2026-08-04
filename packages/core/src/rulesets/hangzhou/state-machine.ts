@@ -43,6 +43,9 @@ export const cloneState = (state: HangzhouState): HangzhouState => {
     caiPiaoCount: [...state.caiPiaoCount] as HangzhouState["caiPiaoCount"],
     gangChain: [...state.gangChain] as GangChain,
   };
+  if (state.caishenLockout) {
+    cloned.caishenLockout = { ...state.caishenLockout };
+  }
   if (state.pendingClaims) {
     cloned.pendingClaims = {
       discard: { ...state.pendingClaims.discard },
@@ -158,13 +161,17 @@ export const claimOptions = (state: HangzhouState, seat: SeatId): HangzhouClaimO
   if (!pending || pending.discard.seat === seat) return [];
   const tile = pending.discard.tile;
   const kind = STANDARD_TILE_SET.kindOf(tile);
+  // docs/variants/hangzhou.md §2: discarded caishen can never be claimed (chi/peng/gang/hu).
+  if (kind === CAISHEN_KIND) return [];
+  // docs/variants/hangzhou.md §2: during caishen lockout, non-discarder seats cannot claim any discard.
+  if (state.caishenLockout && seat !== state.caishenLockout.discarder) return [];
+
   const options: HangzhouClaimOption[] = [];
   // 三牢 (hangzhou.md §5): ron is blocked for the dealer's first two
   // consecutive terms; self-draw (zimo) is never affected by this gate.
   if (isWin(state, seat, tile) && configOf(state).dealerStreak >= 3) {
     options.push({ action: { type: "hu" } });
   }
-  if (kind === CAISHEN_KIND) return options;
   const hand = state.seats[seat]!.hand;
   const matching = sameKind(hand, kind);
   if (matching.length >= 3) options.push({ action: { type: "minGang" } });
@@ -202,6 +209,9 @@ export const beginTurn = (
   replacement = false,
 ): void => {
   state.currentSeat = seat;
+  if (state.caishenLockout && seat === state.caishenLockout.discarder) {
+    delete state.caishenLockout;
+  }
   if (!draw) {
     state.phase = "playing";
     appendEvent(state, events, publicVisibility, { type: EVENT_TYPES.turnStarted, seat });
@@ -408,6 +418,11 @@ export const applyDiscard = (
   events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
+  const isRestricted =
+    state.caishenLockout !== undefined && seat !== state.caishenLockout.discarder;
+  if (isRestricted && state.justDrawn?.seat === seat && tile !== state.justDrawn.tile) {
+    return fail("TILE_NOT_IN_HAND");
+  }
   const hand = state.seats[seat]!.hand;
   const remaining = removeTiles(hand, [tile]);
   if (!remaining) return fail("TILE_NOT_IN_HAND");
@@ -419,6 +434,9 @@ export const applyDiscard = (
   const beforeHand = justDrawnTile !== undefined ? removeTiles(hand, [justDrawnTile])! : hand;
   const wasBaotouBefore = isBaotou(kindsOf(beforeHand), meldsCount);
   const discardedIsCaishen = STANDARD_TILE_SET.kindOf(tile) === CAISHEN_KIND;
+  if (discardedIsCaishen) {
+    state.caishenLockout = { discarder: seat };
+  }
   if (wasBaotouBefore && discardedIsCaishen && isBaotou(kindsOf(remaining), meldsCount)) {
     state.caiPiaoCount[seat] += 1;
   }
@@ -485,6 +503,9 @@ export const applyBuGang = (
   events: GameEvent<HangzhouEventPayload>[],
 ): HangzhouApplyResult => {
   if (state.phase !== "playing" || state.currentSeat !== seat) return fail("NOT_YOUR_TURN");
+  const isRestricted =
+    state.caishenLockout !== undefined && seat !== state.caishenLockout.discarder;
+  if (isRestricted) return fail("GANG_NOT_AVAILABLE");
   if (!state.seats[seat]!.hand.includes(tile)) return fail("TILE_NOT_IN_HAND");
   const kind = STANDARD_TILE_SET.kindOf(tile);
   const meld = state.seats[seat]!.melds.find(
