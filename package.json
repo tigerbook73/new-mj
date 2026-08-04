@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "worktree-cli run turbo run dev",
     "build": "turbo run build",
-    "format": "git ls-files -z | xargs -0 prettier --ignore-unknown --write",
+    "format": "git ls-files -z | xargs -0 prettier --ignore-unknown --log-level warn --write",
     "format:check": "git ls-files -z | xargs -0 prettier --ignore-unknown --check",
     "typecheck": "turbo run typecheck && tsc -p tools/tsconfig.json",
     "lint": "turbo run lint && eslint tools",
