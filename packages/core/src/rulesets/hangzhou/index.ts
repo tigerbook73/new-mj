@@ -75,18 +75,27 @@ export const hangzhouRuleSet: RulesetModule<HangzhouState, HangzhouAction> = {
       return state.currentSeat === seat ? [{ type: "draw" }] : [];
     }
     if (state.phase !== "playing" || state.currentSeat !== seat) return [];
+    const isRestricted =
+      state.caishenLockout !== undefined && seat !== state.caishenLockout.discarder;
     const hand = state.seats[seat]!.hand;
-    const actions: HangzhouAction[] = hand.map((tile) => ({ type: "discard", tile }));
+    let actions: HangzhouAction[] = [];
+    if (isRestricted && state.justDrawn?.seat === seat) {
+      actions.push({ type: "discard", tile: state.justDrawn.tile });
+    } else {
+      actions = hand.map((tile) => ({ type: "discard", tile }));
+    }
     // Caishen can never be gang'd, even concealed — see hangzhou.md §2.
     for (const kind of STANDARD_TILE_SET.kinds) {
       if (kind === CAISHEN_KIND) continue;
       if (sameKind(hand, kind).length === 4) actions.push({ type: "anGang", kind });
     }
-    for (const meld of state.seats[seat]!.melds) {
-      if (meld.type !== "peng") continue;
-      const kind = STANDARD_TILE_SET.kindOf(meld.tiles[0]!);
-      const tile = sameKind(hand, kind)[0];
-      if (tile !== undefined) actions.push({ type: "buGang", tile });
+    if (!isRestricted) {
+      for (const meld of state.seats[seat]!.melds) {
+        if (meld.type !== "peng") continue;
+        const kind = STANDARD_TILE_SET.kindOf(meld.tiles[0]!);
+        const tile = sameKind(hand, kind)[0];
+        if (tile !== undefined) actions.push({ type: "buGang", tile });
+      }
     }
     if (canZimo(state, seat)) actions.push({ type: "zimo" });
     return actions;

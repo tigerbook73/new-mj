@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Dialog } from "@base-ui/react/dialog";
 import { AnimatePresence } from "motion/react";
-import type {
-  GameAdviceResponse,
-  GameEventEnvelope,
-  GameSnapshot,
-  RoomReadyChangedEvent,
-  SessionResult,
-} from "@new-mj/protocol";
+import type { GameAdviceResponse } from "@new-mj/protocol";
 import { Button } from "@/shared/ui/button";
 import { SidebarProvider } from "@/shared/ui/sidebar";
 import { ActionDock } from "@/features/mahjong/components/ActionDock";
@@ -25,6 +18,8 @@ import {
   RoundEndOverlay,
   type GameResultLike,
 } from "@/features/mahjong/components/RoundEndOverlay";
+import { LeaveConfirmDialog } from "@/features/mahjong/components/LeaveConfirmDialog";
+import { SessionFinishedPanel } from "@/features/mahjong/components/SessionFinishedPanel";
 import { TableBoard, type TurnHighlight } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
 import { TableHud, TableHudTrigger } from "@/features/mahjong/components/TableHud";
@@ -34,53 +29,15 @@ import {
   tableAnimationMetadata,
 } from "@/features/mahjong/animation/tableAnimationCoordinator";
 import { tileKindOf, type TileKind } from "@/features/mahjong/lib/mahjongTiles";
-import { playSound, type SoundName } from "@/shared/lib/sounds";
 import { buildStatusBadges } from "@/features/mahjong/lib/statusBadges";
 import { usePrefersReducedMotion } from "@/shared/hooks/usePrefersReducedMotion";
 import { ack } from "@/shared/lib/socket";
 import { cn } from "@/shared/lib/utils";
 import { useSessionStore } from "@/shared/store/session";
 import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
+import { useTableActions } from "./useTableActions";
+import { useTableSocket } from "./useTableSocket";
 import { useTablePresentation } from "./useTablePresentation";
-
-// Sound-effect scope, matching the actual
-// clip set provided: 8 action clips (chi/peng/gang/angang/bugang/hu/zimo/pass) plus
-// a full 34-kind tile-name voice set (public/sounds/{1m,...,7z}.m4a, same naming as
-// TileKind) — a discard announces the discarded tile's name instead of a generic
-// click. `game:event` fires once per live occurrence (not replayed on reconnect,
-// see apps/web AGENTS.md), so no dedup is needed beyond what onEvent already does
-// for its debug log below.
-// - GangMade carries no `gangType` at all for a claimed open kong (junk/claims.ts's
-//   applyClaimResponse only sets `gangType` for anGang/buGang — see hangzhou/junk
-//   state-machine.ts) — that's the "gang" (明杠) case below.
-// - HuDeclared's `winType` distinguishes self-draw (zimo) from off-discard (hu).
-// - ClaimResponded is seat-visible only to the responder, so this only ever fires
-//   for *my own* pass — other seats' passes never reach my `game:event` stream.
-// - A discard is always public (TileId shown is the actual discarded tile — no
-//   visibility concern, unlike a concealed hand), so tileKindOf is safe here.
-const soundForEvent = (payload: {
-  type: string;
-  [key: string]: unknown;
-}): SoundName | undefined => {
-  switch (payload.type) {
-    case "TileDiscarded":
-      return tileKindOf(payload.tile as number);
-    case "ChiMade":
-      return "chi";
-    case "PengMade":
-      return "peng";
-    case "GangMade": {
-      const gangType = payload.gangType as "anGang" | "buGang" | undefined;
-      return gangType === "anGang" ? "angang" : gangType === "buGang" ? "bugang" : "gang";
-    }
-    case "HuDeclared":
-      return payload.winType === "zimo" ? "zimo" : "hu";
-    case "ClaimResponded":
-      return (payload.action as { type: string }).type === "pass" ? "pass" : undefined;
-    default:
-      return undefined;
-  }
-};
 
 /**
  * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myActionOptions），
@@ -99,13 +56,10 @@ export function TableView() {
   const advice = useSessionStore((state) => state.advice);
   const snapshotRevision = useSessionStore((state) => state.snapshotRevision);
   const debugOmniscient = useSessionStore((state) => state.debugOmniscient);
-  const setRoom = useSessionStore((state) => state.setRoom);
   const activeSocket = socket!;
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const [log, setLog] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   // God mode (dev-only, protocol-shared.md §7): only chooses whether to
   // render the synchronous, server-gated debug snapshot already in the
@@ -159,95 +113,13 @@ export function TableView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const onSnapshot = (event: GameSnapshot) => {
-      // registerSnapshotDiff must read the *pre-update* view/gameSeq and run
-      // before applyGameSnapshot swaps them — see animationLedger.ts's
-      // shouldRegisterSnapshotDiff for the seq guard's exact semantics.
-      const {
-        gameSeq: currentGameSeq,
-        view: currentView,
-        room: currentRoom,
-        debugOmniscient: currentDebugOmniscient,
-      } = useSessionStore.getState();
-      const { autoDiscardOrigin } = registerTableSnapshotAnimation({
-        previousSeq: currentGameSeq,
-        nextSeq: event.seq,
-        previousView: currentView,
-        nextView: event.view,
-        seat: event.view.seat,
-        gameNumber: currentRoom?.gameNumber ?? 1,
-        enabled: !prefersReducedMotion,
-        previousGodHands: isGodModeVisible ? currentDebugOmniscient?.hands : undefined,
-        nextGodHands: isGodModeVisible ? event.debugOmniscient?.hands : undefined,
-      });
-      if (autoDiscardOrigin) setPendingDiscardOrigin(autoDiscardOrigin);
-      useSessionStore.getState().applyGameSnapshot(event);
-    };
-    const onEvent = (message: GameEventEnvelope) => {
-      const payload = message.event.payload as { type: string; [key: string]: unknown };
-      setLog((prev) => [...prev.slice(-9), `#${message.event.seq} ${payload.type}`]);
-      const sound = soundForEvent(payload);
-      if (sound) playSound(sound);
-    };
-    const onScoreUpdated = (message: {
-      scores: [number, number, number, number];
-      gameNumber: number;
-      totalGames?: number;
-    }) => {
-      useSessionStore.setState((state) =>
-        state.room
-          ? {
-              room: {
-                ...state.room,
-                scores: message.scores,
-                gameNumber: message.gameNumber,
-                ...(message.totalGames !== undefined ? { totalGames: message.totalGames } : {}),
-              },
-            }
-          : state,
-      );
-    };
-    const onDealerChanged = (message: { dealer: 0 | 1 | 2 | 3; gameNumber: number }) => {
-      useSessionStore.setState((state) =>
-        state.room
-          ? { room: { ...state.room, dealer: message.dealer, gameNumber: message.gameNumber } }
-          : state,
-      );
-      useSessionStore.getState().resetGameSeq();
-      resetTableAnimationRuntime();
-    };
-    const onSessionFinished = (message: { result: SessionResult }) =>
-      setSessionResult(message.result);
-    // Reused for the between-rounds confirm gate too, not just pre-game ready-up
-    // — see docs/contracts/session-mechanics.md §6.
-    const onReadyChanged = (event: RoomReadyChangedEvent) => {
-      useSessionStore.getState().applyReadyChanged(event.seat, event.ready);
-    };
-    const onClosed = ({ reason }: { reason: string }) => {
-      const notice =
-        reason === "hostLeft" ? "The owner closed this room." : "This room was closed.";
-      setRoom(null);
-      void navigate("/games", { state: { notice } });
-    };
-
-    activeSocket.on("game:snapshot", onSnapshot);
-    activeSocket.on("game:event", onEvent);
-    activeSocket.on("room:scoreUpdated", onScoreUpdated);
-    activeSocket.on("room:dealerChanged", onDealerChanged);
-    activeSocket.on("room:sessionFinished", onSessionFinished);
-    activeSocket.on("room:readyChanged", onReadyChanged);
-    activeSocket.on("room:closed", onClosed);
-    return () => {
-      activeSocket.off("game:snapshot", onSnapshot);
-      activeSocket.off("game:event", onEvent);
-      activeSocket.off("room:scoreUpdated", onScoreUpdated);
-      activeSocket.off("room:dealerChanged", onDealerChanged);
-      activeSocket.off("room:readyChanged", onReadyChanged);
-      activeSocket.off("room:sessionFinished", onSessionFinished);
-      activeSocket.off("room:closed", onClosed);
-    };
-  }, [activeSocket, isGodModeVisible, navigate, prefersReducedMotion, setRoom]);
+  const { log, sessionResult } = useTableSocket({
+    activeSocket,
+    isGodModeVisible,
+    prefersReducedMotion,
+    navigate,
+    setPendingDiscardOrigin,
+  });
 
   useEffect(() => {
     if (!view || gameSeq === null) return;
@@ -264,59 +136,12 @@ export function TableView() {
     };
   }, [activeSocket, gameDeadline, gameSeq, snapshotRevision, view]);
 
-  const confirmNextRound = async () => {
-    setError(null);
-    const result = await ack(activeSocket, "room:ready", { ready: true });
-    if (!result.ok) setError(result.code);
-  };
-
-  const sendAction = async (action: unknown) => {
-    setError(null);
-    const result = await ack(activeSocket, "game:action", { action });
-    if (!result.ok) {
-      setError(result.code);
-    }
-  };
-
-  const leave = async () => {
-    setError(null);
-    const result = await ack(activeSocket, "room:leave", {});
-    if (!result.ok) {
-      setError(result.code);
-      return;
-    }
-    setRoom(null);
-    void navigate("/games");
-  };
-
-  /**
-   * room:end — ends the whole session immediately for every seat (see
-   * docs/contracts/session-mechanics.md §6 "提前结束整场对局"), distinct
-   * from `leave()`'s in-game path (permanent auto-pilot, session continues
-   * for everyone else). Two entry points share this: the round-end
-   * overlay's "End" button, and the Leave room dialog's "Force exit"
-   * option (which follows up with its own `leave()` to actually navigate
-   * away — see `forceLeave` below).
-   */
-  const endSession = async (): Promise<boolean> => {
-    setError(null);
-    const result = await ack(activeSocket, "room:end", {});
-    if (!result.ok) {
-      setError(result.code);
-      return false;
-    }
-    return true;
-  };
-
-  const forceLeave = async () => {
-    setLeaveConfirmOpen(false);
-    if (await endSession()) void leave();
-  };
-
-  const handOff = () => {
-    setLeaveConfirmOpen(false);
-    void leave();
-  };
+  const { confirmNextRound, sendAction, leave, endSession, forceLeave, handOff } = useTableActions({
+    activeSocket,
+    navigate,
+    setError,
+    setLeaveConfirmOpen,
+  });
 
   const isIncrementalSnapshot = useIsIncrementalSnapshot(gameSeq);
   const presentation = useTablePresentation({
@@ -523,76 +348,20 @@ export function TableView() {
           </AnimatePresence>
 
           {sessionResult != null && room && (
-            <div
-              data-testid="session-finished-overlay"
-              className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 p-4"
-            >
-              <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border bg-background p-5 text-center shadow-xl">
-                <h2 className="text-lg font-semibold">Session finished</h2>
-                <p className="text-sm text-muted-foreground">
-                  {sessionResult.gamesPlayed} game{sessionResult.gamesPlayed === 1 ? "" : "s"}{" "}
-                  played
-                </p>
-                <ol className="flex flex-col gap-1 text-sm">
-                  {sessionResult.ranking.map((entry, index) => (
-                    <li
-                      key={entry.seatId}
-                      className={cn(
-                        "flex items-center justify-between rounded-md px-2 py-1",
-                        entry.seatId === sessionResult.winner && "bg-primary/10 font-semibold",
-                      )}
-                    >
-                      <span>
-                        #{index + 1}{" "}
-                        {room.players[entry.seatId]?.nickname ?? `Seat ${entry.seatId + 1}`}
-                        {entry.seatId === sessionResult.winner ? " \u{1F3C6}" : ""}
-                      </span>
-                      <span>{entry.score}</span>
-                    </li>
-                  ))}
-                </ol>
-                <div className="flex flex-wrap justify-center gap-2 text-sm">
-                  {Array.from({ length: sessionResult.gamesPlayed }, (_, index) => index + 1).map(
-                    (gameNumber) => (
-                      <Link
-                        key={gameNumber}
-                        to={`/replay/${room.id}/${gameNumber}`}
-                        className="underline"
-                      >
-                        Replay game {gameNumber}
-                      </Link>
-                    ),
-                  )}
-                </div>
-                <Button variant="outline" onClick={() => void leave()}>
-                  Back to games
-                </Button>
-              </div>
-            </div>
+            <SessionFinishedPanel
+              sessionResult={sessionResult}
+              room={room}
+              onLeave={() => void leave()}
+            />
           )}
         </main>
 
-        <Dialog.Root open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
-          <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50" />
-            <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 flex w-96 max-w-[calc(100vw-3rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 rounded-xl border bg-background p-6 shadow-xl">
-              <Dialog.Title className="text-lg font-semibold">Leave room?</Dialog.Title>
-              <Dialog.Description className="text-sm text-muted-foreground">
-                Hand off: an AI takes over your seat and the game continues for everyone else. Force
-                exit: the whole session ends now for every player, straight to settlement.
-              </Dialog.Description>
-              <div className="flex justify-end gap-2">
-                <Dialog.Close render={<Button variant="outline">Cancel</Button>} />
-                <Button variant="secondary" onClick={handOff}>
-                  Hand off to AI
-                </Button>
-                <Button variant="destructive" onClick={() => void forceLeave()}>
-                  Force exit
-                </Button>
-              </div>
-            </Dialog.Popup>
-          </Dialog.Portal>
-        </Dialog.Root>
+        <LeaveConfirmDialog
+          open={leaveConfirmOpen}
+          onOpenChange={setLeaveConfirmOpen}
+          onHandOff={handOff}
+          onForceLeave={() => void forceLeave()}
+        />
 
         <details className="absolute right-3 bottom-3 z-20 max-h-[60dvh] w-72 overflow-auto rounded-lg border bg-background/95 p-2 text-xs shadow-lg">
           <summary className="cursor-pointer font-medium">Diagnostics</summary>

@@ -24,7 +24,8 @@
 - `features/mahjong/`：Junk 牌桌；`TableBoard` 消费 `TableScenario`，桌面绑定在 `components/scenarios/`。布局边界见 `docs/architecture/frontend-layout.md`。
 - `features/layout-sketch/`：仅 DEV 的布局编辑器；与 mahjong 共享 `shared/lib/layoutPreset.ts`，不接 socket/core。
 - `features/auth/`：OAuth 与开发态登录；`shared/lib/sessionBootstrap.ts`/`socket.ts` 是连接恢复与传输入口。
-- `app/views/`：尚未拥有私有 feature 的页面；`test/*.e2e-spec.ts`：Playwright 端到端测试。
+- `features/lobby/`：房间列表/创建（`GamePickerView`）与等待室（`LobbyView`）。
+- `app/views/`：尚未拥有私有 feature 的页面（当前只剩 `ReplayView`）；`test/*.e2e-spec.ts`：Playwright 端到端测试。
 
 ## DoD
 

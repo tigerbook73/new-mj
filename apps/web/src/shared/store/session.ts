@@ -58,12 +58,6 @@ export type SessionState = {
   resetGameSeq: () => void;
   applyGameAdvice: (advice: GameAdviceResponse, requestedRevision: number) => void;
   clearGameAdvice: (requestedRevision?: number) => void;
-  /**
-   * room:playerJoined 事件只带 {seat,nickname,isBot}，没有 userId——client 不
-   * 需要知道别人的 userId（自己的座位号靠自己的 userId 在初始快照里就能定位，
-   * 不依赖这里补的占位值）。
-   */
-  applyPlayerJoined: (seat: SeatId, nickname: string, isBot: boolean, avatar?: string) => void;
   applyReadyChanged: (seat: SeatId, ready: boolean) => void;
 };
 
@@ -178,22 +172,6 @@ export const useSessionStore = create<SessionState>((set) => ({
         ? { advice: null }
         : state,
     ),
-  applyPlayerJoined: (seat, nickname, isBot, avatar) =>
-    set((state) => {
-      if (!state.room) return state;
-      const players = [...state.room.players] as RoomInfo["players"];
-      players[seat] = {
-        userId: "",
-        seatId: seat,
-        nickname,
-        isBot,
-        isReady: false,
-        isAutoPiloted: false,
-        isDisconnected: false,
-        ...(avatar ? { avatar } : {}),
-      };
-      return { room: { ...state.room, players } };
-    }),
   applyReadyChanged: (seat, ready) =>
     set((state) => {
       const player = state.room?.players[seat];
