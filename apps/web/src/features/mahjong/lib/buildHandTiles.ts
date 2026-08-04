@@ -52,7 +52,11 @@ export function buildHandTiles({
     : restOfHand;
 
   const godDrawnTile = godHand && drawnVisible ? godHand[godHand.length - 1] : undefined;
-  const godRestOfHand = godHand ? (godDrawnTile !== undefined ? godHand.slice(0, -1) : godHand) : [];
+  const godRestOfHand = godHand
+    ? godDrawnTile !== undefined
+      ? godHand.slice(0, -1)
+      : godHand
+    : [];
   const godCaishenTiles = highlightCaishen ? godRestOfHand.filter(isCaishenTile) : [];
   const godNonCaishenTiles = highlightCaishen
     ? godRestOfHand.filter((tile) => !isCaishenTile(tile))

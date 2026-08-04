@@ -162,7 +162,14 @@ export function useTableSocket({
       activeSocket.off("room:sessionFinished", onSessionFinished);
       activeSocket.off("room:closed", onClosed);
     };
-  }, [activeSocket, isGodModeVisible, navigate, prefersReducedMotion, setPendingDiscardOrigin, setRoom]);
+  }, [
+    activeSocket,
+    isGodModeVisible,
+    navigate,
+    prefersReducedMotion,
+    setPendingDiscardOrigin,
+    setRoom,
+  ]);
 
   return { log, sessionResult };
 }

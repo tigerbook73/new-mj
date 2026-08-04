@@ -136,8 +136,12 @@ export function TableView() {
     };
   }, [activeSocket, gameDeadline, gameSeq, snapshotRevision, view]);
 
-  const { confirmNextRound, sendAction, leave, endSession, forceLeave, handOff } =
-    useTableActions({ activeSocket, navigate, setError, setLeaveConfirmOpen });
+  const { confirmNextRound, sendAction, leave, endSession, forceLeave, handOff } = useTableActions({
+    activeSocket,
+    navigate,
+    setError,
+    setLeaveConfirmOpen,
+  });
 
   const isIncrementalSnapshot = useIsIncrementalSnapshot(gameSeq);
   const presentation = useTablePresentation({
