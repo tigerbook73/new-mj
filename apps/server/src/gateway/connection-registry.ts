@@ -41,7 +41,18 @@ export class ConnectionRegistry {
     this.enter(client, roomId, userId, nickname, avatar);
     if (!this.seatSockets.has(roomId)) this.seatSockets.set(roomId, new Map());
     // !: the map was just created above if missing, so it is always present here.
-    this.seatSockets.get(roomId)!.set(seat, client);
+    const seatMap = this.seatSockets.get(roomId)!;
+    // A seat switch (room:join into a different seat while already tracked
+    // elsewhere in this room, e.g. LobbyView's re-seat flow) must vacate the
+    // old seat's entry — otherwise both seats keep resolving to this same
+    // socket, and emitSnapshots' per-seat unicast double-delivers (this
+    // client's own game:snapshot plus the old seat's, same seq) onto one
+    // socket, corrupting the animation ledger's diff (registered against
+    // whichever mismatched seat happened to land last).
+    for (const [existingSeat, existingSocket] of seatMap) {
+      if (existingSocket.id === client.id && existingSeat !== seat) seatMap.delete(existingSeat);
+    }
+    seatMap.set(seat, client);
   }
 
   get(client: Socket): ConnectionInfo | undefined {

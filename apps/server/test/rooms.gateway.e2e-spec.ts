@@ -448,4 +448,52 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
       delete process.env["DISCONNECT_GRACE_MS"];
     }
   }, 15000);
+
+  it("switching seats before the game starts does not leave the old seat's socket mapping behind (regression: emitSnapshots double-delivered game:snapshot to one socket)", async () => {
+    const host = await connectAs("reseat-host");
+    const created = await ack<RoomInfo>(host, "room:create", { rulesetId: "junk" });
+    if (!created.ok) throw new Error(`room:create failed: ${created.code}`);
+    const roomId = created.data.id;
+    expect(created.data.players[0]?.userId).toBeDefined(); // room:create auto-seats the host at 0
+
+    // Move from seat 0 to seat 3 — before the fix, ConnectionRegistry kept
+    // both seats pointing at this same socket, so every subsequent
+    // emitSnapshots() unicast this socket its own view *and* seat 0's
+    // (whichever bot ended up there), same seq, back to back.
+    const moved = await ack<RoomInfo>(host, "room:join", { roomId, seat: 3 });
+    expect(moved.ok).toBe(true);
+
+    for (let i = 0; i < 3; i++) {
+      const added = await ack<object>(host, "room:addBot", {});
+      if (!added.ok) throw new Error(`room:addBot failed: ${added.code}`);
+    }
+
+    const snapshots: GameSnapshot[] = [];
+    host.on("game:snapshot", (event: GameSnapshot) => snapshots.push(event));
+
+    const ready = await ack<object>(host, "room:ready", { ready: true });
+    expect(ready.ok).toBe(true);
+    const started = await ack<object>(host, "room:start", {});
+    expect(started.ok).toBe(true);
+
+    // Game 1's dealer is seed-random for junk (session-mechanics.md §5), so
+    // seat 3 isn't reliably dealt last — drive this socket's own turns
+    // directly (same poll-and-act pattern as the reconnect regression test
+    // above) instead of assuming bot turns cascade first, so this test's
+    // snapshot count doesn't depend on who the dealer happens to be.
+    for (let step = 0; step < 12 && snapshots.length < 3; step++) {
+      const room = roomService.get(roomId);
+      if (!room || room.phase !== "in-game") break;
+      const legalActions = gameService.getLegalActions(room.gameState, 3);
+      if (legalActions.length > 0) {
+        await ack<object>(host, "game:action", { action: legalActions[0] });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(snapshots.length).toBeGreaterThanOrEqual(2);
+
+    for (const snapshot of snapshots) expect(snapshot.view.seat).toBe(3);
+    const seqs = snapshots.map((snapshot) => snapshot.seq);
+    expect(new Set(seqs).size).toBe(seqs.length);
+  });
 });
