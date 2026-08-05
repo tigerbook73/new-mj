@@ -23,7 +23,7 @@ async function createRoom(page: Page, name: string) {
 
 // Shared by every test below where a second person finds an already-created
 // room from the lobby list and opens its preview. The explicit Refresh click
-// is belt-and-suspenders — lobby:roomCreated already pushes new rooms live
+// is belt-and-suspenders — lobby:changed already triggers a live refresh
 // (see "a newly created room appears live..." below) — kept here so this
 // helper doesn't race that push's timing in tests that don't care about it.
 // Doesn't sit down; call `sitAt` afterward for tests that need an occupied seat.
@@ -119,12 +119,57 @@ test("a newly created room appears live in another browser's lobby, no refresh n
   await createRoom(creator, "Live pushed room");
   await expect(creator).toHaveURL(/\/lobby\//, { timeout: 10_000 });
 
-  // No Refresh click — this must arrive via lobby:roomCreated alone.
+  // No Refresh click — this must arrive via lobby:changed alone (viewer
+  // re-issuing its own lobby:list query on receipt).
   await expect(viewer.getByRole("button", { name: "Live pushed room" })).toBeVisible({
     timeout: 10_000,
   });
   await viewer.context().close();
   await creator.context().close();
+});
+
+test("a room disappears live from another browser's lobby once it starts or its host closes it", async ({
+  browser,
+}) => {
+  const [viewer, starter, closer] = await Promise.all([
+    loginAs(browser, "roomgone-viewer"),
+    loginAs(browser, "roomgone-starter"),
+    loginAs(browser, "roomgone-closer"),
+  ]);
+  await openVariant(viewer, "垃圾胡");
+  await openVariant(starter, "垃圾胡");
+  await openVariant(closer, "垃圾胡");
+
+  // Case 1: starting a full room removes it from the lobby (no longer
+  // `waiting`) — three bots fill it out, host readies and starts.
+  await createRoom(starter, "About to start");
+  await expect(starter).toHaveURL(/\/lobby\//, { timeout: 10_000 });
+  await expect(viewer.getByRole("button", { name: "About to start" })).toBeVisible({
+    timeout: 10_000,
+  });
+  await starter.getByRole("checkbox", { name: "Ready" }).check();
+  await expect(starter.getByText("BOT")).toHaveCount(3);
+  await starter.getByRole("button", { name: "Start game" }).click();
+  await expect(starter).toHaveURL(/\/room\//, { timeout: 10_000 });
+  await expect(viewer.getByRole("button", { name: "About to start" })).toHaveCount(0, {
+    timeout: 10_000,
+  });
+
+  // Case 2: the host closing a still-waiting room removes it too.
+  await createRoom(closer, "About to close");
+  await expect(closer).toHaveURL(/\/lobby\//, { timeout: 10_000 });
+  await expect(viewer.getByRole("button", { name: "About to close" })).toBeVisible({
+    timeout: 10_000,
+  });
+  await closer.getByRole("button", { name: "Leave room" }).click();
+  await expect(closer).toHaveURL(/\/games$/, { timeout: 10_000 });
+  await expect(viewer.getByRole("button", { name: "About to close" })).toHaveCount(0, {
+    timeout: 10_000,
+  });
+
+  await viewer.context().close();
+  await starter.context().close();
+  await closer.context().close();
 });
 
 test("a pushed room for a different ruleset never appears in the viewer's list", async ({

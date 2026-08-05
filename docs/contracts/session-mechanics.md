@@ -69,7 +69,7 @@ finished: 计算排名，对外公开 result
 | `room:join`   | 可选 `seat`：给了必须是当前空座位（否则 `SEAT_TAKEN`），不给沿用"自动找第一个空位"；ack 给 `RoomInfo` 快照                                                                                                                                                               |
 | `room:ready`  | ack `{}`                                                                                                                                                                                                                                                                 |
 | `room:addBot` | 仅房主（座位 0）、仅 `waiting` 阶段可调用；可选 `seat`（语义同 `room:join`），不给补入下一个空位；bot 立即视为已 ready；ack `{}`                                                                                                                                         |
-| `lobby:list`  | 查询，无副作用；`{ rulesetId, search? }` → `RoomSummary[]`，只返回 `phase==="waiting" && status==="open"` 的房间（一次性查询快照，search 按房间名称大小写不敏感子串匹配；MVP 仍不做观战；新房间创建的增量推送见下方 `lobby:roomCreated`，"房间消失"仍要靠重新查询）           |
+| `lobby:list`  | 查询，无副作用；`{ rulesetId, search? }` → `RoomSummary[]`，只返回 `phase==="waiting" && status==="open"` 的房间（一次性查询快照，search 按房间名称大小写不敏感子串匹配；MVP 仍不做观战；`lobby:changed` 信号触发客户端主动重新发这个查询，见下方"大厅列表变化推送"）           |
 | `room:peek`   | 查询，无副作用，不占座；`{ roomId }` → `RoomInfo` 快照——房间页在玩家真正选座位前用它展示当前座位占用情况                                                                                                                                                                 |
 | `room:leave`  | 无 payload，身份取自连接；`waiting` 阶段房主离开删整个房间（广播 `room:closed`），非房主离开只清空自己的座位（广播 `room:playerLeft`）；`in-game` 阶段立即转永久托管，不删房、不清座位；`finished` 阶段 no-op；ack `{}`                                                  |
 | `room:end`    | 无 payload，身份取自连接；仅 `in-game` 阶段可调用，任意已入座玩家（不限房主）均可发起，**无需其他玩家确认**，立即按当前 `room.scores` 结算整场 session（见下方"提前结束整场对局"）；`waiting`/`finished` 阶段调用报 `GAME_NOT_STARTED`；未入座报 `NOT_IN_ROOM`；ack `{}` |
@@ -110,11 +110,15 @@ finished: 计算排名，对外公开 result
 | `room:sessionFinished`    | result                                   | 会话结束，公开排名                                   |
 | `room:playerLeft`         | seat                                     | `waiting` 阶段非房主主动离开                         |
 | `room:closed`             | reason（`hostLeft` \| `allPlayersLeft`） | 房间不再存在：房主等待阶段离开，或对局中全部真人退出 |
-| `lobby:roomCreated`       | rulesetId、room（`RoomSummary`）         | 见下方"大厅新房间推送"                               |
+| `lobby:changed`           | rulesetId                                | 见下方"大厅列表变化推送"                             |
 
-**大厅新房间推送（2026-08 新增）**：`RoomService.create()` 成功后（房间进入 `waiting`/`open`，即刻对 `lobby:list` 可见）广播 `lobby:roomCreated { rulesetId, room: RoomSummary }`——**全局广播**（`server.emit`，不按 `roomId` 或任何订阅频道过滤），不是新开一个"大厅频道"订阅机制；客户端在 `rulesetId` 匹配当前选中的玩法标签、且房间名匹配当前 `search` 关键字时才把 `room` 插入本地列表，否则丢弃。选择全局广播而不是按 `rulesetId` 建 socket.io room 订阅，是因为这是非商用小型项目、同时在线人数少，省掉一层订阅/退订协议面的复杂度比省下的带宽更值钱；payload 只有一个 `RoomSummary`，量级也小。
+**大厅列表变化推送（2026-08 新增，v2 改为信号制）**：三个会让某个 `rulesetId` 的大厅列表结果变化的时刻各广播一次 `lobby:changed { rulesetId }`——`RoomService.create()` 成功（新房间进入 `waiting`/`open`）、`RoomService.start()` 成功（房间离开 `waiting`，对 `lobby:list` 不再可见）、`leave()` 的房主在 `waiting` 阶段离开分支（房间被删，同一次连带广播的 `room:closed{reason:"hostLeft"}` 之外再加这一条）。
 
-范围严格对齐"新增房间"这一件事：房间变得不可再加入（满座、`room:start`、房主关房）**不**推送撤下大厅列表的事件——这类"房间消失"仍然只能等下次手动 `lobby:list` 查询（切标签页、点 Refresh）才会消失，不在本次范围内，是刻意的最小实现,不是遗漏。
+**只是一个信号，不带房间数据**：**全局广播**（`server.emit`，不按 `roomId` 或任何订阅频道过滤，不是新开一个"大厅频道"订阅机制）。客户端收到后，只在 `rulesetId` 与自己当前选中的玩法标签一致时，重新发一次已有的 `lobby:list` 查询（带上自己本地的 `search` 关键字）刷新列表；`rulesetId` 不匹配就直接丢弃，不查询。
+
+**v1→v2 改动原因**：v1 版本（`lobby:roomCreated`，只推新增、payload 带完整 `RoomSummary`）会导致大厅列表只增不减——房间开局或房主关房后，其他人本地列表里残留一条点了就报错的失效房间。v2 统一用"信号 + 客户端重新查询"覆盖增、减两个方向：好处是服务端不用在三个触发点各自重算并广播一份房间列表（`search` 又是纯客户端本地状态，服务端广播时也不知道该按谁的 `search` 过滤），直接复用已有、已测试过的 `lobby:list` 查询/过滤逻辑，用一次额外的 ack 往返换掉"服务端到处维护列表投影 + 客户端做增量合并/去重"这两块重复实现；大厅列表刷新本来就不是延迟敏感的路径，多一次 round trip 可以忽略。
+
+**已知未覆盖**：座位加入/离开导致的人数变化（`playerCount`）不会触发这个信号——房间满座（4/4）前仍是 `waiting`/`open`，本来就该继续出现在大厅列表里（`lobby:list` 本身就会返回它，`room:join`/`room:addBot` 撞满座时报 `SEAT_TAKEN`/`ROOM_FULL` 已经是现成的错误路径），只是列表上显示的人数在下次刷新前可能不是最新的，不算"房间消失"这个范围要解决的问题。
 
 **未实现**：`room:starting`。
 
@@ -137,7 +141,7 @@ finished: 计算排名，对外公开 result
 - ✅ `room:leave`（阶段 4.4）：`waiting` 阶段主动离座/房主关房，`in-game` 阶段等同断线（同一套托管机制）；全部真人退出即自动关房，见 §6
 - ✅ `room:end`（2026-07 新增）：`in-game` 阶段任意已入座玩家可立即结束整场 session（无需其他人确认），与托管路径互不影响，见 §6"提前结束整场对局"
 - ✅ `lobby:list`/`room:peek`（阶段 4.4）：一次性查询快照，`room:peek` 仍不做推送
-- ✅ `lobby:roomCreated`（2026-08 新增）：新房间创建时全局广播，大厅列表增量更新，见 §6"大厅新房间推送"；房间从大厅消失（满座/开局/关房）仍不推送，见下
+- ✅ `lobby:changed`（2026-08 新增）：新房间创建、开局、房主关房三个时刻广播信号（不带房间数据），客户端按需重新查询 `lobby:list`，见 §6"大厅列表变化推送"；座位加入/离开导致的人数变化不触发，见下
 - ✅ 房间名称（阶段 4.4）：`room:create` 可选 `name`，`room:join`/`room:addBot` 可选 `seat` 指定座位
 - ✅ Replay（阶段 4.5）：每局归档事件日志 + 终局状态快照，参与过的玩家可回放；明牌 replay 走独立调试通道，见 §10
 - ✅ 持久化（阶段 5）：事件日志/战绩落 PG，重启后 `replay:get` 仍可查；真正的 Supabase OAuth，见 §11
@@ -151,7 +155,7 @@ finished: 计算排名，对外公开 result
 - ❌ 中途替换玩家、再来一轮
 - ❌ 观战（根 `AGENTS.md` 不做清单，非某个具体阶段的"待做"，是长期不做）
 - ❌ 战绩聚合查询接口（`stats:get`/`profile:get`，`contracts/protocol-shared.md` §4 仍是占位）：阶段 5 落地的是持久化层本身（schema + 写入 + `replay:get` 的 DB 兜底读取），不是一个新的聚合查询 API/UI，见 §11
-- ❌ 大厅列表"房间消失"推送（满座、开局、房主关房都不广播撤下事件；`lobby:list` 本身仍是查询快照，只有"新房间创建"这一件事有推送，见 §6）
+- ❌ 大厅列表因座位加入/离开（人数变化，非开局/关房）而刷新（`lobby:changed` 只覆盖新增/开局/关房三个时刻，见 §6"已知未覆盖"）
 
 **评审点 H【已定：采纳，2026-07 修订】**：对局中 socket 断开先进入 60 秒可逆宽限期，期间纯等待、不代打；同一 userId 通过 `room:enter` ack 恢复座位与快照。宽限期到期才永久转 AI 并补跑当前动作。主动 `room:leave`/sign out 立即永久托管。两态分别由 `isDisconnected` 与 `isAutoPiloted` 表示，`waiting` 阶段断线不处理。
 

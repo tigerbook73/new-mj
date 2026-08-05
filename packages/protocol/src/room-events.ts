@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { RoomParticipantSchema, RoomSummarySchema, SessionResultSchema } from "./room-models.ts";
+import { RoomParticipantSchema, SessionResultSchema } from "./room-models.ts";
 import { SeatIdSchema } from "./common.ts";
 
 export const RoomPlayerJoinedEventSchema = z.object({
@@ -52,15 +52,15 @@ export type RoomClosedEvent = z.infer<typeof RoomClosedEventSchema>;
 
 /**
  * A global broadcast (every connected socket, not scoped by roomId or any
- * subscription channel — see session-mechanics.md §6 "大厅新房间推送" for
- * why) fired once when a new room enters the lobby (waiting/open, i.e.
- * lobby:list-visible). Clients filter by rulesetId (and their own local
- * search text) before inserting `room` into their list; a room leaving the
- * lobby (full, started, closed) is not pushed — still requires a fresh
- * lobby:list query.
+ * subscription channel — see session-mechanics.md §6 "大厅列表变化推送" for
+ * why) fired whenever a room enters or leaves the lobby (created, started,
+ * or its host closed it while waiting) — signal only, no room data. A
+ * client whose currently-selected rulesetId matches re-issues its own
+ * lobby:list query (with its own local search text) to refresh; a
+ * mismatched rulesetId is simply ignored. Deliberately does not fire on
+ * seat joins/leaves (playerCount changes) — see that section's "已知未覆盖".
  */
-export const LobbyRoomCreatedEventSchema = z.object({
+export const LobbyChangedEventSchema = z.object({
   rulesetId: z.string(),
-  room: RoomSummarySchema,
 });
-export type LobbyRoomCreatedEvent = z.infer<typeof LobbyRoomCreatedEventSchema>;
+export type LobbyChangedEvent = z.infer<typeof LobbyChangedEventSchema>;

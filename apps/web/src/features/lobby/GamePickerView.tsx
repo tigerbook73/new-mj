@@ -4,7 +4,7 @@ import { Info, Plus, RefreshCw } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import {
   SESSION_TOTAL_GAMES,
-  type LobbyRoomCreatedEvent,
+  type LobbyChangedEvent,
   type RoomInfo,
   type RoomSummary,
   type SessionTotalGames,
@@ -56,25 +56,16 @@ export function GamePickerView() {
   }, [rulesetId, search, socket]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void ack<RoomSummary[]>(socket, "lobby:list", {
-        rulesetId,
-        search: search.trim() || undefined,
-      }).then((result) => {
-        if (result.ok) setRooms(result.data);
-        else setError(result.code);
-      });
-    }, 300);
+    const timer = window.setTimeout(() => void loadRooms(), 300);
     return () => window.clearTimeout(timer);
-  }, [rulesetId, search, socket]);
+  }, [loadRooms]);
 
-  // Incremental update for the one thing lobby:list doesn't push (see
-  // session-mechanics.md §6 "大厅新房间推送") — a brand new room appearing.
-  // Global broadcast (every socket, not scoped to this ruleset), so filter
-  // client-side the same way the server's own lobby:list query would:
-  // matching rulesetId and, if a search term is active, a substring match
-  // against the room name. Rooms leaving the lobby (full/started/closed)
-  // still aren't pushed — this only ever appends, never removes.
+  // Refresh on lobby:changed — a signal, not room data (see session-
+  // mechanics.md §6 "大厅列表变化推送"): fires on create/start/host-closes,
+  // so simply re-running the existing query on receipt correctly covers
+  // both a room appearing and one disappearing, with the same server-side
+  // filtering/search logic `loadRooms` already uses — no separate
+  // insert/dedup logic to keep in sync with it.
   useEffect(() => {
     // `socket` is asserted non-null at declaration (store field is genuinely
     // `Socket | null` — e.g. briefly null around a takeover/reconnect), but
@@ -86,19 +77,14 @@ export function GamePickerView() {
     // instead of self-healing. `socket` is in the dependency array, so this
     // effect re-runs and subscribes correctly once it becomes non-null.
     if (!socket) return;
-    const query = search.trim().toLowerCase();
-    const onRoomCreated = (event: LobbyRoomCreatedEvent) => {
-      if (event.rulesetId !== rulesetId) return;
-      if (query && !event.room.name.toLowerCase().includes(query)) return;
-      setRooms((current) =>
-        current.some((room) => room.id === event.room.id) ? current : [...current, event.room],
-      );
+    const onLobbyChanged = (event: LobbyChangedEvent) => {
+      if (event.rulesetId === rulesetId) void loadRooms();
     };
-    socket.on("lobby:roomCreated", onRoomCreated);
+    socket.on("lobby:changed", onLobbyChanged);
     return () => {
-      socket.off("lobby:roomCreated", onRoomCreated);
+      socket.off("lobby:changed", onLobbyChanged);
     };
-  }, [rulesetId, search, socket]);
+  }, [rulesetId, socket, loadRooms]);
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

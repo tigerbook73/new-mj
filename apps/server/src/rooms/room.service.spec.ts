@@ -117,7 +117,7 @@ describe("RoomService — lifecycle", () => {
     expect(service.get(room.id)).toBe(room);
   });
 
-  it("create broadcasts lobby:roomCreated with the new room's lobby:list summary shape", () => {
+  it("broadcasts lobby:changed on create, start, and host-closes-waiting — the three lobby:list-visibility transitions", () => {
     const eventBus = new EventBus();
     const service = new RoomService(
       new GameService(),
@@ -125,34 +125,36 @@ describe("RoomService — lifecycle", () => {
       fakePersistenceService(),
       new ConfigService(),
     );
-    const broadcasts: Array<{ rulesetId: string; room: unknown }> = [];
-    eventBus.on("lobby:roomCreated", (event) => broadcasts.push(event));
+    const changed: Array<{ rulesetId: string }> = [];
+    eventBus.on("lobby:changed", (event) => changed.push(event));
 
-    const room = service.create(
-      "host",
-      "Host",
-      "junk",
-      { rulesetId: "junk" },
-      "4-round",
-      "Fun room",
-    );
-
-    expect(broadcasts).toEqual([
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    expect(changed).toEqual([{ rulesetId: "junk" }]);
+    // Signal only — no room data on the payload; a matching client is
+    // expected to re-issue lobby:list itself, which does return the room.
+    expect(service.list("junk")).toEqual([
       {
+        id: room.id,
+        name: "Host's room",
         rulesetId: "junk",
-        room: {
-          id: room.id,
-          name: "Fun room",
-          rulesetId: "junk",
-          creator: "Host",
-          createdAt: room.createdAt,
-          playerCount: 1,
-          status: "open",
-        },
+        creator: "Host",
+        createdAt: room.createdAt,
+        playerCount: 1,
+        status: "open",
       },
     ]);
-    // Same projection lobby:list itself would return for this room right now.
-    expect(service.list("junk")).toEqual([broadcasts[0]!.room]);
+
+    for (const userId of ["p2", "p3", "p4"]) service.join(room.id, userId, userId);
+    for (const userId of ["host", "p2", "p3", "p4"]) service.ready(room.id, userId, true);
+    service.start(room.id);
+    expect(changed).toEqual([{ rulesetId: "junk" }, { rulesetId: "junk" }]);
+    expect(service.list("junk")).toEqual([]); // no longer waiting/open
+
+    const secondRoom = service.create("host2", "Host2", "junk", { rulesetId: "junk" });
+    changed.length = 0;
+    service.leave(secondRoom.id, "host2");
+    expect(changed).toEqual([{ rulesetId: "junk" }]);
+    expect(service.list("junk")).toEqual([]); // room was deleted
   });
 
   it("join seats subsequent players and rejects duplicates / full rooms", () => {

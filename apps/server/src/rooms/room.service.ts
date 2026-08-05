@@ -122,19 +122,15 @@ export class RoomService {
     };
     this.rooms.set(room.id, room);
     this.seatPlayer(room, hostUserId, hostNickname, false, undefined, avatar);
-    // A fresh room is always waiting/open (lobby:list-visible) — see
-    // session-mechanics.md §6 "大厅新房间推送". Global broadcast, not scoped
-    // by roomId (nothing has joined this room's own socket.io channel to
-    // receive a `.to(roomId)` emit yet besides the host, and every *other*
-    // lobby browser — the actual audience for this event — never does).
-    this.eventBus.emit("lobby:roomCreated", {
-      rulesetId: room.rulesetId,
-      room: this.toSummary(room),
-    });
+    // A fresh room is always waiting/open — becomes lobby:list-visible for
+    // rulesetId right now. See session-mechanics.md §6 "大厅列表变化推送"
+    // for the other two triggers (start/host-closes) and why this is a
+    // signal-only global broadcast, not a room-data push.
+    this.eventBus.emit("lobby:changed", { rulesetId: room.rulesetId });
     return room;
   }
 
-  /** Shared by list() and the lobby:roomCreated broadcast — same projection either way. */
+  /** lobby:list's own per-room projection. */
   private toSummary(room: Room): RoomSummary {
     return {
       id: room.id,
@@ -242,6 +238,9 @@ export class RoomService {
       this.untrackRoomPlayers(room);
       this.rooms.delete(roomId);
       this.eventBus.emit("room:closed", { roomId, reason: "hostLeft" });
+      // This room was lobby:list-visible (still `waiting`) — see
+      // session-mechanics.md §6 "大厅列表变化推送".
+      this.eventBus.emit("lobby:changed", { rulesetId: room.rulesetId });
       return;
     }
     room.players[seat] = null;
@@ -310,6 +309,9 @@ export class RoomService {
       throw new RoomServiceError("INVALID_CONFIG", "room is not full and ready");
     }
     this.beginGame(room, false);
+    // Room just left `waiting` — no longer lobby:list-visible for its
+    // rulesetId. See session-mechanics.md §6 "大厅列表变化推送".
+    this.eventBus.emit("lobby:changed", { rulesetId: room.rulesetId });
     // Game 1's dealer is ruleset-chosen from the seed inside beginGame (junk
     // picks a random seat) — clients cached RoomInfo.dealer at join time, so
     // broadcast it exactly like nextRound() does, before the first snapshots.
