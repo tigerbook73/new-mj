@@ -104,6 +104,23 @@ test("switching tabs changes the active game lobby", async ({ browser }) => {
   await page.context().close();
 });
 
+test("the rules link beside the variant tabs opens that variant's info page", async ({
+  browser,
+}) => {
+  const page = await loginAs(browser, "rules-link-host");
+  await page.getByRole("link", { name: "玩法规则" }).click();
+  await expect(page).toHaveURL(/\/variants\/junk$/);
+  await expect(page.getByRole("heading", { name: "垃圾胡" })).toBeVisible();
+
+  await page.getByRole("link", { name: "返回大厅" }).click();
+  await expect(page).toHaveURL(/\/games$/);
+  await openVariant(page, "Bloodbattle");
+  await page.getByRole("link", { name: "玩法规则" }).click();
+  await expect(page).toHaveURL(/\/variants\/bloodbattle$/);
+  await expect(page.getByRole("heading", { name: "血战到底" })).toBeVisible();
+  await page.context().close();
+});
+
 test("a guest can leave a waiting room and return to the lobby", async ({ browser }) => {
   const [host, guest] = await Promise.all([
     loginAs(browser, "leave-host"),

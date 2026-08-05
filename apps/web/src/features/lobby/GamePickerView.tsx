@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { Plus, RefreshCw } from "lucide-react";
-import { useLocation, useNavigate } from "react-router";
+import { BookOpen, Plus, RefreshCw } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   SESSION_TOTAL_GAMES,
   type RoomInfo,
@@ -100,13 +100,22 @@ export function GamePickerView() {
           )}
         </header>
         <Tabs value={rulesetId} onValueChange={(value) => setRulesetId(value)}>
-          <TabsList aria-label="Game variants">
-            {RULESETS.map((ruleset) => (
-              <TabsTrigger key={ruleset.id} value={ruleset.id}>
-                {ruleset.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="flex items-center gap-2">
+            <TabsList aria-label="Game variants">
+              {RULESETS.map((ruleset) => (
+                <TabsTrigger key={ruleset.id} value={ruleset.id}>
+                  {ruleset.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <Link
+              to={`/variants/${rulesetId}`}
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
+            >
+              <BookOpen className="size-4" aria-hidden="true" />
+              玩法规则
+            </Link>
+          </div>
           {RULESETS.map((ruleset) => (
             <TabsContent key={ruleset.id} value={ruleset.id} className="mt-6">
               <section className="flex flex-col gap-4 rounded-xl border bg-background p-5 shadow-sm">

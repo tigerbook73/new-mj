@@ -19,6 +19,7 @@ import { GamePickerView } from "@/features/lobby/GamePickerView";
 import { LobbyView } from "@/features/lobby/LobbyView";
 import { TableView } from "@/features/mahjong/TableView";
 import { ReplayView } from "@/app/views/ReplayView";
+import { VariantInfoView } from "@/app/views/VariantInfoView";
 import { TableLayoutLabView } from "@/features/layout-sketch/TableLayoutLabView";
 
 /**
@@ -161,6 +162,11 @@ export const router = createBrowserRouter([
       // Dead end for SESSION_EXISTS_SAME_BROWSER — reached before this tab
       // ever gets a socket, no loader of its own needed.
       { path: "/session-blocked", element: <SessionBlockedView /> },
+      // Public rules explainer — no ensureConnected()/socket dependency, so
+      // it's reachable without logging in (and safe to link to from mid-game
+      // without any risk of navigating a live table away from its socket
+      // listeners — see VariantInfoView's own doc).
+      { path: "/variants/:rulesetId", element: <VariantInfoView /> },
       ...(import.meta.env.DEV
         ? [{ path: "/dev/table-layout", element: <TableLayoutLabView /> }]
         : []),
