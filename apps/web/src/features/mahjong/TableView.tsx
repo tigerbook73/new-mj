@@ -19,6 +19,7 @@ import {
   type GameResultLike,
 } from "@/features/mahjong/components/RoundEndOverlay";
 import { LeaveConfirmDialog } from "@/features/mahjong/components/LeaveConfirmDialog";
+import { ResultBanner } from "@/features/mahjong/components/ResultBanner";
 import { SessionFinishedPanel } from "@/features/mahjong/components/SessionFinishedPanel";
 import { TableBoard, type TurnHighlight } from "@/features/mahjong/components/TableBoard";
 import { DESKTOP_TABLE_SCENARIO } from "@/features/mahjong/components/scenarios/desktop";
@@ -38,6 +39,9 @@ import { useIsIncrementalSnapshot } from "./useIsIncrementalSnapshot";
 import { useTableActions } from "./useTableActions";
 import { useTableSocket } from "./useTableSocket";
 import { useTablePresentation } from "./useTablePresentation";
+
+/** How long ResultBanner's "胡了！/自摸！/流局" flash stays up before RoundEndOverlay's settlement panel takes over. */
+const RESULT_BANNER_DURATION_MS = 900;
 
 /**
  * junk 和 bloodbattle 的 view.ts 目前都用这几个字段名（phase/myActionOptions），
@@ -159,6 +163,33 @@ export function TableView() {
     animation: tableAnimationMetadata(),
   });
 
+  // Brief "胡了！/自摸！/流局" flash before RoundEndOverlay's settlement panel
+  // takes over — only for a genuinely live result (isIncrementalSnapshot),
+  // never replayed on reconnect. Hooks placed above the early returns below
+  // since they must run unconditionally every render. The "turn on" edge is
+  // derived during render (same technique as useIsIncrementalSnapshot —
+  // this project's eslint forbids synchronous setState in a useEffect body);
+  // useEffect is only used for the genuinely async part, the delayed
+  // "turn off" timer.
+  const showResultBannerCondition =
+    presentation?.extras.result != null &&
+    sessionResult == null &&
+    isIncrementalSnapshot &&
+    !prefersReducedMotion;
+  const [prevShowResultBannerCondition, setPrevShowResultBannerCondition] = useState(
+    showResultBannerCondition,
+  );
+  const [showResultBanner, setShowResultBanner] = useState(false);
+  if (showResultBannerCondition !== prevShowResultBannerCondition) {
+    setPrevShowResultBannerCondition(showResultBannerCondition);
+    setShowResultBanner(showResultBannerCondition);
+  }
+  useEffect(() => {
+    if (!showResultBanner) return;
+    const timer = setTimeout(() => setShowResultBanner(false), RESULT_BANNER_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [showResultBanner]);
+
   if (!view) {
     // The table loader (router.tsx) only ever lets a `!view` room through
     // when the caller's own seat is permanently auto-piloted (session-
@@ -195,10 +226,15 @@ export function TableView() {
   // Per-seat final hand for the settlement panel — already-declared open melds
   // (converted TileId→TileKind) plus the concealed decomposition actually used,
   // undefined for a seat that didn't win.
-  const winningHands: Array<TileKind[][] | undefined> = (extras.seats ?? []).map((seat) => {
+  const winningHands: Array<{ groups: TileKind[][]; winTile: TileKind } | undefined> = (
+    extras.seats ?? []
+  ).map((seat) => {
     if (!seat.winSnapshot) return undefined;
     const openMeldGroups = seat.melds.map((meld) => meld.tiles.map((tile) => tileKindOf(tile)));
-    return [...openMeldGroups, ...seat.winSnapshot.groups];
+    return {
+      groups: [...openMeldGroups, ...seat.winSnapshot.groups],
+      winTile: seat.winSnapshot.winTile,
+    };
   });
   const turnHighlight: TurnHighlight | undefined = currentDirection && {
     direction: currentDirection,
@@ -280,7 +316,15 @@ export function TableView() {
             />
           </div>
           <AnimatePresence>
-            {extras.result &&
+            {showResultBanner && extras.result && (
+              <ResultBanner
+                key="result-banner"
+                result={extras.result as GameResultLike}
+                reducedMotion={prefersReducedMotion}
+              />
+            )}
+            {!showResultBanner &&
+              extras.result &&
               sessionResult == null &&
               room &&
               (room.rulesetId === "hangzhou" ? (

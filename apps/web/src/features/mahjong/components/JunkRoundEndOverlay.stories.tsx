@@ -86,12 +86,15 @@ function ToggleMountUnmountDemo() {
             entering
             reducedMotion={false}
             winningHands={[
-              [
-                ["1m", "2m", "3m"],
-                ["5p", "5p", "5p"],
-                ["7s", "8s", "9s"],
-                ["9m", "9m"],
-              ],
+              {
+                groups: [
+                  ["1m", "2m", "3m"],
+                  ["5p", "5p", "5p"],
+                  ["7s", "8s", "9s"],
+                  ["9m", "9m"],
+                ],
+                winTile: "9s",
+              },
             ]}
           />
         )}

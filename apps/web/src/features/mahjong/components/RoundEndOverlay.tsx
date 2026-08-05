@@ -53,14 +53,14 @@ interface RoundEndOverlayProps {
   reducedMotion: boolean;
   /**
    * Per-seat final hand (already-declared open melds + the concealed
-   * decomposition actually used), indexed by seat — undefined for a seat that
-   * didn't win. Assembled by TableView.tsx from `view.seats` (melds +
-   * winSnapshot.groups).
+   * decomposition actually used) plus the tile that completed it, indexed by
+   * seat — undefined for a seat that didn't win. Assembled by TableView.tsx
+   * from `view.seats` (melds + winSnapshot.groups/winTile).
    * bloodbattle has no winSnapshot wiring yet, so this is always empty there.
    * Optional so callers that don't care about the reveal (stories/tests)
    * don't need to pass it.
    */
-  winningHands?: Array<TileKind[][] | undefined>;
+  winningHands?: Array<{ groups: TileKind[][]; winTile: TileKind } | undefined>;
 }
 
 const BACKDROP_INITIAL = { opacity: 0 };
@@ -122,7 +122,13 @@ export function RoundEndOverlay({
         {result.type === "win" &&
           result.winners
             .filter((seat) => winningHands[seat])
-            .map((seat) => <WinningHandReveal key={seat} groups={winningHands[seat]!} />)}
+            .map((seat) => (
+              <WinningHandReveal
+                key={seat}
+                groups={winningHands[seat]!.groups}
+                winTile={winningHands[seat]!.winTile}
+              />
+            ))}
         <ul className="text-sm text-muted-foreground">
           {scoreRows(result.scoreDeltas, result.type === "win" ? result.winners : []).map(
             (seat) => (

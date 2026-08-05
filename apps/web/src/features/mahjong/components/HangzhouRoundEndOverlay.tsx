@@ -49,13 +49,13 @@ interface HangzhouRoundEndOverlayProps {
   reducedMotion: boolean;
   /**
    * Per-seat final hand (already-declared open melds + the concealed
-   * decomposition actually used for scoring), indexed by seat — undefined for
-   * a seat that didn't win. Assembled by TableView.tsx from `view.seats`
-   * (melds + winSnapshot.groups).
+   * decomposition actually used for scoring) plus the tile that completed
+   * it, indexed by seat — undefined for a seat that didn't win. Assembled by
+   * TableView.tsx from `view.seats` (melds + winSnapshot.groups/winTile).
    * Optional so callers that don't care about the reveal (stories/tests) don't
    * need to pass it.
    */
-  winningHands?: Array<TileKind[][] | undefined>;
+  winningHands?: Array<{ groups: TileKind[][]; winTile: TileKind } | undefined>;
 }
 
 const BACKDROP_INITIAL = { opacity: 0 };
@@ -157,7 +157,10 @@ export function HangzhouRoundEndOverlay({
               {result.winners.map((detail) => (
                 <li key={detail.seat} className="flex flex-col items-center gap-1">
                   {winningHands[detail.seat] && (
-                    <WinningHandReveal groups={winningHands[detail.seat]!} />
+                    <WinningHandReveal
+                      groups={winningHands[detail.seat]!.groups}
+                      winTile={winningHands[detail.seat]!.winTile}
+                    />
                   )}
                   <span className="text-muted-foreground">
                     杭州麻将 · {dealer === undefined ? "庄家" : `庄家（${nameOf(dealer)}）`} ×

@@ -73,14 +73,19 @@ export const BaotouZimo: Story = {
       scoreDeltas: [12, -4, -4, -4],
     },
     // Exercises WinningHandReveal, including a caishen (5z) filling a run gap
-    // and a caishen completing the pair.
+    // and a caishen completing the pair — winTile also lands on the first
+    // caishen copy (the run's), demonstrating the winTile ring taking
+    // precedence over the caishen ring there (see WinningHandReveal.test.tsx).
     winningHands: [
-      [
-        ["1m", "2m", "3m"],
-        ["4p", "5z", "6p"],
-        ["7s", "8s", "9s"],
-        ["1z", "5z"],
-      ],
+      {
+        groups: [
+          ["1m", "2m", "3m"],
+          ["4p", "5z", "6p"],
+          ["7s", "8s", "9s"],
+          ["1z", "5z"],
+        ],
+        winTile: "5z",
+      },
     ],
   },
 };
@@ -99,12 +104,15 @@ export const CaipiaoGangRon: Story = {
     },
     winningHands: [
       undefined,
-      [
-        ["2m", "3m", "4m"],
-        ["6p", "6p", "6p"],
-        ["3s", "4s", "5s"],
-        ["9s", "9s"],
-      ],
+      {
+        groups: [
+          ["2m", "3m", "4m"],
+          ["6p", "6p", "6p"],
+          ["3s", "4s", "5s"],
+          ["9s", "9s"],
+        ],
+        winTile: "9s",
+      },
     ],
   },
 };
