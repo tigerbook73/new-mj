@@ -14,7 +14,7 @@
 
 ## Backlog
 
-- 杭州 `caiPiaoCount` 清零逻辑：按 `docs/variants/hangzhou.md` §4/§14 已拍板的规则实现——轮到自己弃牌、弃的不是财神、弃后不再爆头时清零 `caiPiaoCount`（当前实现是不清零纯累计，与新拍板不一致）；下一步第一个具体动作是在 `hangzhou/state-machine.ts` 的弃牌分支补这一判断，并加 fixture 覆盖"财飘后弃普通牌打破爆头"这一分支。
+- 杭州 `caiPiaoCount` 清零逻辑：按 `docs/variants/hangzhou.md` §4/§14 已拍板的规则实现——轮到自己弃牌，只要弃的不是财神就清零 `caiPiaoCount`（与弃牌后是否仍爆头无关；当前实现是不清零纯累计，与新拍板不一致）；下一步第一个具体动作是在 `hangzhou/state-machine.ts` 的弃牌分支补这一判断，并加 fixture 覆盖"财飘后弃普通牌即中断"这一分支。
 - 桌面牌桌：将庄家标志移到玩家名称上方并左对齐；改动 `InfoSlot` 时补组件/桌面验收，保证四个旋转座位的屏幕阅读方向不变。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 规划并实现 mobile 横屏/竖屏布局与 Expo 路线。
