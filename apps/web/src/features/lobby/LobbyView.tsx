@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Check, UserRound, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
@@ -35,6 +35,17 @@ export function LobbyView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [readyOverride, setReadyOverride] = useState<boolean | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  // `preview` (this component's own state) is kept fresh by every room:*
+  // event below as seats fill/ready up, but the store's `room` — what
+  // TableView reads after navigating to /room/:id — is only ever written
+  // once, back when this page first entered/created the room. A plain
+  // closure over `preview` inside the game:snapshot handler further down
+  // would see whatever `preview` was when that effect last ran, not
+  // necessarily the latest, so mirror it into a ref on every change instead.
+  const previewRef = useRef(preview);
+  useEffect(() => {
+    previewRef.current = preview;
+  }, [preview]);
 
   useEffect(() => {
     if (room?.id === roomId) {
@@ -116,6 +127,13 @@ export function LobbyView() {
       );
     };
     const onSnapshot = (event: GameSnapshot) => {
+      // Refresh the store's `room` from this page's own up-to-date `preview`
+      // (bots/players added after the store's `room` was first written are
+      // otherwise invisible to TableView — see previewRef's own doc above)
+      // before navigating there.
+      if (previewRef.current && previewRef.current.id === roomId) {
+        useSessionStore.getState().setRoom(previewRef.current);
+      }
       useSessionStore.getState().applyGameSnapshot(event);
       void navigate(`/room/${roomId}`);
     };

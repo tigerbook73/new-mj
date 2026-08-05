@@ -173,6 +173,43 @@ test("junk desktop table fits both target viewports and a discard succeeds", asy
   }
 });
 
+// Regression: the store's `room` (what TableView reads player nicknames
+// from) used to only ever get written once, back when LobbyView first
+// entered/created the room — seats filled afterward (bots added, other
+// players sitting down) only updated LobbyView's own local `preview`
+// state, never the store. So by the time game:snapshot navigated into
+// /room/:id, TableView still saw those seats as null and InfoSlot fell
+// back to "Seat N" instead of the real nickname (LobbyView.tsx's onSnapshot
+// now re-syncs the store from `preview` right before navigating).
+test("opponent seats show their real nickname on the table, not the Seat N fallback", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const host = await context.newPage();
+  await host.goto("/login");
+  await host.getByPlaceholder("Enter nickname").fill("infoslot-nick-host");
+  await host.getByRole("button", { name: "Enter game" }).click();
+  await expect(host).toHaveURL(/\/games$/, { timeout: 10_000 });
+  await host.getByRole("tab", { name: "Junk Hu" }).click();
+  await host.getByRole("button", { name: "Create room" }).last().click();
+  await host.getByLabel("Room name").fill("infoslot nickname room");
+  await host.getByRole("button", { name: "Create room" }).click();
+  await expect(host).toHaveURL(/\/lobby\//, { timeout: 10_000 });
+  // Readying solo auto-fills the other three seats with bots (see lobby.e2e-
+  // spec.ts's "host ready fills empty waiting seats with bots and starts").
+  await host.getByRole("checkbox", { name: "Ready" }).check();
+  await expect(host.getByText("BOT")).toHaveCount(3);
+  await host.getByRole("button", { name: "Start game" }).click();
+  await expect(host).toHaveURL(/\/room\//, { timeout: 10_000 });
+
+  for (const direction of ["top", "left", "right"]) {
+    const info = host.getByTestId(`player-info-${direction}`);
+    await expect(info).toContainText("AI-", { timeout: 10_000 });
+    await expect(info).not.toContainText(/^Seat \d$/);
+  }
+  await host.context().close();
+});
+
 // Phase 5 follow-up: discarding a hand tile unmounts exactly that instance
 // (HandRow.tsx keys revealed hand tiles by their own TileId, not position —
 // see the comment there) so the tiles after it glide into the closed-up gap
