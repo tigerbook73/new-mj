@@ -102,15 +102,22 @@ export function InfoSlot({
   return (
     <div
       data-testid={`player-info-${direction}`}
-      className={`relative h-full w-full border-2 border-dashed ${config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
+      className={`flex h-full w-full flex-col items-start border-2 border-dashed ${config.debug.showRegions ? "border-sky-300 bg-sky-300/10" : "border-transparent"}`}
     >
-      <ScaleText text={seat.info} className="text-white" />
       {seat.isDealer && (
         <Crown
           data-testid={`dealer-badge-${direction}`}
-          className="absolute top-0 right-0 text-amber-400"
+          className="shrink-0 text-amber-400"
           style={{ width: "4cqmin", height: "4cqmin" }}
         />
+      )}
+      {/* Own seat (bottom) is already unambiguous on screen — interactive hand, own turn
+          highlight — so it skips the name label entirely; the dealer badge above still
+          shows regardless of seat, since that's information you need about yourself too. */}
+      {direction !== "bottom" && (
+        <div className="min-h-0 w-full flex-1">
+          <ScaleText text={seat.info} className="text-white" />
+        </div>
       )}
     </div>
   );
