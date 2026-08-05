@@ -1,4 +1,5 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
+import { sortTileIdsForDisplay } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { BloodbattleEventPayload, BloodbattlePlayerView, BloodbattleState } from "./types.ts";
 import { BLOODBATTLE_TILE_SET } from "./constants.ts";
@@ -17,7 +18,7 @@ const publicDiscards = (state: BloodbattleState, seat: SeatId) =>
 
 export const getPlayerView = (state: BloodbattleState, seat: SeatId): BloodbattlePlayerView => ({
   seat,
-  hand: [...state.seats[seat]!.hand],
+  hand: sortTileIdsForDisplay(state.seats[seat]!.hand, BLOODBATTLE_TILE_SET),
   seats: state.seats.map((entry, index) => ({
     handCount: entry.hand.length,
     melds: publicMelds(state, index as SeatId),
@@ -267,5 +268,6 @@ export const rebuildPlayerView = (
     }
   }
   if (!view) throw new Error("MISSING_GAME_STARTED");
+  view.hand = sortTileIdsForDisplay(view.hand, BLOODBATTLE_TILE_SET);
   return view;
 };

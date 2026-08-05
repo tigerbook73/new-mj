@@ -8,13 +8,12 @@
 
 ## 阻塞与遗留问题
 
-- 胡牌展示中的牌型尚未按展示规则排序。根因已定位（暂不动手）：`apps/web/src/features/mahjong/components/WinningHandReveal.tsx` 直接按 core 牌型分解算法输出的原始 `groups` 顺序渲染，无排序层；现有 `sortTilesForDisplay`（`mahjongTiles.ts:58-67`）只处理手牌区的 `TileId[]` 排序，"组间顺序"（哪组在前、对子/雀头放哪）从未定义。下次改动时，第一个具体动作：先定义组间/组内排序契约并写入文档，再实现 `TileKind[][]` 级别的排序工具接入 `WinningHandReveal`，补组件测试。
 - `apps/web/test/lobby.e2e-spec.ts` 中 “leaving an in-game room keeps the other human in the match” 与 “force exiting an in-game room ends the session for every player”、以及 `apps/web/test/table.e2e-spec.ts` 中 “a claimed tile FLIPs from the discard pile into the meld via a ghost clone”，三处在完整套件/多 worker 全量 E2E 中偶发超时，单独或小范围运行稳定。根因已定位为同一类（暂不动手）：全量 E2E 共享单一 server 进程（内存态房间状态 + `setTimeout` 驱动 AI/超时），多 worker 并发挤占 Node 事件循环与浏览器 rAF，导致这几处依赖“定时器/动画按时完成”的固定 10s 超时偶发触发；`cdcebee`（解除主 checkout 的 `E2E_WORKERS` 上限）放大了此问题。下次处理时，第一个具体动作：把这几处断言从固定 `timeout` 改为 `expect.poll` + 更宽松阈值，并评估主 checkout 全量 E2E 是否也该保留合理 worker 上限（按 worker 隔离 server 实例成本更高，先不做）。
 
 ## Backlog
 
 - 杭州 `caiPiaoCount` 清零逻辑：按 `docs/variants/hangzhou.md` §4/§14 已拍板的规则实现——轮到自己弃牌，只要弃的不是财神就清零 `caiPiaoCount`（与弃牌后是否仍爆头无关；当前实现是不清零纯累计，与新拍板不一致）；下一步第一个具体动作是在 `hangzhou/state-machine.ts` 的弃牌分支补这一判断，并加 fixture 覆盖"财飘后弃普通牌即中断"这一分支。
-- 桌面牌桌：将庄家标志移到玩家名称上方并左对齐；改动 `InfoSlot` 时补组件/桌面验收，保证四个旋转座位的屏幕阅读方向不变。
+- 桌面牌桌：将庄家标志移到玩家名称上方并左对齐（玩家名称也同样左对齐），然后本玩家不在桌面显示 “我”，不显示名称；改动 `InfoSlot` 时补组件/桌面验收，保证四个旋转座位的屏幕阅读方向不变。
 - 血战到底专属桌面体验：换三张、定缺、血战状态与完整操作 UI。
 - 规划并实现 mobile 横屏/竖屏布局与 Expo 路线。
 - 日麻立项时复审 `architecture/variant-boundary.md`。

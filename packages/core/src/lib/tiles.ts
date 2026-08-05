@@ -87,3 +87,49 @@ export const tileIdOf = (
   }
   return kindIndex * tileSet.copiesPerKind + copy;
 };
+
+/**
+ * Sort a display copy by `tileSet.kinds` order (m→p→s→z, then rank), stable
+ * on ties — the canonical hand ordering PlayerView.hand/winSnapshot.hand are
+ * returned in. Mirrors apps/web's independent `sortTilesForDisplay`
+ * (duplicated there because web doesn't import core — see that file's own
+ * doc); this is the source of truth other consumers (mobile, AI, tests) can
+ * rely on without reimplementing it.
+ */
+export const sortTileIdsForDisplay = (
+  tileIds: readonly TileId[],
+  tileSet: TileSet = STANDARD_TILE_SET,
+): TileId[] =>
+  tileIds
+    .map((tileId, index) => ({
+      tileId,
+      index,
+      kindIndex: Math.floor(tileId / tileSet.copiesPerKind),
+    }))
+    .sort((left, right) => left.kindIndex - right.kindIndex || left.index - right.index)
+    .map(({ tileId }) => tileId);
+
+/**
+ * Canonical display order for a winning hand's structural `groups` (see
+ * engine-contract.md's HuDeclared doc): melds sorted ascending by their
+ * first tile's kind, with the pair placed last. Each decompose algorithm
+ * already yields group-internal order for free (a run is built
+ * `[kind, kind+1, kind+2]`; a triplet/pair is the same kind repeated) — this
+ * only reorders the groups relative to each other, never their own
+ * contents. Seven pairs has no single pair to pull out (every group is
+ * itself pair-shaped, or a merged deluxe quad — see hangzhou's
+ * `decomposeSevenPairsWithWild`) — detected structurally by the absence of
+ * any length-3 group, since standard-shape kongs live in `melds`, not
+ * `groups`, so `groups` only ever contains a length-3 entry when a jiang is
+ * also present.
+ */
+export const sortWinningGroupsForDisplay = (groups: readonly TileKind[][]): TileKind[][] => {
+  const kindIndex = (group: readonly TileKind[]): number => TILE_KINDS.indexOf(group[0]!);
+  const sorted = [...groups].sort((left, right) => kindIndex(left) - kindIndex(right));
+  const hasJiang = sorted.some((group) => group.length === 3);
+  if (!hasJiang) return sorted;
+  const jiangIndex = sorted.findIndex((group) => group.length === 2);
+  if (jiangIndex === -1) return sorted; // defensive; standard shape always has one
+  const [jiang] = sorted.splice(jiangIndex, 1);
+  return [...sorted, jiang!];
+};

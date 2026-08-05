@@ -15,6 +15,7 @@ import {
   parseJunkConfig,
   fuzzJunkGames,
   playJunkGame,
+  sortTileIdsForDisplay,
   type JunkPlayerView,
   type JunkState,
   type SeatId,
@@ -135,7 +136,9 @@ test("views and event filtering do not expose another seat's concealed hand", ()
   if ("error" in started) throw new Error(started.error.code);
   const viewer = 0 as const;
   const view = junkRuleSet.getPlayerView(started.state, viewer);
-  expect(view.hand).toEqual(started.state.seats[viewer]!.hand);
+  // PlayerView.hand is returned in canonical display order (see lib/tiles.ts's
+  // sortTileIdsForDisplay), not the internal seat state's insertion order.
+  expect(view.hand).toEqual(sortTileIdsForDisplay(started.state.seats[viewer]!.hand));
   expect(view.seats.map((seat) => seat.handCount)).toEqual(
     started.state.seats.map((seat) => seat.hand.length),
   );

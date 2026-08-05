@@ -140,7 +140,7 @@
 - `isTingpai: boolean`、`isBaotou: boolean`、`isCaipiao: boolean`——**私有**，仅本人可见，每次状态转换后重算，通过既有的 `LegalActionsUpdated` 同步机制一并下发，不新开事件类型
 - `dealerStreak: number`——**公开**，所有座位的 view 都带同一个值；这是全桌可推导的信息（点炮是否开放本就不是秘密，见 §5），不像上面三个是私有派生状态。整局固定不变，`getPlayerView`/`rebuildPlayerView` 都从 `state.config.dealerStreak` 取值
 - `dealer: SeatId`——**公开**，本局庄家座位，整局固定，供客户端展示"庄家倍率"提示用；仿 junk.md §7 的同名公开字段
-- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared`。
+- `seats[i].winSnapshot?: { hand: TileKind[]; winTile: TileKind; groups: TileKind[][] }`——**公开**，仅胡牌那一刻起该座位才有此字段（`state.wins[seat]` 落地时写入，直到整局结束不再清除）；`hand`/`winTile` 在 `HuDeclared`（私有 `TileId`）与 `getPlayerView`/`rebuildPlayerView`（转换成 `TileKind`）之间的边界与 bloodbattle 的 `WinSnapshot`/`PublicWinSnapshot` 做法一致，`groups` 本来就是 kind 级别不需要转换。仿血战到底揭示模式，见 `bloodbattle.md` §10 `HuDeclared`。`hand`/`groups` 的展示排序规范见 `contracts/engine-contract.md` §5。
 
 ## 12. Config 清单
 

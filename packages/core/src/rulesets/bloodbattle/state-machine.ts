@@ -1,4 +1,5 @@
 import { assertTileConservation } from "../../lib/invariants.ts";
+import { sortTileIdsForDisplay } from "../../lib/tiles.ts";
 import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { CORE_ERROR_CODES } from "../../errors.ts";
 import type { SeatId, TileId } from "../../lib/ids.ts";
@@ -378,7 +379,7 @@ export const finishWin = (
 ): void => {
   const scored = scoreFor(state, winner, winTile, by);
   if (!scored.hu) throw new Error("WIN_NOT_AVAILABLE");
-  const hand = [...state.seats[winner]!.hand];
+  const hand = sortTileIdsForDisplay(state.seats[winner]!.hand, BLOODBATTLE_TILE_SET);
   state.seats[winner]!.hand = [];
   state.status[winner] = "won";
   state.wins = state.wins ?? {};

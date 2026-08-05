@@ -1,5 +1,5 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
-import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import { STANDARD_TILE_SET, sortTileIdsForDisplay } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import { CAISHEN_KIND } from "./constants.ts";
 import { isBaotou, isTingpai } from "./hand.ts";
@@ -12,7 +12,7 @@ export const getPlayerView = (state: HangzhouState, seat: SeatId): HangzhouPlaye
   const own = state.seats[seat]!;
   const view: HangzhouPlayerView = {
     seat,
-    hand: [...own.hand],
+    hand: sortTileIdsForDisplay(own.hand),
     seats: state.seats.map((entry, index) => ({
       melds: entry.melds.map((meld) => ({
         ...meld,
@@ -273,5 +273,6 @@ export const rebuildPlayerView = (
   view.isTingpai = isTingpai(kindsOf(view.hand), view.seats[seat]!.melds.length);
   view.isBaotou = isBaotou(kindsOf(view.hand), view.seats[seat]!.melds.length);
   view.isCaipiao = caiPiaoCount >= 1;
+  view.hand = sortTileIdsForDisplay(view.hand);
   return view;
 };

@@ -51,6 +51,8 @@
 
 `PlayerViewBase`（`packages/core/src/types.ts`）只含跨玩法一致的字段：`seat`/`hand`/`seats[].handCount`/`wallCount`/`currentSeat`，无时间字段（倒计时 deadline 由 server 在协议层附加）。
 
+`hand` 以及 `winSnapshot.hand`（各 `variants/*.md` §7/§11 私有字段一节）均以 `lib/tiles.ts` 的 `sortTileIdsForDisplay` 规范化排序（m→p→s→z，同花色按点数升序，同点数保留原始相对顺序），不是内部状态的摸牌/声明插入顺序；这是纯展示层规范化，不影响任何合法性判定或计分逻辑（谁也不依赖 `hand` 数组下标）。`winSnapshot.groups`（各 `variants/*.md` 同一节）额外用 `sortWinningGroupsForDisplay` 规范化"组与组"之间的顺序——面子按组内第一张牌的牌面升序排列，雀头固定放最后；七对型没有单独的雀头可抽出（每组本身都是对子或合杠的 4 张组），按同一规则统一升序即可。组内顺序（顺子升序、刻子/对子同点数、财神在组内的位置）由各 ruleset 自己的分解算法产生，天然已经正确，未被这层规范化改动。
+
 玩法私有字段不放进公共骨架，各 ruleset 用交叉类型扩展（`phase`/`myActionOptions`/`myClaimOptions`/`lastDiscard`/`result`、公开副露与牌河的具体表示等）。`myActionOptions` 是该 seat 完整的 server-computed 可执行动作；声明窗口包含 `pass`，`myClaimOptions` 仅保留声明选项与已响应状态的兼容语义。为保持事件重建等价，动作改变时以 seat-private `LegalActionsUpdated { actions }` 事件同步。不同玩法甚至可以选择不同的敏感度表示方式（如 TileId vs TileKind），这是契约允许的自由度，具体选择见各 `variants/*.md`。
 
 ## 6. 事件信封（公共部分）

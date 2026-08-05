@@ -2,7 +2,11 @@ import { assertTileConservation } from "../../lib/invariants.ts";
 import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng } from "../../lib/prng.ts";
 import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
-import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import {
+  STANDARD_TILE_SET,
+  sortTileIdsForDisplay,
+  sortWinningGroupsForDisplay,
+} from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import {
   createGangChain,
@@ -325,13 +329,16 @@ export const finishWin = (
   state.result = result;
   // isWin() already gated the zimo action, so this must find a decomposition;
   // the fallback exists only to satisfy the type without an unsafe cast.
-  const groups = decomposeWinningShape(kindsOf(own.hand), own.melds.length) ?? [];
-  state.wins = { ...state.wins, [winner]: { hand: [...own.hand], winTile, groups } };
+  const sortedHand = sortTileIdsForDisplay(own.hand);
+  const groups = sortWinningGroupsForDisplay(
+    decomposeWinningShape(kindsOf(own.hand), own.melds.length) ?? [],
+  );
+  state.wins = { ...state.wins, [winner]: { hand: sortedHand, winTile, groups } };
   appendEvent(state, events, publicVisibility, {
     type: EVENT_TYPES.huDeclared,
     seat: winner,
     winType: "zimo",
-    hand: [...own.hand],
+    hand: sortedHand,
     winTile,
     groups,
     fanTypes: winDetail.fanTypes,
@@ -375,16 +382,18 @@ export const finishRonWins = (
   state.result = result;
   for (const detail of winDetails) {
     const concealedTiles = [...state.seats[detail.seat]!.hand, tile];
+    const sortedHand = sortTileIdsForDisplay(concealedTiles);
     // claimOptions() already gated this via isWin(), so this must find a
     // decomposition; the fallback exists only to satisfy the type.
-    const groups =
-      decomposeWinningShape(kindsOf(concealedTiles), state.seats[detail.seat]!.melds.length) ?? [];
-    state.wins = { ...state.wins, [detail.seat]: { hand: concealedTiles, winTile: tile, groups } };
+    const groups = sortWinningGroupsForDisplay(
+      decomposeWinningShape(kindsOf(concealedTiles), state.seats[detail.seat]!.melds.length) ?? [],
+    );
+    state.wins = { ...state.wins, [detail.seat]: { hand: sortedHand, winTile: tile, groups } };
     appendEvent(state, events, publicVisibility, {
       type: EVENT_TYPES.huDeclared,
       seat: detail.seat,
       winType: "ron",
-      hand: concealedTiles,
+      hand: sortedHand,
       winTile: tile,
       groups,
       from,

@@ -2,7 +2,11 @@ import { assertTileConservation } from "../../lib/invariants.ts";
 import { createEvent, nextEventSeq, type GameEvent } from "../../events.ts";
 import { createPrng, nextInt } from "../../lib/prng.ts";
 import { SEAT_IDS, nextSeat } from "../../lib/seats.ts";
-import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import {
+  STANDARD_TILE_SET,
+  sortTileIdsForDisplay,
+  sortWinningGroupsForDisplay,
+} from "../../lib/tiles.ts";
 import { createWall, drawFromHead, drawFromTail } from "../../lib/wall.ts";
 import {
   createGangChain,
@@ -335,12 +339,14 @@ export const finishWin = (
   from?: SeatId,
   winningTile?: TileId,
 ): void => {
-  const revealedHand =
+  const revealedHand = sortTileIdsForDisplay(
     winningTile === undefined
       ? [...state.seats[winner]!.hand]
-      : [...state.seats[winner]!.hand, winningTile];
+      : [...state.seats[winner]!.hand, winningTile],
+  );
   const winTile = winningTile ?? state.justDrawn!.tile;
-  const { family, groups } = decomposeJunkWin(state, winner, revealedHand);
+  const { family, groups: rawGroups } = decomposeJunkWin(state, winner, revealedHand);
+  const groups = sortWinningGroupsForDisplay(rawGroups);
   const scored = scoreJunkHand({
     family,
     groups,
@@ -399,8 +405,9 @@ export const finishRonWins = (
   tile: TileId,
 ): void => {
   const scoredWinners = winners.map((winner) => {
-    const concealedTiles = [...state.seats[winner]!.hand, tile];
-    const { family, groups } = decomposeJunkWin(state, winner, concealedTiles);
+    const concealedTiles = sortTileIdsForDisplay([...state.seats[winner]!.hand, tile]);
+    const { family, groups: rawGroups } = decomposeJunkWin(state, winner, concealedTiles);
+    const groups = sortWinningGroupsForDisplay(rawGroups);
     const scored = scoreJunkHand({
       family,
       groups,

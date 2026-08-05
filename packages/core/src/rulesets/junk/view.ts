@@ -1,5 +1,5 @@
 import { eventsVisibleTo, type GameEvent } from "../../events.ts";
-import { STANDARD_TILE_SET } from "../../lib/tiles.ts";
+import { STANDARD_TILE_SET, sortTileIdsForDisplay } from "../../lib/tiles.ts";
 import type { SeatId } from "../../lib/ids.ts";
 import type { JunkEventPayload, JunkPlayerView, JunkState } from "./types.ts";
 
@@ -8,7 +8,7 @@ export const getPlayerView = (state: JunkState, seat: SeatId): JunkPlayerView =>
   const ownResponse = pending?.responses[seat];
   const view: JunkPlayerView = {
     seat,
-    hand: [...state.seats[seat]!.hand],
+    hand: sortTileIdsForDisplay(state.seats[seat]!.hand),
     dealer: state.dealer,
     seats: state.seats.map((entry, index) => ({
       melds: entry.melds.map((meld) => ({
@@ -248,5 +248,6 @@ export const rebuildPlayerView = (
     }
   }
   if (!view) throw new Error("MISSING_GAME_STARTED");
+  view.hand = sortTileIdsForDisplay(view.hand);
   return view;
 };

@@ -117,7 +117,7 @@
 - TileKind 形式的副露/牌河
 - 若已胡，公开 `winSnapshot`
 
-仅本人的 view 额外带 TileId 形式的 `hand`、`myLackSuit`、本阶段是否已提交；其他座位的换三张与定缺选择不得泄漏。
+仅本人的 view 额外带 TileId 形式的 `hand`、`myLackSuit`、本阶段是否已提交；其他座位的换三张与定缺选择不得泄漏。`hand`/`winSnapshot.hand` 的展示排序规范见 `contracts/engine-contract.md` §5（血战没有 `groups` 结构化拆分，只有 `hand`/`melds` 需要这层排序）。
 
 ## 10. 番型 fixture 约定（测试相关，配套 `testing-strategy.md`）
 

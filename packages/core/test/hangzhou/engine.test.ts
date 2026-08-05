@@ -15,6 +15,7 @@ import {
   parseHangzhouConfig,
   playHangzhouGame,
   rebuildPlayerView as engineRebuildPlayerView,
+  sortTileIdsForDisplay,
   type GameEvent,
   type HangzhouPlayerView,
   type HangzhouState,
@@ -665,7 +666,9 @@ test("views and event filtering do not expose another seat's concealed hand", ()
   if ("error" in started) throw new Error(started.error.code);
   const viewer = 0 as const;
   const view = hangzhouRuleSet.getPlayerView(started.state, viewer);
-  expect(view.hand).toEqual(started.state.seats[viewer]!.hand);
+  // PlayerView.hand is returned in canonical display order (see lib/tiles.ts's
+  // sortTileIdsForDisplay), not the internal seat state's insertion order.
+  expect(view.hand).toEqual(sortTileIdsForDisplay(started.state.seats[viewer]!.hand));
   expect(
     eventsVisibleTo(started.events, viewer).every(
       (event) => event.visibility.type === "public" || event.visibility.seats.includes(viewer),
