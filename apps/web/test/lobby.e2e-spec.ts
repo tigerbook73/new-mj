@@ -22,9 +22,11 @@ async function createRoom(page: Page, name: string) {
 }
 
 // Shared by every test below where a second person finds an already-created
-// room from the lobby list and opens its preview — refresh is needed because
-// the list doesn't live-update on room creation. Doesn't sit down; call
-// `sitAt` afterward for tests that need an occupied seat.
+// room from the lobby list and opens its preview. The explicit Refresh click
+// is belt-and-suspenders — lobby:roomCreated already pushes new rooms live
+// (see "a newly created room appears live..." below) — kept here so this
+// helper doesn't race that push's timing in tests that don't care about it.
+// Doesn't sit down; call `sitAt` afterward for tests that need an occupied seat.
 async function openRoomAsGuest(guest: Page, roomName: string) {
   await openVariant(guest, "垃圾胡");
   await guest.getByRole("button", { name: "Refresh" }).click();
@@ -102,6 +104,56 @@ test("switching tabs changes the active game lobby", async ({ browser }) => {
   await expect(page.getByText("No open rooms found.")).toBeVisible();
   await openVariant(page, "垃圾胡");
   await page.context().close();
+});
+
+test("a newly created room appears live in another browser's lobby, no refresh needed", async ({
+  browser,
+}) => {
+  const [viewer, creator] = await Promise.all([
+    loginAs(browser, "roompush-viewer"),
+    loginAs(browser, "roompush-creator"),
+  ]);
+  await openVariant(viewer, "垃圾胡");
+  await openVariant(creator, "垃圾胡");
+
+  await createRoom(creator, "Live pushed room");
+  await expect(creator).toHaveURL(/\/lobby\//, { timeout: 10_000 });
+
+  // No Refresh click — this must arrive via lobby:roomCreated alone.
+  await expect(viewer.getByRole("button", { name: "Live pushed room" })).toBeVisible({
+    timeout: 10_000,
+  });
+  await viewer.context().close();
+  await creator.context().close();
+});
+
+test("a pushed room for a different ruleset never appears in the viewer's list", async ({
+  browser,
+}) => {
+  const [viewer, creator] = await Promise.all([
+    loginAs(browser, "roompush-filter-viewer"),
+    loginAs(browser, "roompush-filter-creator"),
+  ]);
+  // Viewer is on a *different* ruleset tab than the room being created — this
+  // is a global broadcast (every connected socket), so the client-side
+  // rulesetId filter is the only thing keeping it out.
+  await openVariant(viewer, "血战到底");
+  await openVariant(creator, "垃圾胡");
+  await createRoom(creator, "Wrong ruleset room");
+  await expect(creator).toHaveURL(/\/lobby\//, { timeout: 10_000 });
+  await viewer.waitForTimeout(500);
+  await expect(viewer.getByRole("button", { name: "Wrong ruleset room" })).toHaveCount(0);
+
+  // Switching to the matching tab triggers the normal lobby:list query (not
+  // the push, which only ever fires once, at creation time) and finds it —
+  // proving the room really was created, just correctly never pushed here.
+  await openVariant(viewer, "垃圾胡");
+  await expect(viewer.getByRole("button", { name: "Wrong ruleset room" })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await viewer.context().close();
+  await creator.context().close();
 });
 
 test("each variant tab's own info icon opens that variant's info page directly", async ({

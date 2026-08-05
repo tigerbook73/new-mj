@@ -117,6 +117,44 @@ describe("RoomService — lifecycle", () => {
     expect(service.get(room.id)).toBe(room);
   });
 
+  it("create broadcasts lobby:roomCreated with the new room's lobby:list summary shape", () => {
+    const eventBus = new EventBus();
+    const service = new RoomService(
+      new GameService(),
+      eventBus,
+      fakePersistenceService(),
+      new ConfigService(),
+    );
+    const broadcasts: Array<{ rulesetId: string; room: unknown }> = [];
+    eventBus.on("lobby:roomCreated", (event) => broadcasts.push(event));
+
+    const room = service.create(
+      "host",
+      "Host",
+      "junk",
+      { rulesetId: "junk" },
+      "4-round",
+      "Fun room",
+    );
+
+    expect(broadcasts).toEqual([
+      {
+        rulesetId: "junk",
+        room: {
+          id: room.id,
+          name: "Fun room",
+          rulesetId: "junk",
+          creator: "Host",
+          createdAt: room.createdAt,
+          playerCount: 1,
+          status: "open",
+        },
+      },
+    ]);
+    // Same projection lobby:list itself would return for this room right now.
+    expect(service.list("junk")).toEqual([broadcasts[0]!.room]);
+  });
+
   it("join seats subsequent players and rejects duplicates / full rooms", () => {
     const service = newRoomService();
     const room = service.create("host", "Host", "junk", { rulesetId: "junk" });

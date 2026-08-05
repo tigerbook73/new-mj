@@ -122,7 +122,29 @@ export class RoomService {
     };
     this.rooms.set(room.id, room);
     this.seatPlayer(room, hostUserId, hostNickname, false, undefined, avatar);
+    // A fresh room is always waiting/open (lobby:list-visible) — see
+    // session-mechanics.md §6 "大厅新房间推送". Global broadcast, not scoped
+    // by roomId (nothing has joined this room's own socket.io channel to
+    // receive a `.to(roomId)` emit yet besides the host, and every *other*
+    // lobby browser — the actual audience for this event — never does).
+    this.eventBus.emit("lobby:roomCreated", {
+      rulesetId: room.rulesetId,
+      room: this.toSummary(room),
+    });
     return room;
+  }
+
+  /** Shared by list() and the lobby:roomCreated broadcast — same projection either way. */
+  private toSummary(room: Room): RoomSummary {
+    return {
+      id: room.id,
+      name: room.name,
+      rulesetId: room.rulesetId,
+      creator: room.ownerNickname,
+      createdAt: room.createdAt,
+      playerCount: room.players.filter((player) => player !== null).length,
+      status: room.status,
+    };
   }
 
   /**
@@ -136,15 +158,7 @@ export class RoomService {
       if (room.rulesetId !== rulesetId) continue;
       if (room.phase !== "waiting" || room.status !== "open") continue;
       if (query && !room.name.toLowerCase().includes(query)) continue;
-      results.push({
-        id: room.id,
-        name: room.name,
-        rulesetId: room.rulesetId,
-        creator: room.ownerNickname,
-        createdAt: room.createdAt,
-        playerCount: room.players.filter((player) => player !== null).length,
-        status: room.status,
-      });
+      results.push(this.toSummary(room));
     }
     return results;
   }

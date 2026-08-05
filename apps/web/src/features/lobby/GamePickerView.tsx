@@ -4,6 +4,7 @@ import { Info, Plus, RefreshCw } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import {
   SESSION_TOTAL_GAMES,
+  type LobbyRoomCreatedEvent,
   type RoomInfo,
   type RoomSummary,
   type SessionTotalGames,
@@ -65,6 +66,38 @@ export function GamePickerView() {
       });
     }, 300);
     return () => window.clearTimeout(timer);
+  }, [rulesetId, search, socket]);
+
+  // Incremental update for the one thing lobby:list doesn't push (see
+  // session-mechanics.md §6 "大厅新房间推送") — a brand new room appearing.
+  // Global broadcast (every socket, not scoped to this ruleset), so filter
+  // client-side the same way the server's own lobby:list query would:
+  // matching rulesetId and, if a search term is active, a substring match
+  // against the room name. Rooms leaving the lobby (full/started/closed)
+  // still aren't pushed — this only ever appends, never removes.
+  useEffect(() => {
+    // `socket` is asserted non-null at declaration (store field is genuinely
+    // `Socket | null` — e.g. briefly null around a takeover/reconnect), but
+    // that assertion is a type-level promise, not a runtime one: unlike the
+    // debounced lobby:list effect above, which only touches `socket` inside
+    // a 300ms setTimeout (by which point a real re-render with a live
+    // socket has normally already superseded it), this one calls `.on(...)`
+    // synchronously, so a still-null socket here would throw immediately
+    // instead of self-healing. `socket` is in the dependency array, so this
+    // effect re-runs and subscribes correctly once it becomes non-null.
+    if (!socket) return;
+    const query = search.trim().toLowerCase();
+    const onRoomCreated = (event: LobbyRoomCreatedEvent) => {
+      if (event.rulesetId !== rulesetId) return;
+      if (query && !event.room.name.toLowerCase().includes(query)) return;
+      setRooms((current) =>
+        current.some((room) => room.id === event.room.id) ? current : [...current, event.room],
+      );
+    };
+    socket.on("lobby:roomCreated", onRoomCreated);
+    return () => {
+      socket.off("lobby:roomCreated", onRoomCreated);
+    };
   }, [rulesetId, search, socket]);
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {

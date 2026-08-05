@@ -1,5 +1,5 @@
 import type { GameEvent, PlayerViewBase, SeatId } from "@new-mj/core";
-import type { DebugOmniscientSnapshot, SessionResult } from "@new-mj/protocol";
+import type { DebugOmniscientSnapshot, RoomSummary, SessionResult } from "@new-mj/protocol";
 
 export interface PlayerJoinedEvent {
   roomId: string;
@@ -49,6 +49,12 @@ export interface RoomClosedEvent {
   reason: "hostLeft" | "allPlayersLeft";
 }
 
+/** No roomId — this one is a global lobby broadcast, not scoped to a room's own socket.io channel (see session-mechanics.md §6). */
+export interface LobbyRoomCreatedEvent {
+  rulesetId: string;
+  room: RoomSummary;
+}
+
 /** Unicast per docs/protocol.md §3 — the gateway resolves `seat` to a single socket. */
 export interface GameSnapshotEvent {
   roomId: string;
@@ -81,6 +87,7 @@ export interface RoomEventMap {
   "room:playerReconnected": PlayerConnectionEvent;
   "room:playerAutoPiloted": PlayerConnectionEvent;
   "room:closed": RoomClosedEvent;
+  "lobby:roomCreated": LobbyRoomCreatedEvent;
   "game:snapshot": GameSnapshotEvent;
   "game:event": GameEventBroadcast;
 }

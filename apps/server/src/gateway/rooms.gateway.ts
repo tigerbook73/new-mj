@@ -143,6 +143,12 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayDisconnect {
         this.connections.untrack(socket);
       }
     });
+    // Global broadcast, deliberately not `.to(roomId)` — the audience is
+    // every socket currently browsing the lobby, none of whom have joined
+    // this new room's own socket.io channel (see session-mechanics.md §6).
+    this.eventBus.on("lobby:roomCreated", (event) => {
+      this.server.emit("lobby:roomCreated", { rulesetId: event.rulesetId, room: event.room });
+    });
     this.eventBus.on("game:snapshot", (event) => {
       const socket = this.connections.socketForSeat(event.roomId, event.seat);
       socket?.emit("game:snapshot", {
