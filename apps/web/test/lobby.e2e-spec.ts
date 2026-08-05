@@ -277,8 +277,13 @@ test("leaving an in-game room keeps the other human in the match", async ({ brow
   await host.getByTestId("table-hud").click();
   await host.getByRole("button", { name: "Leave room" }).click();
   await host.getByRole("dialog").getByRole("button", { name: "Hand off to AI" }).click();
-  await expect(host).toHaveURL(/\/games$/);
-  await expect(guest).toHaveURL(/\/room\//);
+  // No explicit timeout here defaults to expect()'s global 5s, tighter than
+  // the 10s used elsewhere in this file for waits of comparable weight (a
+  // server round-trip + navigation) — under full-suite/multi-worker
+  // contention that's been observed to flake (see docs/process/plan.md's
+  // former note on this test). Match the file's existing generous convention.
+  await expect(host).toHaveURL(/\/games$/, { timeout: 15_000 });
+  await expect(guest).toHaveURL(/\/room\//, { timeout: 15_000 });
   await host.context().close();
   await guest.context().close();
 });
@@ -305,10 +310,11 @@ test("force exiting an in-game room ends the session for every player", async ({
   await host.getByRole("dialog").getByRole("button", { name: "Force exit" }).click();
 
   // The one who forced it navigates straight back to the game picker...
-  await expect(host).toHaveURL(/\/games$/);
+  // (see the sibling "leaving" test above for why 15s, not the implicit 5s default.)
+  await expect(host).toHaveURL(/\/games$/, { timeout: 15_000 });
   // ...while everyone still on the table page lands on the settlement screen,
   // not a stuck mid-round UI.
-  await expect(guest.getByTestId("session-finished-overlay")).toBeVisible({ timeout: 10_000 });
+  await expect(guest.getByTestId("session-finished-overlay")).toBeVisible({ timeout: 15_000 });
   await host.context().close();
   await guest.context().close();
 });

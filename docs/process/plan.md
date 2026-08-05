@@ -8,7 +8,7 @@
 
 ## 阻塞与遗留问题
 
-- `apps/web/test/lobby.e2e-spec.ts` 中 “leaving an in-game room keeps the other human in the match” 与 “force exiting an in-game room ends the session for every player”、以及 `apps/web/test/table.e2e-spec.ts` 中 “a claimed tile FLIPs from the discard pile into the meld via a ghost clone”，三处在完整套件/多 worker 全量 E2E 中偶发超时，单独或小范围运行稳定。根因已定位为同一类（暂不动手）：全量 E2E 共享单一 server 进程（内存态房间状态 + `setTimeout` 驱动 AI/超时），多 worker 并发挤占 Node 事件循环与浏览器 rAF，导致这几处依赖“定时器/动画按时完成”的固定 10s 超时偶发触发；`cdcebee`（解除主 checkout 的 `E2E_WORKERS` 上限）放大了此问题。下次处理时，第一个具体动作：把这几处断言从固定 `timeout` 改为 `expect.poll` + 更宽松阈值，并评估主 checkout 全量 E2E 是否也该保留合理 worker 上限（按 worker 隔离 server 实例成本更高，先不做）。
+无。
 
 ## Backlog
 

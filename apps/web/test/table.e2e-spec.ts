@@ -663,10 +663,15 @@ test("a claimed tile FLIPs from the discard pile into the meld via a ghost clone
     await secondDock.getByRole("button", { name: /^过/ }).click();
 
     const ghost = claimant.getByTestId("claim-flip-ghost");
-    await expect(ghost).toBeVisible({ timeout: 10_000 });
-    // Self-removes once its transition completes (onAnimationComplete) —
-    // give it generous headroom since the transition itself is ~300ms.
-    await expect(ghost).toBeHidden({ timeout: 10_000 });
+    // Mounting the ghost depends on a claim round-trip through the shared
+    // e2e server (peng/chi resolution + broadcast), which under full-suite/
+    // multi-worker contention can lag well past a plain 10s — see
+    // docs/process/plan.md's former note on this test flaking there.
+    await expect(ghost).toBeVisible({ timeout: 20_000 });
+    // Self-removes once its transition completes (onAnimationComplete) — the
+    // transition itself is only ~300ms, but under the same contention the
+    // main thread/rAF can lag, so keep some headroom here too.
+    await expect(ghost).toBeHidden({ timeout: 15_000 });
 
     // The real meld tile and the discard tombstone must both have settled
     // correctly — the whole point of the ghost is that neither one's own
