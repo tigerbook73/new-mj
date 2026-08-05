@@ -16,6 +16,25 @@ export type Meld = {
   meldLedgerKey: string;
 };
 
+/** A concealed kong is always 4 physical tiles, regardless of how many the viewer's PlayerView reveals. */
+const ANGANG_TILE_COUNT = 4;
+
+/**
+ * anGang's display convention is fixed at 1 real face + 3 backs, independent
+ * of `tiles.length`: the owner's own view carries all 4 real TileIds (core
+ * doesn't redact your own concealed kong), while every other seat's view
+ * redacts it to `[]` (see docs/variants/junk.md's anGang concealment rule) —
+ * either way this always renders exactly 4 slots, revealing at most one real
+ * id. `tile: undefined` is what makes the other 3 (or all 4, for a
+ * non-owner) render face-down — see Tile.tsx's `isBack` derivation.
+ */
+function buildAnGangTileSlots(tiles: number[]): { key: string; tile: number | undefined }[] {
+  return Array.from({ length: ANGANG_TILE_COUNT }, (_, index) => ({
+    key: `angang-${index}`,
+    tile: index === 0 ? tiles[0] : undefined,
+  }));
+}
+
 interface MeldGroupProps {
   /** This track's own seat direction — counter-rotates the source-arrow badge, same technique as DiscardPile. */
   direction: SeatDirection;
@@ -59,17 +78,21 @@ export function MeldGroup({ direction, melds, tileHeight, config }: MeldGroupPro
         // construction order as-is, which already has the claimed tile last (or second-to-last
         // for buGang); sorting those would just be a no-op dressed up as one.
         const sortedTiles = meld.type === "chi" ? sortTilesForDisplay(meld.tiles) : meld.tiles;
+        const tileSlots =
+          meld.type === "anGang"
+            ? buildAnGangTileSlots(meld.tiles)
+            : sortedTiles.map((tile) => ({ key: String(tile), tile }));
         return (
           <div
             key={meldIndex}
             className="flex"
             style={{ height: `${tileHeight}%`, gap: `${config.shared.tileGapPx}px` }}
           >
-            {sortedTiles.map((tile) => {
-              const isFromClaim = tile === fromTileId;
+            {tileSlots.map(({ key, tile }) => {
+              const isFromClaim = tile !== undefined && tile === fromTileId;
               return (
                 <MeldClaimTile
-                  key={tile}
+                  key={key}
                   direction={direction}
                   fromDirection={isFromClaim ? meld.fromDirection : undefined}
                   meldLedgerKey={meld.meldLedgerKey}
@@ -104,7 +127,8 @@ function MeldClaimTile({
   fromDirection: SeatDirection | undefined;
   meldLedgerKey: string;
   aspectRatio: number;
-  tile: number;
+  /** Omitted for anGang's face-down slots — see buildAnGangTileSlots; Tile.tsx renders a back tile whenever `tileId` is undefined. */
+  tile: number | undefined;
 }) {
   const { entering, ghost, onGhostComplete } = useSlotEntering(meldLedgerKey);
   const toRef = useRef<HTMLDivElement>(null);
@@ -121,7 +145,7 @@ function MeldClaimTile({
           entering={entering}
         />
       </div>
-      {ghost && fromDirection !== undefined && (
+      {ghost && fromDirection !== undefined && tile !== undefined && (
         <ClaimFlipGhost
           tileId={tile}
           fromSelector={`[data-testid="table-area-${fromDirection}"] [data-tile-id="${tile}"]`}

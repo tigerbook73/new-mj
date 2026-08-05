@@ -10,7 +10,7 @@ export interface TileProps {
    * so callers can pad a row to a fixed slot count without a dedicated
    * sentinel constant.
    */
-  tileId?: number;
+  tileId?: number | undefined;
   back?: boolean;
   /**
    * Pixel (or CSS percentage) box for this tile. Give both for an exact box
