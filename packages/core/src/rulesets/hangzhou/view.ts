@@ -142,12 +142,13 @@ export const rebuildPlayerView = (
               : view.hand;
           const wasBaotouBefore = isBaotou(kindsOf(beforeHand), meldsCount);
           const afterHand = view.hand.filter((candidate) => candidate !== tile);
-          if (
-            wasBaotouBefore &&
-            STANDARD_TILE_SET.kindOf(tile) === CAISHEN_KIND &&
-            isBaotou(kindsOf(afterHand), meldsCount)
-          ) {
-            caiPiaoCount += 1;
+          const discardedIsCaishen = STANDARD_TILE_SET.kindOf(tile) === CAISHEN_KIND;
+          if (discardedIsCaishen) {
+            if (wasBaotouBefore && isBaotou(kindsOf(afterHand), meldsCount)) {
+              caiPiaoCount += 1;
+            }
+          } else {
+            caiPiaoCount = 0;
           }
           view.hand = afterHand;
           delete view.justDrawn;

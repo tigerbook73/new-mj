@@ -606,6 +606,105 @@ test("event reconstruction replays the same caiPiaoCount-driven isCaipiao flag",
   expect(rebuilt.isBaotou).toBe(true);
 });
 
+test("caiPiaoCount resets to 0 on any non-caishen discard, regardless of baotou afterward", () => {
+  // Discarding anything other than caishen breaks the streak outright, per
+  // docs/variants/hangzhou.md §4 — a stricter condition than "no longer
+  // baotou". Hand/baotou shape here is irrelevant to the assertion; only
+  // "the discarded tile isn't caishen" matters.
+  const hand = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52];
+  const physical = new Set(hand);
+  const state: HangzhouState = {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    dealer: 1,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [1, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+    justDrawn: { seat: 0, tile: 52 },
+  };
+  const result = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 52 }));
+  expect(result.caiPiaoCount).toEqual([0, 0, 0, 0]);
+  assertTileConservation(result);
+});
+
+test("caiPiaoCount is untouched by a non-qualifying caishen discard (not baotou)", () => {
+  // Discarding caishen while not baotou (or not staying baotou) is a "plain"
+  // caishen discard — it neither increments nor resets the streak, since the
+  // reset condition is specifically "discarded tile is not caishen".
+  const hand = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 124];
+  const physical = new Set(hand);
+  const state: HangzhouState = {
+    config: { rulesetId: "hangzhou", multiHuPolicy: "headJump", baseScore: 1, dealerStreak: 3 },
+    phase: "playing",
+    wall: allTileIds().filter((tile) => !physical.has(tile)),
+    seats: [
+      { hand, melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+      { hand: [], melds: [], discards: [] },
+    ],
+    currentSeat: 0,
+    dealer: 1,
+    seq: 0,
+    prng: createPrng(1),
+    caiPiaoCount: [1, 0, 0, 0],
+    gangChain: [0, 0, 0, 0],
+    justDrawn: { seat: 0, tile: 124 },
+  };
+  const result = unwrap(hangzhouRuleSet.applyAction(state, 0, { type: "discard", tile: 124 }));
+  expect(result.caiPiaoCount).toEqual([1, 0, 0, 0]);
+  assertTileConservation(result);
+});
+
+test("event reconstruction replays a caiPiaoCount reset on a later non-caishen discard", () => {
+  const triplets = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
+  const hand = [...triplets, 124, 125];
+  const events: GameEvent[] = [
+    {
+      seq: 1,
+      visibility: { type: "public" },
+      payload: {
+        type: "GameStarted",
+        dealer: 0,
+        handCounts: [14, 13, 13, 13],
+        wallCount: 100,
+        config: { dealerStreak: 1 },
+      },
+    },
+    {
+      seq: 2,
+      visibility: { type: "seat", seats: [0] },
+      payload: { type: "HandDealt", seat: 0, tiles: hand },
+    },
+    {
+      seq: 3,
+      visibility: { type: "public" },
+      payload: { type: "TileDiscarded", seat: 0, tile: 124 },
+    },
+    {
+      seq: 4,
+      visibility: { type: "seat", seats: [0] },
+      payload: { type: "TileDrawn", seat: 0, tile: 16 },
+    },
+    {
+      seq: 5,
+      visibility: { type: "public" },
+      payload: { type: "TileDiscarded", seat: 0, tile: 16 },
+    },
+  ];
+  const rebuilt = hangzhouRuleSet.rebuildPlayerView(events, 0) as HangzhouPlayerView;
+  expect(rebuilt.isCaipiao).toBe(false);
+});
+
 test("gang-chain tiers: two consecutive concealed gangs extend gangChain", () => {
   // Seat 0 holds two concealable quads (1m, 2m) plus a pair; ganging the first
   // should set gangChain to 1, and if the replacement draw makes the second

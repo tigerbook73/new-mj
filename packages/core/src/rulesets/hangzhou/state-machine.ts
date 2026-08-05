@@ -437,7 +437,10 @@ export const applyDiscard = (
   if (!remaining) return fail("TILE_NOT_IN_HAND");
 
   // docs/variants/hangzhou.md §4: caiPiaoCount accumulates whenever a
-  // baotou hand discards caishen and stays baotou afterwards.
+  // baotou hand discards caishen and stays baotou afterwards; discarding
+  // anything else on your own turn breaks the streak outright, regardless
+  // of whether you're still baotou afterward — a stricter condition than
+  // "no longer baotou", intentionally.
   const meldsCount = state.seats[seat]!.melds.length;
   const justDrawnTile = state.justDrawn?.seat === seat ? state.justDrawn.tile : undefined;
   const beforeHand = justDrawnTile !== undefined ? removeTiles(hand, [justDrawnTile])! : hand;
@@ -445,9 +448,11 @@ export const applyDiscard = (
   const discardedIsCaishen = STANDARD_TILE_SET.kindOf(tile) === CAISHEN_KIND;
   if (discardedIsCaishen) {
     state.caishenLockout = { discarder: seat };
-  }
-  if (wasBaotouBefore && discardedIsCaishen && isBaotou(kindsOf(remaining), meldsCount)) {
-    state.caiPiaoCount[seat] += 1;
+    if (wasBaotouBefore && isBaotou(kindsOf(remaining), meldsCount)) {
+      state.caiPiaoCount[seat] += 1;
+    }
+  } else {
+    state.caiPiaoCount[seat] = 0;
   }
 
   state.seats[seat]!.hand = remaining;
