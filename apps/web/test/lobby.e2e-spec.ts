@@ -10,7 +10,7 @@ async function loginAs(browser: Browser, nickname: string): Promise<Page> {
   return page;
 }
 
-async function openVariant(page: Page, name: "Junk Hu" | "Bloodbattle") {
+async function openVariant(page: Page, name: "垃圾胡" | "血战到底") {
   await page.getByRole("tab", { name }).click();
   await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
 }
@@ -26,7 +26,7 @@ async function createRoom(page: Page, name: string) {
 // the list doesn't live-update on room creation. Doesn't sit down; call
 // `sitAt` afterward for tests that need an occupied seat.
 async function openRoomAsGuest(guest: Page, roomName: string) {
-  await openVariant(guest, "Junk Hu");
+  await openVariant(guest, "垃圾胡");
   await guest.getByRole("button", { name: "Refresh" }).click();
   await guest.getByRole("button", { name: roomName }).click();
 }
@@ -43,7 +43,7 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
     loginAs(browser, "start-p4"),
   ]);
 
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Four players");
   await expect(host).toHaveURL(/\/lobby\/[0-9a-f-]{36}$/);
 
@@ -52,7 +52,7 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
     [p3, 2],
     [p4, 3],
   ] as const) {
-    await openVariant(page, "Junk Hu");
+    await openVariant(page, "垃圾胡");
     await page.getByRole("button", { name: "Refresh" }).click();
     await page.getByRole("button", { name: "Four players" }).click();
     await expect(page).toHaveURL(/\/lobby\//);
@@ -72,7 +72,7 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
 
 test("host ready fills empty waiting seats with bots and starts", async ({ browser }) => {
   const page = await loginAs(browser, "solo-host");
-  await openVariant(page, "Junk Hu");
+  await openVariant(page, "垃圾胡");
   await createRoom(page, "Solo table");
   await expect(page).toHaveURL(/\/lobby\//);
   await expect(page.getByText(/Owner:/)).toBeVisible();
@@ -86,7 +86,7 @@ test("host ready fills empty waiting seats with bots and starts", async ({ brows
 
 test("host can choose an allowed total-rounds session setting", async ({ browser }) => {
   const page = await loginAs(browser, "round-config-host");
-  await openVariant(page, "Junk Hu");
+  await openVariant(page, "垃圾胡");
   await page.getByRole("button", { name: "Create room" }).last().click();
   await page.getByLabel("Room name").fill("Eight rounds");
   await page.getByLabel("Total rounds").click();
@@ -98,24 +98,26 @@ test("host can choose an allowed total-rounds session setting", async ({ browser
 
 test("switching tabs changes the active game lobby", async ({ browser }) => {
   const page = await loginAs(browser, "tabs-host");
-  await openVariant(page, "Bloodbattle");
+  await openVariant(page, "血战到底");
   await expect(page.getByText("No open rooms found.")).toBeVisible();
-  await openVariant(page, "Junk Hu");
+  await openVariant(page, "垃圾胡");
   await page.context().close();
 });
 
-test("the rules link beside the variant tabs opens that variant's info page", async ({
+test("each variant tab's own info icon opens that variant's info page directly", async ({
   browser,
 }) => {
   const page = await loginAs(browser, "rules-link-host");
-  await page.getByRole("link", { name: "玩法规则" }).click();
+  // "垃圾胡" is the initially-selected tab — its info icon works from there.
+  await page.getByRole("link", { name: "垃圾胡 玩法规则" }).click();
   await expect(page).toHaveURL(/\/variants\/junk$/);
   await expect(page.getByRole("heading", { name: "垃圾胡" })).toBeVisible();
 
+  // "血战到底"'s own icon works without ever selecting that tab first — each
+  // icon is independent of which tab is currently active.
   await page.getByRole("link", { name: "返回大厅" }).click();
   await expect(page).toHaveURL(/\/games$/);
-  await openVariant(page, "Bloodbattle");
-  await page.getByRole("link", { name: "玩法规则" }).click();
+  await page.getByRole("link", { name: "血战到底 玩法规则" }).click();
   await expect(page).toHaveURL(/\/variants\/bloodbattle$/);
   await expect(page.getByRole("heading", { name: "血战到底" })).toBeVisible();
   await page.context().close();
@@ -126,7 +128,7 @@ test("a guest can leave a waiting room and return to the lobby", async ({ browse
     loginAs(browser, "leave-host"),
     loginAs(browser, "leave-guest"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Guest leaves");
   await openRoomAsGuest(guest, "Guest leaves");
   await sitAt(guest, 2);
@@ -142,7 +144,7 @@ test("a visitor can leave a room preview without taking a seat", async ({ browse
     loginAs(browser, "preview-host"),
     loginAs(browser, "preview-visitor"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Preview only");
   await openRoomAsGuest(visitor, "Preview only");
   await expect(
@@ -156,7 +158,7 @@ test("a visitor can leave a room preview without taking a seat", async ({ browse
 
 test("a player can switch to another empty seat in the same room", async ({ browser }) => {
   const page = await loginAs(browser, "seat-switcher");
-  await openVariant(page, "Junk Hu");
+  await openVariant(page, "垃圾胡");
   await createRoom(page, "Seat switch");
   await page.locator('[data-seat="2"]').getByRole("button", { name: "Sit" }).click();
   await page.locator('[data-seat="3"]').getByRole("button", { name: "Sit" }).click();
@@ -169,7 +171,7 @@ test("a player can switch to another empty seat in the same room", async ({ brow
 
 test("the host can remove a bot from a waiting seat", async ({ browser }) => {
   const page = await loginAs(browser, "bot-remover");
-  await openVariant(page, "Junk Hu");
+  await openVariant(page, "垃圾胡");
   await createRoom(page, "Remove bot");
   await page.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
   await expect(page.locator('[data-seat="2"]')).toContainText("BOT");
@@ -183,7 +185,7 @@ test("the host can remove another player from a waiting room", async ({ browser 
     loginAs(browser, "remove-host"),
     loginAs(browser, "remove-guest"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Remove player");
   await openRoomAsGuest(guest, "Remove player");
   await sitAt(guest, 2);
@@ -199,7 +201,7 @@ test("the host leaving a waiting room closes it for everyone", async ({ browser 
     loginAs(browser, "close-host"),
     loginAs(browser, "close-guest"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Host leaves");
   await openRoomAsGuest(guest, "Host leaves");
   await sitAt(guest, 2);
@@ -223,7 +225,7 @@ test("a room with all four seats filled shows no sittable seat to a later visito
     loginAs(browser, "full-host"),
     loginAs(browser, "full-visitor"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Full room");
   await host.locator('[data-seat="2"]').getByRole("button", { name: "Bot" }).click();
   await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
@@ -241,7 +243,7 @@ test("a room with all four seats filled shows no sittable seat to a later visito
 // not just leave it enabled from an earlier all-ready moment.
 test("unchecking ready disables Start game again", async ({ browser }) => {
   const page = await loginAs(browser, "unready-host");
-  await openVariant(page, "Junk Hu");
+  await openVariant(page, "垃圾胡");
   await createRoom(page, "Unready room");
 
   const readyBox = page.getByRole("checkbox", { name: "Ready" });
@@ -263,7 +265,7 @@ test("unchecking ready disables Start game again", async ({ browser }) => {
 // not any bloodbattle-specific table content.
 test("a bloodbattle room can be created, readied, and started", async ({ browser }) => {
   const page = await loginAs(browser, "bloodbattle-host");
-  await openVariant(page, "Bloodbattle");
+  await openVariant(page, "血战到底");
   await createRoom(page, "Bloodbattle smoke");
   await expect(page).toHaveURL(/\/lobby\//);
 
@@ -280,7 +282,7 @@ test("leaving an in-game room keeps the other human in the match", async ({ brow
     loginAs(browser, "game-leave-host"),
     loginAs(browser, "game-leave-guest"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Game leaves");
   await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
   await host.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();
@@ -310,7 +312,7 @@ test("force exiting an in-game room ends the session for every player", async ({
     loginAs(browser, "force-exit-host"),
     loginAs(browser, "force-exit-guest"),
   ]);
-  await openVariant(host, "Junk Hu");
+  await openVariant(host, "垃圾胡");
   await createRoom(host, "Force exit");
   await host.locator('[data-seat="3"]').getByRole("button", { name: "Bot" }).click();
   await host.locator('[data-seat="4"]').getByRole("button", { name: "Bot" }).click();

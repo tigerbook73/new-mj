@@ -39,7 +39,7 @@ async function createAndStartRoom(
   const roomName = `Table test ${identityPrefix}`;
 
   const variant =
-    rulesetId === "junk" ? "Junk Hu" : rulesetId === "bloodbattle" ? "Bloodbattle" : "Hangzhou";
+    rulesetId === "junk" ? "垃圾胡" : rulesetId === "bloodbattle" ? "血战到底" : "杭州麻将";
   await host.getByRole("tab", { name: variant }).click();
   await host.getByRole("button", { name: "Create room" }).last().click();
   await host.getByLabel("Room name").fill(roomName);
@@ -190,7 +190,7 @@ test("opponent seats show their real nickname on the table, not the Seat N fallb
   await host.getByPlaceholder("Enter nickname").fill("infoslot-nick-host");
   await host.getByRole("button", { name: "Enter game" }).click();
   await expect(host).toHaveURL(/\/games$/, { timeout: 10_000 });
-  await host.getByRole("tab", { name: "Junk Hu" }).click();
+  await host.getByRole("tab", { name: "垃圾胡" }).click();
   await host.getByRole("button", { name: "Create room" }).last().click();
   await host.getByLabel("Room name").fill("infoslot nickname room");
   await host.getByRole("button", { name: "Create room" }).click();

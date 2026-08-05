@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { BookOpen, Plus, RefreshCw } from "lucide-react";
+import { Info, Plus, RefreshCw } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import {
   SESSION_TOTAL_GAMES,
@@ -15,10 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { ack } from "@/shared/lib/socket";
 import { useSessionStore } from "@/shared/store/session";
 
+// Labels match variantInfoContent.ts's VARIANT_INFO[id].title — the rules
+// page for each id opens right from the tab bar (info icon, see below).
 const RULESETS = [
-  { id: "junk", label: "Junk Hu" },
-  { id: "bloodbattle", label: "Bloodbattle" },
-  { id: "hangzhou", label: "Hangzhou" },
+  { id: "junk", label: "垃圾胡" },
+  { id: "bloodbattle", label: "血战到底" },
+  { id: "hangzhou", label: "杭州麻将" },
 ] as const;
 
 const formatCreatedAt = (timestamp: number) => {
@@ -100,22 +102,32 @@ export function GamePickerView() {
           )}
         </header>
         <Tabs value={rulesetId} onValueChange={(value) => setRulesetId(value)}>
-          <div className="flex items-center gap-2">
-            <TabsList aria-label="Game variants">
-              {RULESETS.map((ruleset) => (
-                <TabsTrigger key={ruleset.id} value={ruleset.id}>
-                  {ruleset.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <Link
-              to={`/variants/${rulesetId}`}
-              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
-            >
-              <BookOpen className="size-4" aria-hidden="true" />
-              玩法规则
-            </Link>
-          </div>
+          {/*
+           * The info link sits as a plain sibling of each TabsTrigger inside
+           * TabsList, not nested inside it — an interactive element can't
+           * nest inside the trigger's own <button>, and base-ui's roving-
+           * tabindex/keyboard nav among tabs only tracks Tabs.Tab-typed
+           * children via its own composite-list registration, so this
+           * unrelated Link simply doesn't participate in that and is safely
+           * skippable. Each icon points at that specific ruleset's rules
+           * page regardless of which tab is currently selected — unlike the
+           * tab's own onValueChange, this is plain navigation.
+           */}
+          <TabsList aria-label="Game variants">
+            {RULESETS.map((ruleset) => (
+              <Fragment key={ruleset.id}>
+                <TabsTrigger value={ruleset.id}>{ruleset.label}</TabsTrigger>
+                <Link
+                  to={`/variants/${ruleset.id}`}
+                  aria-label={`${ruleset.label} 玩法规则`}
+                  title="玩法规则"
+                  className="-ml-1 flex items-center text-muted-foreground hover:text-foreground"
+                >
+                  <Info className="size-3.5" />
+                </Link>
+              </Fragment>
+            ))}
+          </TabsList>
           {RULESETS.map((ruleset) => (
             <TabsContent key={ruleset.id} value={ruleset.id} className="mt-6">
               <section className="flex flex-col gap-4 rounded-xl border bg-background p-5 shadow-sm">
