@@ -64,7 +64,7 @@ test("four players find a room, choose seats, ready up, and start", async ({ bro
 
   const players = [host, p2, p3, p4];
   for (const page of players) await page.getByRole("checkbox", { name: "Ready" }).check();
-  await expect(host.getByText("(Ready)")).toHaveCount(4, { timeout: 10_000 });
+  await expect(host.getByRole("img", { name: "Ready" })).toHaveCount(4, { timeout: 10_000 });
   await host.getByRole("button", { name: "Start game" }).click();
   for (const page of players) await expect(page).toHaveURL(/\/room\//, { timeout: 10_000 });
   for (const page of players) await page.context().close();

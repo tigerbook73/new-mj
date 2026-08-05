@@ -62,7 +62,7 @@ async function createAndStartRoom(
   for (const page of players) {
     await page.getByRole("checkbox").check();
   }
-  await expect(host.getByText("(Ready)")).toHaveCount(4, { timeout: 10_000 });
+  await expect(host.getByRole("img", { name: "Ready" })).toHaveCount(4, { timeout: 10_000 });
   await host.getByRole("button", { name: "Start game" }).click();
 
   for (const page of players) {

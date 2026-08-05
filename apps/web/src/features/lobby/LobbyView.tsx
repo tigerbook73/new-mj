@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { UserRound } from "lucide-react";
+import { Check, UserRound, X } from "lucide-react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Tooltip } from "@base-ui/react/tooltip";
 import type {
@@ -338,6 +338,13 @@ export function LobbyView() {
             >
               <span className="font-medium">Seat {seat + 1}</span>
               <span className="flex min-w-0 items-center justify-end gap-2 text-right">
+                {player && player.isReady && (
+                  <Check
+                    className="size-4 shrink-0 text-emerald-500"
+                    aria-label="Ready"
+                    role="img"
+                  />
+                )}
                 {player?.isBot ? (
                   <span className="font-medium">BOT</span>
                 ) : player ? (
@@ -349,9 +356,6 @@ export function LobbyView() {
                     <span className="truncate">{player.nickname}</span>
                   </>
                 ) : null}
-                {player && player.isReady && (
-                  <span className="text-sm text-muted-foreground">(Ready)</span>
-                )}
               </span>
               <span className="flex w-48 justify-end gap-2">
                 {!player && shownRoom.phase === "waiting" && (
@@ -372,11 +376,13 @@ export function LobbyView() {
                 )}
                 {player?.isBot && isHost && shownRoom.phase === "waiting" && (
                   <Button
-                    size="sm"
+                    size="icon-xs"
                     variant="outline"
+                    aria-label="Remove"
+                    title="Remove"
                     onClick={() => void removeBot(seat as 0 | 1 | 2 | 3)}
                   >
-                    Remove
+                    <X className="size-3.5" />
                   </Button>
                 )}
                 {player &&
@@ -385,11 +391,13 @@ export function LobbyView() {
                   isHost &&
                   shownRoom.phase === "waiting" && (
                     <Button
-                      size="sm"
+                      size="icon-xs"
                       variant="outline"
+                      aria-label="Remove"
+                      title="Remove"
                       onClick={() => void removePlayer(seat as 0 | 1 | 2 | 3)}
                     >
-                      Remove
+                      <X className="size-3.5" />
                     </Button>
                   )}
               </span>
