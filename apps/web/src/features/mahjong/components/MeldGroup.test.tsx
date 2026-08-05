@@ -36,9 +36,7 @@ describe("MeldGroup", () => {
   it("shows four backs and leaks no TileId for another seat's anGang", () => {
     // Non-owner PlayerView redacts anGang tiles to [] — no real id ever
     // reaches this component for an opponent's concealed kong.
-    const markup = renderMelds([
-      { type: "anGang", tiles: [], meldLedgerKey: "g1:meld:1:0:0" },
-    ]);
+    const markup = renderMelds([{ type: "anGang", tiles: [], meldLedgerKey: "g1:meld:1:0:0" }]);
 
     expect(markup).not.toContain("data-tile-id=");
     expect(markup.match(/<img /g)).toHaveLength(4);
@@ -46,7 +44,9 @@ describe("MeldGroup", () => {
   });
 
   it("still renders all real faces for non-anGang meld types", () => {
-    const markup = renderMelds([{ type: "peng", tiles: [21, 22, 23], meldLedgerKey: "g1:meld:0:1:3" }]);
+    const markup = renderMelds([
+      { type: "peng", tiles: [21, 22, 23], meldLedgerKey: "g1:meld:0:1:3" },
+    ]);
 
     expect(markup).toContain('data-tile-id="21"');
     expect(markup).toContain('data-tile-id="22"');
