@@ -62,6 +62,24 @@ describe("junk strategy", () => {
     ).toBe(true);
   });
 
+  it("passes on a chi that would break an already-tenpai hand", () => {
+    // Bug report: the AI never recommended pass, and would chi even when the
+    // player already held a complete concealed triplet — because pass was
+    // scored as a hardcoded -1000 regardless of how good the current hand
+    // already was. Here the hand is tenpai (a complete 1m-9m run, a concealed
+    // 9s triplet, waiting to pair 1p) and the only chi available would tear
+    // the run apart for no gain — pass must win.
+    const player: JunkPlayerView = {
+      ...view(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "9s", "9s", "9s", "1p"]),
+      lastDiscard: { seat: 3, tile: tileIdOf("4m", 1) },
+    };
+    const actions: JunkAction[] = [
+      { type: "chi", tiles: [tileIdOf("3m", 0), tileIdOf("5m", 0)] },
+      { type: "pass" },
+    ];
+    expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+  });
+
   it("uses visible discards as a safety tie-break", () => {
     const player = view(["1m", "1m", "2m", "2m"]);
     const first = player.hand[0]!;
@@ -99,11 +117,34 @@ describe("junk strategy", () => {
     expect(keepPairs - breakPair).toBeGreaterThan(50);
   });
 
-  it("keeps the fixed rob-kong risk when comparing gang actions", () => {
-    const player = view(["1m", "1m", "1m", "1m"]);
+  it("prefers anGang over buGang when both leave an equally good hand", () => {
+    // Realistic mid-hand state: seat 0 already has a peng of 9s and holds the
+    // 4th copy (buGang-eligible) plus a concealed 1m kong (anGang-eligible) and
+    // two clean runs — both gangs leave a comparable shape, so only the fixed
+    // gangkai bonus (anGang 5 > buGang 3) should decide the recommendation.
+    const pengTiles = [0, 1, 2].map((copy) => tileIdOf("9s", copy));
+    const hand = [
+      ...[0, 1, 2, 3].map((copy) => tileIdOf("1m", copy)),
+      tileIdOf("9s", 3),
+      ...ids(["1p", "2p", "3p", "4p", "5p", "6p"]),
+    ];
+    const player: JunkPlayerView = {
+      seat: 0,
+      hand,
+      wallCount: 50,
+      currentSeat: 0,
+      dealer: 0,
+      phase: "playing",
+      seats: [0, 1, 2, 3].map((seat) => ({
+        handCount: seat === 0 ? hand.length : 13,
+        melds: seat === 0 ? [{ type: "peng", tiles: pengTiles, from: 1 }] : [],
+        discards: [],
+        justDrawn: false,
+      })),
+    };
     const actions: JunkAction[] = [
       { type: "anGang", kind: "1m" },
-      { type: "buGang", tile: player.hand[0]! },
+      { type: "buGang", tile: tileIdOf("9s", 3) },
     ];
     expect(recommendJunkAction(player, actions)).toBe(actions[0]);
   });

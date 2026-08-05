@@ -1,6 +1,7 @@
 import {
   STANDARD_TILE_SET,
-  junkShanten,
+  sevenPairsShanten,
+  standardShanten,
   ukeire,
   type JunkAction,
   type JunkPlayerView,
@@ -48,6 +49,36 @@ const fanPotential = (input: ShapeInput): number => {
   return score;
 };
 
+/**
+ * standardShanten/sevenPairsShanten only look at the concealed tiles handed to
+ * them — they assume all 4 melds still have to come from that array. A seat
+ * with existing melds (chi/peng/gang) already has some of those 4 melds "for
+ * free", so each existing meld is worth exactly 2 shanten points back (one of
+ * the classic shanten-calculator adjustments); qidui is impossible once any
+ * meld exists (its hand can never be all-concealed pairs again).
+ */
+const shantenOf = (input: ShapeInput): number => {
+  const meldCount = input.melds.length;
+  const standard = standardShanten(input.hand);
+  const raw = meldCount > 0 ? standard : Math.min(standard, sevenPairsShanten(input.hand));
+  return raw - meldCount * 2;
+};
+
+/**
+ * Shared quality metric for a static hand shape (no pending discard) — the common
+ * scale that discard/pass/gang scoring all compare against, so "do nothing" and
+ * "change my hand" are judged on the same terms instead of hardcoded constants.
+ */
+const handQuality = (input: ShapeInput): number => {
+  const shanten = shantenOf(input);
+  // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
+  // 避免自动对局在每一次出牌都做无收益的二层穷举。ukeire 内部的向听差值不
+  // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。
+  const improvements =
+    shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }).length : 0;
+  return -shanten * 100 + improvements * 3 + fanPotential(input);
+};
+
 /** Shared primitive for discard and claim evaluation: preserve shape, then score its best discard. */
 export const scoreHandShapeAfterDiscard = (
   input: ShapeInput,
@@ -56,12 +87,8 @@ export const scoreHandShapeAfterDiscard = (
 ): number => {
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
-  const shanten = junkShanten(hand, { sevenPairs: true });
-  // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
-  // 避免自动对局在每一次出牌都做无收益的二层穷举。
-  const improvements = shanten <= 1 ? ukeire(hand, { sevenPairs: true }).length : 0;
   const safety = visibleDiscards.includes(discard) ? 4 : 0;
-  return -shanten * 100 + improvements * 3 + fanPotential({ hand, melds: input.melds }) + safety;
+  return handQuality({ hand, melds: input.melds }) + safety;
 };
 
 const bestDiscardScore = (input: ShapeInput, visibleDiscards: readonly TileId[]): number =>
@@ -97,23 +124,55 @@ const simulatedClaim = (view: JunkPlayerView, action: JunkAction): ShapeInput | 
     : undefined;
 };
 
+/** anGang consumes all 4 concealed copies of `kind` into a new concealed meld. */
+const simulatedAnGang = (view: JunkPlayerView, kind: TileKind): ShapeInput | undefined => {
+  const tiles = view.hand.filter((tile) => kindOf(tile) === kind).slice(0, 4);
+  if (tiles.length !== 4) return undefined;
+  const hand = removeTiles(view.hand, tiles);
+  return hand
+    ? { hand, melds: [...view.seats[view.seat]!.melds, { type: "anGang", tiles }] }
+    : undefined;
+};
+
+/** buGang upgrades an existing peng meld with the 4th copy drawn into hand. */
+const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undefined => {
+  const kind = kindOf(tile);
+  const melds = view.seats[view.seat]!.melds;
+  const pengIndex = melds.findIndex(
+    (meld) => meld.type === "peng" && kindOf(meld.tiles[0]!) === kind,
+  );
+  if (pengIndex < 0) return undefined;
+  const hand = removeTiles(view.hand, [tile]);
+  if (!hand) return undefined;
+  const upgraded: Meld = { ...melds[pengIndex]!, type: "buGang", tiles: [...melds[pengIndex]!.tiles, tile] };
+  const nextMelds = [...melds];
+  nextMelds[pengIndex] = upgraded;
+  return { hand, melds: nextMelds };
+};
+
 const visibleDiscards = (view: JunkPlayerView): TileId[] =>
   view.seats.flatMap((seat) => seat.discards.map((discard) => discard.tile));
 
 const scoreAction = (view: JunkPlayerView, action: JunkAction): number => {
   const discards = visibleDiscards(view);
+  const currentMelds = view.seats[view.seat]!.melds;
   if (action.type === "discard") {
-    return scoreHandShapeAfterDiscard(
-      { hand: view.hand, melds: view.seats[view.seat]!.melds },
-      action.tile,
-      discards,
-    );
+    return scoreHandShapeAfterDiscard({ hand: view.hand, melds: currentMelds }, action.tile, discards);
   }
-  if (action.type === "anGang") return JUNK_FAN_WEIGHTS.gangkai;
-  if (action.type === "buGang") return JUNK_FAN_WEIGHTS.gangkai - 2;
+  // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
+  // 吃/碰/杠模拟出的结果分数放在同一把尺子上比较，AI 才可能真的选择不动。
+  if (action.type === "pass") return handQuality({ hand: view.hand, melds: currentMelds });
+  if (action.type === "anGang") {
+    const claim = simulatedAnGang(view, action.kind);
+    return claim ? handQuality(claim) + JUNK_FAN_WEIGHTS.gangkai : -100;
+  }
+  if (action.type === "buGang") {
+    const claim = simulatedBuGang(view, action.tile);
+    return claim ? handQuality(claim) + (JUNK_FAN_WEIGHTS.gangkai - 2) : -100;
+  }
   const claim = simulatedClaim(view, action);
   if (claim) return bestDiscardScore(claim, discards);
-  return action.type === "pass" ? -1_000 : -100;
+  return -100;
 };
 
 export const recommendJunkAction = (
