@@ -111,14 +111,11 @@ export function InfoSlot({
           style={{ width: "4cqmin", height: "4cqmin" }}
         />
       )}
-      {/* Own seat (bottom) is already unambiguous on screen — interactive hand, own turn
-          highlight — so it skips the name label entirely; the dealer badge above still
-          shows regardless of seat, since that's information you need about yourself too. */}
-      {direction !== "bottom" && (
-        <div className="min-h-0 w-full flex-1">
-          <ScaleText text={seat.info} className="text-white" />
-        </div>
-      )}
+      {/* Own seat (bottom) shows "我" instead of its real nickname — every other
+          seat still shows the real name it was dealt. */}
+      <div className="min-h-0 w-full flex-1">
+        <ScaleText text={direction === "bottom" ? "我" : seat.info} className="text-white" />
+      </div>
     </div>
   );
 }

@@ -49,9 +49,11 @@ describe("InfoSlot", () => {
     expect(markup).toContain("items-start");
   });
 
-  it("never shows the nickname for the player's own (bottom) seat, dealer or not", () => {
-    expect(renderInfoSlot("bottom")).not.toContain(">Alice<");
-    expect(renderInfoSlot("bottom", { isDealer: true })).not.toContain(">Alice<");
+  it("shows \"我\" instead of the real nickname for the player's own (bottom) seat, dealer or not", () => {
+    for (const markup of [renderInfoSlot("bottom"), renderInfoSlot("bottom", { isDealer: true })]) {
+      expect(markup).not.toContain(">Alice<");
+      expect(markup).toContain(">我<");
+    }
   });
 
   it("still shows the dealer badge on the player's own (bottom) seat when they're dealing", () => {
