@@ -100,6 +100,24 @@ describe("junk weight tuning", () => {
     },
   );
 
+  it("never lets sigma grow past maxSigma", { tags: ["slow"] }, async () => {
+    // maxSigma pinned to initialSigma: any growth attempt at all must be
+    // clamped back down. A real (uncapped) run of this search reliably grows
+    // sigma well past its starting point within its first ~10 generations
+    // (observed empirically — sustained acceptance streaks are common), so
+    // this is a meaningful invariant check, not a vacuously-true one.
+    // minGenerations is set far beyond maxGenerations so no convergence check
+    // short-circuits the run before all 15 generations have a chance to grow.
+    const report = await tuneJunkWeights(9, {
+      maxGenerations: 15,
+      minGenerations: 1000,
+      seedsPerGeneration: 1,
+      initialSigma: 0.15,
+      maxSigma: 0.15,
+    });
+    expect(report.generations.every((g) => g.sigma <= 0.15)).toBe(true);
+  });
+
   it(
     "is reproducible: the same seed produces the same tuned weights",
     { tags: ["slow"] },

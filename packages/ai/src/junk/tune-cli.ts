@@ -23,6 +23,7 @@ type Arguments = {
   initialSigma: number;
   sigmaConvergenceRatio: number;
   stagnationPatience: number;
+  maxSigma: number;
   concurrency: number;
   write: boolean;
 };
@@ -37,7 +38,7 @@ const defaultConcurrency = (): number => {
 
 const usage =
   "Usage: junk/tune-cli.ts [--seed <int>] [--max-generations <int>] [--min-generations <int>] " +
-  "[--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] " +
+  "[--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] [--max-sigma <float>] " +
   "[--sigma-convergence-ratio <float>] [--stagnation-patience <int>] [--concurrency <int>] [--write]\n";
 
 const parseArguments = (argv: string[]): Arguments => {
@@ -47,11 +48,16 @@ const parseArguments = (argv: string[]): Arguments => {
     seed: 1,
     maxGenerations: 100,
     minGenerations: 20,
-    seedsPerGeneration: 6,
+    // 12 rather than the pipeline-smoke-test-era 4-6: each generation's
+    // accept/reject call is only seedsPerGeneration*2 matches of signal against
+    // real mahjong variance — too few and sigma can get driven up by noise
+    // alone (see maxSigma's doc comment in tune.ts for what that leads to).
+    seedsPerGeneration: 12,
     evalSeeds: 15,
     initialSigma: 0.15,
     sigmaConvergenceRatio: 0.05,
     stagnationPatience: 30,
+    maxSigma: 2,
     concurrency: defaultConcurrency(),
     write,
   };
@@ -65,6 +71,7 @@ const parseArguments = (argv: string[]): Arguments => {
     else if (flag === "--seeds-per-generation") result.seedsPerGeneration = Number(value);
     else if (flag === "--eval-seeds") result.evalSeeds = Number(value);
     else if (flag === "--sigma") result.initialSigma = Number(value);
+    else if (flag === "--max-sigma") result.maxSigma = Number(value);
     else if (flag === "--sigma-convergence-ratio") result.sigmaConvergenceRatio = Number(value);
     else if (flag === "--stagnation-patience") result.stagnationPatience = Number(value);
     else if (flag === "--concurrency") result.concurrency = Number(value);
@@ -82,6 +89,7 @@ const parseArguments = (argv: string[]): Arguments => {
     !Number.isInteger(result.evalSeeds) ||
     result.evalSeeds < 1 ||
     !(result.initialSigma > 0) ||
+    !(result.maxSigma >= result.initialSigma) ||
     !(result.sigmaConvergenceRatio > 0 && result.sigmaConvergenceRatio < 1) ||
     !Number.isInteger(result.stagnationPatience) ||
     result.stagnationPatience < 1 ||
@@ -142,6 +150,7 @@ export const runTuneCli = async (
       initialSigma: args.initialSigma,
       sigmaConvergenceRatio: args.sigmaConvergenceRatio,
       stagnationPatience: args.stagnationPatience,
+      maxSigma: args.maxSigma,
       pool,
       onGeneration: (generationLog) => {
         const elapsedSec = (Date.now() - startedAt) / 1000;

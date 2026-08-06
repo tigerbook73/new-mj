@@ -160,6 +160,14 @@ export type TuneOptions = {
    * (in practice it usually fires around the same time as sigma-converged,
    * since sustained rejection also drives sigma down via the 1/5 rule). */
   stagnationPatience?: number;
+  /** Hard ceiling on sigma growth. Without this, a lucky streak of noisy
+   * "successes" (evaluateCandidate is only seedsPerGeneration*2 matches — real
+   * variance) can drive the 1/5 rule's step size up without bound: once sigma is
+   * large enough that mutate()'s log-normal step routinely slams every weight
+   * into its clamp bound, candidates become near-random, comparisons against the
+   * incumbent become coin flips, and a ~20%+ "success rate" can persist by pure
+   * chance — a self-reinforcing runaway with no natural ceiling otherwise. */
+  maxSigma?: number;
   /** Invoked synchronously after each generation completes, before the next one
    * starts — lets a CLI print progress without tune.ts itself doing any I/O. */
   onGeneration?: (log: TuneGenerationLog) => void;
@@ -190,6 +198,7 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     minGenerations = 20,
     sigmaConvergenceRatio = 0.05,
     stagnationPatience = 30,
+    maxSigma = 2,
     pool,
   } = options;
   let incumbent = DEFAULT_JUNK_WEIGHTS;
@@ -230,7 +239,7 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     if (recentOutcomes.length > SUCCESS_WINDOW) recentOutcomes.shift();
     if (recentOutcomes.length >= 5) {
       const successRate = recentOutcomes.filter(Boolean).length / recentOutcomes.length;
-      sigma *= successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25;
+      sigma = Math.min(sigma * (successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25), maxSigma);
     }
 
     const log: TuneGenerationLog = {
