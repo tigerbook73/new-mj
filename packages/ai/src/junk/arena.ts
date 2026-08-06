@@ -10,20 +10,21 @@ import {
   type PrngState,
   type SeatId,
 } from "@new-mj/core";
-import { chooseJunkAction, type JunkStrengthConfig } from "./strategy.ts";
+import { chooseJunkAction, type JunkStrengthConfig, type JunkWeights } from "./strategy.ts";
 
 /** Per-seat decision function; a self-play arena plugs in one per seat so different
- * seats can play at different strength (or, later, with different tuned weights). */
+ * seats can play at different strength or with different tuned weights. */
 export type SeatPolicy = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
 ) => JunkAction;
 
-/** Wraps a strength config as a SeatPolicy backed by the production decision function. */
+/** Wraps a strength config (and optional weight override) as a SeatPolicy backed by
+ * the production decision function; omitting `weights` uses DEFAULT_JUNK_WEIGHTS. */
 export const strengthPolicy =
-  (strength: JunkStrengthConfig = {}): SeatPolicy =>
+  (strength: JunkStrengthConfig = {}, weights?: JunkWeights): SeatPolicy =>
   (view, legalActions) =>
-    chooseJunkAction(view, legalActions, strength);
+    chooseJunkAction(view, legalActions, strength, weights);
 
 export type JunkMatchResult = {
   /** Cumulative score deltas across all played hands, one per seat. */

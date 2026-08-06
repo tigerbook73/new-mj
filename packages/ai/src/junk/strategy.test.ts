@@ -8,7 +8,12 @@ import {
   type TileKind,
 } from "@new-mj/core";
 import { describe, expect, it, vi } from "vitest";
-import { chooseJunkAction, recommendJunkAction, scoreHandShapeAfterDiscard } from "./strategy.ts";
+import {
+  chooseJunkAction,
+  DEFAULT_JUNK_WEIGHTS,
+  recommendJunkAction,
+  scoreHandShapeAfterDiscard,
+} from "./strategy.ts";
 
 /** Deterministic [0, 1) generator over @new-mj/core's xorshift32 PRNG — same
  * reproducibility primitive core's own fuzz driver uses, so a fixed seed always
@@ -252,6 +257,55 @@ describe("junk strategy", () => {
       expect(chooseJunkAction(gapView, gapActions, strength)).toBe(
         recommendJunkAction(gapView, gapActions, { temperature: 0.5, random: seededRandom(7) }),
       );
+    });
+  });
+
+  describe("weight overrides", () => {
+    it("recommendJunkAction with DEFAULT_JUNK_WEIGHTS matches the omitted-weights default", () => {
+      const player = view(["1m", "1m", "2m", "2m"]);
+      const actions: JunkAction[] = [
+        { type: "discard", tile: player.hand[0]! },
+        { type: "discard", tile: player.hand[2]! },
+      ];
+      expect(recommendJunkAction(player, actions, {}, DEFAULT_JUNK_WEIGHTS)).toBe(
+        recommendJunkAction(player, actions),
+      );
+    });
+
+    it("scoreHandShapeAfterDiscard honors a custom safetyBonus weight", () => {
+      const hand = ids(["1m", "1m", "2m", "2m"]);
+      const discard = hand[0]!;
+      const customWeights = { ...DEFAULT_JUNK_WEIGHTS, safetyBonus: 999 };
+      const defaultScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard, [discard]);
+      const customScore = scoreHandShapeAfterDiscard(
+        { hand, melds: [] },
+        discard,
+        [discard],
+        customWeights,
+      );
+      // Only the safety term differs between these two calls (same hand/discard/
+      // visibleDiscards) — the delta must equal exactly the weight difference.
+      expect(customScore - defaultScore).toBeCloseTo(999 - DEFAULT_JUNK_WEIGHTS.safetyBonus, 6);
+    });
+
+    it("scoreHandShapeAfterDiscard honors a custom shantenWeight", () => {
+      // A messy, far-from-complete hand always has shanten > 0 after any discard,
+      // so doubling the (negative) shanten penalty must make the score strictly
+      // worse — this holds regardless of the hand's exact shanten value.
+      const hand = ids(["1m", "5p", "9s", "2z"]);
+      const discard = hand[0]!;
+      const doubledShanten = {
+        ...DEFAULT_JUNK_WEIGHTS,
+        shantenWeight: DEFAULT_JUNK_WEIGHTS.shantenWeight * 2,
+      };
+      const defaultScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard);
+      const doubledScore = scoreHandShapeAfterDiscard(
+        { hand, melds: [] },
+        discard,
+        [],
+        doubledShanten,
+      );
+      expect(doubledScore).toBeLessThan(defaultScore);
     });
   });
 });

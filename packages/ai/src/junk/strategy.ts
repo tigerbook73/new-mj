@@ -19,6 +19,48 @@ export const JUNK_FAN_WEIGHTS = {
   gangkai: 5,
 } as const;
 
+/** Every magic number that shapes handQuality/fanPotential/scoreAction, made
+ * overridable so an offline tuner (see junk/tune.ts) can search this space
+ * instead of it being hand-picked. Defaults reproduce the previous hardcoded
+ * behavior exactly.
+ *
+ * Deliberately not `typeof JUNK_FAN_WEIGHTS & {...}` — JUNK_FAN_WEIGHTS is `as
+ * const`, so its property types are readonly number literals (e.g. `qidui: 14`),
+ * which a tuner can't assign arbitrary mutated values into. */
+export type JunkWeights = {
+  qidui: number;
+  pengpenghu: number;
+  menqing: number;
+  qingyise: number;
+  hunyise: number;
+  gangkai: number;
+  /** buGang bonus = gangkai - buGangPenalty (upgrading a peng is less disruptive than a fresh anGang). */
+  buGangPenalty: number;
+  /** fanPotential: bonus per closed pair, when no chi melds exist. */
+  pairBonus: number;
+  /** fanPotential: bonus per non-chi meld, when no chi melds exist. */
+  meldBonus: number;
+  /** fanPotential: seven-pairs-trajectory bonus while no melds exist yet. */
+  qiduiPotential: number;
+  /** handQuality: shanten weight (-shanten * shantenWeight). */
+  shantenWeight: number;
+  /** handQuality: ukeire-improvement weight. */
+  improvementWeight: number;
+  /** scoreHandShapeAfterDiscard: bonus for discarding an already-visible tile. */
+  safetyBonus: number;
+};
+
+export const DEFAULT_JUNK_WEIGHTS: JunkWeights = {
+  ...JUNK_FAN_WEIGHTS,
+  buGangPenalty: 2,
+  pairBonus: 2,
+  meldBonus: 3,
+  qiduiPotential: JUNK_FAN_WEIGHTS.qidui / 4,
+  shantenWeight: 100,
+  improvementWeight: 3,
+  safetyBonus: 4,
+};
+
 type ShapeInput = Readonly<{ hand: readonly TileId[]; melds: readonly Meld[] }>;
 
 const kindOf = (tile: TileId): TileKind => STANDARD_TILE_SET.kindOf(tile);
@@ -32,20 +74,20 @@ const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[
   return remaining;
 };
 
-const fanPotential = (input: ShapeInput): number => {
+const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
   const all = [...input.hand, ...input.melds.flatMap((meld) => meld.tiles)].map(kindOf);
   const suits = new Set(all.filter((kind) => !kind.endsWith("z")).map((kind) => kind[1]));
   const hasHonor = all.some((kind) => kind.endsWith("z"));
   const opened = input.melds.some((meld) => meld.type !== "anGang");
-  let score = opened ? 0 : JUNK_FAN_WEIGHTS.menqing;
-  if (suits.size === 1) score += hasHonor ? JUNK_FAN_WEIGHTS.hunyise : JUNK_FAN_WEIGHTS.qingyise;
+  let score = opened ? 0 : weights.menqing;
+  if (suits.size === 1) score += hasHonor ? weights.hunyise : weights.qingyise;
   if (input.melds.every((meld) => meld.type !== "chi")) {
     const counts = new Map<TileKind, number>();
     for (const tile of input.hand) counts.set(kindOf(tile), (counts.get(kindOf(tile)) ?? 0) + 1);
-    score += [...counts.values()].filter((count) => count >= 2).length * 2;
-    score += input.melds.filter((meld) => meld.type !== "chi").length * 3;
+    score += [...counts.values()].filter((count) => count >= 2).length * weights.pairBonus;
+    score += input.melds.filter((meld) => meld.type !== "chi").length * weights.meldBonus;
   }
-  if (input.melds.length === 0) score += JUNK_FAN_WEIGHTS.qidui / 4;
+  if (input.melds.length === 0) score += weights.qiduiPotential;
   return score;
 };
 
@@ -69,14 +111,14 @@ const shantenOf = (input: ShapeInput): number => {
  * scale that discard/pass/gang scoring all compare against, so "do nothing" and
  * "change my hand" are judged on the same terms instead of hardcoded constants.
  */
-const handQuality = (input: ShapeInput): number => {
+const handQuality = (input: ShapeInput, weights: JunkWeights): number => {
   const shanten = shantenOf(input);
   // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
   // 避免自动对局在每一次出牌都做无收益的二层穷举。ukeire 内部的向听差值不
   // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。
   const improvements =
     shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }).length : 0;
-  return -shanten * 100 + improvements * 3 + fanPotential(input);
+  return -shanten * weights.shantenWeight + improvements * weights.improvementWeight + fanPotential(input, weights);
 };
 
 /** Shared primitive for discard and claim evaluation: preserve shape, then score its best discard. */
@@ -84,15 +126,22 @@ export const scoreHandShapeAfterDiscard = (
   input: ShapeInput,
   discard: TileId,
   visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
 ): number => {
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
-  const safety = visibleDiscards.includes(discard) ? 4 : 0;
-  return handQuality({ hand, melds: input.melds }) + safety;
+  const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
+  return handQuality({ hand, melds: input.melds }, weights) + safety;
 };
 
-const bestDiscardScore = (input: ShapeInput, visibleDiscards: readonly TileId[]): number =>
-  Math.max(...input.hand.map((tile) => scoreHandShapeAfterDiscard(input, tile, visibleDiscards)));
+const bestDiscardScore = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[],
+  weights: JunkWeights,
+): number =>
+  Math.max(
+    ...input.hand.map((tile) => scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights)),
+  );
 
 const simulatedClaim = (view: JunkPlayerView, action: JunkAction): ShapeInput | undefined => {
   const claimTile = view.lastDiscard?.tile;
@@ -153,25 +202,30 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
 const visibleDiscards = (view: JunkPlayerView): TileId[] =>
   view.seats.flatMap((seat) => seat.discards.map((discard) => discard.tile));
 
-const scoreAction = (view: JunkPlayerView, action: JunkAction): number => {
+const scoreAction = (view: JunkPlayerView, action: JunkAction, weights: JunkWeights): number => {
   const discards = visibleDiscards(view);
   const currentMelds = view.seats[view.seat]!.melds;
   if (action.type === "discard") {
-    return scoreHandShapeAfterDiscard({ hand: view.hand, melds: currentMelds }, action.tile, discards);
+    return scoreHandShapeAfterDiscard(
+      { hand: view.hand, melds: currentMelds },
+      action.tile,
+      discards,
+      weights,
+    );
   }
   // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
   // 吃/碰/杠模拟出的结果分数放在同一把尺子上比较，AI 才可能真的选择不动。
-  if (action.type === "pass") return handQuality({ hand: view.hand, melds: currentMelds });
+  if (action.type === "pass") return handQuality({ hand: view.hand, melds: currentMelds }, weights);
   if (action.type === "anGang") {
     const claim = simulatedAnGang(view, action.kind);
-    return claim ? handQuality(claim) + JUNK_FAN_WEIGHTS.gangkai : -100;
+    return claim ? handQuality(claim, weights) + weights.gangkai : -100;
   }
   if (action.type === "buGang") {
     const claim = simulatedBuGang(view, action.tile);
-    return claim ? handQuality(claim) + (JUNK_FAN_WEIGHTS.gangkai - 2) : -100;
+    return claim ? handQuality(claim, weights) + (weights.gangkai - weights.buGangPenalty) : -100;
   }
   const claim = simulatedClaim(view, action);
-  if (claim) return bestDiscardScore(claim, discards);
+  if (claim) return bestDiscardScore(claim, discards, weights);
   return -100;
 };
 
@@ -192,16 +246,17 @@ type ScoredAction = { action: JunkAction; score: number };
 const scoreLegalActions = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
+  weights: JunkWeights,
 ): ScoredAction[] => {
   const discardScores = new Map<TileKind, number>();
   return legalActions.map((action) => ({
     action,
     score:
       action.type !== "discard"
-        ? scoreAction(view, action)
+        ? scoreAction(view, action, weights)
         : (discardScores.get(kindOf(action.tile)) ??
           (() => {
-            const calculated = scoreAction(view, action);
+            const calculated = scoreAction(view, action, weights);
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
           })()),
@@ -247,10 +302,11 @@ export const recommendJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
   strength: JunkStrengthConfig = {},
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
 ): JunkAction | undefined => {
   const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
   if (winning) return winning;
-  const scored = scoreLegalActions(view, legalActions);
+  const scored = scoreLegalActions(view, legalActions, weights);
   const temperature = strength.temperature ?? 0;
   if (temperature <= 0) return argmaxAction(scored);
   return sampleSoftmax(scored, temperature, strength.random ?? Math.random);
@@ -260,8 +316,9 @@ export const chooseJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
   strength: JunkStrengthConfig = {},
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
 ): JunkAction => {
-  const action = recommendJunkAction(view, legalActions, strength);
+  const action = recommendJunkAction(view, legalActions, strength, weights);
   if (!action) throw new Error("chooseJunkAction called with no legal actions");
   return action;
 };

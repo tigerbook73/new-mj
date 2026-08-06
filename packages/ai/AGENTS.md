@@ -12,7 +12,8 @@
 - 决策函数（`recommendXxxAction`/`chooseXxxAction`）的强度/随机性通过显式可选参数注入（如 `JunkStrengthConfig.random`），默认 `Math.random` 零配置可用；自对弈/测试场景注入基于 `@new-mj/core` 的 `createPrng`/`nextUint32` 闭包换取可复现性。新增决策函数遵循同一约定，不要各自发明随机源。
 - 测试文件位置遵循根 `docs/testing-strategy.md` §1.1：贴近实现的纯函数单测放 `src/`；跨模块/驱动 core 完整引擎的测试放 `test/`。
 - 慢速用例（如 arena 跑几十局完整对局）按 §1.2 用 `{ tags: ["slow"] }` 标记，`pnpm test` 默认排除、`pnpm test:full`/`pnpm verify:full` 全量跑。
-- 自对弈/调参用的驱动器（如 `src/junk/arena.ts`）与人工触发的离线脚本（如未来的调参脚本）不同：前者有对应的 slow-tag 测试、走标准 verify 链；后者是手动运行的工具，不进 `package.json` 的 `test`/`verify` 依赖链，放在对应玩法目录 `src/` 内（保持被 `tsconfig.json`/`eslint` 覆盖），不从包的公共 `index.ts` barrel 导出。
+- 自对弈/调参驱动器（如 `src/junk/arena.ts`、`src/junk/tune.ts`）本身要有对应的 slow-tag 测试、走标准 `verify`/`verify:full` 链，证明管线跑得通；但**真正跑一次有意义的调参/大规模自对弈是人工触发的**，不进 `test`/`verify` 依赖链，只通过根 `package.json` 的便捷脚本（如 `tune:junk`）手动调用。两者都放在对应玩法目录 `src/` 内（保持被 `tsconfig.json`/`eslint` 覆盖），不从包的公共 `index.ts` barrel 导出。
+- CLI 入口与算法实现分文件（参照 `packages/core/src/rulesets/junk/cli.ts` 的先例）：算法/纯函数放一个文件（可被测试直接 import，如 `tune.ts`），命令行参数解析 + 顶层 `process.argv`/`process.stdout` 副作用放另一个文件（如 `tune-cli.ts`）——避免测试文件 import 算法时意外触发脚本执行副作用。
 
 ## DoD
 
