@@ -12,7 +12,7 @@ const isSuit = (kind: string): boolean =>
 const countsOf = (tiles: readonly TileId[], tileSet: TileSet): number[] => {
   const counts = tileSet.kinds.map(() => 0);
   for (const tile of tiles) {
-    const index = tileSet.kinds.indexOf(tileSet.kindOf(tile));
+    const index = tileSet.kindIndexOf(tileSet.kindOf(tile));
     counts[index] = (counts[index] ?? 0) + 1;
   }
   return counts;
@@ -56,7 +56,7 @@ export const standardShanten = (
     const kind = tileSet.kinds[index] as string;
     const rank = Number(kind[0]);
     const sameSuitIndex = (offset: number): number =>
-      tileSet.kinds.indexOf(`${rank + offset}${kind[1]}` as TileKind);
+      tileSet.kindIndexOf(`${rank + offset}${kind[1]}` as TileKind);
 
     if ((counts[index] ?? 0) >= 3) take([index, index, index], melds + 1);
     if (isSuit(kind) && rank <= 7) {
@@ -136,7 +136,7 @@ export const isTingpai = (
   tileSet: TileSet = STANDARD_TILE_SET,
 ): boolean =>
   ukeire(tiles, options, tileSet).some((kind) => {
-    const index = tileSet.kinds.indexOf(kind);
+    const index = tileSet.kindIndexOf(kind);
     const candidate = (index * tileSet.copiesPerKind) as TileId;
     return (
       isStandardWinningHand([...tiles, candidate], tileSet) ||

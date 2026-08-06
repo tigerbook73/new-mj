@@ -42,6 +42,10 @@ export type TileSet = Readonly<{
   copiesPerKind: number;
   size: number;
   kindOf: (id: TileId) => TileKind;
+  /** O(1) reverse lookup into `kinds` (-1 if absent), for hot paths (e.g. the
+   * shanten search) that would otherwise call `kinds.indexOf` — an O(kinds.length)
+   * scan — many times per recursive step. */
+  kindIndexOf: (kind: TileKind) => number;
 }>;
 
 // TileId 的排序是 kindIndex * copiesPerKind + copy；映射稳定且公开，因此
@@ -58,6 +62,7 @@ export const createTileSet = (
     throw new Error("DUPLICATE_TILE_KIND");
   }
   const size = kinds.length * copiesPerKind;
+  const kindIndex = new Map(kinds.map((kind, index) => [kind, index]));
   return Object.freeze({
     kinds: Object.freeze([...kinds]),
     copiesPerKind,
@@ -68,6 +73,7 @@ export const createTileSet = (
       }
       return kinds[Math.floor(id / copiesPerKind)] as TileKind;
     },
+    kindIndexOf: (kind: TileKind): number => kindIndex.get(kind) ?? -1,
   });
 };
 
