@@ -9,8 +9,11 @@
 - **目标**：给 junk 的 AI（`packages/ai/src/junk/strategy.ts`）加上可配置强度旋钮，并建立全自动（自对弈胜率/顺位/得分统计）的评估与调参闭环，让后续启发式/权重改动能被客观验证，而不是靠人工判断牌局好坏。仅做 junk；验证成功后再决定是否推广到其他玩法。
 - **首个 slice 验收**（已完成，见下）：`recommendJunkAction`/`chooseJunkAction` 新增第三个可选参数 `JunkStrengthConfig`（`temperature`/`random`），省略或 `temperature<=0` 时逐字节复现现有确定性 argmax；`temperature>0` 时按已算出的动作分数做 softmax 采样。`apps/server` 调用点零改动。
 - **不可违反约束**：`ai → core` 依赖方向不可反转；不改 `apps/server` 协议/Room/UI（强度配置只服务自对弈评测内部，不做玩家可选难度）；不引入日麻宝牌/立直概念（junk 无花牌无癞子）；调参脚本产出的候选权重必须人工 review 后才能替换生产默认值，不做自动替换；若未来要把 AI 拆成独立进程/服务，先作为架构级决定提交 Claude Project。
-- **已知未知项**：`packages/ai` 是否需要像 `packages/core` 一样拆 slow-tag——留到 Slice 2（自对弈多局 session 驱动器，几十局冒烟测试）落地时再判断。
-- **进度**：Slice 1（强度旋钮）已完成并通过 `pnpm --filter @new-mj/ai verify`。下一步第一个具体动作：开工 Slice 2——在 `packages/ai` 新增自对弈多局 session 驱动器（fork `packages/core/src/rulesets/junk/fuzz.ts` 的 `playJunkGame`/`nextAction` 模式，复刻 `docs/contracts/session-mechanics.md` §4/§5/§8 的累分/庄家轮换/排名逻辑，每座位可插拔 `JunkStrengthConfig`），先做几十局量级冒烟测试验证分数守恒 + 强弱座位平均名次差异符合直觉。
+- **已知未知项**：Slice 3 的调参脚本要不要引入第三方 CMA-ES/遗传算法库还是手写简化版——留到开工时再定。
+- **进度**：
+  - Slice 1（强度旋钮）已完成，`pnpm --filter @new-mj/ai verify` 全绿。
+  - Slice 2（自对弈多局 session 驱动器）已完成：新增 `packages/ai/src/junk/arena.ts`（`playJunkMatch`/`strengthPolicy`，fork 自 `packages/core/src/rulesets/junk/fuzz.ts` 的 `playJunkGame`/`nextAction` 模式，复刻 `docs/contracts/session-mechanics.md` §4/§5/§8 的累分/庄家轮换/排名逻辑；`dealerStreak` 有意省略，见 arena.ts 注释）+ 冒烟测试 `packages/ai/test/junk-arena.test.ts`（30 局量级：分数守恒 + 低温强座位平均名次显著优于高温弱座位）。冒烟局数较大导致单测秒级以上，已按 `testing-strategy.md` §1.2 给 `packages/ai` 补上 slow-tag 拆分（`vitest.config.ts`、`package.json` 的 `test`/`test:full`/`verify:full` 脚本、`testing-strategy.md` §1.2 同步更新 workspace 列表）；新建 `packages/ai/AGENTS.md` 记录随机源注入约定与工具脚本边界。`pnpm --filter @new-mj/ai verify:full` 全绿（27/27，含 2 个慢速用例，共约 137s）。
+  - 下一步第一个具体动作：开工 Slice 3——把 `JUNK_FAN_WEIGHTS` 和 `handQuality`/`scoreAction`/`fanPotential` 里的魔数系数抽成显式可覆盖的权重结构（`JUNK_FAN_WEIGHTS` 仍作默认导出值），再写一个手动触发、不进 `pnpm verify` 的离线调参脚本（`packages/ai/src/junk/arena/tune.ts`，用 Slice 2 的 `playJunkMatch` 做同种子对局复制对比），产出新旧权重对比报告供人工 review。
 
 ## 阻塞与遗留问题
 

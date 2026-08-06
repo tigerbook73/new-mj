@@ -26,7 +26,7 @@ web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调
 
 - **判定标准**：单用例运行秒级以上的 fuzz / property / 全量回放冒烟（如 1000 局 fuzz、万局扫描、全量 ukeire property）标记为慢速；普通 fixture/单元用例不标。
 - **标记方式**：Vitest 一等 test tag（4.1+）——`vitest.config.ts` 的 `test.tags` 声明 `{ name: "slow", timeout: … }`（timeout 由 tag 统一提供，慢速用例不再各自写位置参数），用例用 `test("…", { tags: ["slow"] }, fn)` 标记。快速 `test` 脚本以 `--tags-filter '!slow'` 排除（显示为 skipped），`test:full` 不筛选、跑全部。
-- **脚本约定**：有慢速用例的 workspace（当前 `packages/core`）提供 `test:full`/`verify:full`；没有的 workspace `test:full` 等于 `test`（与 `apps/server` 的 `test:e2e:full` 别名同理，不强行拆分）。根 `pnpm verify` 用快速子集，`pnpm verify:full` 用 `test:full` + `test:e2e:full`。
+- **脚本约定**：有慢速用例的 workspace（当前 `packages/core`、`packages/ai`）提供 `test:full`/`verify:full`；没有的 workspace `test:full` 等于 `test`（与 `apps/server` 的 `test:e2e:full` 别名同理，不强行拆分）。根 `pnpm verify` 用快速子集，`pnpm verify:full` 用 `test:full` + `test:e2e:full`。
 - **DoD 挂钩**：日常迭代跑 `verify`；core 改动提交前必须跑 core 的 `verify:full`（fuzz 冒烟 ≥1000 局在 `test:full` 中），合并到 main 前跑根 `verify:full`。
 
 ## 2. 黄金路径 vs fuzz 的分工原则

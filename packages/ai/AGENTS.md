@@ -1,0 +1,20 @@
+# packages/ai AGENTS.md
+
+本文件只约束 `packages/ai`；根目录 `AGENTS.md` 的全局规则同样适用。
+
+## package 职责
+
+- 纯策略层：给定 core 的 `PlayerView`/`legalActions`，返回推荐动作；不实现任何规则，不缓存/持有 core state。
+- 依赖方向单向 `ai → core`；`core` 不得反向依赖本包。
+
+## 代码约定
+
+- 决策函数（`recommendXxxAction`/`chooseXxxAction`）的强度/随机性通过显式可选参数注入（如 `JunkStrengthConfig.random`），默认 `Math.random` 零配置可用；自对弈/测试场景注入基于 `@new-mj/core` 的 `createPrng`/`nextUint32` 闭包换取可复现性。新增决策函数遵循同一约定，不要各自发明随机源。
+- 测试文件位置遵循根 `docs/testing-strategy.md` §1.1：贴近实现的纯函数单测放 `src/`；跨模块/驱动 core 完整引擎的测试放 `test/`。
+- 慢速用例（如 arena 跑几十局完整对局）按 §1.2 用 `{ tags: ["slow"] }` 标记，`pnpm test` 默认排除、`pnpm test:full`/`pnpm verify:full` 全量跑。
+- 自对弈/调参用的驱动器（如 `src/junk/arena.ts`）与人工触发的离线脚本（如未来的调参脚本）不同：前者有对应的 slow-tag 测试、走标准 verify 链；后者是手动运行的工具，不进 `package.json` 的 `test`/`verify` 依赖链，放在对应玩法目录 `src/` 内（保持被 `tsconfig.json`/`eslint` 覆盖），不从包的公共 `index.ts` barrel 导出。
+
+## DoD
+
+- `pnpm --filter @new-mj/ai verify` 全绿（快速子集，慢速用例默认跳过）。
+- 新增/修改自对弈或调参相关代码，提交前额外跑一次 `pnpm --filter @new-mj/ai verify:full`。
