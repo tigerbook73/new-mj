@@ -111,6 +111,9 @@ export type TuneOptions = {
   generations: number;
   seedsPerGeneration: number;
   initialSigma?: number;
+  /** Invoked synchronously after each generation completes, before the next one
+   * starts — lets a CLI print progress without tune.ts itself doing any I/O. */
+  onGeneration?: (log: TuneGenerationLog) => void;
 };
 
 const SUCCESS_WINDOW = 10;
@@ -158,14 +161,16 @@ export const tuneJunkWeights = (seed: number, options: TuneOptions): TuneReport 
       sigma *= successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25;
     }
 
-    logs.push({
+    const log: TuneGenerationLog = {
       generation,
       sigma,
       accepted,
       candidateScore,
       incumbentScore: baselineScore,
       matches: totalMatches,
-    });
+    };
+    logs.push(log);
+    options.onGeneration?.(log);
   }
 
   return { seed, generations: logs, baselineWeights: DEFAULT_JUNK_WEIGHTS, tunedWeights: incumbent };

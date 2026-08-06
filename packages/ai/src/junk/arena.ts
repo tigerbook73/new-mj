@@ -46,14 +46,22 @@ const nextMatchAction = (
   policies: SeatPolicies,
   prng: PrngState,
 ): { seat: SeatId; action: JunkAction; prng: PrngState } | undefined => {
-  const eligible =
+  // Populated during the awaiting-claims eligibility scan so the chosen seat's
+  // legal actions aren't computed twice (once to check eligibility, once to act).
+  const legalActionsBySeat = new Map<SeatId, JunkAction[]>();
+  const eligible: SeatId[] =
     state.phase === "awaiting-claims"
-      ? SEAT_IDS.filter((seat) => junkRuleSet.getLegalActions(state, seat).length > 0)
+      ? SEAT_IDS.filter((seat) => {
+          const actions = junkRuleSet.getLegalActions(state, seat) as JunkAction[];
+          legalActionsBySeat.set(seat, actions);
+          return actions.length > 0;
+        })
       : [state.currentSeat];
   if (eligible.length === 0) return undefined;
   const seatPick = nextInt(prng, eligible.length);
   const seat = eligible[seatPick.value] as SeatId;
-  const legalActions = junkRuleSet.getLegalActions(state, seat) as JunkAction[];
+  const legalActions =
+    legalActionsBySeat.get(seat) ?? (junkRuleSet.getLegalActions(state, seat) as JunkAction[]);
   // junkRuleSet is typed against RulesetModule<JunkState, JunkAction> (TView defaults
   // to PlayerViewBase); the runtime value is always a full JunkPlayerView, same cast
   // apps/server's room.service.ts already relies on at this exact boundary.

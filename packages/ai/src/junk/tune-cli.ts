@@ -45,14 +45,36 @@ const parseArguments = (argv: string[]): Arguments => {
   return result;
 };
 
-export const runTuneCli = (argv: string[]): { exitCode: number; output: string } => {
+/** Progress goes to stderr (never stdout) so `pnpm tune:junk > report.txt` still
+ * captures only the final report; `log` is injectable so this stays testable. */
+export const runTuneCli = (
+  argv: string[],
+  log: (line: string) => void = (line) => process.stderr.write(line),
+): { exitCode: number; output: string } => {
   try {
     const args = parseArguments(argv);
+    const totalMatches =
+      args.generations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
+    log(
+      `[tune] generations=${args.generations} seeds/generation=${args.seedsPerGeneration} eval-seeds=${args.evalSeeds}  ~${totalMatches} matches total\n`,
+    );
+    const startedAt = Date.now();
     const report = tuneJunkWeights(args.seed, {
       generations: args.generations,
       seedsPerGeneration: args.seedsPerGeneration,
       initialSigma: args.initialSigma,
+      onGeneration: (generationLog) => {
+        const elapsedSec = (Date.now() - startedAt) / 1000;
+        const etaSec = (elapsedSec / generationLog.generation) * (args.generations - generationLog.generation);
+        log(
+          `[gen ${generationLog.generation}/${args.generations}] ` +
+            `${generationLog.accepted ? "accepted" : "rejected"}  sigma=${generationLog.sigma.toFixed(3)}  ` +
+            `candidate=${generationLog.candidateScore} incumbent=${generationLog.incumbentScore}  ` +
+            `elapsed=${elapsedSec.toFixed(0)}s eta=${etaSec.toFixed(0)}s\n`,
+        );
+      },
     });
+    log(`[tune] search done in ${((Date.now() - startedAt) / 1000).toFixed(0)}s, running held-out evaluation...\n`);
     const finalEval = evaluateTunedWeights(args.seed, args.evalSeeds, report);
     return { exitCode: 0, output: `${formatTuneReport(report, finalEval, args)}\n` };
   } catch (error) {

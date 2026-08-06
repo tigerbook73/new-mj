@@ -134,14 +134,29 @@ export const scoreHandShapeAfterDiscard = (
   return handQuality({ hand, melds: input.melds }, weights) + safety;
 };
 
+/** Duplicate copies of the same kind produce the same resulting hand once
+ * removed — memoize by kind (mirrors scoreLegalActions' discard memo) instead
+ * of rescoring every physical tile. */
 const bestDiscardScore = (
   input: ShapeInput,
   visibleDiscards: readonly TileId[],
   weights: JunkWeights,
-): number =>
-  Math.max(
-    ...input.hand.map((tile) => scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights)),
-  );
+): number => {
+  const scores = new Map<TileKind, number>();
+  let best = Number.NEGATIVE_INFINITY;
+  for (const tile of input.hand) {
+    const kind = kindOf(tile);
+    const score =
+      scores.get(kind) ??
+      (() => {
+        const calculated = scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights);
+        scores.set(kind, calculated);
+        return calculated;
+      })();
+    if (score > best) best = score;
+  }
+  return best;
+};
 
 const simulatedClaim = (view: JunkPlayerView, action: JunkAction): ShapeInput | undefined => {
   const claimTile = view.lastDiscard?.tile;
