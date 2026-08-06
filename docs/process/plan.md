@@ -6,7 +6,7 @@
 
 当前专题：无。
 
-Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动器 / 权重参数化 + 手写 (1+1)-ES 调参脚本）已全部完成，`pnpm --filter @new-mj/ai verify:full` 全绿，详见 `packages/ai/AGENTS.md` 与 `packages/ai/src/junk/{strategy,arena,tune,tune-cli}.ts`。后续动作转入 Backlog。
+Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动器 / 权重参数化 + 手写 (1+1)-ES 调参脚本）已全部完成，`pnpm --filter @new-mj/ai verify:full` 全绿，详见 `packages/ai/AGENTS.md` 与 `packages/ai/src/junk/{strategy,arena,tune,tune-cli,tune-pool,tune-worker}.ts`。后续加了一轮性能优化：`worker_threads` 并行跑对局（`tune-pool.ts`，手写、不引进第三方库）+ `standardShanten` 递归 memo 跨同回合候选手牌共享（`packages/core/src/lib/shanten.ts`，纯可选参数、`verify:full` 含 1000+ 局 fuzz 确认无回归）——同一个 4 代/3 种子/4 held-out 种子的调参样例耗时从 80s 降到 11s（约 7.2x），报告内容全程逐字节一致。权重默认值也从硬编码 TS 改成 `packages/ai/src/junk/default-weights.json`，`tune-cli.ts` 新增 `--write`（仍需人工显式传参，且 held-out 评估变差时自动跳过写入）。后续动作转入 Backlog。
 
 ## 阻塞与遗留问题
 
@@ -15,7 +15,7 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
 ## Backlog
 
 - 规划并实现 mobile 横屏/竖屏布局与 Expo 路线。
-- 跑一次真正规模的 junk AI 调参（`pnpm tune:junk --generations <大数> --seeds-per-generation <大数>`，当前默认参数只是烟测量级），人工 review 报告决定是否用产出的候选权重替换 `strategy.ts` 里的 `JUNK_FAN_WEIGHTS`/`DEFAULT_JUNK_WEIGHTS` 默认值。
+- 跑一次真正规模的 junk AI 调参（`pnpm tune:junk --generations <大数> --seeds-per-generation <大数>`，当前默认参数只是烟测量级；现在有并行+shanten memo 共享，同规模比最初快约 7 倍，可以放心加大参数），人工 review 报告后决定是否 `--write` 采纳候选权重（或手动改 `default-weights.json`）。
 - 评估 Junk AI 自我优化基础设施（Feature 参数化 + 自对弈 arena + 调参脚本这套结构）是否推广到 hangzhou/bloodbattle：可复用部分是 Layer B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属的 Feature 抽取（对应各玩法番型/规则）仍需各自单独做，不会自动免掉。
 - AI Bot 启发式质量盲点（未修，现在 Junk AI 自对弈平台已落地，可以用它验证修复效果）：孤立字牌（`z` 结尾）在 `handQuality`（`packages/ai/src/junk/strategy.ts`）里不会比孤立数牌先被打出。原因链：`standardShanten`（`packages/core/src/lib/shanten.ts` 的 `isSuit` 分支）里孤立单张无论字牌数牌都只命中"直接丢弃"分支，对打牌后的向听数贡献相同；`improvements`（ukeire 差值）只在 `shanten <= 1` 时才计算，早中盘该项恒为 0；于是多张"孤立无用单张"打分完全打平，`recommendJunkAction` 的严格比较让平局取先遍历到的那张，字牌若排在 `legalActions` 末尾就永远选不到。修法方向：给 `handQuality` 加一项不依赖 `shanten<=1` 门槛的"孤立单张潜在进张宽度"打分（字牌固定给低分，数牌按周边同花色已有牌数给分）。
 - 结算展示优化（剩余）：已完成结果 panel 的赢家/和牌/番型与庄家倍率/积分阅读顺序、赢家积分置顶、“我”命名和并列操作按钮；已完成胡牌/流局大字提示（`ResultBanner.tsx`，900ms 后过渡到 panel，仅对本局实时结果播放、重连不重放）与赢家手牌胡牌张高亮（`WinningHandReveal` 新增 `winTile`，复用 `justDiscarded` 同款红环，与财神环冲突时 `cn()` 保留后者）。下一步第一个具体动作：放铳牌从牌河落入结算展示区——需要新的飞行动画（可参照 `ClaimFlipGhost.tsx`/`DiscardFlipGhost.tsx` 的 `TileFlightPortal` 模式），并先定义清楚"目标位置"具体指结算展示里的什么地方（`WinningHandReveal` 没有 `HandRow` 那种摸牌区概念，需要设计落点）。

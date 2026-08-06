@@ -1,0 +1,15 @@
+{
+  "qidui": 14,
+  "pengpenghu": 10,
+  "menqing": 8,
+  "qingyise": 20,
+  "hunyise": 9,
+  "gangkai": 5,
+  "buGangPenalty": 2,
+  "pairBonus": 2,
+  "meldBonus": 3,
+  "qiduiPotential": 3.5,
+  "shantenWeight": 100,
+  "improvementWeight": 3,
+  "safetyBonus": 4
+}

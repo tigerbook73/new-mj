@@ -9,24 +9,11 @@ import {
   type TileId,
   type TileKind,
 } from "@new-mj/core";
-
-export const JUNK_FAN_WEIGHTS = {
-  qidui: 14,
-  pengpenghu: 10,
-  menqing: 8,
-  qingyise: 20,
-  hunyise: 9,
-  gangkai: 5,
-} as const;
+import defaultWeightsData from "./default-weights.json" with { type: "json" };
 
 /** Every magic number that shapes handQuality/fanPotential/scoreAction, made
  * overridable so an offline tuner (see junk/tune.ts) can search this space
- * instead of it being hand-picked. Defaults reproduce the previous hardcoded
- * behavior exactly.
- *
- * Deliberately not `typeof JUNK_FAN_WEIGHTS & {...}` — JUNK_FAN_WEIGHTS is `as
- * const`, so its property types are readonly number literals (e.g. `qidui: 14`),
- * which a tuner can't assign arbitrary mutated values into. */
+ * instead of it being hand-picked. */
 export type JunkWeights = {
   qidui: number;
   pengpenghu: number;
@@ -50,16 +37,24 @@ export type JunkWeights = {
   safetyBonus: number;
 };
 
-export const DEFAULT_JUNK_WEIGHTS: JunkWeights = {
-  ...JUNK_FAN_WEIGHTS,
-  buGangPenalty: 2,
-  pairBonus: 2,
-  meldBonus: 3,
-  qiduiPotential: JUNK_FAN_WEIGHTS.qidui / 4,
-  shantenWeight: 100,
-  improvementWeight: 3,
-  safetyBonus: 4,
-};
+/** Loaded from default-weights.json rather than hardcoded here, so adopting a
+ * tuned candidate (junk/tune-cli.ts --write) is a data-file edit, not a code
+ * change. Frozen so an accidental in-place mutation (e.g. a `mutate()` bug that
+ * forgets to spread) throws immediately in strict mode instead of silently
+ * corrupting the shared default for every future call. */
+export const DEFAULT_JUNK_WEIGHTS: JunkWeights = Object.freeze({ ...defaultWeightsData });
+
+/** The original hand-picked fan-type weights, kept as a stable named export for
+ * any existing import. Derived from DEFAULT_JUNK_WEIGHTS (not a second literal)
+ * so it can never drift out of sync with the JSON file. */
+export const JUNK_FAN_WEIGHTS = {
+  qidui: DEFAULT_JUNK_WEIGHTS.qidui,
+  pengpenghu: DEFAULT_JUNK_WEIGHTS.pengpenghu,
+  menqing: DEFAULT_JUNK_WEIGHTS.menqing,
+  qingyise: DEFAULT_JUNK_WEIGHTS.qingyise,
+  hunyise: DEFAULT_JUNK_WEIGHTS.hunyise,
+  gangkai: DEFAULT_JUNK_WEIGHTS.gangkai,
+} as const;
 
 type ShapeInput = Readonly<{ hand: readonly TileId[]; melds: readonly Meld[] }>;
 
@@ -99,9 +94,19 @@ const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
  * the classic shanten-calculator adjustments); qidui is impossible once any
  * meld exists (its hand can never be all-concealed pairs again).
  */
-const shantenOf = (input: ShapeInput): number => {
+/**
+ * `memo` is optional and, when given, shared with standardShanten's internal
+ * recursive cache — the caller (scoreLegalActions) creates ONE memo per turn and
+ * threads it through every candidate hand it evaluates. Those hands mostly differ
+ * from each other by a single tile, so their recursive shanten sub-searches
+ * overlap heavily; sharing the memo (instead of each call starting a fresh one,
+ * standardShanten's own default) turns most of that overlap into cache hits
+ * without changing any returned value — memo only affects what gets cached, not
+ * what a given recursive state computes to.
+ */
+const shantenOf = (input: ShapeInput, memo?: Map<string, number>): number => {
   const meldCount = input.melds.length;
-  const standard = standardShanten(input.hand);
+  const standard = standardShanten(input.hand, undefined, memo);
   const raw = meldCount > 0 ? standard : Math.min(standard, sevenPairsShanten(input.hand));
   return raw - meldCount * 2;
 };
@@ -111,11 +116,13 @@ const shantenOf = (input: ShapeInput): number => {
  * scale that discard/pass/gang scoring all compare against, so "do nothing" and
  * "change my hand" are judged on the same terms instead of hardcoded constants.
  */
-const handQuality = (input: ShapeInput, weights: JunkWeights): number => {
-  const shanten = shantenOf(input);
+const handQuality = (input: ShapeInput, weights: JunkWeights, memo?: Map<string, number>): number => {
+  const shanten = shantenOf(input, memo);
   // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
   // 避免自动对局在每一次出牌都做无收益的二层穷举。ukeire 内部的向听差值不
-  // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。
+  // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。ukeire 自己内部
+  // 已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的 memo
+  // 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
   const improvements =
     shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }).length : 0;
   return -shanten * weights.shantenWeight + improvements * weights.improvementWeight + fanPotential(input, weights);
@@ -127,11 +134,12 @@ export const scoreHandShapeAfterDiscard = (
   discard: TileId,
   visibleDiscards: readonly TileId[] = [],
   weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  memo?: Map<string, number>,
 ): number => {
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
-  return handQuality({ hand, melds: input.melds }, weights) + safety;
+  return handQuality({ hand, melds: input.melds }, weights, memo) + safety;
 };
 
 /** Duplicate copies of the same kind produce the same resulting hand once
@@ -141,6 +149,7 @@ const bestDiscardScore = (
   input: ShapeInput,
   visibleDiscards: readonly TileId[],
   weights: JunkWeights,
+  memo?: Map<string, number>,
 ): number => {
   const scores = new Map<TileKind, number>();
   let best = Number.NEGATIVE_INFINITY;
@@ -149,7 +158,7 @@ const bestDiscardScore = (
     const score =
       scores.get(kind) ??
       (() => {
-        const calculated = scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights);
+        const calculated = scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights, memo);
         scores.set(kind, calculated);
         return calculated;
       })();
@@ -217,7 +226,12 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
 const visibleDiscards = (view: JunkPlayerView): TileId[] =>
   view.seats.flatMap((seat) => seat.discards.map((discard) => discard.tile));
 
-const scoreAction = (view: JunkPlayerView, action: JunkAction, weights: JunkWeights): number => {
+const scoreAction = (
+  view: JunkPlayerView,
+  action: JunkAction,
+  weights: JunkWeights,
+  memo: Map<string, number>,
+): number => {
   const discards = visibleDiscards(view);
   const currentMelds = view.seats[view.seat]!.melds;
   if (action.type === "discard") {
@@ -226,21 +240,23 @@ const scoreAction = (view: JunkPlayerView, action: JunkAction, weights: JunkWeig
       action.tile,
       discards,
       weights,
+      memo,
     );
   }
   // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
   // 吃/碰/杠模拟出的结果分数放在同一把尺子上比较，AI 才可能真的选择不动。
-  if (action.type === "pass") return handQuality({ hand: view.hand, melds: currentMelds }, weights);
+  if (action.type === "pass")
+    return handQuality({ hand: view.hand, melds: currentMelds }, weights, memo);
   if (action.type === "anGang") {
     const claim = simulatedAnGang(view, action.kind);
-    return claim ? handQuality(claim, weights) + weights.gangkai : -100;
+    return claim ? handQuality(claim, weights, memo) + weights.gangkai : -100;
   }
   if (action.type === "buGang") {
     const claim = simulatedBuGang(view, action.tile);
-    return claim ? handQuality(claim, weights) + (weights.gangkai - weights.buGangPenalty) : -100;
+    return claim ? handQuality(claim, weights, memo) + (weights.gangkai - weights.buGangPenalty) : -100;
   }
   const claim = simulatedClaim(view, action);
-  if (claim) return bestDiscardScore(claim, discards, weights);
+  if (claim) return bestDiscardScore(claim, discards, weights, memo);
   return -100;
 };
 
@@ -263,15 +279,19 @@ const scoreLegalActions = (
   legalActions: readonly JunkAction[],
   weights: JunkWeights,
 ): ScoredAction[] => {
+  // One memo shared across every candidate this turn evaluates — see shantenOf's
+  // doc comment for why that turns overlapping recursive sub-searches into cache
+  // hits instead of each candidate re-deriving them from scratch.
+  const memo = new Map<string, number>();
   const discardScores = new Map<TileKind, number>();
   return legalActions.map((action) => ({
     action,
     score:
       action.type !== "discard"
-        ? scoreAction(view, action, weights)
+        ? scoreAction(view, action, weights, memo)
         : (discardScores.get(kindOf(action.tile)) ??
           (() => {
-            const calculated = scoreAction(view, action, weights);
+            const calculated = scoreAction(view, action, weights, memo);
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
           })()),

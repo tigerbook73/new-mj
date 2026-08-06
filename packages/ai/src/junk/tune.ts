@@ -1,6 +1,7 @@
 import { createPrng, nextUint32, SEAT_IDS, type SeatId } from "@new-mj/core";
 import { playJunkMatch, strengthPolicy, type SeatPolicy } from "./arena.ts";
 import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./strategy.ts";
+import type { MatchTask, MatchTaskResult, MatchWorkerPool } from "./tune-pool.ts";
 
 const WEIGHT_KEYS = Object.keys(DEFAULT_JUNK_WEIGHTS) as (keyof JunkWeights)[];
 
@@ -55,38 +56,66 @@ export type MatchupResult = {
 };
 
 /**
+ * Plays one (seed, seat-split) match and reduces it to a candidate/baseline score
+ * split. Pure and side-effect-free by design — this is the exact unit of work a
+ * MatchWorkerPool ships to a worker thread (see tune-worker.ts), and also what the
+ * sequential fallback below calls directly on the main thread. Keeping both paths
+ * call the identical function (rather than two parallel implementations) is what
+ * guarantees the parallel and sequential results match, not just testing for it.
+ */
+export const runMatchTask = (task: MatchTask): MatchTaskResult => {
+  const policies = SEAT_IDS.map((seat) =>
+    task.candidateSeats.includes(seat)
+      ? strengthPolicy({}, task.candidateWeights)
+      : strengthPolicy({}, task.baselineWeights),
+  ) as [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
+  const result = playJunkMatch(task.seed, policies);
+  if ("error" in result) return { ok: false, candidateTotal: 0, baselineTotal: 0 };
+  const candidateTotal = task.candidateSeats.reduce<number>(
+    (sum, seat) => sum + result.scores[seat],
+    0,
+  );
+  const baselineTotal = result.scores.reduce((sum, score) => sum + score, 0) - candidateTotal;
+  return { ok: true, candidateTotal, baselineTotal };
+};
+
+/**
  * Compares two weight sets by self-play: for every seed, both seat splits are
  * played (same wall/deal, candidate/baseline seats swapped) so deal-luck and
  * seat-position effects cancel out across the pair — a lightweight version of
  * duplicate-deal comparison, not literal single-hand replay (a 4-seat game has
  * no notion of "the same hand" for two independent policies at once).
+ *
+ * Runs sequentially on the main thread when no pool is given (used by tests and
+ * anywhere a full worker pool would be overkill); dispatches through the pool
+ * otherwise, for real wall-clock speedup on multi-core machines.
  */
-export const evaluateCandidate = (
+export const evaluateCandidate = async (
   seeds: readonly number[],
   baseline: JunkWeights,
   candidate: JunkWeights,
-): MatchupResult => {
+  pool?: MatchWorkerPool,
+): Promise<MatchupResult> => {
+  const tasks: MatchTask[] = seeds.flatMap((seed) =>
+    CANDIDATE_SEAT_SPLITS.map((candidateSeats) => ({
+      seed,
+      candidateSeats,
+      baselineWeights: baseline,
+      candidateWeights: candidate,
+    })),
+  );
+  const results = pool ? await pool.runAll(tasks) : tasks.map(runMatchTask);
+
   let candidateScore = 0;
   let baselineScore = 0;
   let candidateWins = 0;
   let totalMatches = 0;
-  for (const seed of seeds) {
-    for (const candidateSeats of CANDIDATE_SEAT_SPLITS) {
-      const policies = SEAT_IDS.map((seat) =>
-        candidateSeats.includes(seat) ? strengthPolicy({}, candidate) : strengthPolicy({}, baseline),
-      ) as [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
-      const result = playJunkMatch(seed, policies);
-      if ("error" in result) continue;
-      totalMatches += 1;
-      const candidateTotal = candidateSeats.reduce<number>(
-        (sum, seat) => sum + result.scores[seat],
-        0,
-      );
-      const baselineTotal = result.scores.reduce((sum, score) => sum + score, 0) - candidateTotal;
-      candidateScore += candidateTotal;
-      baselineScore += baselineTotal;
-      if (candidateTotal > baselineTotal) candidateWins += 1;
-    }
+  for (const result of results) {
+    if (!result.ok) continue;
+    totalMatches += 1;
+    candidateScore += result.candidateTotal;
+    baselineScore += result.baselineTotal;
+    if (result.candidateTotal > result.baselineTotal) candidateWins += 1;
   }
   return { candidateScore, baselineScore, candidateWins, totalMatches };
 };
@@ -114,6 +143,9 @@ export type TuneOptions = {
   /** Invoked synchronously after each generation completes, before the next one
    * starts — lets a CLI print progress without tune.ts itself doing any I/O. */
   onGeneration?: (log: TuneGenerationLog) => void;
+  /** Runs every generation's matches through this pool instead of sequentially
+   * on the main thread. Omit for the (slower but dependency-free) default. */
+  pool?: MatchWorkerPool;
 };
 
 const SUCCESS_WINDOW = 10;
@@ -126,8 +158,8 @@ const TARGET_SUCCESS_RATE = 0.2; // Rechenberg's 1/5 rule
  * a ~20% acceptance rate — widen the search while succeeding often, narrow it
  * while mostly failing. No external optimization library; see AGENTS.md for why.
  */
-export const tuneJunkWeights = (seed: number, options: TuneOptions): TuneReport => {
-  const { generations, seedsPerGeneration, initialSigma = 0.15 } = options;
+export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promise<TuneReport> => {
+  const { generations, seedsPerGeneration, initialSigma = 0.15, pool } = options;
   let incumbent = DEFAULT_JUNK_WEIGHTS;
   let sigma = initialSigma;
   let prng = createPrng(seed);
@@ -146,10 +178,11 @@ export const tuneJunkWeights = (seed: number, options: TuneOptions): TuneReport 
       seeds.push(seedStep.value);
     }
 
-    const { candidateScore, baselineScore, totalMatches } = evaluateCandidate(
+    const { candidateScore, baselineScore, totalMatches } = await evaluateCandidate(
       seeds,
       incumbent,
       candidate,
+      pool,
     );
     const accepted = totalMatches > 0 && candidateScore > baselineScore;
     if (accepted) incumbent = candidate;
@@ -181,11 +214,12 @@ export type FinalEvaluation = MatchupResult & { seeds: readonly number[] };
 /** Held-out comparison on a seed range disjoint from the search (seed XOR'd with a
  * fixed constant), so the reported win rate isn't measured on the exact seeds the
  * search already adapted to. */
-export const evaluateTunedWeights = (
+export const evaluateTunedWeights = async (
   seed: number,
   evalSeeds: number,
   report: TuneReport,
-): FinalEvaluation => {
+  pool?: MatchWorkerPool,
+): Promise<FinalEvaluation> => {
   let prng = createPrng(seed ^ 0x5bd1_e995);
   const seeds: number[] = [];
   for (let index = 0; index < evalSeeds; index += 1) {
@@ -193,7 +227,10 @@ export const evaluateTunedWeights = (
     prng = step.prng;
     seeds.push(step.value);
   }
-  return { seeds, ...evaluateCandidate(seeds, report.baselineWeights, report.tunedWeights) };
+  return {
+    seeds,
+    ...(await evaluateCandidate(seeds, report.baselineWeights, report.tunedWeights, pool)),
+  };
 };
 
 const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
@@ -204,10 +241,34 @@ const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
     return `  ${key}: ${before.toFixed(2)} -> ${after.toFixed(2)} (${pct})`;
   }).join("\n");
 
+/** Reported at the bottom of the tune report so it always reflects what actually
+ * happened to default-weights.json, not a boilerplate disclaimer. `attempted` is
+ * false when the CLI wasn't given --write (still the default; nothing writes
+ * unless a human explicitly asks for it on that invocation). */
+export type TuneWriteStatus =
+  | { attempted: false }
+  | { attempted: true; written: true; path: string }
+  | { attempted: true; written: false; reason: string };
+
+const formatWriteStatus = (status: TuneWriteStatus): string[] => {
+  if (!status.attempted) {
+    return [
+      "This is a candidate only — it does not change any file. Review the numbers",
+      "above, then manually update JUNK_FAN_WEIGHTS/DEFAULT_JUNK_WEIGHTS in",
+      "strategy.ts (or rerun with --write) if you want to adopt it.",
+    ];
+  }
+  if (status.written) {
+    return [`--write: wrote the tuned weights to ${status.path}.`];
+  }
+  return [`--write: skipped — ${status.reason}`];
+};
+
 export const formatTuneReport = (
   report: TuneReport,
   finalEval: FinalEvaluation,
   options: TuneOptions,
+  writeStatus: TuneWriteStatus = { attempted: false },
 ): string => {
   const accepted = report.generations.filter((generation) => generation.accepted).length;
   const winRate =
@@ -227,8 +288,6 @@ export const formatTuneReport = (
     "Weight changes (baseline -> tuned):",
     formatWeightDelta(report.baselineWeights, report.tunedWeights),
     "",
-    "This is a candidate only — it does not change any file. Review the numbers",
-    "above, then manually update JUNK_FAN_WEIGHTS/DEFAULT_JUNK_WEIGHTS in",
-    "strategy.ts if you want to adopt it.",
+    ...formatWriteStatus(writeStatus),
   ].join("\n");
 };

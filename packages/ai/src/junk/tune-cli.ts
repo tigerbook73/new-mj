@@ -1,4 +1,18 @@
-import { evaluateTunedWeights, formatTuneReport, tuneJunkWeights } from "./tune.ts";
+import { writeFileSync } from "node:fs";
+import os from "node:os";
+import {
+  evaluateTunedWeights,
+  formatTuneReport,
+  tuneJunkWeights,
+  type FinalEvaluation,
+  type TuneReport,
+  type TuneWriteStatus,
+} from "./tune.ts";
+import { MatchWorkerPool } from "./tune-pool.ts";
+
+/** Same file strategy.ts's DEFAULT_JUNK_WEIGHTS loads from — this file lives
+ * next to it in the same directory, so the relative URL always agrees. */
+const DEFAULT_WEIGHTS_PATH = new URL("./default-weights.json", import.meta.url);
 
 type Arguments = {
   seed: number;
@@ -6,28 +20,43 @@ type Arguments = {
   seedsPerGeneration: number;
   evalSeeds: number;
   initialSigma: number;
+  concurrency: number;
+  write: boolean;
+};
+
+const defaultConcurrency = (): number => {
+  try {
+    return os.availableParallelism();
+  } catch {
+    return os.cpus().length || 1;
+  }
 };
 
 const usage =
-  "Usage: junk/tune-cli.ts [--seed <int>] [--generations <int>] [--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>]\n";
+  "Usage: junk/tune-cli.ts [--seed <int>] [--generations <int>] [--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] [--concurrency <int>] [--write]\n";
 
 const parseArguments = (argv: string[]): Arguments => {
+  const write = argv.includes("--write");
+  const pairs = argv.filter((value) => value !== "--write");
   const result: Arguments = {
     seed: 1,
     generations: 10,
     seedsPerGeneration: 4,
     evalSeeds: 10,
     initialSigma: 0.15,
+    concurrency: defaultConcurrency(),
+    write,
   };
-  for (let index = 0; index < argv.length; index += 2) {
-    const flag = argv[index];
-    const value = argv[index + 1];
+  for (let index = 0; index < pairs.length; index += 2) {
+    const flag = pairs[index];
+    const value = pairs[index + 1];
     if (!flag || value === undefined) throw new Error("MISSING_ARGUMENT_VALUE");
     if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--generations") result.generations = Number(value);
     else if (flag === "--seeds-per-generation") result.seedsPerGeneration = Number(value);
     else if (flag === "--eval-seeds") result.evalSeeds = Number(value);
     else if (flag === "--sigma") result.initialSigma = Number(value);
+    else if (flag === "--concurrency") result.concurrency = Number(value);
     else throw new Error("UNKNOWN_ARGUMENT");
   }
   if (
@@ -38,34 +67,65 @@ const parseArguments = (argv: string[]): Arguments => {
     result.seedsPerGeneration < 1 ||
     !Number.isInteger(result.evalSeeds) ||
     result.evalSeeds < 1 ||
-    !(result.initialSigma > 0)
+    !(result.initialSigma > 0) ||
+    !Number.isInteger(result.concurrency) ||
+    result.concurrency < 1
   ) {
     throw new Error("INVALID_NUMERIC_ARGUMENT");
   }
   return result;
 };
 
+/**
+ * --write is still an explicit, human-triggered action (the human decides to pass
+ * the flag before ever running the command) — this does not reintroduce automatic
+ * adoption. It only refuses to write when the held-out evaluation shows the
+ * search's own result regressed against the baseline, as one extra guard against
+ * writing a candidate that got lucky against the (small) search-time seed batch
+ * but doesn't actually hold up.
+ */
+const writeTunedWeights = (
+  finalEval: FinalEvaluation,
+  report: TuneReport,
+  log: (line: string) => void,
+): TuneWriteStatus => {
+  if (finalEval.candidateScore < finalEval.baselineScore) {
+    const reason =
+      "held-out evaluation did not show an improvement (tuned score < baseline " +
+      "score) — rerun with more generations/seeds, or edit default-weights.json by hand.";
+    log(`[tune] --write skipped: ${reason}\n`);
+    return { attempted: true, written: false, reason };
+  }
+  writeFileSync(DEFAULT_WEIGHTS_PATH, `${JSON.stringify(report.tunedWeights, null, 2)}\n`);
+  log(`[tune] wrote tuned weights to ${DEFAULT_WEIGHTS_PATH.pathname}\n`);
+  return { attempted: true, written: true, path: DEFAULT_WEIGHTS_PATH.pathname };
+};
+
 /** Progress goes to stderr (never stdout) so `pnpm tune:junk > report.txt` still
  * captures only the final report; `log` is injectable so this stays testable. */
-export const runTuneCli = (
+export const runTuneCli = async (
   argv: string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
-): { exitCode: number; output: string } => {
+): Promise<{ exitCode: number; output: string }> => {
+  let pool: MatchWorkerPool | undefined;
   try {
     const args = parseArguments(argv);
-    const totalMatches =
-      args.generations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
+    const totalMatches = args.generations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
     log(
-      `[tune] generations=${args.generations} seeds/generation=${args.seedsPerGeneration} eval-seeds=${args.evalSeeds}  ~${totalMatches} matches total\n`,
+      `[tune] generations=${args.generations} seeds/generation=${args.seedsPerGeneration} ` +
+        `eval-seeds=${args.evalSeeds} concurrency=${args.concurrency}  ~${totalMatches} matches total\n`,
     );
+    pool = new MatchWorkerPool(args.concurrency);
     const startedAt = Date.now();
-    const report = tuneJunkWeights(args.seed, {
+    const report = await tuneJunkWeights(args.seed, {
       generations: args.generations,
       seedsPerGeneration: args.seedsPerGeneration,
       initialSigma: args.initialSigma,
+      pool,
       onGeneration: (generationLog) => {
         const elapsedSec = (Date.now() - startedAt) / 1000;
-        const etaSec = (elapsedSec / generationLog.generation) * (args.generations - generationLog.generation);
+        const etaSec =
+          (elapsedSec / generationLog.generation) * (args.generations - generationLog.generation);
         log(
           `[gen ${generationLog.generation}/${args.generations}] ` +
             `${generationLog.accepted ? "accepted" : "rejected"}  sigma=${generationLog.sigma.toFixed(3)}  ` +
@@ -74,17 +134,24 @@ export const runTuneCli = (
         );
       },
     });
-    log(`[tune] search done in ${((Date.now() - startedAt) / 1000).toFixed(0)}s, running held-out evaluation...\n`);
-    const finalEval = evaluateTunedWeights(args.seed, args.evalSeeds, report);
-    return { exitCode: 0, output: `${formatTuneReport(report, finalEval, args)}\n` };
+    log(
+      `[tune] search done in ${((Date.now() - startedAt) / 1000).toFixed(0)}s, running held-out evaluation...\n`,
+    );
+    const finalEval = await evaluateTunedWeights(args.seed, args.evalSeeds, report, pool);
+    const writeStatus: TuneWriteStatus = args.write
+      ? writeTunedWeights(finalEval, report, log)
+      : { attempted: false };
+    return { exitCode: 0, output: `${formatTuneReport(report, finalEval, args, writeStatus)}\n` };
   } catch (error) {
     return {
       exitCode: 1,
       output: `${error instanceof Error ? error.message : "UNKNOWN"}\n${usage}`,
     };
+  } finally {
+    await pool?.close();
   }
 };
 
-const output = runTuneCli(process.argv.slice(2));
+const output = await runTuneCli(process.argv.slice(2));
 process.stdout.write(output.output);
 process.exitCode = output.exitCode;
