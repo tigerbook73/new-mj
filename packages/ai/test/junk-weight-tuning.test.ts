@@ -6,19 +6,24 @@ import {
   evaluateTunedWeights,
   formatTuneReport,
   tuneJunkWeights,
+  type TuneReport,
 } from "../src/junk/tune.ts";
 
 // Tiny by design — this is a smoke test of the tuning *pipeline* (does it run
 // end-to-end, produce the right shape, stay reproducible), not a real tuning
-// session. Real runs use much larger --generations/--seeds-per-generation via
-// junk/tune-cli.ts and take proportionally longer.
-const TINY_OPTIONS = { generations: 2, seedsPerGeneration: 1 } as const;
+// session. Real runs use much larger --max-generations/--seeds-per-generation
+// via junk/tune-cli.ts and take proportionally longer. minGenerations defaults
+// to 20 (> maxGenerations here), so early-stop convergence checks never fire —
+// these runs always use exactly maxGenerations generations, which is what makes
+// the "toHaveLength" assertion below meaningful rather than a coincidence.
+const TINY_OPTIONS = { maxGenerations: 2, seedsPerGeneration: 1 } as const;
 
-const SYNTHETIC_REPORT = {
+const SYNTHETIC_REPORT: TuneReport = {
   seed: 1,
   generations: [],
   baselineWeights: DEFAULT_JUNK_WEIGHTS,
   tunedWeights: DEFAULT_JUNK_WEIGHTS,
+  stopReason: "max-generations",
 };
 const SYNTHETIC_EVAL = { seeds: [1], candidateScore: 1, baselineScore: 0, candidateWins: 1, totalMatches: 1 };
 
@@ -56,7 +61,8 @@ describe("junk weight tuning", () => {
       const beforeFanWeights = { ...JUNK_FAN_WEIGHTS };
 
       const report = await tuneJunkWeights(1, TINY_OPTIONS);
-      expect(report.generations).toHaveLength(TINY_OPTIONS.generations);
+      expect(report.generations).toHaveLength(TINY_OPTIONS.maxGenerations);
+      expect(report.stopReason).toBe("max-generations");
       expect(Object.keys(report.tunedWeights).sort()).toEqual(
         Object.keys(DEFAULT_JUNK_WEIGHTS).sort(),
       );
@@ -72,6 +78,25 @@ describe("junk weight tuning", () => {
       expect(text).toContain("Junk AI weight tuning report");
       expect(text).toContain("Weight changes");
       expect(text).toContain("qidui:");
+    },
+  );
+
+  it(
+    "stops itself before the max-generations cap once it detects convergence",
+    { tags: ["slow"] },
+    async () => {
+      // Tiny minGenerations/stagnationPatience so one of the two convergence
+      // checks fires quickly instead of needing dozens of generations to prove
+      // the mechanism works; maxGenerations is a generous cap this should never
+      // reach if early stopping is doing its job.
+      const report = await tuneJunkWeights(3, {
+        maxGenerations: 50,
+        minGenerations: 3,
+        seedsPerGeneration: 1,
+        stagnationPatience: 3,
+      });
+      expect(report.generations.length).toBeLessThan(50);
+      expect(report.stopReason).not.toBe("max-generations");
     },
   );
 

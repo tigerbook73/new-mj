@@ -16,10 +16,13 @@ const DEFAULT_WEIGHTS_PATH = new URL("./default-weights.json", import.meta.url);
 
 type Arguments = {
   seed: number;
-  generations: number;
+  maxGenerations: number;
+  minGenerations: number;
   seedsPerGeneration: number;
   evalSeeds: number;
   initialSigma: number;
+  sigmaConvergenceRatio: number;
+  stagnationPatience: number;
   concurrency: number;
   write: boolean;
 };
@@ -33,17 +36,22 @@ const defaultConcurrency = (): number => {
 };
 
 const usage =
-  "Usage: junk/tune-cli.ts [--seed <int>] [--generations <int>] [--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] [--concurrency <int>] [--write]\n";
+  "Usage: junk/tune-cli.ts [--seed <int>] [--max-generations <int>] [--min-generations <int>] " +
+  "[--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] " +
+  "[--sigma-convergence-ratio <float>] [--stagnation-patience <int>] [--concurrency <int>] [--write]\n";
 
 const parseArguments = (argv: string[]): Arguments => {
   const write = argv.includes("--write");
   const pairs = argv.filter((value) => value !== "--write");
   const result: Arguments = {
     seed: 1,
-    generations: 10,
-    seedsPerGeneration: 4,
-    evalSeeds: 10,
+    maxGenerations: 100,
+    minGenerations: 20,
+    seedsPerGeneration: 6,
+    evalSeeds: 15,
     initialSigma: 0.15,
+    sigmaConvergenceRatio: 0.05,
+    stagnationPatience: 30,
     concurrency: defaultConcurrency(),
     write,
   };
@@ -52,22 +60,31 @@ const parseArguments = (argv: string[]): Arguments => {
     const value = pairs[index + 1];
     if (!flag || value === undefined) throw new Error("MISSING_ARGUMENT_VALUE");
     if (flag === "--seed") result.seed = Number(value);
-    else if (flag === "--generations") result.generations = Number(value);
+    else if (flag === "--max-generations") result.maxGenerations = Number(value);
+    else if (flag === "--min-generations") result.minGenerations = Number(value);
     else if (flag === "--seeds-per-generation") result.seedsPerGeneration = Number(value);
     else if (flag === "--eval-seeds") result.evalSeeds = Number(value);
     else if (flag === "--sigma") result.initialSigma = Number(value);
+    else if (flag === "--sigma-convergence-ratio") result.sigmaConvergenceRatio = Number(value);
+    else if (flag === "--stagnation-patience") result.stagnationPatience = Number(value);
     else if (flag === "--concurrency") result.concurrency = Number(value);
     else throw new Error("UNKNOWN_ARGUMENT");
   }
   if (
     !Number.isInteger(result.seed) ||
-    !Number.isInteger(result.generations) ||
-    result.generations < 1 ||
+    !Number.isInteger(result.maxGenerations) ||
+    result.maxGenerations < 1 ||
+    !Number.isInteger(result.minGenerations) ||
+    result.minGenerations < 1 ||
+    result.minGenerations > result.maxGenerations ||
     !Number.isInteger(result.seedsPerGeneration) ||
     result.seedsPerGeneration < 1 ||
     !Number.isInteger(result.evalSeeds) ||
     result.evalSeeds < 1 ||
     !(result.initialSigma > 0) ||
+    !(result.sigmaConvergenceRatio > 0 && result.sigmaConvergenceRatio < 1) ||
+    !Number.isInteger(result.stagnationPatience) ||
+    result.stagnationPatience < 1 ||
     !Number.isInteger(result.concurrency) ||
     result.concurrency < 1
   ) {
@@ -110,32 +127,40 @@ export const runTuneCli = async (
   let pool: MatchWorkerPool | undefined;
   try {
     const args = parseArguments(argv);
-    const totalMatches = args.generations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
+    const worstCaseMatches = args.maxGenerations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
     log(
-      `[tune] generations=${args.generations} seeds/generation=${args.seedsPerGeneration} ` +
-        `eval-seeds=${args.evalSeeds} concurrency=${args.concurrency}  ~${totalMatches} matches total\n`,
+      `[tune] max-generations=${args.maxGenerations} (min ${args.minGenerations}, stops early on ` +
+        `convergence) seeds/generation=${args.seedsPerGeneration} eval-seeds=${args.evalSeeds} ` +
+        `concurrency=${args.concurrency}  worst case ~${worstCaseMatches} matches\n`,
     );
     pool = new MatchWorkerPool(args.concurrency);
     const startedAt = Date.now();
     const report = await tuneJunkWeights(args.seed, {
-      generations: args.generations,
+      maxGenerations: args.maxGenerations,
+      minGenerations: args.minGenerations,
       seedsPerGeneration: args.seedsPerGeneration,
       initialSigma: args.initialSigma,
+      sigmaConvergenceRatio: args.sigmaConvergenceRatio,
+      stagnationPatience: args.stagnationPatience,
       pool,
       onGeneration: (generationLog) => {
         const elapsedSec = (Date.now() - startedAt) / 1000;
-        const etaSec =
-          (elapsedSec / generationLog.generation) * (args.generations - generationLog.generation);
+        // "eta" here is time-to-cap, an upper bound — early stopping usually means
+        // the run finishes well before this, not exactly at it.
+        const etaToCapSec =
+          (elapsedSec / generationLog.generation) * (args.maxGenerations - generationLog.generation);
         log(
-          `[gen ${generationLog.generation}/${args.generations}] ` +
+          `[gen ${generationLog.generation}/${args.maxGenerations}] ` +
             `${generationLog.accepted ? "accepted" : "rejected"}  sigma=${generationLog.sigma.toFixed(3)}  ` +
             `candidate=${generationLog.candidateScore} incumbent=${generationLog.incumbentScore}  ` +
-            `elapsed=${elapsedSec.toFixed(0)}s eta=${etaSec.toFixed(0)}s\n`,
+            `elapsed=${elapsedSec.toFixed(0)}s eta-to-cap=${etaToCapSec.toFixed(0)}s\n`,
         );
       },
     });
     log(
-      `[tune] search done in ${((Date.now() - startedAt) / 1000).toFixed(0)}s, running held-out evaluation...\n`,
+      `[tune] search stopped after ${report.generations.length} generations ` +
+        `(${report.stopReason}) in ${((Date.now() - startedAt) / 1000).toFixed(0)}s, ` +
+        "running held-out evaluation...\n",
     );
     const finalEval = await evaluateTunedWeights(args.seed, args.evalSeeds, report, pool);
     const writeStatus: TuneWriteStatus = args.write

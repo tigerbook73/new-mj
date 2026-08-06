@@ -17,6 +17,8 @@
 - 调参默认权重是数据、不是代码：`src/junk/default-weights.json`（`import ... with { type: "json" }`），`DEFAULT_JUNK_WEIGHTS` 从这个文件加载并 `Object.freeze`，不再手写字面量。`tune-cli.ts --write` 是唯一允许写这个文件的入口，且只在人工显式传了这个 flag、held-out 评估显示候选权重没有变差时才写——不自动、不默认。
 - 自对弈/调参这类"跑很多局独立对局比大小"的场景优先考虑 `worker_threads` 并行（见 `src/junk/tune-pool.ts`）：把单场对局评估抽成一个纯函数（如 `tune.ts` 的 `runMatchTask`），worker 和顺序 fallback 调用同一份实现，保证并行结果和顺序结果必然一致（不是靠测试碰运气对齐）；worker pool 手写、不引入第三方库，同一个"这块小、没必要加依赖"的判断标准，见下条。
 - `standardShanten`（`packages/core/src/lib/shanten.ts`）的递归 memo 可以通过可选参数在多次调用间共享——同一回合评估的候选手牌大多只差一张牌，递归子状态重叠很多，共享 memo 能把这些重叠转成缓存命中（不改变任何返回值，只影响缓存）。`scoreLegalActions` 每回合建一个 memo、贯穿整回合所有候选评估；新增会重复算向听数的路径时优先复用这个模式，而不是每次都建一个新的空 memo。
+- 用 `node --cpu-prof` 对着单线程跑一批 `runMatchTask` 找过热点：`packages/core` 里 `tileSet.kinds.indexOf(...)` 这类线性扫描曾占掉大头（见 `packages/core/AGENTS.md` 的 `kindIndexOf` 记录）；这个手法可复用——怀疑哪条路径慢，先 profile 拿数据，不要凭直觉猜。
+- `tuneJunkWeights` 自己判断收敛并提前停（sigma 缩到阈值以下，或连续多代没有变异被接受），不要求调用方猜一个"够用"的 `--max-generations`——那只是安全上限。新增迭代式搜索/训练循环时优先复用"步长/停滞收敛信号 + 硬顶"这个模式，而不是让调用方自己试错代数。
 
 ## DoD
 

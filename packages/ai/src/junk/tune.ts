@@ -129,17 +129,37 @@ export type TuneGenerationLog = {
   matches: number;
 };
 
+/** Why the search loop stopped, reported so a human can tell "it converged" from
+ * "it hit the safety cap without converging" without re-reading every generation. */
+export type TuneStopReason = "max-generations" | "sigma-converged" | "stagnant";
+
 export type TuneReport = {
   seed: number;
   generations: TuneGenerationLog[];
   baselineWeights: JunkWeights;
   tunedWeights: JunkWeights;
+  stopReason: TuneStopReason;
 };
 
 export type TuneOptions = {
-  generations: number;
+  /** Hard safety cap — the search always stops here even if neither convergence
+   * signal below has fired yet. In practice it should rarely be reached. */
+  maxGenerations: number;
   seedsPerGeneration: number;
   initialSigma?: number;
+  /** No convergence check runs before this many generations: the 1/5 rule's own
+   * step-size adaptation needs a few generations of history (see SUCCESS_WINDOW)
+   * before sigma means anything, and a run of early rejections is normal, not
+   * evidence of convergence. */
+  minGenerations?: number;
+  /** Stop once sigma shrinks to this fraction of initialSigma — mutations that
+   * small are no longer meaningfully exploring, just noise around the incumbent. */
+  sigmaConvergenceRatio?: number;
+  /** Stop after this many consecutive generations with no accepted mutation,
+   * regardless of where sigma is — a second, independent convergence signal
+   * (in practice it usually fires around the same time as sigma-converged,
+   * since sustained rejection also drives sigma down via the 1/5 rule). */
+  stagnationPatience?: number;
   /** Invoked synchronously after each generation completes, before the next one
    * starts — lets a CLI print progress without tune.ts itself doing any I/O. */
   onGeneration?: (log: TuneGenerationLog) => void;
@@ -157,16 +177,30 @@ const TARGET_SUCCESS_RATE = 0.2; // Rechenberg's 1/5 rule
  * self-play (see evaluateCandidate), and adjusts the mutation step size to track
  * a ~20% acceptance rate — widen the search while succeeding often, narrow it
  * while mostly failing. No external optimization library; see AGENTS.md for why.
+ *
+ * Stops itself once it detects convergence (see TuneStopReason) instead of always
+ * running to maxGenerations — the caller shouldn't have to pre-guess how many
+ * generations are "enough".
  */
 export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promise<TuneReport> => {
-  const { generations, seedsPerGeneration, initialSigma = 0.15, pool } = options;
+  const {
+    maxGenerations,
+    seedsPerGeneration,
+    initialSigma = 0.15,
+    minGenerations = 20,
+    sigmaConvergenceRatio = 0.05,
+    stagnationPatience = 30,
+    pool,
+  } = options;
   let incumbent = DEFAULT_JUNK_WEIGHTS;
   let sigma = initialSigma;
   let prng = createPrng(seed);
   const logs: TuneGenerationLog[] = [];
   const recentOutcomes: boolean[] = [];
+  let generationsSinceAccept = 0;
+  let stopReason: TuneStopReason = "max-generations";
 
-  for (let generation = 1; generation <= generations; generation += 1) {
+  for (let generation = 1; generation <= maxGenerations; generation += 1) {
     const mutationSeedStep = nextUint32(prng);
     prng = mutationSeedStep.prng;
     const candidate = mutate(incumbent, sigma, seededRandom(mutationSeedStep.value));
@@ -185,7 +219,12 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
       pool,
     );
     const accepted = totalMatches > 0 && candidateScore > baselineScore;
-    if (accepted) incumbent = candidate;
+    if (accepted) {
+      incumbent = candidate;
+      generationsSinceAccept = 0;
+    } else {
+      generationsSinceAccept += 1;
+    }
 
     recentOutcomes.push(accepted);
     if (recentOutcomes.length > SUCCESS_WINDOW) recentOutcomes.shift();
@@ -204,9 +243,26 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     };
     logs.push(log);
     options.onGeneration?.(log);
+
+    if (generation >= minGenerations) {
+      if (sigma <= initialSigma * sigmaConvergenceRatio) {
+        stopReason = "sigma-converged";
+        break;
+      }
+      if (generationsSinceAccept >= stagnationPatience) {
+        stopReason = "stagnant";
+        break;
+      }
+    }
   }
 
-  return { seed, generations: logs, baselineWeights: DEFAULT_JUNK_WEIGHTS, tunedWeights: incumbent };
+  return {
+    seed,
+    generations: logs,
+    baselineWeights: DEFAULT_JUNK_WEIGHTS,
+    tunedWeights: incumbent,
+    stopReason,
+  };
 };
 
 export type FinalEvaluation = MatchupResult & { seeds: readonly number[] };
@@ -264,6 +320,15 @@ const formatWriteStatus = (status: TuneWriteStatus): string[] => {
   return [`--write: skipped — ${status.reason}`];
 };
 
+const STOP_REASON_TEXT: Record<TuneStopReason, string> = {
+  "max-generations":
+    "hit the max-generations cap without converging — consider raising " +
+    "--max-generations, or lowering --stagnation-patience/raising " +
+    "--sigma-convergence-ratio if this happens a lot",
+  "sigma-converged": "sigma shrank below the convergence threshold (mutations stopped meaningfully exploring)",
+  stagnant: "no accepted mutation for --stagnation-patience generations in a row",
+};
+
 export const formatTuneReport = (
   report: TuneReport,
   finalEval: FinalEvaluation,
@@ -271,14 +336,16 @@ export const formatTuneReport = (
   writeStatus: TuneWriteStatus = { attempted: false },
 ): string => {
   const accepted = report.generations.filter((generation) => generation.accepted).length;
+  const ranGenerations = report.generations.length;
   const winRate =
     finalEval.totalMatches === 0
       ? "n/a"
       : `${((finalEval.candidateWins / finalEval.totalMatches) * 100).toFixed(1)}%`;
   return [
     "=== Junk AI weight tuning report ===",
-    `search seed: ${report.seed}  generations: ${options.generations}  seeds/generation: ${options.seedsPerGeneration}`,
-    `accepted mutations: ${accepted}/${options.generations}`,
+    `search seed: ${report.seed}  seeds/generation: ${options.seedsPerGeneration}`,
+    `ran ${ranGenerations}/${options.maxGenerations} generations, ${accepted} accepted ` +
+      `— stopped: ${STOP_REASON_TEXT[report.stopReason]}`,
     "",
     "Final held-out evaluation (baseline vs tuned, duplicate-deal paired, seeds disjoint from search):",
     `  matches: ${finalEval.totalMatches} (${finalEval.seeds.length} seeds x 2 seat splits)`,
