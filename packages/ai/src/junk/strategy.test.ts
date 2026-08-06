@@ -1,12 +1,26 @@
 import {
+  createPrng,
   isTingpai,
+  nextUint32,
   tileIdOf,
   type JunkAction,
   type JunkPlayerView,
   type TileKind,
 } from "@new-mj/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { chooseJunkAction, recommendJunkAction, scoreHandShapeAfterDiscard } from "./strategy.ts";
+
+/** Deterministic [0, 1) generator over @new-mj/core's xorshift32 PRNG — same
+ * reproducibility primitive core's own fuzz driver uses, so a fixed seed always
+ * replays the exact same sample sequence. */
+const seededRandom = (seed: number): (() => number) => {
+  let prng = createPrng(seed);
+  return () => {
+    const step = nextUint32(prng);
+    prng = step.prng;
+    return step.value / 0x1_0000_0000;
+  };
+};
 
 const ids = (kinds: readonly TileKind[]) => {
   const copies = new Map<TileKind, number>();
@@ -151,5 +165,93 @@ describe("junk strategy", () => {
 
   it("throws only when there is no legal action", () => {
     expect(() => chooseJunkAction(view([]), [])).toThrow("no legal actions");
+  });
+
+  describe("strength config", () => {
+    // Discarding either copy of a symmetric two-pair hand (1m1m2m2m) scores
+    // identically with no melds — proven by the "safety tie-break" test above,
+    // which only differs once a visible-discard bonus is added. That symmetry
+    // (and the tininess of the resulting 3-tile hand, which keeps shanten well
+    // above the ukeire<=1 threshold so `improvements` never breaks the tie) makes
+    // it a clean pair of tied-score actions for softmax sampling tests.
+    const tiedHand = ids(["1m", "1m", "2m", "2m"]);
+    const tiedView = view(["1m", "1m", "2m", "2m"]);
+    const discardA: JunkAction = { type: "discard", tile: tiedHand[0]! };
+    const discardB: JunkAction = { type: "discard", tile: tiedHand[2]! };
+    const tiedActions: JunkAction[] = [discardA, discardB];
+
+    // Same hand, but seat 1 has already discarded the tile in `discardA` — the
+    // +4 safety bonus (see scoreHandShapeAfterDiscard) gives discardA a small
+    // but clear, deterministic edge over discardB.
+    const gapView: JunkPlayerView = {
+      ...tiedView,
+      seats: [0, 1, 2, 3].map((seat) => ({
+        handCount: seat === 0 ? tiedHand.length : 13,
+        melds: [],
+        discards: seat === 1 ? [{ tile: tiedHand[0]! }] : [],
+        justDrawn: false,
+      })),
+    };
+    const gapActions: JunkAction[] = [discardA, discardB];
+
+    it("temperature 0 matches the omitted-parameter default", () => {
+      expect(recommendJunkAction(tiedView, tiedActions, { temperature: 0 })).toBe(
+        recommendJunkAction(tiedView, tiedActions),
+      );
+    });
+
+    it("temperature 0 ignores an injected random source", () => {
+      const hostileRandom = () => 0.999;
+      expect(recommendJunkAction(gapView, gapActions, { temperature: 0, random: hostileRandom })).toBe(
+        recommendJunkAction(gapView, gapActions),
+      );
+    });
+
+    it("a legal win bypasses temperature/random entirely", () => {
+      const random = vi.fn(() => 0.5);
+      const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
+      expect(recommendJunkAction(view(["1m"]), actions, { temperature: 1000, random })).toBe(
+        actions[1],
+      );
+      expect(random).not.toHaveBeenCalled();
+    });
+
+    it("returns the only legal action regardless of temperature/random", () => {
+      const random = () => 0.5;
+      expect(recommendJunkAction(tiedView, [discardA], { temperature: 5, random })).toBe(discardA);
+    });
+
+    it("low temperature converges to the higher-scoring action", () => {
+      const random = seededRandom(1);
+      const results = Array.from({ length: 200 }, () =>
+        recommendJunkAction(gapView, gapActions, { temperature: 0.5, random }),
+      );
+      expect(results.every((result) => result === discardA)).toBe(true);
+    });
+
+    it("moderate temperature produces a mixed outcome for near-tied scores", () => {
+      const random = seededRandom(1);
+      const results = Array.from({ length: 200 }, () =>
+        recommendJunkAction(gapView, gapActions, { temperature: 100, random }),
+      );
+      const countA = results.filter((result) => result === discardA).length;
+      expect(countA).toBeGreaterThan(40);
+      expect(countA).toBeLessThan(160);
+    });
+
+    it("a fixed seed reproduces the exact same sampled action", () => {
+      const random = seededRandom(42);
+      const result = recommendJunkAction(tiedView, tiedActions, { temperature: 1, random });
+      // Pinned from an actual run — this is a reproducibility lock, not a hand-derived value.
+      expect(result).toBe(discardA);
+    });
+
+    it("chooseJunkAction forwards the strength config", () => {
+      const random = seededRandom(7);
+      const strength = { temperature: 0.5, random };
+      expect(chooseJunkAction(gapView, gapActions, strength)).toBe(
+        recommendJunkAction(gapView, gapActions, { temperature: 0.5, random: seededRandom(7) }),
+      );
+    });
   });
 });

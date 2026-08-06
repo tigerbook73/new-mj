@@ -175,17 +175,28 @@ const scoreAction = (view: JunkPlayerView, action: JunkAction): number => {
   return -100;
 };
 
-export const recommendJunkAction = (
+/**
+ * Softmax temperature knob for action sampling. Omitted or <= 0 reproduces the
+ * previous deterministic argmax bit-for-bit. `random` defaults to Math.random for
+ * zero-config production use (bot autoplay / advice); inject a seeded generator
+ * (e.g. a closure over @new-mj/core's createPrng/nextUint32) for reproducible
+ * self-play/arena runs.
+ */
+export type JunkStrengthConfig = {
+  temperature?: number;
+  random?: () => number;
+};
+
+type ScoredAction = { action: JunkAction; score: number };
+
+const scoreLegalActions = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-): JunkAction | undefined => {
-  const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
-  if (winning) return winning;
-  let best: JunkAction | undefined;
-  let bestScore = Number.NEGATIVE_INFINITY;
+): ScoredAction[] => {
   const discardScores = new Map<TileKind, number>();
-  for (const action of legalActions) {
-    const score =
+  return legalActions.map((action) => ({
+    action,
+    score:
       action.type !== "discard"
         ? scoreAction(view, action)
         : (discardScores.get(kindOf(action.tile)) ??
@@ -193,7 +204,14 @@ export const recommendJunkAction = (
             const calculated = scoreAction(view, action);
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
-          })());
+          })()),
+  }));
+};
+
+const argmaxAction = (scored: readonly ScoredAction[]): JunkAction | undefined => {
+  let best: JunkAction | undefined;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const { action, score } of scored) {
     if (score > bestScore) {
       best = action;
       bestScore = score;
@@ -202,11 +220,48 @@ export const recommendJunkAction = (
   return best;
 };
 
+/**
+ * Numerically-stable softmax sampling over precomputed action scores (max-subtraction
+ * keeps the -100/-Infinity sentinels used elsewhere in this file from producing NaN —
+ * they naturally collapse to ~0 weight instead of needing special-casing).
+ */
+const sampleSoftmax = (
+  scored: readonly ScoredAction[],
+  temperature: number,
+  random: () => number,
+): JunkAction | undefined => {
+  if (scored.length === 0) return undefined;
+  const maxScore = Math.max(...scored.map(({ score }) => score));
+  const weights = scored.map(({ score }) => Math.exp((score - maxScore) / temperature));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const threshold = random() * total;
+  let cumulative = 0;
+  for (const [index, weight] of weights.entries()) {
+    cumulative += weight;
+    if (threshold < cumulative) return scored[index]!.action;
+  }
+  return scored[scored.length - 1]!.action;
+};
+
+export const recommendJunkAction = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+  strength: JunkStrengthConfig = {},
+): JunkAction | undefined => {
+  const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
+  if (winning) return winning;
+  const scored = scoreLegalActions(view, legalActions);
+  const temperature = strength.temperature ?? 0;
+  if (temperature <= 0) return argmaxAction(scored);
+  return sampleSoftmax(scored, temperature, strength.random ?? Math.random);
+};
+
 export const chooseJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
+  strength: JunkStrengthConfig = {},
 ): JunkAction => {
-  const action = recommendJunkAction(view, legalActions);
+  const action = recommendJunkAction(view, legalActions, strength);
   if (!action) throw new Error("chooseJunkAction called with no legal actions");
   return action;
 };
