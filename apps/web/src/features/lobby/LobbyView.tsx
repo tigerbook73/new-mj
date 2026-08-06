@@ -126,6 +126,25 @@ export function LobbyView() {
           : current,
       );
     };
+    const onDealerChanged = (event: { dealer: 0 | 1 | 2 | 3; gameNumber: number }) => {
+      // room:start emits this and the first game:snapshot back-to-back in the
+      // same synchronous server-side call, so both can reach onSnapshot below
+      // before this handler's setPreview has been committed and mirrored into
+      // previewRef by the effect above. Write the ref synchronously too, so
+      // onSnapshot never reads a stale (pre-dealer) preview.
+      if (previewRef.current && previewRef.current.id === roomId) {
+        previewRef.current = {
+          ...previewRef.current,
+          dealer: event.dealer,
+          gameNumber: event.gameNumber,
+        };
+      }
+      setPreview((current) =>
+        current && current.id === roomId
+          ? { ...current, dealer: event.dealer, gameNumber: event.gameNumber }
+          : current,
+      );
+    };
     const onSnapshot = (event: GameSnapshot) => {
       // Refresh the store's `room` from this page's own up-to-date `preview`
       // (bots/players added after the store's `room` was first written are
@@ -168,6 +187,7 @@ export function LobbyView() {
     socket.on("room:readyChanged", onReadyChanged);
     socket.on("room:participantJoined", onParticipantJoined);
     socket.on("room:participantLeft", onParticipantLeft);
+    socket.on("room:dealerChanged", onDealerChanged);
     socket.on("game:snapshot", onSnapshot);
     socket.on("room:playerLeft", onPlayerLeft);
     socket.on("room:closed", onClosed);
@@ -177,6 +197,7 @@ export function LobbyView() {
       socket.off("room:readyChanged", onReadyChanged);
       socket.off("room:participantJoined", onParticipantJoined);
       socket.off("room:participantLeft", onParticipantLeft);
+      socket.off("room:dealerChanged", onDealerChanged);
       socket.off("game:snapshot", onSnapshot);
       socket.off("room:playerLeft", onPlayerLeft);
       socket.off("room:closed", onClosed);
