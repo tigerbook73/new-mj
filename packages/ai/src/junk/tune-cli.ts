@@ -48,16 +48,16 @@ const parseArguments = (argv: string[]): Arguments => {
     seed: 1,
     maxGenerations: 100,
     minGenerations: 20,
-    // 12 rather than the pipeline-smoke-test-era 4-6: each generation's
+    // 15 rather than the pipeline-smoke-test-era 4-6: each generation's
     // accept/reject call is only seedsPerGeneration*2 matches of signal against
-    // real mahjong variance — too few and sigma can get driven up by noise
-    // alone (see maxSigma's doc comment in tune.ts for what that leads to).
-    seedsPerGeneration: 12,
+    // real mahjong variance — too few and even single-dimension mutations (see
+    // tune.ts's mutate) get accepted/rejected by noise rather than genuine signal.
+    seedsPerGeneration: 15,
     evalSeeds: 15,
     initialSigma: 0.15,
     sigmaConvergenceRatio: 0.05,
     stagnationPatience: 30,
-    maxSigma: 2,
+    maxSigma: 1,
     concurrency: defaultConcurrency(),
     write,
   };

@@ -27,16 +27,24 @@ const gaussian = (random: () => number): number => {
 };
 
 /**
- * Log-normal multiplicative mutation: every weight moves by roughly the same
- * *relative* percentage regardless of its absolute scale (shantenWeight ~100 vs
- * pairBonus ~2) — a single additive step size would let the largest-magnitude
- * weight dominate every mutation. Clamped to keep pathological drift finite.
+ * Mutates exactly one randomly-chosen weight per call (coordinate-wise
+ * perturbation), not all 13 at once. Mutating every dimension simultaneously
+ * sounded reasonable but wasn't: even a "moderate" per-dimension sigma compounds
+ * across 13 independent draws into a candidate that's nowhere near the
+ * incumbent, so accept/reject stopped measuring "is this direction better" and
+ * started measuring "did this batch of 13 coin flips land in our favor" — noise,
+ * not signal (confirmed by two real tuning runs converging on garbage weights
+ * despite a capped sigma). One dimension at a time keeps each generation's
+ * comparison meaningful: a single, log-normal multiplicative step (every weight
+ * moves by roughly the same *relative* percentage regardless of its absolute
+ * scale — shantenWeight ~100 vs pairBonus ~2 — so a single additive step
+ * wouldn't be comparable across dimensions), clamped to keep pathological drift
+ * finite.
  */
 const mutate = (weights: JunkWeights, sigma: number, random: () => number): JunkWeights => {
   const mutated = { ...weights };
-  for (const key of WEIGHT_KEYS) {
-    mutated[key] = clamp(mutated[key] * Math.exp(sigma * gaussian(random)), 0.01, 10_000);
-  }
+  const key = WEIGHT_KEYS[Math.floor(random() * WEIGHT_KEYS.length)]!;
+  mutated[key] = clamp(mutated[key] * Math.exp(sigma * gaussian(random)), 0.01, 10_000);
   return mutated;
 };
 
@@ -162,11 +170,10 @@ export type TuneOptions = {
   stagnationPatience?: number;
   /** Hard ceiling on sigma growth. Without this, a lucky streak of noisy
    * "successes" (evaluateCandidate is only seedsPerGeneration*2 matches — real
-   * variance) can drive the 1/5 rule's step size up without bound: once sigma is
-   * large enough that mutate()'s log-normal step routinely slams every weight
-   * into its clamp bound, candidates become near-random, comparisons against the
-   * incumbent become coin flips, and a ~20%+ "success rate" can persist by pure
-   * chance — a self-reinforcing runaway with no natural ceiling otherwise. */
+   * variance) can drive the 1/5 rule's step size up without bound — a
+   * self-reinforcing runaway with no natural ceiling otherwise. Now that mutate()
+   * only ever touches one weight per generation (see its doc comment), this only
+   * needs to bound a single dimension's step, not 13 compounding at once. */
   maxSigma?: number;
   /** Invoked synchronously after each generation completes, before the next one
    * starts — lets a CLI print progress without tune.ts itself doing any I/O. */
@@ -180,8 +187,9 @@ const SUCCESS_WINDOW = 10;
 const TARGET_SUCCESS_RATE = 0.2; // Rechenberg's 1/5 rule
 
 /**
- * (1+1) evolution strategy with the 1/5 success rule: each generation mutates the
- * current incumbent once, keeps the mutant only if it beats the incumbent in
+ * (1+1) evolution strategy with the 1/5 success rule: each generation mutates one
+ * randomly-chosen weight of the current incumbent (see mutate's doc comment for
+ * why not all 13 at once), keeps the mutant only if it beats the incumbent in
  * self-play (see evaluateCandidate), and adjusts the mutation step size to track
  * a ~20% acceptance rate — widen the search while succeeding often, narrow it
  * while mostly failing. No external optimization library; see AGENTS.md for why.
@@ -198,7 +206,7 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     minGenerations = 20,
     sigmaConvergenceRatio = 0.05,
     stagnationPatience = 30,
-    maxSigma = 2,
+    maxSigma = 1,
     pool,
   } = options;
   let incumbent = DEFAULT_JUNK_WEIGHTS;
