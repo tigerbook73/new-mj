@@ -31,10 +31,18 @@ export type JunkWeights = {
   qiduiPotential: number;
   /** handQuality: shanten weight (-shanten * shantenWeight). */
   shantenWeight: number;
-  /** handQuality: ukeire-improvement weight. */
+  /** handQuality: ukeire-improvement weight, applied per live tile still available
+   * (4 - copies in own hand/melds - copies visible in any seat's discards), not
+   * per improving *kind* — a wait with 3 live copies outscores one with 1. */
   improvementWeight: number;
   /** scoreHandShapeAfterDiscard: bonus for discarding an already-visible tile. */
   safetyBonus: number;
+  /** handQuality: flat bonus for a concealed, unpaired suited tile that has no
+   * same-suit tile within two ranks (a genuine floating tile, not mid-run/tatsu
+   * material already scored elsewhere). Honor tiles get nothing — they can only
+   * ever pair, never form a run — so this is what makes discarding an isolated
+   * honor outscore discarding an isolated number tile even while shanten ties. */
+  isolationPotential: number;
 };
 
 /** Loaded from default-weights.json rather than hardcoded here, so adopting a
@@ -87,6 +95,37 @@ const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
 };
 
 /**
+ * Rewards keeping a concealed suited tile that still has run-forming upside,
+ * over keeping an isolated honor that never will — independent of shanten, so
+ * it breaks ties even outside the shanten<=1 window where `improvements` is 0
+ * (early/mid-game discards, where standardShanten's isolated-tile branch scores
+ * honors and numbers identically; see plan.md's "AI Bot 启发式质量盲点").
+ *
+ * A tile only counts as "isolated" here if it has no pair (scored via
+ * pairBonus already) and no same-suit tile within two ranks (already counted
+ * as a run/tatsu by shantenOf) — otherwise this would double-pay tiles that
+ * shanten already rewards for being connected.
+ */
+const isolationPotential = (hand: readonly TileId[], weights: JunkWeights): number => {
+  const counts = new Map<TileKind, number>();
+  for (const tile of hand) {
+    const kind = kindOf(tile);
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  let score = 0;
+  for (const [kind, count] of counts) {
+    if (count >= 2 || kind.endsWith("z")) continue;
+    const rank = Number(kind[0]);
+    const suit = kind[1];
+    const hasNeighbor = [-2, -1, 1, 2].some(
+      (offset) => (counts.get(`${rank + offset}${suit}` as TileKind) ?? 0) > 0,
+    );
+    if (!hasNeighbor) score += weights.isolationPotential;
+  }
+  return score;
+};
+
+/**
  * standardShanten/sevenPairsShanten only look at the concealed tiles handed to
  * them — they assume all 4 melds still have to come from that array. A seat
  * with existing melds (chi/peng/gang) already has some of those 4 melds "for
@@ -112,20 +151,57 @@ const shantenOf = (input: ShapeInput, memo?: Map<string, number>): number => {
 };
 
 /**
+ * Sums *remaining live copies* of each improving kind (4 minus copies already
+ * accounted for in this hand, this seat's own melds, and anyone's discard pile —
+ * including tombstones of claimed discards, since a claimed tile's id stays in
+ * the original discard entry). Known gap: a kind locked into another seat's
+ * anGang/buGang never passed through a discard, so those copies aren't
+ * subtracted — the count can overstate liveness in that case. Two waits with
+ * the same *kind* count can differ wildly in how many tiles are actually still
+ * drawable; this is what makes handQuality prefer the live one over the dead one.
+ */
+const liveUkeireCount = (
+  input: ShapeInput,
+  kinds: readonly TileKind[],
+  visibleDiscards: readonly TileId[],
+): number => {
+  let total = 0;
+  for (const kind of kinds) {
+    const known =
+      input.hand.filter((tile) => kindOf(tile) === kind).length +
+      input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
+      visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
+    total += Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
+  }
+  return total;
+};
+
+/**
  * Shared quality metric for a static hand shape (no pending discard) — the common
  * scale that discard/pass/gang scoring all compare against, so "do nothing" and
  * "change my hand" are judged on the same terms instead of hardcoded constants.
  */
-const handQuality = (input: ShapeInput, weights: JunkWeights, memo?: Map<string, number>): number => {
+const handQuality = (
+  input: ShapeInput,
+  weights: JunkWeights,
+  memo?: Map<string, number>,
+  visibleDiscards: readonly TileId[] = [],
+): number => {
   const shanten = shantenOf(input, memo);
   // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
   // 避免自动对局在每一次出牌都做无收益的二层穷举。ukeire 内部的向听差值不
   // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。ukeire 自己内部
   // 已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的 memo
   // 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
-  const improvements =
-    shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }).length : 0;
-  return -shanten * weights.shantenWeight + improvements * weights.improvementWeight + fanPotential(input, weights);
+  const improvingKinds =
+    shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }) : [];
+  const improvements = liveUkeireCount(input, improvingKinds, visibleDiscards);
+  return (
+    -shanten * weights.shantenWeight +
+    improvements * weights.improvementWeight +
+    fanPotential(input, weights) +
+    isolationPotential(input.hand, weights)
+  );
 };
 
 /** Shared primitive for discard and claim evaluation: preserve shape, then score its best discard. */
@@ -139,7 +215,7 @@ export const scoreHandShapeAfterDiscard = (
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
-  return handQuality({ hand, melds: input.melds }, weights, memo) + safety;
+  return handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards) + safety;
 };
 
 /** Duplicate copies of the same kind produce the same resulting hand once
@@ -246,14 +322,16 @@ const scoreAction = (
   // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
   // 吃/碰/杠模拟出的结果分数放在同一把尺子上比较，AI 才可能真的选择不动。
   if (action.type === "pass")
-    return handQuality({ hand: view.hand, melds: currentMelds }, weights, memo);
+    return handQuality({ hand: view.hand, melds: currentMelds }, weights, memo, discards);
   if (action.type === "anGang") {
     const claim = simulatedAnGang(view, action.kind);
-    return claim ? handQuality(claim, weights, memo) + weights.gangkai : -100;
+    return claim ? handQuality(claim, weights, memo, discards) + weights.gangkai : -100;
   }
   if (action.type === "buGang") {
     const claim = simulatedBuGang(view, action.tile);
-    return claim ? handQuality(claim, weights, memo) + (weights.gangkai - weights.buGangPenalty) : -100;
+    return claim
+      ? handQuality(claim, weights, memo, discards) + (weights.gangkai - weights.buGangPenalty)
+      : -100;
   }
   const claim = simulatedClaim(view, action);
   if (claim) return bestDiscardScore(claim, discards, weights, memo);

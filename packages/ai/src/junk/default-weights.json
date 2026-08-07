@@ -11,5 +11,6 @@
   "qiduiPotential": 3.5,
   "shantenWeight": 100,
   "improvementWeight": 3,
-  "safetyBonus": 4
+  "safetyBonus": 4,
+  "isolationPotential": 1.5
 }

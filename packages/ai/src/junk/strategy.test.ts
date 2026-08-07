@@ -168,6 +168,45 @@ describe("junk strategy", () => {
     expect(recommendJunkAction(player, actions)).toBe(actions[0]);
   });
 
+  it("prefers discarding an isolated honor over an isolated number tile at equal shanten (plan.md AI Bot blind spot)", () => {
+    // 3 complete runs + a pair + two "junk" singles (1z, 9s) that neither
+    // connects to anything nor changes shanten however they're discarded —
+    // pre-fix, handQuality scored both discards identically (shanten tied at
+    // 1, fanPotential tied, improvements gated off since 1-shanten already
+    // triggers it but both waits are symmetric), so argmax picked whichever
+    // came first in legalActions. Listing the honor discard *last* reproduces
+    // that failure mode directly.
+    const player = view(["1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "1s", "1z", "9s"]);
+    const discardNumber: JunkAction = { type: "discard", tile: player.hand[12]! };
+    const discardHonor: JunkAction = { type: "discard", tile: player.hand[11]! };
+    expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
+  });
+
+  it("prefers keeping a live wait over a dead one (theoretical -> practical ukeire)", () => {
+    // Same shape as above, but both junk singles are numbered (9s, 9p) — tied
+    // on isolationPotential too — so only the live-copy count can break the
+    // tie. Seat 1 has already discarded all three other copies of 9s: keeping
+    // 9s after this discard would wait on a fully dead kind.
+    const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "1s", "9s", "9p"]);
+    const player: JunkPlayerView = {
+      seat: 0,
+      hand,
+      wallCount: 50,
+      currentSeat: 0,
+      dealer: 0,
+      phase: "playing",
+      seats: [0, 1, 2, 3].map((seat) => ({
+        handCount: seat === 0 ? hand.length : 13,
+        melds: [],
+        discards: seat === 1 ? [1, 2, 3].map((copy) => ({ tile: tileIdOf("9s", copy) })) : [],
+        justDrawn: false,
+      })),
+    };
+    const keepLive9p: JunkAction = { type: "discard", tile: hand[11]! }; // discards 9s
+    const keepDead9s: JunkAction = { type: "discard", tile: hand[12]! }; // discards 9p
+    expect(recommendJunkAction(player, [keepDead9s, keepLive9p])).toBe(keepLive9p);
+  });
+
   it("throws only when there is no legal action", () => {
     expect(() => chooseJunkAction(view([]), [])).toThrow("no legal actions");
   });
