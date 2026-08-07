@@ -182,6 +182,34 @@ describe("junk strategy", () => {
     expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
   });
 
+  it("does not reward breaking a genuinely redundant tatsu to manufacture a new isolated tile", () => {
+    // 2 complete runs + 3 *symmetric* ryanmen tatsu (5p6p, 3s4s, 7s8s) + 2 lone
+    // honors. standardShanten's usableTatsu is capped at (4 - melds) = 2 here,
+    // so only 2 of the 3 tatsu ever count — any one of them, including 5p6p,
+    // is exactly as redundant as either honor: discarding half of it changes
+    // shanten no more than discarding a honor does. Regression found in real
+    // play: pre-fix, isolationPotential scored the *post-discard* hand, so
+    // breaking 5p6p left a "newly isolated" 5p that collected the isolation
+    // bonus — making the AI prefer discarding 6p (breaking a useful shape)
+    // over discarding a genuinely useless lone honor.
+    const player = view([
+      "1m", "2m", "3m",
+      "4m", "5m", "6m",
+      "5p", "6p",
+      "3s", "4s",
+      "7s", "8s",
+      "1z", "2z",
+    ]);
+    const discardTatsuTile: JunkAction = { type: "discard", tile: player.hand[7]! }; // 6p
+    const discardHonor: JunkAction = { type: "discard", tile: player.hand[12]! }; // 1z
+    expect(
+      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardTatsuTile.tile),
+    ).toBe(scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardHonor.tile));
+    // With scores genuinely tied, listing the tatsu-breaking discard first
+    // pins down that it no longer wins outright (which is what the bug did).
+    expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardTatsuTile);
+  });
+
   it("prefers keeping a live wait over a dead one (theoretical -> practical ukeire)", () => {
     // Same shape as above, but both junk singles are numbered (9s, 9p) — tied
     // on isolationPotential too — so only the live-copy count can break the

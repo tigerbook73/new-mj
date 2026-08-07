@@ -105,12 +105,28 @@ const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
  * pairBonus already) and no same-suit tile within two ranks (already counted
  * as a run/tatsu by shantenOf) — otherwise this would double-pay tiles that
  * shanten already rewards for being connected.
+ *
+ * `referenceHand` (defaults to `hand`) is used only for the neighbor lookup —
+ * it must be the hand *before* the candidate discard under evaluation, not
+ * `hand` itself. Without this, discarding one tile of a tatsu (e.g. 6p out of
+ * 5p6p) makes the surviving 5p look newly "isolated" in the post-discard hand
+ * and collects this bonus — rewarding the act of breaking a tatsu instead of
+ * genuinely-isolated tiles that were never connected to begin with.
  */
-const isolationPotential = (hand: readonly TileId[], weights: JunkWeights): number => {
+const isolationPotential = (
+  hand: readonly TileId[],
+  weights: JunkWeights,
+  referenceHand: readonly TileId[] = hand,
+): number => {
   const counts = new Map<TileKind, number>();
   for (const tile of hand) {
     const kind = kindOf(tile);
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  const referenceCounts = new Map<TileKind, number>();
+  for (const tile of referenceHand) {
+    const kind = kindOf(tile);
+    referenceCounts.set(kind, (referenceCounts.get(kind) ?? 0) + 1);
   }
   let score = 0;
   for (const [kind, count] of counts) {
@@ -118,7 +134,7 @@ const isolationPotential = (hand: readonly TileId[], weights: JunkWeights): numb
     const rank = Number(kind[0]);
     const suit = kind[1];
     const hasNeighbor = [-2, -1, 1, 2].some(
-      (offset) => (counts.get(`${rank + offset}${suit}` as TileKind) ?? 0) > 0,
+      (offset) => (referenceCounts.get(`${rank + offset}${suit}` as TileKind) ?? 0) > 0,
     );
     if (!hasNeighbor) score += weights.isolationPotential;
   }
@@ -186,6 +202,7 @@ const handQuality = (
   weights: JunkWeights,
   memo?: Map<string, number>,
   visibleDiscards: readonly TileId[] = [],
+  isolationReferenceHand: readonly TileId[] = input.hand,
 ): number => {
   const shanten = shantenOf(input, memo);
   // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
@@ -200,7 +217,7 @@ const handQuality = (
     -shanten * weights.shantenWeight +
     improvements * weights.improvementWeight +
     fanPotential(input, weights) +
-    isolationPotential(input.hand, weights)
+    isolationPotential(input.hand, weights, isolationReferenceHand)
   );
 };
 
@@ -215,7 +232,7 @@ export const scoreHandShapeAfterDiscard = (
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
-  return handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards) + safety;
+  return handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards, input.hand) + safety;
 };
 
 /** Duplicate copies of the same kind produce the same resulting hand once
