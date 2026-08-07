@@ -1,7 +1,6 @@
 import {
   STANDARD_TILE_SET,
-  sevenPairsShanten,
-  standardShanten,
+  shantenWithExposedMelds,
   ukeire,
   type JunkAction,
   type JunkPlayerView,
@@ -89,6 +88,10 @@ const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
     for (const tile of input.hand) counts.set(kindOf(tile), (counts.get(kindOf(tile)) ?? 0) + 1);
     score += [...counts.values()].filter((count) => count >= 2).length * weights.pairBonus;
     score += input.melds.filter((meld) => meld.type !== "chi").length * weights.meldBonus;
+    // 无 chi 副露即仍走在碰碰胡轨道上（呼应 core scoring.ts 里 isPengPengHu
+    // 的判定条件：家族为 standard 且没有任何 chi 副露）；这里只按同一条件给
+    // 一个固定加成，不逐搭子计分——真正是否成型由 meldBonus/shanten 收敛。
+    score += weights.pengpenghu;
   }
   if (input.melds.length === 0) score += weights.qiduiPotential;
   return score;
@@ -142,29 +145,17 @@ const isolationPotential = (
 };
 
 /**
- * standardShanten/sevenPairsShanten only look at the concealed tiles handed to
- * them — they assume all 4 melds still have to come from that array. A seat
- * with existing melds (chi/peng/gang) already has some of those 4 melds "for
- * free", so each existing meld is worth exactly 2 shanten points back (one of
- * the classic shanten-calculator adjustments); qidui is impossible once any
- * meld exists (its hand can never be all-concealed pairs again).
+ * `memo` is optional and, when given, shared with shantenWithExposedMelds'
+ * internal recursive cache — the caller (scoreLegalActions) creates ONE memo
+ * per turn and threads it through every candidate hand it evaluates. Those
+ * hands mostly differ from each other by a single tile, so their recursive
+ * shanten sub-searches overlap heavily; sharing the memo (instead of each
+ * call starting a fresh one) turns most of that overlap into cache hits
+ * without changing any returned value — memo only affects what gets cached,
+ * not what a given recursive state computes to.
  */
-/**
- * `memo` is optional and, when given, shared with standardShanten's internal
- * recursive cache — the caller (scoreLegalActions) creates ONE memo per turn and
- * threads it through every candidate hand it evaluates. Those hands mostly differ
- * from each other by a single tile, so their recursive shanten sub-searches
- * overlap heavily; sharing the memo (instead of each call starting a fresh one,
- * standardShanten's own default) turns most of that overlap into cache hits
- * without changing any returned value — memo only affects what gets cached, not
- * what a given recursive state computes to.
- */
-const shantenOf = (input: ShapeInput, memo?: Map<string, number>): number => {
-  const meldCount = input.melds.length;
-  const standard = standardShanten(input.hand, undefined, memo);
-  const raw = meldCount > 0 ? standard : Math.min(standard, sevenPairsShanten(input.hand));
-  return raw - meldCount * 2;
-};
+const shantenOf = (input: ShapeInput, memo?: Map<string, number>): number =>
+  shantenWithExposedMelds(input.hand, input.melds.length, STANDARD_TILE_SET, memo);
 
 /**
  * Sums *remaining live copies* of each improving kind (4 minus copies already

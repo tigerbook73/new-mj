@@ -3,7 +3,9 @@ import { playJunkMatch, strengthPolicy, type SeatPolicy } from "./arena.ts";
 import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./strategy.ts";
 import type { MatchTask, MatchTaskResult, MatchWorkerPool } from "./tune-pool.ts";
 
-const WEIGHT_KEYS = Object.keys(DEFAULT_JUNK_WEIGHTS) as (keyof JunkWeights)[];
+/** Exported so compare-weights-cli.ts can validate an arbitrary candidate JSON
+ * file has exactly this key set without duplicating the list. */
+export const WEIGHT_KEYS = Object.keys(DEFAULT_JUNK_WEIGHTS) as (keyof JunkWeights)[];
 
 /** Deterministic [0, 1) generator, same primitive used across this package's
  * reproducible-randomness spots (see JunkStrengthConfig.random). */
@@ -306,7 +308,9 @@ export const evaluateTunedWeights = async (
   };
 };
 
-const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
+/** Exported so compare-weights-cli.ts can render the same "baseline -> other"
+ * delta table for an arbitrary hand-authored candidate, not just a search result. */
+export const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
   WEIGHT_KEYS.map((key) => {
     const before = baseline[key];
     const after = tuned[key];

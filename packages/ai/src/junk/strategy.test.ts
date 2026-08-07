@@ -355,6 +355,18 @@ describe("junk strategy", () => {
       expect(customScore - defaultScore).toBeCloseTo(999 - DEFAULT_JUNK_WEIGHTS.safetyBonus, 6);
     });
 
+    it("scoreHandShapeAfterDiscard honors a custom pengpenghu weight (regression: weight was defined but never read)", () => {
+      // Bug: pengpenghu was declared in JunkWeights and default-weights.json but
+      // fanPotential never added it to the score — this test fails on the
+      // pre-fix code (delta would be 0, not the weight difference).
+      const hand = ids(["1m", "1m", "2m", "2m"]);
+      const discard = hand[0]!;
+      const customWeights = { ...DEFAULT_JUNK_WEIGHTS, pengpenghu: DEFAULT_JUNK_WEIGHTS.pengpenghu + 999 };
+      const defaultScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard);
+      const customScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard, [], customWeights);
+      expect(customScore - defaultScore).toBeCloseTo(999, 6);
+    });
+
     it("scoreHandShapeAfterDiscard honors a custom shantenWeight", () => {
       // A messy, far-from-complete hand always has shanten > 0 after any discard,
       // so doubling the (negative) shanten penalty must make the score strictly

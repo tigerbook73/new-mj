@@ -2,7 +2,7 @@ import type { TileId, TileKind } from "./ids.ts";
 import { isSevenPairsWinningHand, isStandardWinningHand } from "./standard-hand.ts";
 import { STANDARD_TILE_SET, type TileSet } from "./tiles.ts";
 
-export type JunkShantenOptions = Readonly<{
+export type ShantenOptions = Readonly<{
   sevenPairs: boolean;
 }>;
 
@@ -29,6 +29,7 @@ export const standardShanten = (
   tiles: readonly TileId[],
   tileSet: TileSet = STANDARD_TILE_SET,
   memo: Map<string, number> = new Map(),
+  existingMelds = 0,
 ): number => {
   const search = (counts: number[], melds: number, tatsu: number, pair: number): number => {
     const key = `${counts.join("")}/${melds}/${tatsu}/${pair}`;
@@ -83,7 +84,27 @@ export const standardShanten = (
     return best;
   };
 
-  return search(countsOf(tiles, tileSet), 0, 0, 0);
+  return search(countsOf(tiles, tileSet), existingMelds, 0, 0);
+};
+
+/**
+ * standardShanten 只看得到手牌自己找到的面子数；已有副露的面子并不在
+ * `tiles` 里，需要作为 `exposedMelds` 传入才能让内部的搭子上限
+ * `min(tatsu, 4-melds)` 与已报副露共同封顶 `4-总面子数`，否则副露越多、
+ * 手里搭子越多时会算出偏乐观的向听数（副露越多能"免费"用的搭子应该越
+ * 少，不是维持在 4 不变）。sevenPairs 不与副露共存（报出副露后手牌结构
+ * 就不可能再凑成七对），所以只在 `exposedMelds === 0` 时纳入比较。
+ */
+export const shantenWithExposedMelds = (
+  concealedTiles: readonly TileId[],
+  exposedMelds: number,
+  tileSet: TileSet = STANDARD_TILE_SET,
+  memo?: Map<string, number>,
+): number => {
+  const standard = standardShanten(concealedTiles, tileSet, memo, exposedMelds);
+  return exposedMelds > 0
+    ? standard
+    : Math.min(standard, sevenPairsShanten(concealedTiles, tileSet));
 };
 
 export const sevenPairsShanten = (
@@ -96,9 +117,13 @@ export const sevenPairsShanten = (
   return 6 - pairs + Math.max(0, 7 - kinds);
 };
 
-export const junkShanten = (
+/**
+ * 玩法无关的标准型/七对二选一向听数：`sevenPairs` 只是一个开关，函数本身
+ * 不含任何玩法专属逻辑（原名 `junkShanten` 是历史遗留，实际不只 junk 在用）。
+ */
+export const computeShanten = (
   tiles: readonly TileId[],
-  options: JunkShantenOptions,
+  options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
   memo?: Map<string, number>,
 ): number =>
@@ -110,29 +135,29 @@ export const junkShanten = (
  * 会令向听数下降的牌种；不报告手中已经拿满的牌种。
  *
  * 这里要为同一手牌反复试探 30 余种候选进张，每种候选只比原手牌多一张牌，
- * 递归子状态高度重叠——共享同一个 memo（而不是让 junkShanten 内部各自新建）
+ * 递归子状态高度重叠——共享同一个 memo（而不是让 computeShanten 内部各自新建）
  * 把这些搜索之间的重复计算省下来，结果不受影响（memo 只影响缓存命中，不
  * 影响 search 的返回值本身）。
  */
 export const ukeire = (
   tiles: readonly TileId[],
-  options: JunkShantenOptions,
+  options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
 ): TileKind[] => {
   const memo = new Map<string, number>();
-  const current = junkShanten(tiles, options, tileSet, memo);
+  const current = computeShanten(tiles, options, tileSet, memo);
   const counts = countsOf(tiles, tileSet);
   return tileSet.kinds.filter((kind, index) => {
     if ((counts[index] ?? 0) >= tileSet.copiesPerKind) return false;
     const candidate = (index * tileSet.copiesPerKind) as TileId;
-    return junkShanten([...tiles, candidate], options, tileSet, memo) < current;
+    return computeShanten([...tiles, candidate], options, tileSet, memo) < current;
   });
 };
 
 /** 听牌只描述下一张摸牌能否直接胡，不把普通进张误判为听牌。 */
 export const isTingpai = (
   tiles: readonly TileId[],
-  options: JunkShantenOptions,
+  options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
 ): boolean =>
   ukeire(tiles, options, tileSet).some((kind) => {

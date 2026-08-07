@@ -4,7 +4,20 @@
 
 ## 当前任务
 
-当前专题：无。
+当前专题：Shanten/Ukeire 共享底层重构，Phase 1（详见 `docs/process/
+shanten-architecture-plan.md`）。已完成：§1 两处 bug 修复（副露搭子上限、
+`pengpenghu` 死代码接线）+ 正式回归测试；`pnpm --filter @new-mj/core
+verify:full`/`pnpm --filter @new-mj/ai verify:full` 全绿；§4 步骤 4 重新
+profile（结论：递归 DFS 仍占真实自对弈约 92% 自耗时，Layer 0 建表仍值得
+做）；Layer 1 正名（`junkShanten`/`JunkShantenOptions` →
+`computeShanten`/`ShantenOptions`）；调参风险决策（`default-weights.json`
+确认是手调原值非调参产物，不需要因本次修复重新调参）；落地"AI 质量调优
+要有 A/B 证据"流程规则（`packages/ai/AGENTS.md`）+ 新增
+`compare-weights-cli.ts`（`pnpm compare:junk-weights`）。
+
+**下一步第一个具体动作**：Layer 0 预计算表实现（单花色 5^9 状态 BFS 建表，
+方案见 shanten-architecture-plan.md §2/§4 步骤 5），用户已明确要求单独
+排期，不在本次会话继续。
 
 Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动器 / 权重参数化 + 手写 (1+1)-ES 调参脚本）已全部完成，`pnpm --filter @new-mj/ai verify:full` 全绿，详见 `packages/ai/AGENTS.md` 与 `packages/ai/src/junk/{strategy,arena,tune,tune-cli,tune-pool,tune-worker}.ts`。后续加了两轮跟进：
 - 性能：`worker_threads` 并行跑对局（`tune-pool.ts`，手写不引第三方库）+ `standardShanten` 递归 memo 跨同回合候选手牌共享 + `node --cpu-prof` profiling 定位到 `TileSet.kinds.indexOf` 线性扫描（改成 O(1) 的 `kindIndexOf`，见 `packages/core/AGENTS.md`）——同一个调参样例耗时从 80s 降到 11s（约 7x），全程报告逐字节一致、`verify:full` 含 1000+ 局 fuzz 确认无回归。
