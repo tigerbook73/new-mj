@@ -1,4 +1,5 @@
 import type { TileId, TileKind } from "./ids.ts";
+import { computeShantenViaTable } from "./shanten-suit-table.ts";
 import { isSevenPairsWinningHand, isStandardWinningHand } from "./standard-hand.ts";
 import { STANDARD_TILE_SET, type TileSet } from "./tiles.ts";
 
@@ -19,13 +20,16 @@ const countsOf = (tiles: readonly TileId[], tileSet: TileSet): number[] => {
 };
 
 /**
- * 标准牌型向听数。递归枚举面子、雀头和搭子；副露应由调用方先从手牌中排除。
+ * 标准牌型向听数的递归实现：枚举面子、雀头和搭子；副露应由调用方先从手牌中
+ * 排除。`standardShanten` 只在 `tileSet` 不是 `STANDARD_TILE_SET`（引用相等）
+ * 时才回退到这里——标准 34 种牌走 shanten-suit-table.ts 的预计算表查表快路径，
+ * 语义必须与这里逐位一致（差分测试见 shanten-suit-table.test.ts）。
  *
  * `memo` 默认每次调用各自新建（行为与之前完全一致）；调用方可传入一个共享的
  * Map 跨多次调用复用缓存——例如 ukeire 要为同一手牌反复试探 30 余种不同的
  * 候选进张，这些递归子状态高度重叠，共享 memo 能省掉大量重复搜索（见 ukeire）。
  */
-export const standardShanten = (
+const standardShantenByRecursion = (
   tiles: readonly TileId[],
   tileSet: TileSet = STANDARD_TILE_SET,
   memo: Map<string, number> = new Map(),
@@ -86,6 +90,26 @@ export const standardShanten = (
 
   return search(countsOf(tiles, tileSet), existingMelds, 0, 0);
 };
+
+/**
+ * 标准牌型向听数。`tileSet === STANDARD_TILE_SET`（引用相等，因为它是
+ * frozen 单例）时走 shanten-suit-table.ts 的 Layer 0 预计算表查表快路径
+ * （`computeShantenViaTable`），O(1) 量级；任何非标准 `TileSet`（比如未被
+ * 实际使用的 27-kind `BLOODBATTLE_TILE_SET`）回退到
+ * `standardShantenByRecursion`，保持通用性不受影响。
+ *
+ * `memo` 只在回退路径上有意义（见 `standardShantenByRecursion` 的文档）；
+ * 快路径本身就是 O(1) 查表 + 一个很小的合并 DP，不需要、也不使用 memo。
+ */
+export const standardShanten = (
+  tiles: readonly TileId[],
+  tileSet: TileSet = STANDARD_TILE_SET,
+  memo: Map<string, number> = new Map(),
+  existingMelds = 0,
+): number =>
+  tileSet === STANDARD_TILE_SET
+    ? computeShantenViaTable(tiles, tileSet, existingMelds)
+    : standardShantenByRecursion(tiles, tileSet, memo, existingMelds);
 
 /**
  * standardShanten 只看得到手牌自己找到的面子数；已有副露的面子并不在
