@@ -6,17 +6,11 @@
 
 当前专题：无。
 
-Shanten/Ukeire 共享底层重构 Phase 1（详见 `docs/process/
-shanten-architecture-plan.md`）已全部完成：§1 两处 bug 修复、Layer 1 正名
-（`computeShanten`/`ShantenOptions`）、Layer 0 单花色预计算表落地（`packages/
-core/src/lib/shanten-suit-table.ts`，懒加载内存单例，`standardShanten` 等
-公共函数逐位一致，差分测试穷举+大样本覆盖）、AI 质量调优 A/B 流程规则
-（`packages/ai/AGENTS.md` + `compare-weights-cli.ts`）。端到端自对弈耗时
-降了约 8.75x（982ms/局→112ms/局）。`pnpm --filter @new-mj/core verify:full`/
-`pnpm --filter @new-mj/ai verify:full` 均全绿。后又追加一轮常数级优化：查询
-热路径三项 + `indexMap` 镜像折叠寻址 + 建表内存，单次查表约 1.78x、表总
-内存约 3.74MB→1.93MB，数字与论证见 `shanten-architecture-plan.md` §6 及
-`shanten-suit-table.ts` 顶部注释。后续动作转入 Backlog。
+Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
+沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
+lib/shanten-suit-table.ts` 顶部注释，性能演进见 git history（`perf(core):`
+系列 commit）。端到端自对弈耗时累计降约 11.9x，`verify:full` 全绿。后续
+动作转入 Backlog。
 
 Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动器 / 权重参数化 + 手写 (1+1)-ES 调参脚本）已全部完成，`pnpm --filter @new-mj/ai verify:full` 全绿，详见 `packages/ai/AGENTS.md` 与 `packages/ai/src/junk/{strategy,arena,tune,tune-cli,tune-pool,tune-worker}.ts`。后续加了两轮跟进：
 
