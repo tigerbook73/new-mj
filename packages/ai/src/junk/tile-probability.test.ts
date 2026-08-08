@@ -22,16 +22,15 @@ describe("probabilityAtLeastOneDraw", () => {
     [5, 2, 3],
     [8, 3, 3],
     [20, 1, 5],
-  ])("matches the exact hypergeometric formula for population=%i success=%i draws=%i", (
-    population,
-    success,
-    draws,
-  ) => {
-    expect(probabilityAtLeastOneDraw(population, success, draws)).toBeCloseTo(
-      exactProbability(population, success, draws),
-      10,
-    );
-  });
+  ])(
+    "matches the exact hypergeometric formula for population=%i success=%i draws=%i",
+    (population, success, draws) => {
+      expect(probabilityAtLeastOneDraw(population, success, draws)).toBeCloseTo(
+        exactProbability(population, success, draws),
+        10,
+      );
+    },
+  );
 
   it("returns 0 when there are no draws left", () => {
     expect(probabilityAtLeastOneDraw(50, 3, 0)).toBe(0);
@@ -61,9 +60,7 @@ describe("probabilityAtLeastOneDraw", () => {
   });
 
   it("is monotonically increasing in successCount for fixed population/draws", () => {
-    const probabilities = [1, 2, 3, 4].map((success) =>
-      probabilityAtLeastOneDraw(50, success, 10),
-    );
+    const probabilities = [1, 2, 3, 4].map((success) => probabilityAtLeastOneDraw(50, success, 10));
     for (let i = 1; i < probabilities.length; i += 1) {
       expect(probabilities[i]!).toBeGreaterThan(probabilities[i - 1]!);
     }

@@ -95,10 +95,7 @@ const isStrategyModuleShape = (value: unknown): value is StrategyModuleShape =>
  * the *loaded module's own* weight key set (not necessarily the current working
  * tree's), since a `ref`/`modulePath` source may be a different code version
  * with a different JunkWeights shape (e.g. pre-Phase-1's improvementWeight). */
-export const loadWeightsFile = (
-  filePath: string,
-  expectedKeys: readonly string[],
-): JunkWeights => {
+export const loadWeightsFile = (filePath: string, expectedKeys: readonly string[]): JunkWeights => {
   const parsed: unknown = JSON.parse(readFileSync(filePath, "utf8"));
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error(`INVALID_WEIGHTS_FILE: ${filePath}`);

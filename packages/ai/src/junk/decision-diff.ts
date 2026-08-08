@@ -22,7 +22,8 @@ export type DecisionDiffReport = Readonly<{
 /** JunkAction is a small discriminated union of JSON-safe fields (numbers/arrays
  * of numbers) — structural equality via JSON.stringify is exact and simple here,
  * no need for a field-by-field comparator. */
-const actionsEqual = (a: JunkAction, b: JunkAction): boolean => JSON.stringify(a) === JSON.stringify(b);
+const actionsEqual = (a: JunkAction, b: JunkAction): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 type SeatPolicies = readonly [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
 

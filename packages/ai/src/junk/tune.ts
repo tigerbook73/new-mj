@@ -173,7 +173,9 @@ export const evaluateCandidatePolicies = async (
       policyMatchTask(seed, candidateSeats, baseline, candidate),
     ),
   );
-  const results = pool ? await pool.runAll(tasks) : await Promise.all(tasks.map(runPolicyMatchTask));
+  const results = pool
+    ? await pool.runAll(tasks)
+    : await Promise.all(tasks.map(runPolicyMatchTask));
 
   let candidateScore = 0;
   let baselineScore = 0;

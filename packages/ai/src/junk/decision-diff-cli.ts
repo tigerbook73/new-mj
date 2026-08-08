@@ -1,4 +1,10 @@
-import { createPrng, nextUint32, STANDARD_TILE_SET, type JunkAction, type TileId } from "@new-mj/core";
+import {
+  createPrng,
+  nextUint32,
+  STANDARD_TILE_SET,
+  type JunkAction,
+  type TileId,
+} from "@new-mj/core";
 import { loadPolicy, type PolicySource } from "./policy-loader.ts";
 import { runDecisionDiff, type Divergence } from "./decision-diff.ts";
 
@@ -144,7 +150,11 @@ export const runDecisionDiffCli = async (
       seeds.push(step.value);
     }
     log("[decision-diff] running self-play (both directions driving)...\n");
-    const { decisionPoints, divergences } = runDecisionDiff(seeds, baseline.policy, candidate.policy);
+    const { decisionPoints, divergences } = runDecisionDiff(
+      seeds,
+      baseline.policy,
+      candidate.policy,
+    );
     return {
       exitCode: 0,
       output: `${formatReport(args, baseline, candidate, seeds, decisionPoints, divergences)}\n`,

@@ -75,9 +75,9 @@ describe("loadPolicy", () => {
   }, 20_000);
 
   it("rejects passing both ref and modulePath", async () => {
-    await expect(loadPolicy({ ref: "HEAD", modulePath: currentStrategyPath }, "bad")).rejects.toThrow(
-      "POLICY_SOURCE_AMBIGUOUS",
-    );
+    await expect(
+      loadPolicy({ ref: "HEAD", modulePath: currentStrategyPath }, "bad"),
+    ).rejects.toThrow("POLICY_SOURCE_AMBIGUOUS");
   });
 });
 

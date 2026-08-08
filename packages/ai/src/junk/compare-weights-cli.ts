@@ -216,7 +216,9 @@ export const runCompareWeightsCli = async (
       };
     }
 
-    log(`[compare] cross-version comparison (parallel, concurrency=${args.concurrency}), seeds=${args.seeds}\n`);
+    log(
+      `[compare] cross-version comparison (parallel, concurrency=${args.concurrency}), seeds=${args.seeds}\n`,
+    );
     // ref snapshots resolve once here, on the main thread — workers only ever
     // import() an already-materialized path, never run git themselves (see
     // policy-loader.ts's resolveModulePath doc comment).

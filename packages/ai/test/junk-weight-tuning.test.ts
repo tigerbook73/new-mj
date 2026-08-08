@@ -178,7 +178,10 @@ describe("junk weight tuning", () => {
 
         const sequential = await evaluateCandidate(seeds, DEFAULT_JUNK_WEIGHTS, candidate);
 
-        pool = new MatchWorkerPool<MatchTask>(2, new URL("../src/junk/tune-worker.ts", import.meta.url));
+        pool = new MatchWorkerPool<MatchTask>(
+          2,
+          new URL("../src/junk/tune-worker.ts", import.meta.url),
+        );
         const parallel = await evaluateCandidate(seeds, DEFAULT_JUNK_WEIGHTS, candidate, pool);
 
         expect(parallel).toEqual(sequential);

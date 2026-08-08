@@ -369,7 +369,12 @@ export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTa
 
     indexMap[indexMapSlotOf(counts)] = contentId;
   }
-  return { suitLength, hasRunLogic, indexMap, data: data.slice(0, contentCount * SLOTS_PER_VECTOR) };
+  return {
+    suitLength,
+    hasRunLogic,
+    indexMap,
+    data: data.slice(0, contentCount * SLOTS_PER_VECTOR),
+  };
 };
 
 let numberSuitTableSingleton: SuitTable | undefined;
@@ -618,7 +623,8 @@ export const createShantenProber = (
   const mid = new Int16Array(10);
   const fin = new Int16Array(10);
   return (kindIndex: number): number => {
-    const blockIndex = kindIndex < NUMBER_SUIT_LENGTH * 3 ? Math.floor(kindIndex / NUMBER_SUIT_LENGTH) : 3;
+    const blockIndex =
+      kindIndex < NUMBER_SUIT_LENGTH * 3 ? Math.floor(kindIndex / NUMBER_SUIT_LENGTH) : 3;
     const block = blocks[blockIndex]!;
     counts[kindIndex] = (counts[kindIndex] ?? 0) + 1;
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);

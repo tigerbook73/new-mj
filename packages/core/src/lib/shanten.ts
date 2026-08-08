@@ -226,9 +226,7 @@ export const ukeire = (
   return tileSet.kinds.filter((kind, index) => {
     if ((counts[index] ?? 0) >= tileSet.copiesPerKind) return false;
     const candidate = (index * tileSet.copiesPerKind) as TileId;
-    return (
-      computeShanten([...tiles, candidate], options, tileSet, memo, existingMelds) < current
-    );
+    return computeShanten([...tiles, candidate], options, tileSet, memo, existingMelds) < current;
   });
 };
 
