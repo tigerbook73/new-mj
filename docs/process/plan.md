@@ -4,7 +4,12 @@
 
 ## 当前任务
 
-当前专题：无。
+当前专题：Junk AI 决策质量结构性缺口，按验证优先→算法逻辑→高风险不确定 三档排序推进
+（讨论见 Backlog 中"权重之外的基本逻辑缺口审计"及其下③④两条）。第一档（④+④-b
+花色集中/间距/位次验证）已完成并收档，结论并入下方"权重之外的基本逻辑缺口审计"条目。
+下一步：第二档第一项，③ 听牌概率模型区分自摸/吃/碰不同来源（`strategy.ts:241-245`
+`tenpaiProbability` 目前把三种来源混进同一个池子，是"阻挡低价值吃碰"权重调不动的
+根因之一，改动不引入新可调参数）。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
@@ -64,6 +69,54 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
   `toBe(discardHonor)`）。`pnpm --filter @new-mj/ai verify:full` 全绿。
 
 - Phase 2（Monte Carlo rollout + 真实番数期望，呼应 `docs/architecture/shanten.md` "Layer 3 远期方向"）评估级，暂不实现：已确认 `scoreJunkHand`/`decomposeStandardWinningHand`/`decomposeSevenPairsWinningHand` 已是 `@new-mj/core` 公开导出，不需要新增 core API。未解决问题：① rollout 内部"打哪张"用什么策略模拟——递归调用当前评分函数最准确但成本比 Phase 1 高一个数量级以上，需要先做基准测试才知道能否进自对弈/调参闭环；② rollout 只在什么 shanten 区间触发，避免全量候选都跑一遍；③ "D 层后是否到达和牌"这类链式结果没有闭式解，只能靠构造场景的 fixture 断言，不能指望自对弈胜率（原因与 Phase 1 相同、且样本需求更大）。建议 Phase 1 上线观察一段时间后再评估是否启动 Phase 2；启动时第一步是先解决①的性能基准，不要直接写 rollout 主体代码。
+- Junk AI「阻挡低价值吃碰」专题（2026-08-08 讨论记录，未启动，未选定方案）：现状 `scoreAction`（`strategy.ts:385-431`）里吃/碰分支与打牌共用同一套 `handQuality`（向听 + 进张概率 + `fanPotential` + `isolationPotential`），没有专门的吃碰价值判断——`fanPotential`（83-102行）虽然对 chi 有常量惩罚（关闭 `pengpenghu`/`pairBonus`/`meldBonus` track、开口扣 `menqing`），但都是人工挑的静态权重，不是"吃碰后期望得分会掉多少"的真实估算；`recommendJunkAction` 对 claim 和 pass 直接 argmax 比大小，没有阈值、没有机会成本概念。候选方向：① 给 chi/peng 分支加显式迟疑阈值（δ hurdle，claim 分数需比 pass 基线高出 δ 才通过），δ 按关闭的番型 track 数量、并随 `gameProgress`（残局放宽）动态调整，改动小风险低；② 把 `fanPotential` 换成真正的期望倍数（EV）模型（枚举收尾番型分支×达成概率求和，复用 core `scoring.ts` 倍数计算），更准确但改动面大、单次决策计算量上升——与本条上方 Phase 2 rollout 方向一致，可合并考虑；③ chi 与 peng 应设不同门槛（chi 同时伤门清+碰碰胡+清一色三条线，peng 只伤门清）；④ 用已有 `decision-diff-cli`/`compare-weights-cli` A/B 工具量化任一改动对"低价值吃碰频率"与实际胜率/得分的影响，避免主观调参。下一步第一个具体动作（若启动）：先做①（成本最低），跑 A/B 工具验证效果后再决定是否投入②。
+
+  **权重之外的基本逻辑缺口审计**（2026-08-08，讨论记录，未启动，未定优先级）：排查权重
+  取值之外的决策路径本身（`scoreAction`/`handQuality`/`argmaxAction`，`strategy.ts:311-518`），
+  发现两处跟具体权重无关的结构性缺口：① **完全没有防守/放铳风险模型**——`safetyBonus`
+  （265行）只对"现物"（他家牌河里已出现过的同张牌）加固定分，没有对手危险度推理（副露/
+  打牌节奏暗示听牌可能性、筋/壁牌一类数牌相对安全推理），也没有攻守切换逻辑，AI 永远
+  单向最大化自己的进张——这比番型权重更基础，是常见的麻将 AI 强度短板，此前文档/代码
+  里完全没有记录。② **吃/碰决策没有迟疑阈值**——`argmaxAction`（471-481行）对 claim 和
+  pass 直接比大小，没有"claim 必须显著优于 pass 才通过"的门槛，是决策结构问题、不是
+  调参能解决的（与本条上方"阻挡低价值吃碰"专题的候选方向①同一件事，两条讨论可合并）。
+  次要、优先级低：`remainingDraws`（198行注释已自承认）未建模吃碰导致摸牌轮次提前；
+  `argmaxAction` 打平分时无 tie-break，纯看 `legalActions` 数组顺序。追加（2026-08-08，
+  ④-b 验证后新增）：**`isolationPotential` 权重可能冗余**——位次差异（边张 vs 中张）
+  已被 `tenpaiProbabilityWeight` 链路精确捕捉（见下方④-b 验证结论），`isolationPotential`
+  二元固定加成是在已有信号上叠加不精确常数，评估是否该简化/去掉时一并处理。
+
+  **③ 听牌概率模型没有区分自摸/吃/碰的不同来源**（2026-08-08，同一类"决策结构问题"，
+  与①②合并考虑）：`tenpaiProbability`（`handQuality`，`strategy.ts:241-245`）用的
+  `probabilityAtLeastOneDraw`（`tile-probability.ts:11-24`）是纯超几何"至少抽中一次"
+  模型，`populationSize` 用 `gameProgressOf` 算出的 `unseenPoolSize` = 牌墙 + 其他三家
+  隐藏手牌合并成一个池子（`strategy.ts:374-383`），`draws` 用自己的摸牌轮次数
+  `ceil(wallCount/4)`。这把三件事混成一件事算：自摸（population 该是牌墙）、碰（三个
+  对手都可能来源）、吃（只有上家一个来源），且完全没有"对手会不会真的打出这张牌"的
+  行为概率，只假设未现身的牌均匀分布在剩余轮次里被摸到——`GameProgress` 类型注释
+  （202-205行）里已经承认这是故意的简化（"exchangeable for probability purposes"）。
+  影响：吃和碰的进张速度理论上不同（碰的来源数是吃的三倍），但现在两者算出的
+  `tenpaiProbability` 用同一套不分来源的池子逻辑，权重再怎么调也补不齐这个结构性
+  误差，是"阻挡低价值吃碰"专题权重调不动的根因之一，不是调参能解决的。
+
+  **④+④-b 验证已完成（2026-08-08）：结论是两条都不加权重，且发现 isolationPotential
+  可能冗余**。用诊断脚本直接对比裸 `ukeire`/`liveUkeireCount`（不经过
+  `isolationPotential`）：
+  - **④-b 位次差异（边张 1/9 vs 中张 3-7）：确认已被精确捕捉**——1/9 位=3 种/16 活牌，
+    2/8 位=4 种/20 活牌，3~7 位（3/5/7 均测过）打平=5 种/24 活牌，完全对称单调。
+    真实差异已经存在于 `tenpaiProbabilityWeight` 链路里，`isolationPotential`
+    （`strategy.ts:123-149`）现在不分位次给同一个固定加成，是在已有真实信号上
+    叠加了一层不精确的常数——**不需要加位次分级权重，反而应评估是否该简化/去掉
+    `isolationPotential`**（留给下面"权重之外的基本逻辑缺口审计"一起考虑，不单独
+    起专题）。
+  - **④(a)(b) 花色集中/间距：数据不支持原假设，效应方向是反的**——测了"同花色
+    gap=3"(9 种/32 活牌) vs "同花色 gap=5"(10 种/36 活牌) vs "跨花色同 rank"
+    (11 种/40 活牌)：同花色小间距反而活牌数最少。原因不是 bug：`ukeire`/
+    `liveUkeireCount` 统计的是"能让向听下降的不同牌种"这种广度，两个孤立牌越
+    接近（尤其同花色）各自 ±2 邻域重叠越多，并集反而变小；"双向搭桥牌效率更高"
+    这个真实存在的麻将常识，在这套单步广度指标里没有被建模成正向因素。**不要
+    加"间距"或"同花色集中度"权重**——真要建模这个效应需要多步前瞻（2-ply/
+    rollout），属于已暂缓的 Phase 2 范畴，不是简单加权重能解决的。
 - 评估 Junk AI 自我优化基础设施（Feature 参数化 + 自对弈 arena + 调参脚本这套结构）是否推广到 hangzhou/bloodbattle：可复用部分是 Layer B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属的 Feature 抽取（对应各玩法番型/规则）仍需各自单独做，不会自动免掉。
 - Junk AI `handQuality` 打分两处升级已完成（`packages/ai/src/junk/strategy.ts`，`pnpm --filter @new-mj/ai verify:full` 全绿）：① `improvements` 项从"ukeire 种类数"改为"剩余活牌数求和"（新增 `liveUkeireCount`，按自己手牌/副露+全桌牌河扣减，已知缺口：不扣他家 anGang/buGang 锁死的牌，因为这些牌没经过牌河、看不到）；② 新增 `isolationPotential` 权重修复"孤立字牌不优先打出"盲点（字牌不加分，数牌按"无同花色 ±2 内邻居"给固定分，不依赖 `shanten<=1` 门槛）。上线后实战中发现 ② 引入了新回归：判断"是否有邻居"用的是弃牌之后的手牌，导致打散一个本来多余的搭子（如 5p6p 拆掉 6p）会让剩下那张牌看起来"新孤立"、反而拿到孤立分，AI 因此更愿意拆搭子也不愿打真正没用的字牌；已修（判断邻居时改用弃牌前的手牌做参照，`isolationPotential`/`handQuality` 新增 `referenceHand` 参数），并补了对应 fixture 回归测试。`isolationPotential`（初始 1.5）仍是保守起始值，没有做过定量验证——已确认自对弈胜率信噪比不够，分不出"合理 vs 更优"，后续要调这个权重应该靠场景化 fixture 测试（构造具体牌型断言推荐动作），不要跑 `tune:junk` 去微调。原 `improvementWeight` 已被 `tenpaiProbabilityWeight` 结构性取代（见下方 Junk AI Phase 1 记录），不再适用本条提醒。
 - 结算展示优化（剩余）：已完成结果 panel 的赢家/和牌/番型与庄家倍率/积分阅读顺序、赢家积分置顶、“我”命名和并列操作按钮；已完成胡牌/流局大字提示（`ResultBanner.tsx`，900ms 后过渡到 panel，仅对本局实时结果播放、重连不重放）与赢家手牌胡牌张高亮（`WinningHandReveal` 新增 `winTile`，复用 `justDiscarded` 同款红环，与财神环冲突时 `cn()` 保留后者）。下一步第一个具体动作：放铳牌从牌河落入结算展示区——需要新的飞行动画（可参照 `ClaimFlipGhost.tsx`/`DiscardFlipGhost.tsx` 的 `TileFlightPortal` 模式），并先定义清楚"目标位置"具体指结算展示里的什么地方（`WinningHandReveal` 没有 `HandRow` 那种摸牌区概念，需要设计落点）。
