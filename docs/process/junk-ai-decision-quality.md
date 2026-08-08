@@ -52,8 +52,9 @@ number-tile cluster, even far from tenpai"）。
 
 - **位次差异（边张 1/9 vs 中张 3-7）已被精确捕捉**：1/9 位=3 种/16 活牌，2/8
   位=4 种/20 活牌，3~7 位打平=5 种/24 活牌，完全对称单调。不需要加位次分级
-  权重——真实差异已存在于 `tenpaiProbabilityWeight` 链路，`isolationPotential`
-  现在的二元固定加成可能与此信号重复，见下方"待选①"。
+  权重——真实差异已存在于 `tenpaiProbabilityWeight` 链路。（当时怀疑
+  `isolationPotential` 因此冗余，验证后发现结论更细致，见下方"① `isolationPotential`
+  冗余评估已完成"。）
 - **花色集中/间距假设不成立，效应方向相反**：同花色 gap=3（9 种/32 活牌）
   反而比 gap=5（10 种/36 活牌）和跨花色（11 种/40 活牌）活牌数更少——`ukeire`
   统计的是"能让向听下降的不同牌种"这种广度，两个孤立牌越接近邻域重叠越多、
@@ -82,12 +83,35 @@ successCount 按"牌墙/未见池"的期望占比拆分改进牌活牌数（`wal
 信息，需要先从 core 挖出牌型分解数据，工程量接近 Phase 2 EV 模型；且"对手手里
 的牌多久会被打出来"仍是未建模的行为概率。不再算"不引入新参数"这一档。
 
+### ① `isolationPotential` 冗余评估已完成（2026-08-08）：**结论是保留，不简化**
+
+④-b 曾speculate它可能冗余，验证后发现结论要分两种情形，且早前的推测只看到了
+其中一种：
+
+- **孤立牌仍在向听计算里起作用时（还差的那个 block 候选）**：raw
+  ukeire/liveUkeireCount 已经把"字牌 vs 数牌""边张 vs 中张"放在同一条连续谱系
+  上精确区分——诊断脚本对比"留孤立 5m"(shanten=1, 7 种 ukeire, 24 活牌) vs
+  "留孤立 1z"(shanten=1, 3 种 ukeire, 8 活牌)：3 倍差距，比④-b 测出的边张/
+  中张差距（约 1.5 倍）还悬殊，因为字牌在这条谱系上等于"永远的最差位置"（0 个
+  可搭桥邻居，边张好歹还有 2 个）。这部分 `tenpaiProbabilityWeight` 链路已经
+  精确覆盖，`isolationPotential` 在这里是重复加成，但方向一致、不会翻转决策，
+  无害。
+- **孤立牌已经是纯多余（手牌已够 block 数，这张牌怎么弃都不影响 shanten）时**：
+  诊断脚本显示两种候选（孤立 1z vs 孤立 5m）算出**完全相同**的 shanten/ukeire
+  ——广度指标看不出任何差异，因为这张牌对当前向听真的毫无贡献。这正是
+  `isolationPotential` 唯一能提供新信号的场景，也是它最初要解决的场景——已有
+  fixture 锁定（`strategy.test.ts` "prefers discarding an isolated honor over
+  an isolated number tile at equal shanten"，该用例注释明确写着"两种弃牌在
+  shanten/fanPotential 上完全打平"，即不靠 `isolationPotential` 分不出胜负）。
+
+**结论：保留 `isolationPotential`，不简化/不去掉**；也不需要额外改动（重复
+加成的那部分是无害的，专门为它加"只在纯多余时才触发"的门槛属于过度设计，
+没有实测证据支持这类改动能修正任何错误决策）。未额外提交代码改动，仅更正本
+文档此前的推测。
+
 ## 待选（未选定顺序）
 
-- **① 评估 `isolationPotential` 是否该简化/去掉**：④-b 验证发现位次差异已被
-  `tenpaiProbabilityWeight` 覆盖，但 honor-vs-number 这条区分轴是否也已被
-  ukeire 隐式捕捉还未验证，需要专门 fixture 对比，不能凭推理下结论。
-- **② 吃/碰迟疑阈值 δ hurdle**：`argmaxAction`（`strategy.ts:471-481`）对
+- **① 吃/碰迟疑阈值 δ hurdle**：`argmaxAction`（`strategy.ts:471-481`）对
   claim 和 pass 直接比大小，没有"claim 必须显著优于 pass 才通过"的门槛，是
   决策结构问题、不是调参能解决的。引入新参数 δ（可随 `gameProgress` 残局放宽
   动态调整），需要重新确认算第二档还是第三档。chi 与 peng 理论上应设不同
