@@ -9,6 +9,7 @@ import {
   type TileKind,
 } from "@new-mj/core";
 import defaultWeightsData from "./default-weights.json" with { type: "json" };
+import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
 
 /** Every magic number that shapes handQuality/fanPotential/scoreAction, made
  * overridable so an offline tuner (see junk/tune.ts) can search this space
@@ -30,10 +31,13 @@ export type JunkWeights = {
   qiduiPotential: number;
   /** handQuality: shanten weight (-shanten * shantenWeight). */
   shantenWeight: number;
-  /** handQuality: ukeire-improvement weight, applied per live tile still available
-   * (4 - copies in own hand/melds - copies visible in any seat's discards), not
-   * per improving *kind* — a wait with 3 live copies outscores one with 1. */
-  improvementWeight: number;
+  /** handQuality: weight on the *probability* of drawing an improving tile within
+   * the seat's estimated remaining draws this game (see tile-probability.ts and
+   * GameProgress) — not a raw live-copy count. A wait backed by more live copies
+   * still scores higher (probability rises with successCount), but the same live
+   * count is worth less late in the wall than early, which a flat per-copy weight
+   * could never express. */
+  tenpaiProbabilityWeight: number;
   /** scoreHandShapeAfterDiscard: bonus for discarding an already-visible tile. */
   safetyBonus: number;
   /** handQuality: flat bonus for a concealed, unpaired suited tile that has no
@@ -184,6 +188,33 @@ const liveUkeireCount = (
 };
 
 /**
+ * The two numbers `handQuality` needs to turn a live-copy count into a draw
+ * probability: how many tiles are still unaccounted for from this seat's
+ * point of view, and how many more times this seat is expected to draw this
+ * game. `remainingDraws` is estimated as `ceil(wallCount / 4)` — the four
+ * seats draw in strict rotation, so this is exact when no one calls a tile
+ * out of turn; claims (chi/peng/gang) skip other seats' draws and shift the
+ * rotation, which this estimate doesn't model. Known simplification, same
+ * spirit as liveUkeireCount's anGang/buGang gap above.
+ */
+export type GameProgress = Readonly<{
+  wallCount: number;
+  /** wallCount plus every other seat's concealed hand — tiles whose identity
+   * is unknown to this seat and exchangeable for probability purposes, even
+   * though physically some sit in the wall and some in opponents' hands. */
+  unseenPoolSize: number;
+}>;
+
+/** Default for callers that don't track game progress (most direct unit-test
+ * calls into scoreHandShapeAfterDiscard) — a full, untouched wall, so the
+ * probability term behaves as "plenty of time left" rather than being
+ * silently zeroed out. */
+const AMPLE_GAME_PROGRESS: GameProgress = {
+  wallCount: STANDARD_TILE_SET.kinds.length * STANDARD_TILE_SET.copiesPerKind,
+  unseenPoolSize: STANDARD_TILE_SET.kinds.length * STANDARD_TILE_SET.copiesPerKind,
+};
+
+/**
  * Shared quality metric for a static hand shape (no pending discard) — the common
  * scale that discard/pass/gang scoring all compare against, so "do nothing" and
  * "change my hand" are judged on the same terms instead of hardcoded constants.
@@ -194,19 +225,27 @@ const handQuality = (
   memo?: Map<string, number>,
   visibleDiscards: readonly TileId[] = [],
   isolationReferenceHand: readonly TileId[] = input.hand,
+  gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
 ): number => {
   const shanten = shantenOf(input, memo);
-  // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
-  // 避免自动对局在每一次出牌都做无收益的二层穷举。ukeire 内部的向听差值不
-  // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。ukeire 自己内部
-  // 已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的 memo
-  // 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
-  const improvingKinds =
-    shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }) : [];
+  // 曾经只在 shanten<=1 时才算 ukeire（避免中局无收益穷举），实测这个门槛让
+  // 中局"留一手换未来更多可能性"这类判断完全看不到进张信号——shanten/ukeire
+  // 性能提升后，无条件计算的开销经基准测试确认可接受（1000 场自对弈从 10.5s
+  // 涨到 16.4s，约 1.56x，不是数量级级别的暴涨），于是把门槛去掉。ukeire 内部
+  // 的向听差值不受副露数量的常数偏移影响，因此这里不需要把偏移传进去。ukeire
+  // 自己内部已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的
+  // memo 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
+  const improvingKinds = ukeire(input.hand, { sevenPairs: input.melds.length === 0 });
   const improvements = liveUkeireCount(input, improvingKinds, visibleDiscards);
+  const remainingDraws = Math.ceil(gameProgress.wallCount / 4);
+  const tenpaiProbability = probabilityAtLeastOneDraw(
+    gameProgress.unseenPoolSize,
+    improvements,
+    remainingDraws,
+  );
   return (
     -shanten * weights.shantenWeight +
-    improvements * weights.improvementWeight +
+    tenpaiProbability * weights.tenpaiProbabilityWeight +
     fanPotential(input, weights) +
     isolationPotential(input.hand, weights, isolationReferenceHand)
   );
@@ -219,12 +258,20 @@ export const scoreHandShapeAfterDiscard = (
   visibleDiscards: readonly TileId[] = [],
   weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
   memo?: Map<string, number>,
+  gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
 ): number => {
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
   return (
-    handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards, input.hand) + safety
+    handQuality(
+      { hand, melds: input.melds },
+      weights,
+      memo,
+      visibleDiscards,
+      input.hand,
+      gameProgress,
+    ) + safety
   );
 };
 
@@ -235,7 +282,8 @@ const bestDiscardScore = (
   input: ShapeInput,
   visibleDiscards: readonly TileId[],
   weights: JunkWeights,
-  memo?: Map<string, number>,
+  memo: Map<string, number> | undefined,
+  gameProgress: GameProgress,
 ): number => {
   const scores = new Map<TileKind, number>();
   let best = Number.NEGATIVE_INFINITY;
@@ -244,7 +292,14 @@ const bestDiscardScore = (
     const score =
       scores.get(kind) ??
       (() => {
-        const calculated = scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights, memo);
+        const calculated = scoreHandShapeAfterDiscard(
+          input,
+          tile,
+          visibleDiscards,
+          weights,
+          memo,
+          gameProgress,
+        );
         scores.set(kind, calculated);
         return calculated;
       })();
@@ -316,6 +371,17 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
 const visibleDiscards = (view: JunkPlayerView): TileId[] =>
   view.seats.flatMap((seat) => seat.discards.map((discard) => discard.tile));
 
+/** unseenPoolSize = wallCount + every *other* seat's concealed hand (own hand is
+ * fully known, so it's excluded); see GameProgress's doc comment for why this
+ * pool is treated as exchangeable for a draw-probability estimate. */
+const gameProgressOf = (view: JunkPlayerView): GameProgress => {
+  const othersHandCount = view.seats.reduce(
+    (sum, seat, seatIndex) => (seatIndex === view.seat ? sum : sum + seat.handCount),
+    0,
+  );
+  return { wallCount: view.wallCount, unseenPoolSize: view.wallCount + othersHandCount };
+};
+
 const scoreAction = (
   view: JunkPlayerView,
   action: JunkAction,
@@ -324,6 +390,7 @@ const scoreAction = (
 ): number => {
   const discards = visibleDiscards(view);
   const currentMelds = view.seats[view.seat]!.melds;
+  const gameProgress = gameProgressOf(view);
   if (action.type === "discard") {
     return scoreHandShapeAfterDiscard(
       { hand: view.hand, melds: currentMelds },
@@ -331,24 +398,35 @@ const scoreAction = (
       discards,
       weights,
       memo,
+      gameProgress,
     );
   }
   // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
   // 吃/碰/杠模拟出的结果分数放在同一把尺子上比较，AI 才可能真的选择不动。
   if (action.type === "pass")
-    return handQuality({ hand: view.hand, melds: currentMelds }, weights, memo, discards);
+    return handQuality(
+      { hand: view.hand, melds: currentMelds },
+      weights,
+      memo,
+      discards,
+      undefined,
+      gameProgress,
+    );
   if (action.type === "anGang") {
     const claim = simulatedAnGang(view, action.kind);
-    return claim ? handQuality(claim, weights, memo, discards) + weights.gangkai : -100;
+    return claim
+      ? handQuality(claim, weights, memo, discards, undefined, gameProgress) + weights.gangkai
+      : -100;
   }
   if (action.type === "buGang") {
     const claim = simulatedBuGang(view, action.tile);
     return claim
-      ? handQuality(claim, weights, memo, discards) + (weights.gangkai - weights.buGangPenalty)
+      ? handQuality(claim, weights, memo, discards, undefined, gameProgress) +
+          (weights.gangkai - weights.buGangPenalty)
       : -100;
   }
   const claim = simulatedClaim(view, action);
-  if (claim) return bestDiscardScore(claim, discards, weights, memo);
+  if (claim) return bestDiscardScore(claim, discards, weights, memo, gameProgress);
   return -100;
 };
 

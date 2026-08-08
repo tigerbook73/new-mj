@@ -13,6 +13,7 @@ import {
   DEFAULT_JUNK_WEIGHTS,
   recommendJunkAction,
   scoreHandShapeAfterDiscard,
+  type GameProgress,
 } from "./strategy.ts";
 
 /** Deterministic [0, 1) generator over @new-mj/core's xorshift32 PRNG — same
@@ -97,6 +98,26 @@ describe("junk strategy", () => {
       { type: "pass" },
     ];
     expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+  });
+
+  it("still pengs when doing so reaches tenpai (regression guard: tenpaiProbabilityWeight's endgame-awareness must not make claiming too conservative)", () => {
+    // Phase 1 (improvementWeight -> tenpaiProbabilityWeight, plan.md 2026-08-08)
+    // made the AI decline plenty of marginal chi/peng opportunities it used to
+    // take, because the probability term saturates while menqing's fixed cost
+    // doesn't — an accepted, direction-sound side effect (see plan.md), but one
+    // that needs a lower bound: a claim that's *substantially* good (not
+    // marginal) must still win. Here two complete runs (2m3m4m, 5m6m7m) + a
+    // pair (8p8p) + a pengable pair (3s3s) + a ryanmen (6s7s) + one dead honor
+    // (1z) is 1-shanten; pengging the discarded 3s and discarding the useless
+    // 1z reaches tenpai (shanten 0) — a full shanten-level jump that must
+    // dominate menqing's loss regardless of how conservative the probability
+    // term has become.
+    const player: JunkPlayerView = {
+      ...view(["2m", "3m", "4m", "5m", "6m", "7m", "8p", "8p", "3s", "3s", "6s", "7s", "1z"]),
+      lastDiscard: { seat: 1, tile: tileIdOf("3s", 2) },
+    };
+    const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
+    expect(recommendJunkAction(player, actions)).toBe(actions[0]);
   });
 
   it("uses visible discards as a safety tie-break", () => {
@@ -196,16 +217,54 @@ describe("junk strategy", () => {
     expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
   });
 
+  it("prefers discarding a lone honor over breaking a live number-tile cluster, even far from tenpai (regression guard: ukeire's ungated mid-game signal, plan.md 2026-08-08)", () => {
+    // Turn 2 of a real self-played game (round 0, step 2, wallCount=82) — many
+    // shanten away from tenpai. `handQuality` used to only compute ukeire when
+    // shanten<=1 ("2 层穷举" was considered too expensive to run every turn);
+    // now that shanten/ukeire are microsecond-fast, the gate was removed so
+    // this signal reaches the mid-game too. Before removing it, discarding 7s
+    // (which sits between live neighbors 6s/8s) and discarding 5z (a lone
+    // honor connected to nothing) tied on every other term this far from
+    // tenpai, so argmax picked whichever came first in hand order — an
+    // arbitrary tie, not a real judgment. With ukeire ungated, keeping the
+    // 6s/8s-connected tile and discarding the honor is now a deliberate,
+    // reasoned pick.
+    const player = view([
+      "1m",
+      "2s",
+      "2s",
+      "2z",
+      "3s",
+      "4z",
+      "5z",
+      "6p",
+      "6s",
+      "7s",
+      "7z",
+      "7z",
+      "8s",
+      "9p",
+    ]);
+    const discardSequenceTile: JunkAction = { type: "discard", tile: player.hand[9]! }; // 7s
+    const discardHonor: JunkAction = { type: "discard", tile: player.hand[6]! }; // 5z
+    expect(recommendJunkAction(player, [discardSequenceTile, discardHonor])).toBe(discardHonor);
+  });
+
   it("does not reward breaking a genuinely redundant tatsu to manufacture a new isolated tile", () => {
     // 2 complete runs + 3 *symmetric* ryanmen tatsu (5p6p, 3s4s, 7s8s) + 2 lone
     // honors. standardShanten's usableTatsu is capped at (4 - melds) = 2 here,
-    // so only 2 of the 3 tatsu ever count — any one of them, including 5p6p,
-    // is exactly as redundant as either honor: discarding half of it changes
-    // shanten no more than discarding a honor does. Regression found in real
-    // play: pre-fix, isolationPotential scored the *post-discard* hand, so
-    // breaking 5p6p left a "newly isolated" 5p that collected the isolation
-    // bonus — making the AI prefer discarding 6p (breaking a useful shape)
-    // over discarding a genuinely useless lone honor.
+    // so only 2 of the 3 tatsu ever count on shanten alone — any one of them,
+    // including 5p6p, is exactly as redundant as either honor there.
+    // Historical regression: pre-fix, isolationPotential scored the
+    // *post-discard* hand, so breaking 5p6p left a "newly isolated" 5p that
+    // collected the isolation bonus — making the AI prefer discarding 6p
+    // (breaking a useful shape) over discarding a genuinely useless lone
+    // honor. Originally this hand's two candidates scored *exactly* tied
+    // (shanten=2, so ukeire was gated off before plan.md's 2026-08-08
+    // mid-game ukeire change) and the test could only probe list-order
+    // behavior; now ukeire is ungated and genuinely tells them apart (keeping
+    // the tatsu scores higher), so this asserts the correct discard wins
+    // outright, independent of list order.
     const player = view([
       "1m",
       "2m",
@@ -224,12 +283,8 @@ describe("junk strategy", () => {
     ]);
     const discardTatsuTile: JunkAction = { type: "discard", tile: player.hand[7]! }; // 6p
     const discardHonor: JunkAction = { type: "discard", tile: player.hand[12]! }; // 1z
-    expect(
-      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardTatsuTile.tile),
-    ).toBe(scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardHonor.tile));
-    // With scores genuinely tied, listing the tatsu-breaking discard first
-    // pins down that it no longer wins outright (which is what the bug did).
-    expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardTatsuTile);
+    expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardHonor);
+    expect(recommendJunkAction(player, [discardHonor, discardTatsuTile])).toBe(discardHonor);
   });
 
   it("prefers keeping a live wait over a dead one (theoretical -> practical ukeire)", () => {
@@ -269,6 +324,57 @@ describe("junk strategy", () => {
     const keepLive9p: JunkAction = { type: "discard", tile: hand[11]! }; // discards 9s
     const keepDead9s: JunkAction = { type: "discard", tile: hand[12]! }; // discards 9p
     expect(recommendJunkAction(player, [keepDead9s, keepLive9p])).toBe(keepLive9p);
+  });
+
+  it("values the same live wait less as the wall runs low (tenpaiProbabilityWeight reads GameProgress, not just the raw live-tile count)", () => {
+    // Same hand/discard as the previous test (keeping the 3-live-copy 9p wait);
+    // only wallCount changes. A flat per-live-copy weight (the pre-Phase-1
+    // formula) would score this identically regardless of how many draws are
+    // left — this is the behavior that was structurally impossible before
+    // GameProgress existed, so it's the one fact this test needs to pin down.
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "1p",
+      "2p",
+      "3p",
+      "1s",
+      "1s",
+      "9s",
+      "9p",
+    ]);
+    const shapeInput = { hand, melds: [] };
+    const discard = hand[11]!; // discards 9s, keeps the live 9p wait
+    const othersHandCount = 39; // 3 opponents x 13, matching this file's `view` helper convention
+    const earlyGame: GameProgress = {
+      wallCount: 60,
+      unseenPoolSize: 60 + othersHandCount,
+    };
+    const lateGame: GameProgress = {
+      wallCount: 4,
+      unseenPoolSize: 4 + othersHandCount,
+    };
+    const earlyScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      earlyGame,
+    );
+    const lateScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      lateGame,
+    );
+    expect(earlyScore).toBeGreaterThan(lateScore);
   });
 
   it("throws only when there is no legal action", () => {
