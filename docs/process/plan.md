@@ -6,10 +6,15 @@
 
 当前专题：Junk AI 决策质量结构性缺口，按验证优先→算法逻辑→高风险不确定 三档排序推进
 （讨论见 Backlog 中"权重之外的基本逻辑缺口审计"及其下③④两条）。第一档（④+④-b
-花色集中/间距/位次验证）已完成并收档，结论并入下方"权重之外的基本逻辑缺口审计"条目。
-下一步：第二档第一项，③ 听牌概率模型区分自摸/吃/碰不同来源（`strategy.ts:241-245`
-`tenpaiProbability` 目前把三种来源混进同一个池子，是"阻挡低价值吃碰"权重调不动的
-根因之一，改动不引入新可调参数）。
+花色集中/间距/位次验证）已完成并收档。第二档第一项（③ 自摸渠道池子修正）已完成，
+详见下方"权重之外的基本逻辑缺口审计"条目；碰/吃渠道区分工程量超出"不引入新参数"
+范围，已改归入 Phase 2 一类，不再算第二档任务。
+
+下一步候选（未选定）：① 评估 `isolationPotential` 是否该简化/去掉（④-b 验证已发现
+它可能与 `tenpaiProbabilityWeight` 链路的信号重复，但honor-vs-number 这条区分轴是否
+也已被 ukeire 隐式捕捉还未验证，需要专门 fixture 对比，不能凭推理下结论）；②
+吃/碰迟疑阈值 δ hurdle（引入新参数，departs from"不依赖参数配置"，需要重新确认是否
+仍算第二档还是该挪到第三档）。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
@@ -86,18 +91,29 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
   已被 `tenpaiProbabilityWeight` 链路精确捕捉（见下方④-b 验证结论），`isolationPotential`
   二元固定加成是在已有信号上叠加不精确常数，评估是否该简化/去掉时一并处理。
 
-  **③ 听牌概率模型没有区分自摸/吃/碰的不同来源**（2026-08-08，同一类"决策结构问题"，
-  与①②合并考虑）：`tenpaiProbability`（`handQuality`，`strategy.ts:241-245`）用的
-  `probabilityAtLeastOneDraw`（`tile-probability.ts:11-24`）是纯超几何"至少抽中一次"
-  模型，`populationSize` 用 `gameProgressOf` 算出的 `unseenPoolSize` = 牌墙 + 其他三家
-  隐藏手牌合并成一个池子（`strategy.ts:374-383`），`draws` 用自己的摸牌轮次数
-  `ceil(wallCount/4)`。这把三件事混成一件事算：自摸（population 该是牌墙）、碰（三个
-  对手都可能来源）、吃（只有上家一个来源），且完全没有"对手会不会真的打出这张牌"的
-  行为概率，只假设未现身的牌均匀分布在剩余轮次里被摸到——`GameProgress` 类型注释
-  （202-205行）里已经承认这是故意的简化（"exchangeable for probability purposes"）。
-  影响：吃和碰的进张速度理论上不同（碰的来源数是吃的三倍），但现在两者算出的
-  `tenpaiProbability` 用同一套不分来源的池子逻辑，权重再怎么调也补不齐这个结构性
-  误差，是"阻挡低价值吃碰"专题权重调不动的根因之一，不是调参能解决的。
+  **③ 自摸渠道池子已修正（2026-08-08）；碰/吃渠道区分仍未做，改列入 Phase 2 一类**：
+  原诊断——`tenpaiProbability`（`handQuality`，`strategy.ts:241-245`）用的
+  `probabilityAtLeastOneDraw` 是纯超几何"至少抽中一次"模型，`populationSize` 用
+  `gameProgressOf` 算出的 `unseenPoolSize` = 牌墙 + 其他三家隐藏手牌合并成一个池子，
+  `draws` 却只用自己的摸牌轮次数 `ceil(wallCount/4)`——population 变大但 draws 没跟着
+  变大，系统性低估自摸命中率。**已修**：改成 population=牌墙本身，successCount 按
+  "牌墙 / 未见池" 的期望占比拆分改进牌活牌数（`wallShare`，不引入新可调参数，纯粹
+  用可交换性假设把已有数据用对地方）。数值验证：中局同一活牌数下概率从 0.68 升到
+  0.71（约 +0.025），残局阶段变化幅度更小（约 +0.005~+0.017）——幅度不大但方向一致、
+  数学上更准确，已接受并记录（数值对比脚本+结论见本条，未落盘为文件）。已补 fixture
+  `strategy.test.ts` "estimates self-draw probability from the wall alone..."，直接
+  断言修正后概率的精确值、并断言严格高于旧的 merged-pool 公式会给出的值；
+  `pnpm --filter @new-mj/ai verify:full` 全绿（72 用例，含慢速 arena）。
+
+  **碰（三个对手都可能来源）/ 吃（只有上家一个来源）的真正区分，未做，改归为
+  Phase 2 一类问题**：深入分析后发现这不是"population 换个数"就能做对的小改动——要
+  正确算，得先知道 `ukeire()` 返回的每个改进牌种，具体是"补对子→碰"还是"补搭子→吃"
+  完成的，但 `ukeire()` 目前只返回黑盒的"摸这些牌种能让向听下降"，不暴露结构分解
+  信息，需要先从 core 挖出牌型分解数据，工程量接近上方 Phase 2 EV 模型的量级；且
+  "对手手里的牌多久会被打出来"仍然是未建模的行为概率，即使分了渠道也还要沿用现在
+  这套"均匀分布在剩余轮次里被摸到"的简化假设。**结论：不再归入"算法逻辑、不引入新
+  参数"这一档，与 Phase 2 / 阻挡低价值吃碰专题候选方向②（EV 模型）合并考虑**，
+  待评估是否启动时一起排期。
 
   **④+④-b 验证已完成（2026-08-08）：结论是两条都不加权重，且发现 isolationPotential
   可能冗余**。用诊断脚本直接对比裸 `ukeire`/`liveUkeireCount`（不经过

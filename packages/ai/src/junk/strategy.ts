@@ -200,8 +200,13 @@ const liveUkeireCount = (
 export type GameProgress = Readonly<{
   wallCount: number;
   /** wallCount plus every other seat's concealed hand — tiles whose identity
-   * is unknown to this seat and exchangeable for probability purposes, even
-   * though physically some sit in the wall and some in opponents' hands. */
+   * is unknown to this seat, so from this seat's subjective epistemic state
+   * a given live copy is exchangeably likely to be sitting in the wall or in
+   * an opponent's hand (deal was uniform random). handQuality uses this only
+   * to estimate what *share* of a kind's live copies are expected to be in
+   * the wall right now (see wallShare below) — the actual draw simulation
+   * samples from `wallCount` alone, since a self-draw physically only pulls
+   * from the wall, never from an opponent's concealed hand. */
   unseenPoolSize: number;
 }>;
 
@@ -238,9 +243,25 @@ const handQuality = (
   const improvingKinds = ukeire(input.hand, { sevenPairs: input.melds.length === 0 });
   const improvements = liveUkeireCount(input, improvingKinds, visibleDiscards);
   const remainingDraws = Math.ceil(gameProgress.wallCount / 4);
+  // Self-draws physically only pull from the wall — never from an opponent's
+  // concealed hand — so the draw simulation must sample from `wallCount`, not
+  // `unseenPoolSize` (wallCount + opponents' hands). But `improvements` counts
+  // live copies across *both* locations (liveUkeireCount can't see into hidden
+  // opponent hands), so it overstates what's actually drawable this way. Since
+  // this seat can't tell which unseen copies sit where, the two locations are
+  // exchangeable from its point of view (see GameProgress) — the expected
+  // number actually in the wall is `improvements` scaled by the wall's share
+  // of the whole unseen pool. This only fixes the self-draw channel; claiming
+  // an improving tile via a future peng/chi off an opponent's discard is a
+  // separate, harder-to-model channel (needs opponent-behavior assumptions)
+  // and stays untouched here — see plan.md's backlog note on this gap.
+  const wallShare =
+    gameProgress.unseenPoolSize > 0
+      ? (improvements * gameProgress.wallCount) / gameProgress.unseenPoolSize
+      : 0;
   const tenpaiProbability = probabilityAtLeastOneDraw(
-    gameProgress.unseenPoolSize,
-    improvements,
+    gameProgress.wallCount,
+    wallShare,
     remainingDraws,
   );
   return (

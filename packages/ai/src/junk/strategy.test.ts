@@ -15,6 +15,7 @@ import {
   scoreHandShapeAfterDiscard,
   type GameProgress,
 } from "./strategy.ts";
+import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
 
 /** Deterministic [0, 1) generator over @new-mj/core's xorshift32 PRNG — same
  * reproducibility primitive core's own fuzz driver uses, so a fixed seed always
@@ -375,6 +376,96 @@ describe("junk strategy", () => {
       lateGame,
     );
     expect(earlyScore).toBeGreaterThan(lateScore);
+  });
+
+  it("estimates self-draw probability from the wall alone, not a merged wall+opponents pool (plan.md ③: tenpaiProbability's zimo channel)", () => {
+    // A clean single-kind tenpai wait (123456789m run of 3 + 11p pair + 12s
+    // kanchan, waiting only on 3s) padded with a dead 14th tile (1z) so
+    // scoreHandShapeAfterDiscard has something to discard; after discarding 1z
+    // the hand is back to the same tenpai shape, so `improvements` is the live
+    // copy count of 3s alone (4, none seen yet) — one unambiguous number to
+    // hand-verify against, unlike a multi-kind ukeire wait.
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1s",
+      "2s",
+      "1z",
+    ]);
+    const shapeInput = { hand, melds: [] };
+    const discard = hand[13]!; // discards 1z
+    const liveCopies = 4;
+
+    const wallCount = 8;
+    const othersHandCount = 39;
+    const remainingDraws = Math.ceil(wallCount / 4);
+
+    // Baseline where wallCount === unseenPoolSize (no opponents to distinguish):
+    // the merged-pool (pre-fix) and wall-only (fixed) formulas coincide here, so
+    // this isolates the score's non-probability terms (shanten/fanPotential/
+    // isolationPotential/safety), none of which read GameProgress.
+    const noOthersProgress: GameProgress = { wallCount, unseenPoolSize: wallCount };
+    const baselineScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      noOthersProgress,
+    );
+    const nonProbabilityTerms =
+      baselineScore -
+      DEFAULT_JUNK_WEIGHTS.tenpaiProbabilityWeight *
+        probabilityAtLeastOneDraw(wallCount, liveCopies, remainingDraws);
+
+    const realisticProgress: GameProgress = {
+      wallCount,
+      unseenPoolSize: wallCount + othersHandCount,
+    };
+    const actualScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      realisticProgress,
+    );
+
+    // Fixed formula: a self-draw only ever pulls from the wall, so the draw
+    // simulation samples `wallCount` tiles, not the wall+opponents pool — but
+    // successCount must shrink to this seat's expected *wall share* of the live
+    // copies (exchangeability, see GameProgress's doc comment), since
+    // liveUkeireCount can't tell which unseen copies sit in the wall vs in an
+    // opponent's hand.
+    const expectedFixedProbability = probabilityAtLeastOneDraw(
+      wallCount,
+      (liveCopies * wallCount) / (wallCount + othersHandCount),
+      remainingDraws,
+    );
+    expect(actualScore).toBeCloseTo(
+      nonProbabilityTerms + DEFAULT_JUNK_WEIGHTS.tenpaiProbabilityWeight * expectedFixedProbability,
+      6,
+    );
+
+    // The bug this replaces: sampling `remainingDraws` from the *merged* pool
+    // with the raw (unscaled) live-copy count as successCount — same draws
+    // count but a bigger population, so it systematically understated the true
+    // self-draw odds.
+    const buggyMergedPoolProbability = probabilityAtLeastOneDraw(
+      wallCount + othersHandCount,
+      liveCopies,
+      remainingDraws,
+    );
+    expect(expectedFixedProbability).toBeGreaterThan(buggyMergedPoolProbability);
   });
 
   it("throws only when there is no legal action", () => {
