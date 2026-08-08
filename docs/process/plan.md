@@ -103,7 +103,10 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
   数学上更准确，已接受并记录（数值对比脚本+结论见本条，未落盘为文件）。已补 fixture
   `strategy.test.ts` "estimates self-draw probability from the wall alone..."，直接
   断言修正后概率的精确值、并断言严格高于旧的 merged-pool 公式会给出的值；
-  `pnpm --filter @new-mj/ai verify:full` 全绿（72 用例，含慢速 arena）。
+  `pnpm --filter @new-mj/ai verify:full` 全绿（72 用例，含慢速 arena）。额外用
+  `decision-diff:junk` 侦察（20 种子、14485 个决策点，佐证用、非正式证据）：分歧率
+  0.2%（24 例），全部是活牌数接近的弃牌选择被小幅概率修正翻盘，无吃/碰/杠分歧，
+  符合数值验证时"幅度不大但方向正确"的预期。
 
   **碰（三个对手都可能来源）/ 吃（只有上家一个来源）的真正区分，未做，改归为
   Phase 2 一类问题**：深入分析后发现这不是"population 换个数"就能做对的小改动——要
