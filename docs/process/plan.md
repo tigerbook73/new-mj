@@ -6,8 +6,11 @@
 
 当前专题：Junk AI 决策质量优化，详见 `docs/process/junk-ai-decision-quality.md`
 （专题推演页，按 `doc-map.md` 分流规则单独整理，避免本文件堆积）。当前进度：
-验证档（④+④-b）与自摸概率修正（③）已完成；下一步候选（`isolationPotential`
-简化评估 / 迟疑阈值 δ）见该文档"待选"节，未选定顺序。
+验证档（④+④-b）、自摸概率修正（③）与迟疑阈值 δ 已完成；Phase 2 的轻量
+2-ply 自摸诊断探针及目标/反例 fixture 已完成，但性能门槛未通过，尚未接入默认
+评分。下一步第一个具体动作：新增可重复多轮调用探针的独立微基准入口后再用
+`node --cpu-prof` profile，确认能否以不改变 fixture 语义的缓存/安全剪枝降至
+可接受预算；否则暂停本线。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/

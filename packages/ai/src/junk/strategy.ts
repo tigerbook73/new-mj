@@ -1,6 +1,7 @@
 import {
   STANDARD_TILE_SET,
   shantenWithExposedMelds,
+  tileIdOf,
   ukeire,
   type JunkAction,
   type JunkPlayerView,
@@ -191,13 +192,21 @@ const liveUkeireCount = (
 ): number => {
   let total = 0;
   for (const kind of kinds) {
-    const known =
-      input.hand.filter((tile) => kindOf(tile) === kind).length +
-      input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
-      visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
-    total += Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
+    total += remainingLiveCopies(input, kind, visibleDiscards);
   }
   return total;
+};
+
+const remainingLiveCopies = (
+  input: ShapeInput,
+  kind: TileKind,
+  visibleDiscards: readonly TileId[],
+): number => {
+  const known =
+    input.hand.filter((tile) => kindOf(tile) === kind).length +
+    input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
+    visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
+  return Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
 };
 
 /**
@@ -349,6 +358,86 @@ const bestDiscardScore = (
     if (score > best) best = score;
   }
   return best;
+};
+
+export type SelfDrawTwoPlyOutcome = Readonly<{
+  kind: TileKind;
+  probability: number;
+  /** Undefined for an immediate win: this probe deliberately does not invent
+   * a terminal payout model and therefore never asks the bot to discard a
+   * winning 14-tile hand. */
+  leafScore?: number;
+}>;
+
+export type SelfDrawTwoPlyProbe = Readonly<{
+  /** Sum of probabilities represented by non-winning outcomes. */
+  continuationProbability: number;
+  /** Sum of probability × leaf score for non-winning outcomes. This is not a
+   * complete action score until a future terminal-win payout is added. */
+  continuationValue: number;
+  /** Probability that the next self-draw immediately wins. */
+  winProbability: number;
+  outcomes: readonly SelfDrawTwoPlyOutcome[];
+}>;
+
+/**
+ * A deliberately narrow 2-ply probe for Phase 2 exploration:
+ *
+ *   post-discard hand -> next *self* draw -> best subsequent discard -> leaf quality
+ *
+ * Every hidden copy is assigned its visible-information probability: under the
+ * same exchangeability assumption as handQuality, kind k has probability
+ * `remainingCopies(k) / unseenPoolSize` of being our next wall draw. The wall
+ * share cancels out here because E[wall copies] / wallCount = live copies /
+ * unseenPoolSize. Opponent discards, chi/peng opportunities, and terminal win
+ * payouts are intentionally outside this probe; immediate wins are reported
+ * separately rather than incorrectly forcing a discard from the winning hand.
+ *
+ * This is not wired into default policy yet. Its fixture behavior and benchmark
+ * are the evidence gate for deciding whether it may become a scoring feature.
+ */
+export const probeSelfDrawTwoPly = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+): SelfDrawTwoPlyProbe => {
+  if (gameProgress.unseenPoolSize <= 0 || gameProgress.wallCount <= 0)
+    return { continuationProbability: 0, continuationValue: 0, winProbability: 0, outcomes: [] };
+
+  const memo = new Map<string, number>();
+  let continuationProbability = 0;
+  let continuationValue = 0;
+  let winProbability = 0;
+  const outcomes: SelfDrawTwoPlyOutcome[] = [];
+  const occupied = new Set([
+    ...input.hand,
+    ...input.melds.flatMap((meld) => meld.tiles),
+    ...visibleDiscards,
+  ]);
+
+  for (const kind of STANDARD_TILE_SET.kinds) {
+    const remaining = remainingLiveCopies(input, kind, visibleDiscards);
+    if (remaining === 0) continue;
+    const probability = remaining / gameProgress.unseenPoolSize;
+    const drawnTile = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
+      tileIdOf(kind, copy),
+    ).find((tile) => !occupied.has(tile));
+    if (drawnTile === undefined) continue;
+
+    const afterDraw: ShapeInput = { hand: [...input.hand, drawnTile], melds: input.melds };
+    if (shantenOf(afterDraw, memo) < 0) {
+      winProbability += probability;
+      outcomes.push({ kind, probability });
+      continue;
+    }
+
+    const leafScore = bestDiscardScore(afterDraw, visibleDiscards, weights, memo, gameProgress);
+    continuationProbability += probability;
+    continuationValue += probability * leafScore;
+    outcomes.push({ kind, probability, leafScore });
+  }
+  return { continuationProbability, continuationValue, winProbability, outcomes };
 };
 
 const simulatedClaim = (view: JunkPlayerView, action: JunkAction): ShapeInput | undefined => {

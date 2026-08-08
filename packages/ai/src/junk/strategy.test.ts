@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   chooseJunkAction,
   DEFAULT_JUNK_WEIGHTS,
+  probeSelfDrawTwoPly,
   recommendJunkAction,
   scoreHandShapeAfterDiscard,
   type GameProgress,
@@ -50,6 +51,87 @@ const view = (hand: TileKind[]): JunkPlayerView => ({
   seats: [0, 1, 2, 3].map(() => ({ handCount: 13, melds: [], discards: [], justDrawn: false })),
 });
 describe("junk strategy", () => {
+  it("two-ply probe recognizes a live bridge through its post-draw leaf, without giving close ranks a flat bonus", () => {
+    // Three complete runs plus a pair leave one block to build. Both candidates
+    // have the same surrounding hand; the target keeps 3m6m, while the control
+    // keeps the more spread-out 2m7m. The target's 4m draw makes 3m4m6m, whose
+    // best follow-up discard has genuinely better shape than the control's 4m
+    // draw. This intentionally does *not* assert that the target's total EV is
+    // larger: the control has a wider first-step catchment, exactly the point
+    // that a conditional leaf score must remain separate from raw breadth.
+    const shared: TileKind[] = ["1p", "2p", "3p", "4p", "5p", "6p", "7s", "8s", "9s", "1z", "1z"];
+    const progress: GameProgress = { wallCount: 84, unseenPoolSize: 123 };
+    const bridge = probeSelfDrawTwoPly(
+      { hand: ids([...shared, "3m", "6m"]), melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+    );
+    const control = probeSelfDrawTwoPly(
+      { hand: ids([...shared, "2m", "7m"]), melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+    );
+    const bridge4m = bridge.outcomes.find(({ kind }) => kind === "4m");
+    const control4m = control.outcomes.find(({ kind }) => kind === "4m");
+    expect(bridge.continuationProbability).toBeCloseTo(1, 12);
+    expect(bridge4m?.leafScore).toBeGreaterThan(control4m?.leafScore ?? Number.POSITIVE_INFINITY);
+  });
+
+  it("two-ply probe does not reward a bridge whose every copy is already visible", () => {
+    const hand = ids([
+      "1p",
+      "2p",
+      "3p",
+      "4p",
+      "5p",
+      "6p",
+      "7s",
+      "8s",
+      "9s",
+      "1z",
+      "1z",
+      "3m",
+      "6m",
+    ]);
+    // All four copies of both bridge ranks have left the unseen pool. The
+    // corresponding wall/unseen counts remain physically consistent with 13
+    // own tiles, 39 opponent concealed tiles, and 8 visible discards.
+    const deadBridgeTiles = ids(["4m", "4m", "4m", "4m", "5m", "5m", "5m", "5m"]);
+    const result = probeSelfDrawTwoPly({ hand, melds: [] }, deadBridgeTiles, DEFAULT_JUNK_WEIGHTS, {
+      wallCount: 76,
+      unseenPoolSize: 115,
+    });
+    expect(result.outcomes.some(({ kind }) => kind === "4m" || kind === "5m")).toBe(false);
+    expect(result.continuationProbability).toBeCloseTo(1, 12);
+  });
+
+  it("two-ply probe reports an immediate self-draw win separately from continuation leaves", () => {
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1s",
+      "2s",
+    ]);
+    const result = probeSelfDrawTwoPly({ hand, melds: [] }, [], DEFAULT_JUNK_WEIGHTS, {
+      wallCount: 84,
+      unseenPoolSize: 123,
+    });
+    const win = result.outcomes.find(({ kind }) => kind === "3s");
+    expect(win).toEqual({ kind: "3s", probability: 4 / 123 });
+    expect(result.winProbability).toBeCloseTo(4 / 123, 12);
+  });
+
   it("always takes a legal win and preserves its original reference", () => {
     const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
     expect(recommendJunkAction(view(["1m"]), actions)).toBe(actions[1]);
