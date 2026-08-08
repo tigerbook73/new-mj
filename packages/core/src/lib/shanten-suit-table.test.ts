@@ -4,6 +4,7 @@ import { createPrng, nextInt } from "./prng.ts";
 import {
   buildSuitTable,
   HONOR_SUIT_LENGTH,
+  indexMapSlotOf,
   MAX_REAL_HAND_TILES,
   NUMBER_SUIT_LENGTH,
   SLOTS_PER_VECTOR,
@@ -126,13 +127,13 @@ const referenceSolve = (
 
 /** 把 buildSuitTable 的两级存储（indexMap + 紧凑 data）重建成跟
  * referenceSolve 一样的 10-slot [exit0(5),exit1(5)] 格式，方便直接比较。
- * `indexMap[vectorIndex] === -1`（从未建过，总张数 >14 被剪掉）时显式返回
- * 全哨兵——不能让它落到下面的越界读取里：越界读 `Int8Array` 返回
- * `undefined`，再赋值进新建的 `Int8Array` 会被强制转成 0，不是 -1，会跟
- * "全哨兵"这个预期悄悄对不上。 */
-const extractResult = (table: SuitTable, vectorIndex: number, pair: 0 | 1): Int8Array => {
+ * 经由 `indexMapSlotOf` 取槽位——寻址方案改变时测试不用重写。
+ * 槽位值 -1（从未建过，总张数 >14 被剪掉）时显式返回全哨兵——不能让它落到
+ * 下面的越界读取里：越界读 `Int8Array` 返回 `undefined`，再赋值进新建的
+ * `Int8Array` 会被强制转成 0，不是 -1，会跟"全哨兵"这个预期悄悄对不上。 */
+const extractResult = (table: SuitTable, counts: readonly number[], pair: 0 | 1): Int8Array => {
   const out = new Int8Array(10).fill(-1);
-  const compactIndex = table.indexMap[vectorIndex]!;
+  const compactIndex = table.indexMap[indexMapSlotOf(counts)]!;
   if (compactIndex < 0) return out;
   const base = compactIndex * SLOTS_PER_VECTOR;
   const data = table.data;
@@ -166,10 +167,9 @@ test("honor table matches the reference implementation for hand-picked vectors",
     [3, 3, 0, 0, 0, 0, 0],
   ];
   for (const counts of samples) {
-    const vectorIndex = counts.reduceRight((acc, count) => acc * 5 + count, 0);
     for (const pair of [0, 1] as const) {
       assert.deepEqual(
-        [...extractResult(table, vectorIndex, pair)],
+        [...extractResult(table, counts, pair)],
         [...referenceSolve(counts, pair, false, memo)],
       );
     }
@@ -193,7 +193,7 @@ test(
       const counts = countsFromIndex(vectorIndex, HONOR_SUIT_LENGTH);
       const total = counts.reduce((sum, count) => sum + count, 0);
       for (const pair of [0, 1] as const) {
-        const actual = [...extractResult(table, vectorIndex, pair)];
+        const actual = [...extractResult(table, counts, pair)];
         if (total > MAX_REAL_HAND_TILES) {
           assert.deepEqual(
             actual,
@@ -230,21 +230,16 @@ test(
         counts[i] = step.value;
         total += step.value;
       }
-      const vectorIndex = counts.reduceRight((acc, count) => acc * 5 + count, 0);
       for (const pair of [0, 1] as const) {
-        const actual = [...extractResult(table, vectorIndex, pair)];
+        const actual = [...extractResult(table, counts, pair)];
         if (total > MAX_REAL_HAND_TILES) {
-          assert.deepEqual(
-            actual,
-            ALL_SENTINEL,
-            `expected sentinel for pruned vector ${vectorIndex}`,
-          );
+          assert.deepEqual(actual, ALL_SENTINEL, `expected sentinel for (${counts.join(",")})`);
           continue;
         }
         assert.deepEqual(
           actual,
           [...referenceSolve(counts, pair, true, memo)],
-          `mismatch at vector ${vectorIndex} (${counts.join(",")}) pair=${pair}`,
+          `mismatch at (${counts.join(",")}) pair=${pair}`,
         );
       }
     }
@@ -257,12 +252,10 @@ test("buildSuitTable: mirror symmetry — a vector and its rank-reversed counter
   // 只是整体在 rank 轴上平移到另一头，结果应该逐位相同。
   const original = [0, 1, 0, 1, 0, 1, 0, 0, 0]; // 2m,4m,6m
   const mirrored = [0, 0, 0, 1, 0, 1, 0, 1, 0]; // 4m,6m,8m
-  const originalIndex = original.reduceRight((acc, count) => acc * 5 + count, 0);
-  const mirroredIndex = mirrored.reduceRight((acc, count) => acc * 5 + count, 0);
   for (const pair of [0, 1] as const) {
     assert.deepEqual(
-      [...extractResult(table, originalIndex, pair)],
-      [...extractResult(table, mirroredIndex, pair)],
+      [...extractResult(table, original, pair)],
+      [...extractResult(table, mirrored, pair)],
     );
   }
 });
@@ -270,8 +263,89 @@ test("buildSuitTable: mirror symmetry — a vector and its rank-reversed counter
 test("buildSuitTable: vectors with total tile count over 14 are left as sentinel (never queried by real hands)", () => {
   const table = buildSuitTable(NUMBER_SUIT_LENGTH, true);
   const maxedOut = new Array<number>(NUMBER_SUIT_LENGTH).fill(4); // 36 张，远超 14
-  const vectorIndex = maxedOut.reduceRight((acc, count) => acc * 5 + count, 0);
   for (const pair of [0, 1] as const) {
-    assert.deepEqual([...extractResult(table, vectorIndex, pair)], ALL_SENTINEL);
+    assert.deepEqual([...extractResult(table, maxedOut, pair)], ALL_SENTINEL);
   }
 });
+
+/**
+ * 寻址方案的穷举安全网（性质 1/2，布局无关）：任何一个槽位只允许被**一个
+ * 镜像对**认领——不同镜像对的向量永不共享槽位（单射性），否则两个不同
+ * 向量的结果会互相覆盖。对全部向量穷举（含 >14 被剪的：剪枝只影响槽位里
+ * 存什么，不影响寻址本身的单射性）。性质 2（镜像对内容一致）见下一个用例。
+ */
+const assertSlotBijection = (suitLength: number) => {
+  const vectorCount = 5 ** suitLength;
+  // seenPairRepresentative[slot] = 该槽位第一次被谁（镜像对里较小的
+  // vectorIndex，作为对的代表）认领；-1 = 尚未认领。
+  let maxSlot = -1;
+  for (let vectorIndex = 0; vectorIndex < vectorCount; vectorIndex += 1) {
+    const counts = countsFromIndex(vectorIndex, suitLength);
+    const slot = indexMapSlotOf(counts);
+    if (slot > maxSlot) maxSlot = slot;
+  }
+  const seenPairRepresentative = new Int32Array(maxSlot + 1).fill(-1);
+  for (let vectorIndex = 0; vectorIndex < vectorCount; vectorIndex += 1) {
+    const counts = countsFromIndex(vectorIndex, suitLength);
+    const slot = indexMapSlotOf(counts);
+    assert.ok(slot >= 0, `negative slot for (${counts.join(",")})`);
+    const mirrorIndex = counts.reduce((acc, count) => acc * 5 + count, 0);
+    const representative = Math.min(vectorIndex, mirrorIndex);
+    const claimed = seenPairRepresentative[slot]!;
+    if (claimed === -1) {
+      seenPairRepresentative[slot] = representative;
+    } else {
+      assert.equal(
+        claimed,
+        representative,
+        `slot collision at (${counts.join(",")}): slot ${slot} already claimed by pair ${claimed}`,
+      );
+    }
+  }
+};
+
+test(
+  "indexMapSlotOf: distinct mirror pairs never collide on a slot (exhaustive, both suit shapes)",
+  { tags: ["slow"] },
+  () => {
+    assertSlotBijection(NUMBER_SUIT_LENGTH);
+    assertSlotBijection(HONOR_SUIT_LENGTH);
+  },
+);
+
+/**
+ * 寻址方案的穷举安全网（性质 2/2，布局无关）：向量与其 rank 反转镜像查出的
+ * **内容**必须逐位相同。当前直址方案下由 `buildSuitTable` 的镜像抄写保证；
+ * 若未来寻址改成"镜像对共享一个槽位"，则由寻址公式本身保证——公式若写错
+ * （比如 x/y 未做 min/max 规范化，导致非 canonical 一侧落到从未写入的槽），
+ * 这里会以"真实内容 vs 全哨兵"的形式暴露。只穷举 ≤14 张的向量：>14 两侧
+ * 都是哨兵，比较没有信息量。
+ */
+const assertMirrorContentConsistency = (suitLength: number, hasRunLogic: boolean) => {
+  const table = buildSuitTable(suitLength, hasRunLogic);
+  const vectorCount = 5 ** suitLength;
+  for (let vectorIndex = 0; vectorIndex < vectorCount; vectorIndex += 1) {
+    const counts = countsFromIndex(vectorIndex, suitLength);
+    const mirrorIndex = counts.reduce((acc, count) => acc * 5 + count, 0);
+    if (mirrorIndex <= vectorIndex) continue; // 每对只比一次；回文自身无需比较
+    const total = counts.reduce((sum, count) => sum + count, 0);
+    if (total > MAX_REAL_HAND_TILES) continue;
+    const mirrored = [...counts].reverse();
+    for (const pair of [0, 1] as const) {
+      assert.deepEqual(
+        [...extractResult(table, counts, pair)],
+        [...extractResult(table, mirrored, pair)],
+        `mirror content mismatch at (${counts.join(",")}) pair=${pair}`,
+      );
+    }
+  }
+};
+
+test(
+  "mirror consistency: a vector and its rank-reversed mirror always resolve to identical content (exhaustive, both suit shapes)",
+  { tags: ["slow"] },
+  () => {
+    assertMirrorContentConsistency(NUMBER_SUIT_LENGTH, true);
+    assertMirrorContentConsistency(HONOR_SUIT_LENGTH, false);
+  },
+);
