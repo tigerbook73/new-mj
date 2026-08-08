@@ -76,7 +76,8 @@ const parseArguments = (argv: string[]): Arguments => {
 
 const loadWeights = (path: string): JunkWeights => {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (typeof parsed !== "object" || parsed === null) throw new Error(`INVALID_WEIGHTS_FILE: ${path}`);
+  if (typeof parsed !== "object" || parsed === null)
+    throw new Error(`INVALID_WEIGHTS_FILE: ${path}`);
   const keys = Object.keys(parsed).sort();
   if (keys.join(",") !== [...WEIGHT_KEYS].sort().join(",")) {
     throw new Error(`INVALID_WEIGHTS_FILE: ${path} does not have exactly the JunkWeights key set`);
@@ -92,7 +93,9 @@ const formatCompareReport = (
   result: MatchupResult,
 ): string => {
   const winRate =
-    result.totalMatches === 0 ? "n/a" : `${((result.candidateWins / result.totalMatches) * 100).toFixed(1)}%`;
+    result.totalMatches === 0
+      ? "n/a"
+      : `${((result.candidateWins / result.totalMatches) * 100).toFixed(1)}%`;
   const verdict =
     result.totalMatches === 0
       ? "no valid matches — cannot judge"
@@ -128,7 +131,9 @@ export const runCompareWeightsCli = async (
     const args = parseArguments(argv);
     const baseline = loadWeights(args.baselinePath);
     const candidate = loadWeights(args.candidatePath);
-    log(`[compare] baseline=${args.baselinePath} candidate=${args.candidatePath} seeds=${args.seeds}\n`);
+    log(
+      `[compare] baseline=${args.baselinePath} candidate=${args.candidatePath} seeds=${args.seeds}\n`,
+    );
     pool = new MatchWorkerPool(args.concurrency);
     let prng = createPrng(args.seed);
     const seeds: number[] = [];
@@ -138,7 +143,10 @@ export const runCompareWeightsCli = async (
       seeds.push(step.value);
     }
     const result = await evaluateCandidate(seeds, baseline, candidate, pool);
-    return { exitCode: 0, output: `${formatCompareReport(args, baseline, candidate, seeds, result)}\n` };
+    return {
+      exitCode: 0,
+      output: `${formatCompareReport(args, baseline, candidate, seeds, result)}\n`,
+    };
   } catch (error) {
     return {
       exitCode: 1,

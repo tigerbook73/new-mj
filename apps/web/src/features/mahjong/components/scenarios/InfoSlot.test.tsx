@@ -49,7 +49,7 @@ describe("InfoSlot", () => {
     expect(markup).toContain("items-start");
   });
 
-  it("shows \"我\" instead of the real nickname for the player's own (bottom) seat, dealer or not", () => {
+  it('shows "我" instead of the real nickname for the player\'s own (bottom) seat, dealer or not', () => {
     for (const markup of [renderInfoSlot("bottom"), renderInfoSlot("bottom", { isDealer: true })]) {
       expect(markup).not.toContain(">Alice<");
       expect(markup).toContain(">我<");

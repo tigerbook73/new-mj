@@ -16,6 +16,7 @@ core/src/lib/shanten-suit-table.ts`，懒加载内存单例，`standardShanten` 
 `pnpm --filter @new-mj/ai verify:full` 均全绿。后续动作转入 Backlog。
 
 Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动器 / 权重参数化 + 手写 (1+1)-ES 调参脚本）已全部完成，`pnpm --filter @new-mj/ai verify:full` 全绿，详见 `packages/ai/AGENTS.md` 与 `packages/ai/src/junk/{strategy,arena,tune,tune-cli,tune-pool,tune-worker}.ts`。后续加了两轮跟进：
+
 - 性能：`worker_threads` 并行跑对局（`tune-pool.ts`，手写不引第三方库）+ `standardShanten` 递归 memo 跨同回合候选手牌共享 + `node --cpu-prof` profiling 定位到 `TileSet.kinds.indexOf` 线性扫描（改成 O(1) 的 `kindIndexOf`，见 `packages/core/AGENTS.md`）——同一个调参样例耗时从 80s 降到 11s（约 7x），全程报告逐字节一致、`verify:full` 含 1000+ 局 fuzz 确认无回归。
 - 调参算法自己判断收敛并提前停（sigma 缩到阈值、或连续多代无变异被接受），不再需要人工猜 `--max-generations`；权重默认值从硬编码 TS 改成 `packages/ai/src/junk/default-weights.json`，`tune-cli.ts` 新增 `--write`（仍需人工显式传参，held-out 评估变差时自动跳过写入）。
 

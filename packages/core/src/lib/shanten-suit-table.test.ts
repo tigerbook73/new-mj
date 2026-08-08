@@ -187,7 +187,11 @@ test(
       for (const pair of [0, 1] as const) {
         const actual = [...extractResult(table.data, vectorIndex, pair)];
         if (total > MAX_REAL_HAND_TILES) {
-          assert.deepEqual(actual, ALL_SENTINEL, `expected sentinel for pruned vector ${vectorIndex}`);
+          assert.deepEqual(
+            actual,
+            ALL_SENTINEL,
+            `expected sentinel for pruned vector ${vectorIndex}`,
+          );
           continue;
         }
         assert.deepEqual(
@@ -222,7 +226,11 @@ test(
       for (const pair of [0, 1] as const) {
         const actual = [...extractResult(table.data, vectorIndex, pair)];
         if (total > MAX_REAL_HAND_TILES) {
-          assert.deepEqual(actual, ALL_SENTINEL, `expected sentinel for pruned vector ${vectorIndex}`);
+          assert.deepEqual(
+            actual,
+            ALL_SENTINEL,
+            `expected sentinel for pruned vector ${vectorIndex}`,
+          );
           continue;
         }
         assert.deepEqual(

@@ -223,7 +223,9 @@ export const scoreHandShapeAfterDiscard = (
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
-  return handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards, input.hand) + safety;
+  return (
+    handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards, input.hand) + safety
+  );
 };
 
 /** Duplicate copies of the same kind produce the same resulting hand once
@@ -301,7 +303,11 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
   if (pengIndex < 0) return undefined;
   const hand = removeTiles(view.hand, [tile]);
   if (!hand) return undefined;
-  const upgraded: Meld = { ...melds[pengIndex]!, type: "buGang", tiles: [...melds[pengIndex]!.tiles, tile] };
+  const upgraded: Meld = {
+    ...melds[pengIndex]!,
+    type: "buGang",
+    tiles: [...melds[pengIndex]!.tiles, tile],
+  };
   const nextMelds = [...melds];
   nextMelds[pengIndex] = upgraded;
   return { hand, melds: nextMelds };

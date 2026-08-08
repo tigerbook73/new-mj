@@ -249,7 +249,10 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     if (recentOutcomes.length > SUCCESS_WINDOW) recentOutcomes.shift();
     if (recentOutcomes.length >= 5) {
       const successRate = recentOutcomes.filter(Boolean).length / recentOutcomes.length;
-      sigma = Math.min(sigma * (successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25), maxSigma);
+      sigma = Math.min(
+        sigma * (successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25),
+        maxSigma,
+      );
     }
 
     const log: TuneGenerationLog = {
@@ -314,7 +317,8 @@ export const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): st
   WEIGHT_KEYS.map((key) => {
     const before = baseline[key];
     const after = tuned[key];
-    const pct = before === 0 ? "n/a" : `${(((after - before) / Math.abs(before)) * 100).toFixed(1)}%`;
+    const pct =
+      before === 0 ? "n/a" : `${(((after - before) / Math.abs(before)) * 100).toFixed(1)}%`;
     return `  ${key}: ${before.toFixed(2)} -> ${after.toFixed(2)} (${pct})`;
   }).join("\n");
 
@@ -346,7 +350,8 @@ const STOP_REASON_TEXT: Record<TuneStopReason, string> = {
     "hit the max-generations cap without converging — consider raising " +
     "--max-generations, or lowering --stagnation-patience/raising " +
     "--sigma-convergence-ratio if this happens a lot",
-  "sigma-converged": "sigma shrank below the convergence threshold (mutations stopped meaningfully exploring)",
+  "sigma-converged":
+    "sigma shrank below the convergence threshold (mutations stopped meaningfully exploring)",
   stagnant: "no accepted mutation for --stagnation-patience generations in a row",
 };
 

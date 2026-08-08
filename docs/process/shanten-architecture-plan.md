@@ -98,14 +98,14 @@ Layer 0  单花色预计算表      （5^9 状态 BFS 建表，纯数学，玩�
 
 - **Layer 1**：现有 `standardShanten`/`sevenPairsShanten`/`ukeire`/
   `isTingpai` 这几个函数本质上就是这一层，**物理上已经在 `packages/core/
-  src/lib/shanten.ts`，不在任何 junk 目录下**，不需要跨包搬文件。**已正名
+src/lib/shanten.ts`，不在任何 junk 目录下**，不需要跨包搬文件。**已正名
   （你已确认）**：`junkShanten`/`JunkShantenOptions` → `computeShanten`/
   `ShantenOptions`，函数本身从未含任何 junk 专属逻辑（只是接一个
   `sevenPairs` 开关），只是历史遗留的名字。全仓库排查确认调用点只有
   `packages/core/src/lib/shanten.ts` 自身与其测试，`packages/ai`/其余
   package 都只经 `ukeire`/`shantenWithExposedMelds`/`isTingpai` 间接消费，
   不直接引用这两个名字，改名影响面很小。`pnpm --filter @new-mj/core
-  verify:full`、`pnpm --filter @new-mj/ai verify:full` 均已重跑确认全绿。
+verify:full`、`pnpm --filter @new-mj/ai verify:full` 均已重跑确认全绿。
   §1 提到的副露修正已在这一层补了通用函数 `shantenWithExposedMelds`。
 - **Layer 2**：数学性质是"财神是万能替身 ⇒ 对任意目标的距离直接减财神数，
   封底在 -1"，可以做成一个通用装饰函数，不需要重新建表、不需要给 Layer 0
@@ -173,7 +173,7 @@ Layer 0  单花色预计算表      （5^9 状态 BFS 建表，纯数学，玩�
      默认值，规则和工具已写进 `packages/ai/AGENTS.md`「AI 质量调优要有
      A/B 证据」一节：① 权重幅度类改动用自对弈胜率/分差做 A/B，新增
      `compare-weights-cli.ts`（`pnpm compare:junk-weights --candidate
-     <path> [--baseline <path>]`，只报告不落盘，是 `tune-cli.ts --write`
+<path> [--baseline <path>]`，只报告不落盘，是 `tune-cli.ts --write`
      之外"直接对比两组已经定好的具体权重、不跑搜索"的通用版本，复用同一个
      `tune.ts` 的 `evaluateCandidate` 原语）；② 打分公式/规则代码改动用
      场景化 fixture 测试做 A/B（自对弈胜率信噪比不够分辨这类小改动，
@@ -194,7 +194,7 @@ Layer 0  单花色预计算表      （5^9 状态 BFS 建表，纯数学，玩�
 5. ~~实现 Layer 0 + 替换 Layer 1 内部实现~~ **已完成**：按 §2 的方案（单花色
    5^9 状态建表，万/筒/条共用一张表，字牌单独一张小表，只做基础距离表，不做
    结构化并行数组）实现建表，`standardShanten` 在 `tileSet ===
-   STANDARD_TILE_SET` 时改走查表 + 4 花色合并 DP，非标准 `TileSet` 回退到
+STANDARD_TILE_SET` 时改走查表 + 4 花色合并 DP，非标准 `TileSet` 回退到
    保留下来的递归实现。用大样本/穷举差分测试验证新旧实现结果一致（见 §5）；
    建表耗时/内存已实测（见 §6），决定不切到离线预生成文件方案。
 6. ~~性能验证~~ **已完成**：没有用 `tune-cli.ts` 跑完整调参会话来测（那个
@@ -278,15 +278,15 @@ Phase 1 视为完成，需要同时满足：
     几倍，但当时决定先接受（见下一条）。
   - **后续追加两个剪枝（已实施、已实测）**：①总张数 >14 的向量不建表——
     任何分支都是从 counts 里减牌再递归，子状态总张数只会更少不会更多，
-    >14 的向量不可能是任何合法向量的必经之路，也不会被真实手牌的查询路径
-    用到；②m/p/s 表按 rank 反转对称（1↔9、2↔8…5 自对称）只算一半镜像
-    另一半——所有分支在 rank 反转下语义不变。两条都先用差分测试验证正确性
-    （字牌穷举、数牌大样本、镜像对称专项用例、>14 剪枝边界用例，均 0 处
-    不一致）才采纳。实测数牌表建表从约 1.1 秒降到 **约 290ms（约 3.8x）**，
-    字牌表从约 20ms 降到约 15ms，内存占用没有变化。端到端自对弈耗时（同一
-    段驱动脚本）从上一轮的 112ms/局 再降到 **约 82.5ms/局**，相对最初基线
-    （982ms/局）总提升约 **11.9x**。多线程建表仍留作后续，目前数字已经
-    足够好，没有必要再加这层复杂度。
+    > 14 的向量不可能是任何合法向量的必经之路，也不会被真实手牌的查询路径
+    > 用到；②m/p/s 表按 rank 反转对称（1↔9、2↔8…5 自对称）只算一半镜像
+    > 另一半——所有分支在 rank 反转下语义不变。两条都先用差分测试验证正确性
+    > （字牌穷举、数牌大样本、镜像对称专项用例、>14 剪枝边界用例，均 0 处
+    > 不一致）才采纳。实测数牌表建表从约 1.1 秒降到 **约 290ms（约 3.8x）**，
+    > 字牌表从约 20ms 降到约 15ms，内存占用没有变化。端到端自对弈耗时（同一
+    > 段驱动脚本）从上一轮的 112ms/局 再降到 **约 82.5ms/局**，相对最初基线
+    > （982ms/局）总提升约 **11.9x**。多线程建表仍留作后续，目前数字已经
+    > 足够好，没有必要再加这层复杂度。
   - **建表方式决策**：懒加载内存单例（`getNumberSuitTable`/
     `getHonorSuitTable`，`shanten-suit-table.ts`），不落盘。放弃"离线生成+
     持久化二进制文件"的原因：(a) `packages/core/AGENTS.md` 明确"禁止…任何
@@ -338,17 +338,17 @@ hangzhou/血战到底不在本阶段交付范围内，本阶段不改它们的�
    规则 + 新增 `compare-weights-cli.ts` 工具。
 4. ~~Layer 1 正名~~ **已完成**：`junkShanten`/`JunkShantenOptions` →
    `computeShanten`/`ShantenOptions`，`pnpm --filter @new-mj/core
-   verify:full`/`pnpm --filter @new-mj/ai verify:full` 均全绿。
+verify:full`/`pnpm --filter @new-mj/ai verify:full` 均全绿。
 5. ~~§4 步骤 4 的重新 profile~~ **已完成，结论：仍值得做**：见 §6 新增段落。
    当前已优化基线上，递归 DFS（`search`+`take`+`kindIndexOf`）仍占一段真实
    自对弈约 91.8% 自耗时，微基准量级与旧基线一致，没有发现更便宜的局部
    优化点。
 6. ~~Layer 0 预计算表本身~~ **已完成**：见 §6"Layer 0 实现结果"——单花色子表
-   + 4 花色合并 DP，`standardShanten` 等公共函数已切到查表快路径，差分测试
-   （字牌穷举 + 数牌大样本 + 整手大样本 + 包装函数大样本）全部逐位一致，
-   `pnpm --filter @new-mj/core verify:full`/`pnpm --filter @new-mj/ai
-   verify:full` 均全绿，端到端自对弈耗时降了约 8.75x；后续又追加两个已验证
-   安全、已实测有效的建表剪枝（总张数 >14 不建表、m/p/s 按 rank 反转对称
-   镜像），累计降到约 11.9x。Phase 1 至此全部完成。
+   - 4 花色合并 DP，`standardShanten` 等公共函数已切到查表快路径，差分测试
+     （字牌穷举 + 数牌大样本 + 整手大样本 + 包装函数大样本）全部逐位一致，
+     `pnpm --filter @new-mj/core verify:full`/`pnpm --filter @new-mj/ai
+verify:full` 均全绿，端到端自对弈耗时降了约 8.75x；后续又追加两个已验证
+     安全、已实测有效的建表剪枝（总张数 >14 不建表、m/p/s 按 rank 反转对称
+     镜像），累计降到约 11.9x。Phase 1 至此全部完成。
 7. **hangzhou/血战到底重做的时间表**：决定 Layer 1 正名/Layer 2 预留设计
    投入多少精力合适，需要你来定，本阶段不需要现在就有答案。

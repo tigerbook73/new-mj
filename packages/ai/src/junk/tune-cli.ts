@@ -157,7 +157,8 @@ export const runTuneCli = async (
         // "eta" here is time-to-cap, an upper bound — early stopping usually means
         // the run finishes well before this, not exactly at it.
         const etaToCapSec =
-          (elapsedSec / generationLog.generation) * (args.maxGenerations - generationLog.generation);
+          (elapsedSec / generationLog.generation) *
+          (args.maxGenerations - generationLog.generation);
         log(
           `[gen ${generationLog.generation}/${args.maxGenerations}] ` +
             `${generationLog.accepted ? "accepted" : "rejected"}  sigma=${generationLog.sigma.toFixed(3)}  ` +

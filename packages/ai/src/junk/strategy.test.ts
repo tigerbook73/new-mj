@@ -176,7 +176,21 @@ describe("junk strategy", () => {
     // triggers it but both waits are symmetric), so argmax picked whichever
     // came first in legalActions. Listing the honor discard *last* reproduces
     // that failure mode directly.
-    const player = view(["1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "1s", "1z", "9s"]);
+    const player = view([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "1p",
+      "2p",
+      "3p",
+      "1s",
+      "1s",
+      "1z",
+      "9s",
+    ]);
     const discardNumber: JunkAction = { type: "discard", tile: player.hand[12]! };
     const discardHonor: JunkAction = { type: "discard", tile: player.hand[11]! };
     expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
@@ -193,12 +207,20 @@ describe("junk strategy", () => {
     // bonus — making the AI prefer discarding 6p (breaking a useful shape)
     // over discarding a genuinely useless lone honor.
     const player = view([
-      "1m", "2m", "3m",
-      "4m", "5m", "6m",
-      "5p", "6p",
-      "3s", "4s",
-      "7s", "8s",
-      "1z", "2z",
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "5p",
+      "6p",
+      "3s",
+      "4s",
+      "7s",
+      "8s",
+      "1z",
+      "2z",
     ]);
     const discardTatsuTile: JunkAction = { type: "discard", tile: player.hand[7]! }; // 6p
     const discardHonor: JunkAction = { type: "discard", tile: player.hand[12]! }; // 1z
@@ -215,7 +237,21 @@ describe("junk strategy", () => {
     // on isolationPotential too — so only the live-copy count can break the
     // tie. Seat 1 has already discarded all three other copies of 9s: keeping
     // 9s after this discard would wait on a fully dead kind.
-    const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "1s", "9s", "9p"]);
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "1p",
+      "2p",
+      "3p",
+      "1s",
+      "1s",
+      "9s",
+      "9p",
+    ]);
     const player: JunkPlayerView = {
       seat: 0,
       hand,
@@ -274,9 +310,9 @@ describe("junk strategy", () => {
 
     it("temperature 0 ignores an injected random source", () => {
       const hostileRandom = () => 0.999;
-      expect(recommendJunkAction(gapView, gapActions, { temperature: 0, random: hostileRandom })).toBe(
-        recommendJunkAction(gapView, gapActions),
-      );
+      expect(
+        recommendJunkAction(gapView, gapActions, { temperature: 0, random: hostileRandom }),
+      ).toBe(recommendJunkAction(gapView, gapActions));
     });
 
     it("a legal win bypasses temperature/random entirely", () => {
@@ -361,9 +397,17 @@ describe("junk strategy", () => {
       // pre-fix code (delta would be 0, not the weight difference).
       const hand = ids(["1m", "1m", "2m", "2m"]);
       const discard = hand[0]!;
-      const customWeights = { ...DEFAULT_JUNK_WEIGHTS, pengpenghu: DEFAULT_JUNK_WEIGHTS.pengpenghu + 999 };
+      const customWeights = {
+        ...DEFAULT_JUNK_WEIGHTS,
+        pengpenghu: DEFAULT_JUNK_WEIGHTS.pengpenghu + 999,
+      };
       const defaultScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard);
-      const customScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard, [], customWeights);
+      const customScore = scoreHandShapeAfterDiscard(
+        { hand, melds: [] },
+        discard,
+        [],
+        customWeights,
+      );
       expect(customScore - defaultScore).toBeCloseTo(999, 6);
     });
 

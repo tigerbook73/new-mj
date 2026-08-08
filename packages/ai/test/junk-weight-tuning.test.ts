@@ -25,7 +25,13 @@ const SYNTHETIC_REPORT: TuneReport = {
   tunedWeights: DEFAULT_JUNK_WEIGHTS,
   stopReason: "max-generations",
 };
-const SYNTHETIC_EVAL = { seeds: [1], candidateScore: 1, baselineScore: 0, candidateWins: 1, totalMatches: 1 };
+const SYNTHETIC_EVAL = {
+  seeds: [1],
+  candidateScore: 1,
+  baselineScore: 0,
+  candidateWins: 1,
+  totalMatches: 1,
+};
 
 describe("junk weight tuning", () => {
   describe("formatTuneReport write status", () => {
