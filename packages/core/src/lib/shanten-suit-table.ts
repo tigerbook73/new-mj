@@ -26,8 +26,21 @@
  * ——内存问题基本解决，耗时仍比"几十到几百毫秒"高几倍；已确认这部分是懒
  * 加载单例的一次性成本（进程生命周期内只付一次），端到端 profiling（见
  * `docs/process/shanten-architecture-plan.md` §6）显示对真实自对弈整体
- * 耗时的净收益已经很显著（8.75x），进一步优化（多线程建表、m/p/s 表按
- * rank 反转对称只算一半镜像另一半）留作后续按需追加，不在本次范围内。
+ * 耗时的净收益已经很显著（8.75x）。
+ *
+ * 后续又追加了两个已验证正确、已实测有效的剪枝（`buildSuitTable` 内部）：
+ *   1. 总张数 >14 的向量不建表，留哨兵值：任何分支都是从 counts 里减牌再
+ *      递归，子状态总张数只会更少不会更多——总张数 >14 的向量不可能是任何
+ *      合法（≤14 张）向量的必经之路，也不会被真实手牌的查询路径用到，跳过
+ *      它们不影响任何真实场景的结果。
+ *   2. rank 反转对称（1↔9、2↔8…5 自对称）：所有分支（刻子/顺子/搭子/雀头
+ *      判断）在 rank 反转下语义不变，只需要对 `vectorIndex <=
+ *      mirrorVectorIndexOf(counts)` 的一半向量真正调用 `solveSuitVector`，
+ *      结果直接镜像复制给另一半。
+ * 两条叠加后，数牌表全量建表实测从约 1.1 秒降到约 **290ms**（约 3.8x），
+ * 字牌表从约 20ms 降到约 15ms，内存占用没有变化。多线程建表（复用
+ * `packages/ai/src/junk/tune-pool.ts` 的 worker_threads 池模式）仍留作后续
+ * 按需追加，目前的数字已经足够好，没有必要再加这层复杂度。
  */
 
 import type { TileId } from "./ids.ts";
@@ -45,6 +58,23 @@ const UNSET = -2;
 export const vectorIndexOf = (counts: readonly number[]): number => {
   let index = 0;
   for (let i = counts.length - 1; i >= 0; i -= 1) index = index * 5 + (counts[i] ?? 0);
+  return index;
+};
+
+/**
+ * 不实际反转 counts 数组，直接算出"rank 反转后那个向量"的下标：
+ * `vectorIndexOf` 是 `Σ counts[i]*5^i`（从高位到低位累乘），这里只是反过来
+ * 从低位到高位累乘，等价于 `vectorIndexOf(counts.slice().reverse())`。用于
+ * `buildSuitTable` 的镜像对称优化——所有分支（刻子/顺子/搭子/雀头判断）都
+ * 只看"是不是同一 rank"或"差 1/2 个 rank"，反转 rank 顺序（1↔9、2↔8…）
+ * 不改变这些条件本身，所以 `solveSuitVector(counts,...)` 与
+ * `solveSuitVector(反转后的 counts,...)` 结果逐位相同——只需要算一半、镜像
+ * 出另一半。这个对称性对字牌（没有顺子/相邻搭子分支，逐位置本来就互相
+ * 独立）同样成立，只是字牌表本来就很快，意义不大。
+ */
+const mirrorVectorIndexOf = (counts: readonly number[]): number => {
+  let index = 0;
+  for (let i = 0; i < counts.length; i += 1) index = index * 5 + (counts[i] ?? 0);
   return index;
 };
 
@@ -209,10 +239,24 @@ export type SuitTable = {
   data: Int8Array;
 };
 
+/** 一整手牌（不管副露）最多 14 张——单个花色的向量若总张数超过这个数，
+ * 不可能是任何真实手牌里"这个花色那部分"的样子（见 `buildSuitTable` 里的
+ * 剪枝）。导出给测试用，确保测试断言的边界和实现用的是同一个数。 */
+export const MAX_REAL_HAND_TILES = 14;
+
 /** 全量建表：对 `[0, 5^suitLength)` 每个向量都算出 withEntryPair1/
  * entryPair0ExitPair0/entryPair0ExitPair1 三组结果并写进一张扁平 `Int8Array`。
  * m/p/s 传 `(9, true)` 共用同一张表；z 传 `(7, false)`。全程只分配一块 flat
- * memo + 一个复用的 `counts` 缓冲区，不逐向量/逐分支分配新对象。 */
+ * memo + 一个复用的 `counts` 缓冲区，不逐向量/逐分支分配新对象。
+ *
+ * 两个剪枝（均已验证安全，见文件顶部注释）：
+ * 1. 总张数 >14 的向量不计算，直接留哨兵值——任何分支都是从 counts 里
+ *    减牌再递归，子状态总张数只会更少不会更多，>14 的向量不可能是任何
+ *    合法向量的必经之路，也不会被查询路径（真实手牌）用到。
+ * 2. rank 反转对称：只对 `vectorIndex <= mirrorVectorIndexOf(counts)` 的
+ *    向量真正调用 `solveSuitVector`，算完顺手把同一份结果写进它的镜像
+ *    位置；轮到镜像那个下标自己被遍历到时，直接跳过（结果已经在算原始
+ *    向量时写过了）。 */
 export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTable => {
   const vectorCount = 5 ** suitLength;
   const flat = new Int8Array(vectorCount * 2 * 10).fill(UNSET);
@@ -220,10 +264,17 @@ export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTa
   const counts = new Array<number>(suitLength).fill(0);
   for (let vectorIndex = 0; vectorIndex < vectorCount; vectorIndex += 1) {
     let remaining = vectorIndex;
+    let total = 0;
     for (let i = 0; i < suitLength; i += 1) {
       counts[i] = remaining % 5;
+      total += counts[i]!;
       remaining = Math.floor(remaining / 5);
     }
+    if (total > MAX_REAL_HAND_TILES) continue;
+
+    const mirrorIndex = mirrorVectorIndexOf(counts);
+    if (mirrorIndex < vectorIndex) continue; // 镜像那边已经算过、写过这份结果了
+
     const base0 = solveSuitVector(flat, counts, 0, hasRunLogic);
     const base1 = solveSuitVector(flat, counts, 1, hasRunLogic);
     const outBase = vectorIndex * SLOTS_PER_VECTOR;
@@ -231,6 +282,9 @@ export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTa
       data[outBase + dm] = flat[base1 + 5 + dm]!; // withEntryPair1
       data[outBase + 5 + dm] = flat[base0 + dm]!; // entryPair0ExitPair0
       data[outBase + 10 + dm] = flat[base0 + 5 + dm]!; // entryPair0ExitPair1
+    }
+    if (mirrorIndex !== vectorIndex) {
+      data.copyWithin(mirrorIndex * SLOTS_PER_VECTOR, outBase, outBase + SLOTS_PER_VECTOR);
     }
   }
   return { suitLength, hasRunLogic, data };

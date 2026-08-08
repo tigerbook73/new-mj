@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { createPrng, nextInt } from "./prng.ts";
-import { buildSuitTable, HONOR_SUIT_LENGTH, NUMBER_SUIT_LENGTH, SLOTS_PER_VECTOR } from "./shanten-suit-table.ts";
+import {
+  buildSuitTable,
+  HONOR_SUIT_LENGTH,
+  MAX_REAL_HAND_TILES,
+  NUMBER_SUIT_LENGTH,
+  SLOTS_PER_VECTOR,
+} from "./shanten-suit-table.ts";
 
 /**
  * 独立的第二份参考实现——只用来交叉校验 shanten-suit-table.ts 的
@@ -162,8 +168,14 @@ test("honor table matches the reference implementation for hand-picked vectors",
   }
 });
 
+/** >14 张的向量是 `buildSuitTable` 故意不建的（真实手牌单个花色不可能超过
+ * 14 张，见该函数文档）——差分测试要把这类向量单独分支处理：不跟参考实现
+ * 比较（参考实现没有这条剪枝，会算出真实答案，跟故意留的哨兵值不一致），
+ * 改成断言表里就是全哨兵值，把这条剪枝边界本身也纳入验证范围。 */
+const ALL_SENTINEL = new Array<number>(10).fill(-1);
+
 test(
-  "honor table matches the reference implementation for all 5^7 vectors x 2 entryPair",
+  "honor table matches the reference implementation for all 5^7 vectors x 2 entryPair (or is the intentional >14 sentinel)",
   { tags: ["slow"] },
   () => {
     const table = buildSuitTable(HONOR_SUIT_LENGTH, false);
@@ -171,9 +183,15 @@ test(
     const vectorCount = 5 ** HONOR_SUIT_LENGTH;
     for (let vectorIndex = 0; vectorIndex < vectorCount; vectorIndex += 1) {
       const counts = countsFromIndex(vectorIndex, HONOR_SUIT_LENGTH);
+      const total = counts.reduce((sum, count) => sum + count, 0);
       for (const pair of [0, 1] as const) {
+        const actual = [...extractResult(table.data, vectorIndex, pair)];
+        if (total > MAX_REAL_HAND_TILES) {
+          assert.deepEqual(actual, ALL_SENTINEL, `expected sentinel for pruned vector ${vectorIndex}`);
+          continue;
+        }
         assert.deepEqual(
-          [...extractResult(table.data, vectorIndex, pair)],
+          actual,
           [...referenceSolve(counts, pair, false, memo)],
           `mismatch at vector ${vectorIndex} (${counts.join(",")}) pair=${pair}`,
         );
@@ -183,7 +201,7 @@ test(
 );
 
 test(
-  "number-suit (m/p/s) table matches the reference implementation on a large random sample",
+  "number-suit (m/p/s) table matches the reference implementation on a large random sample (or is the intentional >14 sentinel)",
   { tags: ["slow"] },
   () => {
     // 5^9=1,953,125 个向量做不到穷举，用大样本随机抽样；种子固定，失败可复现。
@@ -193,15 +211,22 @@ test(
     const sampleCount = 20000;
     for (let trial = 0; trial < sampleCount; trial += 1) {
       const counts = new Array<number>(NUMBER_SUIT_LENGTH);
+      let total = 0;
       for (let i = 0; i < NUMBER_SUIT_LENGTH; i += 1) {
         const step = nextInt(prng, 5);
         prng = step.prng;
         counts[i] = step.value;
+        total += step.value;
       }
       const vectorIndex = counts.reduceRight((acc, count) => acc * 5 + count, 0);
       for (const pair of [0, 1] as const) {
+        const actual = [...extractResult(table.data, vectorIndex, pair)];
+        if (total > MAX_REAL_HAND_TILES) {
+          assert.deepEqual(actual, ALL_SENTINEL, `expected sentinel for pruned vector ${vectorIndex}`);
+          continue;
+        }
         assert.deepEqual(
-          [...extractResult(table.data, vectorIndex, pair)],
+          actual,
           [...referenceSolve(counts, pair, true, memo)],
           `mismatch at vector ${vectorIndex} (${counts.join(",")}) pair=${pair}`,
         );
@@ -209,3 +234,28 @@ test(
     }
   },
 );
+
+test("buildSuitTable: mirror symmetry — a vector and its rank-reversed counterpart store identical results", () => {
+  const table = buildSuitTable(NUMBER_SUIT_LENGTH, true);
+  // 246m (2m,4m,6m 各一张) 反转后是 468m（4m,6m,8m 各一张）——同一个坎张结构，
+  // 只是整体在 rank 轴上平移到另一头，结果应该逐位相同。
+  const original = [0, 1, 0, 1, 0, 1, 0, 0, 0]; // 2m,4m,6m
+  const mirrored = [0, 0, 0, 1, 0, 1, 0, 1, 0]; // 4m,6m,8m
+  const originalIndex = original.reduceRight((acc, count) => acc * 5 + count, 0);
+  const mirroredIndex = mirrored.reduceRight((acc, count) => acc * 5 + count, 0);
+  for (const pair of [0, 1] as const) {
+    assert.deepEqual(
+      [...extractResult(table.data, originalIndex, pair)],
+      [...extractResult(table.data, mirroredIndex, pair)],
+    );
+  }
+});
+
+test("buildSuitTable: vectors with total tile count over 14 are left as sentinel (never queried by real hands)", () => {
+  const table = buildSuitTable(NUMBER_SUIT_LENGTH, true);
+  const maxedOut = new Array<number>(NUMBER_SUIT_LENGTH).fill(4); // 36 张，远超 14
+  const vectorIndex = maxedOut.reduceRight((acc, count) => acc * 5 + count, 0);
+  for (const pair of [0, 1] as const) {
+    assert.deepEqual([...extractResult(table.data, vectorIndex, pair)], ALL_SENTINEL);
+  }
+});
