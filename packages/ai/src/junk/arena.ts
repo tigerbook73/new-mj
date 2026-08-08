@@ -34,6 +34,18 @@ export type JunkMatchFailure = { seed: number; error: string };
 
 type SeatPolicies = readonly [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
 
+/** Fired for every decision a SeatPolicy makes, right before it's applied to the
+ * real state — purely observational (returning/throwing has no effect on the
+ * match). Each layer (nextMatchAction/playPolicyHand/playJunkMatch) decorates the
+ * info with the piece of context only it knows (seat/view/legalActions/action,
+ * then step, then round), so this is the base shape shared across all three. */
+export type DecisionInfo = {
+  seat: SeatId;
+  view: JunkPlayerView;
+  legalActions: readonly JunkAction[];
+  action: JunkAction;
+};
+
 /** Same eligible-seat selection as core's own fuzz driver (rulesets/junk/fuzz.ts):
  * during awaiting-claims, several seats may have a legal response and one is picked
  * at random to act next (real submission order, not a strategic choice); every other
@@ -42,6 +54,7 @@ const nextMatchAction = (
   state: JunkState,
   policies: SeatPolicies,
   prng: PrngState,
+  onDecision?: (info: DecisionInfo) => void,
 ): { seat: SeatId; action: JunkAction; prng: PrngState } | undefined => {
   // Populated during the awaiting-claims eligibility scan so the chosen seat's
   // legal actions aren't computed twice (once to check eligibility, once to act).
@@ -63,7 +76,9 @@ const nextMatchAction = (
   // to PlayerViewBase); the runtime value is always a full JunkPlayerView, same cast
   // apps/server's room.service.ts already relies on at this exact boundary.
   const view = junkRuleSet.getPlayerView(state, seat) as JunkPlayerView;
-  return { seat, action: policies[seat](view, legalActions), prng: seatPick.prng };
+  const action = policies[seat](view, legalActions);
+  onDecision?.({ seat, view, legalActions, action });
+  return { seat, action, prng: seatPick.prng };
 };
 
 /** Runs one complete hand in-process, forked from playJunkGame in
@@ -72,13 +87,19 @@ const playPolicyHand = (
   seed: number,
   dealer: SeatId,
   policies: SeatPolicies,
+  onDecision?: (info: DecisionInfo & { step: number }) => void,
 ): JunkState | { error: string } => {
   const started = junkRuleSet.createGame(seed, dealer);
   if ("error" in started) return { error: started.error.code };
   let state = started.state;
   let prng = createPrng(seed ^ 0x9e37_79b9);
   for (let step = 0; step < 500 && state.phase !== "finished"; step += 1) {
-    const selected = nextMatchAction(state, policies, prng);
+    const selected = nextMatchAction(
+      state,
+      policies,
+      prng,
+      onDecision && ((info) => onDecision({ ...info, step })),
+    );
     if (!selected) return { error: "NO_LEGAL_ACTION" };
     prng = selected.prng;
     const result = junkRuleSet.applyAction(state, selected.seat, selected.action);
@@ -105,6 +126,7 @@ export const playJunkMatch = (
   seed: number,
   policies: SeatPolicies,
   rounds = 4,
+  onDecision?: (info: DecisionInfo & { step: number; round: number }) => void,
 ): JunkMatchResult | JunkMatchFailure => {
   const scores: [number, number, number, number] = [0, 0, 0, 0];
   let dealer = junkRuleSet.computeInitialDealer(seed);
@@ -112,7 +134,12 @@ export const playJunkMatch = (
   for (let round = 0; round < rounds; round += 1) {
     const seedStep = nextUint32(prng);
     prng = seedStep.prng;
-    const finished = playPolicyHand(seedStep.value, dealer, policies);
+    const finished = playPolicyHand(
+      seedStep.value,
+      dealer,
+      policies,
+      onDecision && ((info) => onDecision({ ...info, round })),
+    );
     if ("error" in finished) return { seed, error: finished.error };
     if (!finished.result) return { seed, error: "MISSING_RESULT" };
     const deltas = finished.result.scoreDeltas;
