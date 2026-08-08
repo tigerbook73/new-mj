@@ -109,16 +109,67 @@ successCount 按"牌墙/未见池"的期望占比拆分改进牌活牌数（`wal
 没有实测证据支持这类改动能修正任何错误决策）。未额外提交代码改动，仅更正本
 文档此前的推测。
 
+### core bug：`ukeire()` 忽略已有副露，导致开口手牌的进张被高估（2026-08-08）
+
+排查 δ hurdle 的 fixture 时，构造一个有 2 个已声明副露的手牌，发现 `ukeire()`
+把摸一张实际不降向听的牌种（9m）也报成"进张"——直接验证：`shantenWithExposedMelds`
+用 2 副露算出向听 0，摸 9m 后仍是 0（没变），但 `ukeire()` 却把 9m 也列进候选。
+
+**根因**：`ukeire(tiles, options, tileSet)` 内部硬编码 `existingMelds=0` 传给
+`computeShantenFromCounts`/`createShantenProber`，不管调用方实际有几个已声明
+副露——跟 `shantenWithExposedMelds` 用的是两套不一致的基准。`strategy.ts:256`
+调用 `ukeire(input.hand, {...})` 时同样没传副露数，且旧注释还写着"ukeire 内部
+的向听差值不受副露数量的常数偏移影响，因此这里不需要把偏移传进去"——这个假设
+是错的，也是 bug 存在的原因。
+
+**影响范围**：所有"手牌已有副露"场景下的 `tenpaiProbability`/`liveUkeireCount`
+计算都可能被这类 false positive 拉高——即所有涉及吃/碰/杠之后的打分。
+
+**已修**（`packages/core/src/lib/shanten.ts`）：`ukeire`/`computeShanten`/
+`isTingpai` 新增 `existingMelds` 参数（默认 0，不破坏现有调用方），正确转发给
+底层已经支持这个参数的 `computeShantenFromCounts`/`createShantenProber`。
+`strategy.ts` 调用点改为显式传 `input.melds.length`。`shanten.test.ts` 新增
+回归用例锁定这个具体场景；`packages/core` `verify:full` 全绿（189 用例，含
+fuzz）。
+
+数值影响：重跑 δ hurdle 调研用的 margin 分布诊断（20 种子自对弈，仅对比
+"有 bug"vs"无 bug"、两侧都不带 hurdle）——薄边际 claim（margin≤10）占比从
+13.2%降到 8.0%，margin≤0.5 从 5.1%降到 1.3%，说明这个 bug 是"低价值吃碰"
+现象的一部分真实成因，不只是理论顾虑。
+
+### ① 吃/碰迟疑阈值 δ hurdle 已完成（2026-08-08，commit 待提交）
+
+**先验证问题是否真实存在**：修 ukeire bug 前，自对弈实测发现约 13%的被接受
+claim（chi/peng）只以 ≤10 的分差压线胜过 pass，5.1%在 ≤0.5（噪声级别）——
+证实"阻挡低价值吃碰"不是纯理论担忧。修完 ukeire bug 后此现象显著缓解但没有
+消失（分别降到 8.0%/1.3%），说明 δ hurdle 仍有独立价值，值得继续做。
+
+**实现**：`JunkWeights` 新增 `chiHurdle`（默认 8）/`pengHurdle`（默认 4）——
+chi 门槛更高，呼应"chi 伤门清+碰碰胡两条线（碰碰胡按规则明确排除吃，
+`scoring.ts:41`）、peng 只伤门清一条线；清一色/混一色只看花色纯度，与吃碰
+无关，2026-08-08 核实并更正过此前的误判"。`scoreAction`（`strategy.ts`）对 chi/peng/minGang 分支的
+最终得分统一减去对应门槛，再进入 argmax/softmax 比较——不改 `argmaxAction`
+本身，效果自然扩散到 softmax 强度采样。
+
+**fixture 证据**（`strategy.test.ts`，按 `packages/ai/AGENTS.md` 公式类改动
+要求）：① 一个手算构造的场景，chi 与 pass 的裸分数**精确相等**（验证到小数点
+后 10 位），不带 hurdle 时 `argmaxAction` 纯靠数组顺序打平局（列在前面的 chi
+胜出）——带 hurdle 后正确回退到 pass，直接证明"打平局不该开口"这个 δ hurdle
+的核心设计意图；② 一个从真实自对弈挖出的 peng 场景（修 bug 后裸分差仅
++2.6，远低于 pengHurdle=4），同样验证 hurdle 能正确拦截、且 hurdle=0 时会
+恢复到旧行为。**踩坑记录**：手动用 `ids()` 按花色重建复杂真实局面时，手牌与
+自己牌河两个独立的编号计数器各自从 copy0 开始，可能给"同花色"分配到完全
+相同的 TileId，恰好触发 `safetyBonus` 的精确 ID 匹配（`visibleDiscards.includes(discard)`），
+误判"这张手牌之前已经打过"——静默地把分数搞错而不报错。第二个 fixture 改用
+从自对弈直接导出的原始 TileId 数组，不再按花色重建，规避这个陷阱。
+
+`decision-diff:junk` 侦察（hurdle=0 vs 当前默认，20 种子、12222 决策点）：
+分歧率 1.1%（131 例），全部是 chi/peng→pass 的单向翻转（75 pass +34 chi
++22 peng 类型分歧，没有反方向的），方向符合预期。`pnpm --filter @new-mj/ai
+verify:full` 全绿（74 用例，含慢速 arena）。
+
 ## 待选（未选定顺序）
 
-- **① 吃/碰迟疑阈值 δ hurdle**：`argmaxAction`（`strategy.ts:471-481`）对
-  claim 和 pass 直接比大小，没有"claim 必须显著优于 pass 才通过"的门槛，是
-  决策结构问题、不是调参能解决的。引入新参数 δ（可随 `gameProgress` 残局放宽
-  动态调整），需要重新确认算第二档还是第三档。chi 与 peng 理论上应设不同
-  门槛（chi 伤门清+碰碰胡两条线——碰碰胡按规则明确排除吃，`scoring.ts:41`；
-  peng 只伤门清一条线；**清一色/混一色只看花色纯度，与吃/碰无关，不受影响**——
-  2026-08-08 核实并更正，此前笔记误把清一色也算进 chi 的代价，实际
-  `fanPotential`/`scoring.ts` 都没有这个耦合）。
 - **防守/放铳风险模型**：`safetyBonus`（`strategy.ts:265`）只对"现物"加固定
   分，没有对手危险度推理（副露/打牌节奏暗示听牌可能性、筋/壁牌相对安全推理），
   没有攻守切换逻辑，AI 永远单向最大化自己的进张——比番型权重更基础，是常见

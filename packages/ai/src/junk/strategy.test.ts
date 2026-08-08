@@ -5,6 +5,7 @@ import {
   tileIdOf,
   type JunkAction,
   type JunkPlayerView,
+  type TileId,
   type TileKind,
 } from "@new-mj/core";
 import { describe, expect, it, vi } from "vitest";
@@ -14,6 +15,7 @@ import {
   recommendJunkAction,
   scoreHandShapeAfterDiscard,
   type GameProgress,
+  type JunkWeights,
 } from "./strategy.ts";
 import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
 
@@ -119,6 +121,155 @@ describe("junk strategy", () => {
     };
     const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
     expect(recommendJunkAction(player, actions)).toBe(actions[0]);
+  });
+
+  it("declines a chi that only trades one tanki wait for an equally-wide one (chiHurdle regression)", () => {
+    // 1 declared meld (1s2s3s) + concealed 4s5s6s + 7s8s9s + 1p2p3p (three
+    // complete runs) + a lone 4m: already tenpai, waiting tanki on 4m (4 melds
+    // + isolated single). Seat 1 discards a second 9s; chi-ing it with hand's
+    // 7s+8s forms a *new* declared run, leaving hand's own 9s as the new
+    // isolated tile — a straight swap of one tanki wait for another, same
+    // width, no shanten change. Since both branches share the exact same
+    // shanten/fanPotential/isolationPotential and (here) the same live-tile
+    // count for their respective tanki target, the *raw* pre-hurdle scores are
+    // exactly equal (verified to 10 decimal places) — a genuine tie, not just
+    // a thin margin. Declining a tied claim is exactly what a hurdle is for:
+    // opening the hand should require a *real* edge, not a coin flip. Without
+    // chiHurdle, argmaxAction's first-wins tie-break would still pick the
+    // claim purely because it's listed first in `actions` — an arbitrary
+    // reason to give up menqing, which chiHurdle correctly overrides.
+    const hand = ids(["4s", "5s", "6s", "7s", "8s", "9s", "1p", "2p", "3p", "4m"]);
+    const player: JunkPlayerView = {
+      seat: 0,
+      hand,
+      wallCount: 60,
+      currentSeat: 0,
+      dealer: 0,
+      phase: "playing",
+      lastDiscard: { seat: 1, tile: tileIdOf("9s", 1) },
+      seats: [
+        {
+          handCount: 10,
+          melds: [{ type: "chi", tiles: ids(["1s", "2s", "3s"]), from: 3 }],
+          discards: [],
+          justDrawn: false,
+        },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    };
+    const chi: JunkAction = { type: "chi", tiles: [hand[3]!, hand[4]!] }; // 7s, 8s
+    const actions: JunkAction[] = [chi, { type: "pass" }];
+    expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+    const noHurdle: JunkWeights = { ...DEFAULT_JUNK_WEIGHTS, chiHurdle: 0 };
+    expect(recommendJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
+  });
+
+  it("declines a thin-margin peng that only trades a wide wait for a narrower one (pengHurdle regression, mined from self-play seed=5 step=75)", () => {
+    // Real position from arena self-play, reconstructed from the exact raw
+    // TileIds the arena produced (not re-derived by kind — this hand has
+    // several tombstoned claimed-discard entries shared with declared melds,
+    // e.g. seat 3's tile 81 is both a discard-pile tombstone and one of this
+    // seat's own chi-meld tiles; re-deriving fresh TileIds per kind broke that
+    // sharing and silently drifted the score by colliding two *different*
+    // physical tiles onto the same id instead — see plan.md/session notes on
+    // this fixture's construction for the debugging story). Decoded: this
+    // seat holds 1m2m6m8m3s3s6s concealed with a declared 1z1z1z peng and
+    // 1s2s3s chi; seat 3 discards a second 3s, peng-able against the existing
+    // pair. Pre-fix (buggy ukeire ignoring exposed melds) this claim looked
+    // meaningfully positive; post-fix the raw margin is only +2.6 — comfortably
+    // under pengHurdle's default (4), so the hurdle correctly falls back to
+    // pass; zeroing it recovers the pre-hurdle pick.
+    const player: JunkPlayerView = {
+      seat: 0,
+      hand: [2, 6, 20, 28, 80, 82, 93],
+      dealer: 1,
+      seats: [
+        {
+          melds: [
+            { type: "peng", tiles: [108, 111, 110], from: 2 },
+            { type: "chi", tiles: [73, 76, 81], from: 3 },
+          ],
+          discards: [
+            { tile: 123 },
+            { tile: 114, claimedBy: 2 },
+            { tile: 21, claimedBy: 1 },
+            { tile: 33 },
+            { tile: 127 },
+            { tile: 54, claimedBy: 2 },
+            { tile: 130 },
+            { tile: 37 },
+            { tile: 95, claimedBy: 1 },
+          ],
+          handCount: 7,
+          justDrawn: false,
+        },
+        {
+          melds: [
+            { type: "chi", tiles: [16, 25, 21], from: 0 },
+            { type: "chi", tiles: [89, 98, 95], from: 0 },
+          ],
+          discards: [
+            { tile: 120 },
+            { tile: 128 },
+            { tile: 116 },
+            { tile: 78 },
+            { tile: 47 },
+            { tile: 1 },
+            { tile: 97 },
+            { tile: 12, claimedBy: 2 },
+          ],
+          handCount: 7,
+          justDrawn: false,
+        },
+        {
+          melds: [
+            { type: "peng", tiles: [115, 113, 114], from: 0 },
+            { type: "peng", tiles: [53, 55, 54], from: 0 },
+            { type: "peng", tiles: [14, 13, 12], from: 1 },
+          ],
+          discards: [
+            { tile: 110, claimedBy: 0 },
+            { tile: 102 },
+            { tile: 68 },
+            { tile: 105 },
+            { tile: 103 },
+            { tile: 65 },
+            { tile: 45 },
+            { tile: 48 },
+            { tile: 63 },
+            { tile: 18 },
+          ],
+          handCount: 4,
+          justDrawn: false,
+        },
+        {
+          melds: [],
+          discards: [
+            { tile: 122 },
+            { tile: 112 },
+            { tile: 135 },
+            { tile: 77 },
+            { tile: 81, claimedBy: 0 },
+            { tile: 46 },
+            { tile: 66 },
+            { tile: 61 },
+            { tile: 83 },
+          ],
+          handCount: 13,
+          justDrawn: false,
+        },
+      ],
+      wallCount: 55,
+      currentSeat: 3,
+      phase: "awaiting-claims",
+      lastDiscard: { seat: 3, tile: 83 },
+    };
+    const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
+    expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+    const noHurdle: JunkWeights = { ...DEFAULT_JUNK_WEIGHTS, pengHurdle: 0 };
+    expect(recommendJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
   });
 
   it("uses visible discards as a safety tie-break", () => {

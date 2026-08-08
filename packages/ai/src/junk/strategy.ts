@@ -46,6 +46,19 @@ export type JunkWeights = {
    * ever pair, never form a run — so this is what makes discarding an isolated
    * honor outscore discarding an isolated number tile even while shanten ties. */
   isolationPotential: number;
+  /** scoreAction: flat penalty subtracted from a chi claim's score before it's
+   * compared against pass — a margin the claim must clear, not just beat pass
+   * by any amount. handQuality already prices in chi's certain costs (loses
+   * menqing, forecloses pengpenghu), but that point estimate carries real
+   * uncertainty (known gaps: no opponent-behavior model, no zimo/peng/chi
+   * channel split — see docs/process/junk-ai-decision-quality.md); requiring a
+   * clear margin guards against committing to an irreversible open hand over a
+   * claim that only *looks* better because of the formula's own noise. */
+  chiHurdle: number;
+  /** Same idea as chiHurdle, for peng/minGang — smaller by default since those
+   * only cost menqing, not pengpenghu too (see the same doc's note correcting
+   * an earlier claim that chi also costs qingyise — it doesn't). */
+  pengHurdle: number;
 };
 
 /** Loaded from default-weights.json rather than hardcoded here, so adopting a
@@ -236,11 +249,20 @@ const handQuality = (
   // 曾经只在 shanten<=1 时才算 ukeire（避免中局无收益穷举），实测这个门槛让
   // 中局"留一手换未来更多可能性"这类判断完全看不到进张信号——shanten/ukeire
   // 性能提升后，无条件计算的开销经基准测试确认可接受（1000 场自对弈从 10.5s
-  // 涨到 16.4s，约 1.56x，不是数量级级别的暴涨），于是把门槛去掉。ukeire 内部
-  // 的向听差值不受副露数量的常数偏移影响，因此这里不需要把偏移传进去。ukeire
-  // 自己内部已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的
+  // 涨到 16.4s，约 1.56x，不是数量级级别的暴涨），于是把门槛去掉。ukeire 自己
+  // 内部已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的
   // memo 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
-  const improvingKinds = ukeire(input.hand, { sevenPairs: input.melds.length === 0 });
+  //
+  // existingMelds 必须传 input.melds.length：ukeire 内部按"搭子数上限
+  // min(tatsu, 4-已有面子数)"给候选封顶，遗漏这个偏移会让有副露的手牌把不
+  // 真正降向听的牌种也报成进张（2026-08-08 修复，见 shanten.ts ukeire 的
+  // 文档注释与 shanten.test.ts 的回归用例）。
+  const improvingKinds = ukeire(
+    input.hand,
+    { sevenPairs: input.melds.length === 0 },
+    STANDARD_TILE_SET,
+    input.melds.length,
+  );
   const improvements = liveUkeireCount(input, improvingKinds, visibleDiscards);
   const remainingDraws = Math.ceil(gameProgress.wallCount / 4);
   // Self-draws physically only pull from the wall — never from an opponent's
@@ -447,8 +469,9 @@ const scoreAction = (
       : -100;
   }
   const claim = simulatedClaim(view, action);
-  if (claim) return bestDiscardScore(claim, discards, weights, memo, gameProgress);
-  return -100;
+  if (!claim) return -100;
+  const hurdle = action.type === "chi" ? weights.chiHurdle : weights.pengHurdle;
+  return bestDiscardScore(claim, discards, weights, memo, gameProgress) - hurdle;
 };
 
 /**
@@ -463,9 +486,12 @@ export type JunkStrengthConfig = {
   random?: () => number;
 };
 
-type ScoredAction = { action: JunkAction; score: number };
+export type ScoredAction = { action: JunkAction; score: number };
 
-const scoreLegalActions = (
+/** Exposed (beyond recommendJunkAction's own use) so diagnostic/tuning scripts can
+ * inspect per-action scores directly — e.g. measuring how large a margin a claim
+ * beats pass by, which recommendJunkAction's return value alone can't answer. */
+export const scoreLegalActions = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
   weights: JunkWeights,
