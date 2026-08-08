@@ -176,10 +176,60 @@ describe("junk strategy", () => {
     // triggers it but both waits are symmetric), so argmax picked whichever
     // came first in legalActions. Listing the honor discard *last* reproduces
     // that failure mode directly.
-    const player = view(["1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "1s", "1z", "9s"]);
+    const player = view([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "1p",
+      "2p",
+      "3p",
+      "1s",
+      "1s",
+      "1z",
+      "9s",
+    ]);
     const discardNumber: JunkAction = { type: "discard", tile: player.hand[12]! };
     const discardHonor: JunkAction = { type: "discard", tile: player.hand[11]! };
     expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
+  });
+
+  it("does not reward breaking a genuinely redundant tatsu to manufacture a new isolated tile", () => {
+    // 2 complete runs + 3 *symmetric* ryanmen tatsu (5p6p, 3s4s, 7s8s) + 2 lone
+    // honors. standardShanten's usableTatsu is capped at (4 - melds) = 2 here,
+    // so only 2 of the 3 tatsu ever count — any one of them, including 5p6p,
+    // is exactly as redundant as either honor: discarding half of it changes
+    // shanten no more than discarding a honor does. Regression found in real
+    // play: pre-fix, isolationPotential scored the *post-discard* hand, so
+    // breaking 5p6p left a "newly isolated" 5p that collected the isolation
+    // bonus — making the AI prefer discarding 6p (breaking a useful shape)
+    // over discarding a genuinely useless lone honor.
+    const player = view([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "5p",
+      "6p",
+      "3s",
+      "4s",
+      "7s",
+      "8s",
+      "1z",
+      "2z",
+    ]);
+    const discardTatsuTile: JunkAction = { type: "discard", tile: player.hand[7]! }; // 6p
+    const discardHonor: JunkAction = { type: "discard", tile: player.hand[12]! }; // 1z
+    expect(
+      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardTatsuTile.tile),
+    ).toBe(scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardHonor.tile));
+    // With scores genuinely tied, listing the tatsu-breaking discard first
+    // pins down that it no longer wins outright (which is what the bug did).
+    expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardTatsuTile);
   });
 
   it("prefers keeping a live wait over a dead one (theoretical -> practical ukeire)", () => {
@@ -187,7 +237,21 @@ describe("junk strategy", () => {
     // on isolationPotential too — so only the live-copy count can break the
     // tie. Seat 1 has already discarded all three other copies of 9s: keeping
     // 9s after this discard would wait on a fully dead kind.
-    const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "1p", "2p", "3p", "1s", "1s", "9s", "9p"]);
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "1p",
+      "2p",
+      "3p",
+      "1s",
+      "1s",
+      "9s",
+      "9p",
+    ]);
     const player: JunkPlayerView = {
       seat: 0,
       hand,
@@ -246,9 +310,9 @@ describe("junk strategy", () => {
 
     it("temperature 0 ignores an injected random source", () => {
       const hostileRandom = () => 0.999;
-      expect(recommendJunkAction(gapView, gapActions, { temperature: 0, random: hostileRandom })).toBe(
-        recommendJunkAction(gapView, gapActions),
-      );
+      expect(
+        recommendJunkAction(gapView, gapActions, { temperature: 0, random: hostileRandom }),
+      ).toBe(recommendJunkAction(gapView, gapActions));
     });
 
     it("a legal win bypasses temperature/random entirely", () => {
@@ -325,6 +389,26 @@ describe("junk strategy", () => {
       // Only the safety term differs between these two calls (same hand/discard/
       // visibleDiscards) — the delta must equal exactly the weight difference.
       expect(customScore - defaultScore).toBeCloseTo(999 - DEFAULT_JUNK_WEIGHTS.safetyBonus, 6);
+    });
+
+    it("scoreHandShapeAfterDiscard honors a custom pengpenghu weight (regression: weight was defined but never read)", () => {
+      // Bug: pengpenghu was declared in JunkWeights and default-weights.json but
+      // fanPotential never added it to the score — this test fails on the
+      // pre-fix code (delta would be 0, not the weight difference).
+      const hand = ids(["1m", "1m", "2m", "2m"]);
+      const discard = hand[0]!;
+      const customWeights = {
+        ...DEFAULT_JUNK_WEIGHTS,
+        pengpenghu: DEFAULT_JUNK_WEIGHTS.pengpenghu + 999,
+      };
+      const defaultScore = scoreHandShapeAfterDiscard({ hand, melds: [] }, discard);
+      const customScore = scoreHandShapeAfterDiscard(
+        { hand, melds: [] },
+        discard,
+        [],
+        customWeights,
+      );
+      expect(customScore - defaultScore).toBeCloseTo(999, 6);
     });
 
     it("scoreHandShapeAfterDiscard honors a custom shantenWeight", () => {

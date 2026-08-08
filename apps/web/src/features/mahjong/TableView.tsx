@@ -176,9 +176,8 @@ export function TableView() {
     sessionResult == null &&
     isIncrementalSnapshot &&
     !prefersReducedMotion;
-  const [prevShowResultBannerCondition, setPrevShowResultBannerCondition] = useState(
-    showResultBannerCondition,
-  );
+  const [prevShowResultBannerCondition, setPrevShowResultBannerCondition] =
+    useState(showResultBannerCondition);
   const [showResultBanner, setShowResultBanner] = useState(false);
   if (showResultBannerCondition !== prevShowResultBannerCondition) {
     setPrevShowResultBannerCondition(showResultBannerCondition);

@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { createPrng, shuffle } from "./prng.ts";
-import { isTingpai, junkShanten, sevenPairsShanten, standardShanten, ukeire } from "./shanten.ts";
+import { createPrng, nextInt, shuffle } from "./prng.ts";
+import {
+  computeShanten,
+  isTingpai,
+  sevenPairsShanten,
+  shantenWithExposedMelds,
+  standardShanten,
+  ukeire,
+} from "./shanten.ts";
 import { isSevenPairsWinningHand, isStandardWinningHand } from "./standard-hand.ts";
-import { STANDARD_TILE_SET, TILE_KINDS, allTileIds, tileIdOf } from "./tiles.ts";
+import { createTileSet, STANDARD_TILE_SET, TILE_KINDS, allTileIds, tileIdOf } from "./tiles.ts";
 
 const id = (kind: (typeof TILE_KINDS)[number], copy = 0) => tileIdOf(kind, copy);
 const ids = (kinds: readonly (typeof TILE_KINDS)[number][]) => {
@@ -47,13 +54,13 @@ test("sevenPairsShanten: formula handles distinct kinds and a seven-pairs hand",
   assert.equal(sevenPairsShanten(hand.slice(0, -1)), 0);
 });
 
-test("junkShanten: seven-pairs option changes the selected family", () => {
+test("computeShanten: seven-pairs option changes the selected family", () => {
   const hand = ["1z", "2z", "3z", "4z", "5z", "6z", "7z"].flatMap((kind) => [
     id(kind as (typeof TILE_KINDS)[number]),
     id(kind as (typeof TILE_KINDS)[number], 1),
   ]);
-  assert.equal(junkShanten(hand, withSevenPairs), -1);
-  assert.ok(junkShanten(hand, standardOnly) > -1);
+  assert.equal(computeShanten(hand, withSevenPairs), -1);
+  assert.ok(computeShanten(hand, standardOnly) > -1);
 });
 
 test("isTingpai and ukeire report only tiles that can immediately win", () => {
@@ -61,6 +68,104 @@ test("isTingpai and ukeire report only tiles that can immediately win", () => {
   assert.equal(isTingpai(hand, standardOnly), true);
   assert.deepEqual(ukeire(hand, standardOnly), ["1p", "1s"]);
 });
+
+test("shantenWithExposedMelds: usable tatsu is capped by exposed melds, not just concealed melds", () => {
+  // 1 副露 + 4 搭子（1m2m/4m5m/7m8m/1p2p，互不相邻不会拼成面子）+ 1 雀头（1s1s），
+  // 10 张手牌。standardShanten 内部 `min(tatsu, 4-melds)` 只看得到手牌自己找到
+  // 的 0 个面子，把 4 个搭子全当有效，算出 3 向听；再套用过时的
+  // `- meldCount*2` 事后修正会得到 1 向听——但副露已经占了 1 个面子位，手牌
+  // 里真正能计费的搭子上限应该是 4-1=3 个，正确答案是 2 向听。
+  const concealed = ids(["1m", "2m", "4m", "5m", "7m", "8m", "1p", "2p", "1s", "1s"]);
+  assert.equal(shantenWithExposedMelds(concealed, 1), 2);
+  assert.equal(standardShanten(concealed) - 1 * 2, 1);
+});
+
+test("standardShanten: table fast path matches the recursive fallback on hand-picked edge cases", () => {
+  // fallbackTileSet 跟 STANDARD_TILE_SET 内容一样（34 种/每种4张）但不是同一个
+  // 对象，standardShanten 内部按引用相等判断是否走查表快路径——传这个对象会
+  // 强制走 standardShantenByRecursion 回退实现，从而能通过公开 API 直接比较
+  // 快路径 vs 回退路径，不用导出私有实现细节。
+  const fallbackTileSet = createTileSet();
+  const zKinds = ["1z", "2z", "3z", "4z", "5z", "6z", "7z"] as const;
+  const edgeCases: ReturnType<typeof ids>[] = [
+    [],
+    ids(["1m", "1m", "1m", "1m"]), // 单 kind 拿满四张
+    ids(["1m", "1m", "1m", "1m", "2m", "2m", "2m", "2m", "3m", "3m", "3m", "3m"]), // 数牌重叠拿满
+    zKinds.flatMap((kind) => [id(kind), id(kind, 1)]), // 七对型（全字牌）
+    ids([...zKinds]), // 字牌为主，各一张
+  ];
+  for (const hand of edgeCases) {
+    for (let existingMelds = 0; existingMelds <= 4; existingMelds += 1) {
+      assert.equal(
+        standardShanten(hand, STANDARD_TILE_SET, undefined, existingMelds),
+        standardShanten(hand, fallbackTileSet, undefined, existingMelds),
+        `mismatch for hand [${hand.join(",")}] existingMelds=${existingMelds}`,
+      );
+    }
+  }
+});
+
+test(
+  "standardShanten: table fast path matches the recursive fallback on a large random sample",
+  { tags: ["slow"] },
+  () => {
+    const fallbackTileSet = createTileSet();
+    let prng = createPrng(20260806);
+    const allIds = allTileIds();
+    for (let trial = 0; trial < 4000; trial += 1) {
+      const shuffled = shuffle(allIds, prng);
+      prng = shuffled.prng;
+      const sizeStep = nextInt(prng, 15); // 手牌大小 0..14 全扫
+      prng = sizeStep.prng;
+      const hand = shuffled.items.slice(0, sizeStep.value);
+      for (let existingMelds = 0; existingMelds <= 4; existingMelds += 1) {
+        const fast = standardShanten(hand, STANDARD_TILE_SET, undefined, existingMelds);
+        const fallback = standardShanten(hand, fallbackTileSet, undefined, existingMelds);
+        assert.equal(
+          fast,
+          fallback,
+          `mismatch at trial ${trial}, hand size ${hand.length}, existingMelds ${existingMelds}`,
+        );
+      }
+    }
+  },
+);
+
+test(
+  "ukeire/isTingpai/shantenWithExposedMelds: table fast path matches the recursive fallback on a large random sample",
+  { tags: ["slow"] },
+  () => {
+    const fallbackTileSet = createTileSet();
+    let prng = createPrng(20260807);
+    const allIds = allTileIds();
+    for (let trial = 0; trial < 2000; trial += 1) {
+      const shuffled = shuffle(allIds, prng);
+      prng = shuffled.prng;
+      const sizeStep = nextInt(prng, 14); // 0..13：ukeire 典型用在打牌前的 13 张手
+      prng = sizeStep.prng;
+      const hand = shuffled.items.slice(0, sizeStep.value);
+      for (const options of [standardOnly, withSevenPairs]) {
+        assert.deepEqual(
+          ukeire(hand, options, STANDARD_TILE_SET),
+          ukeire(hand, options, fallbackTileSet),
+          `ukeire mismatch trial ${trial} size ${hand.length} sevenPairs=${options.sevenPairs}`,
+        );
+        assert.equal(
+          isTingpai(hand, options, STANDARD_TILE_SET),
+          isTingpai(hand, options, fallbackTileSet),
+          `isTingpai mismatch trial ${trial} size ${hand.length} sevenPairs=${options.sevenPairs}`,
+        );
+      }
+      for (let exposedMelds = 0; exposedMelds <= 4; exposedMelds += 1) {
+        assert.equal(
+          shantenWithExposedMelds(hand, exposedMelds, STANDARD_TILE_SET),
+          shantenWithExposedMelds(hand, exposedMelds, fallbackTileSet),
+          `shantenWithExposedMelds mismatch trial ${trial} size ${hand.length} exposedMelds=${exposedMelds}`,
+        );
+      }
+    }
+  },
+);
 
 test("shanten property: -1 is equivalent to the direct winning checks", () => {
   let prng = createPrng(20260802);
@@ -72,7 +177,7 @@ test("shanten property: -1 is equivalent to the direct winning checks", () => {
     assert.equal(standardShanten(hand) === -1, isStandardWinningHand(hand, STANDARD_TILE_SET));
     assert.equal(sevenPairsShanten(hand) === -1, isSevenPairsWinningHand(hand, STANDARD_TILE_SET));
     assert.equal(
-      junkShanten(hand, withSevenPairs) === -1,
+      computeShanten(hand, withSevenPairs) === -1,
       isStandardWinningHand(hand, STANDARD_TILE_SET) ||
         isSevenPairsWinningHand(hand, STANDARD_TILE_SET),
     );
@@ -86,9 +191,9 @@ test("shanten property: every ukeire strictly reduces shanten", { tags: ["slow"]
     const shuffled = shuffle(allIds, prng);
     prng = shuffled.prng;
     const hand = shuffled.items.slice(0, 13);
-    const current = junkShanten(hand, withSevenPairs);
+    const current = computeShanten(hand, withSevenPairs);
     for (const kind of ukeire(hand, withSevenPairs)) {
-      assert.ok(junkShanten([...hand, id(kind)], withSevenPairs) < current);
+      assert.ok(computeShanten([...hand, id(kind)], withSevenPairs) < current);
     }
   }
 });

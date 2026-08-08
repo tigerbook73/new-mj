@@ -1,7 +1,6 @@
 import {
   STANDARD_TILE_SET,
-  sevenPairsShanten,
-  standardShanten,
+  shantenWithExposedMelds,
   ukeire,
   type JunkAction,
   type JunkPlayerView,
@@ -89,6 +88,10 @@ const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
     for (const tile of input.hand) counts.set(kindOf(tile), (counts.get(kindOf(tile)) ?? 0) + 1);
     score += [...counts.values()].filter((count) => count >= 2).length * weights.pairBonus;
     score += input.melds.filter((meld) => meld.type !== "chi").length * weights.meldBonus;
+    // 无 chi 副露即仍走在碰碰胡轨道上（呼应 core scoring.ts 里 isPengPengHu
+    // 的判定条件：家族为 standard 且没有任何 chi 副露）；这里只按同一条件给
+    // 一个固定加成，不逐搭子计分——真正是否成型由 meldBonus/shanten 收敛。
+    score += weights.pengpenghu;
   }
   if (input.melds.length === 0) score += weights.qiduiPotential;
   return score;
@@ -105,12 +108,28 @@ const fanPotential = (input: ShapeInput, weights: JunkWeights): number => {
  * pairBonus already) and no same-suit tile within two ranks (already counted
  * as a run/tatsu by shantenOf) — otherwise this would double-pay tiles that
  * shanten already rewards for being connected.
+ *
+ * `referenceHand` (defaults to `hand`) is used only for the neighbor lookup —
+ * it must be the hand *before* the candidate discard under evaluation, not
+ * `hand` itself. Without this, discarding one tile of a tatsu (e.g. 6p out of
+ * 5p6p) makes the surviving 5p look newly "isolated" in the post-discard hand
+ * and collects this bonus — rewarding the act of breaking a tatsu instead of
+ * genuinely-isolated tiles that were never connected to begin with.
  */
-const isolationPotential = (hand: readonly TileId[], weights: JunkWeights): number => {
+const isolationPotential = (
+  hand: readonly TileId[],
+  weights: JunkWeights,
+  referenceHand: readonly TileId[] = hand,
+): number => {
   const counts = new Map<TileKind, number>();
   for (const tile of hand) {
     const kind = kindOf(tile);
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  const referenceCounts = new Map<TileKind, number>();
+  for (const tile of referenceHand) {
+    const kind = kindOf(tile);
+    referenceCounts.set(kind, (referenceCounts.get(kind) ?? 0) + 1);
   }
   let score = 0;
   for (const [kind, count] of counts) {
@@ -118,7 +137,7 @@ const isolationPotential = (hand: readonly TileId[], weights: JunkWeights): numb
     const rank = Number(kind[0]);
     const suit = kind[1];
     const hasNeighbor = [-2, -1, 1, 2].some(
-      (offset) => (counts.get(`${rank + offset}${suit}` as TileKind) ?? 0) > 0,
+      (offset) => (referenceCounts.get(`${rank + offset}${suit}` as TileKind) ?? 0) > 0,
     );
     if (!hasNeighbor) score += weights.isolationPotential;
   }
@@ -126,29 +145,17 @@ const isolationPotential = (hand: readonly TileId[], weights: JunkWeights): numb
 };
 
 /**
- * standardShanten/sevenPairsShanten only look at the concealed tiles handed to
- * them — they assume all 4 melds still have to come from that array. A seat
- * with existing melds (chi/peng/gang) already has some of those 4 melds "for
- * free", so each existing meld is worth exactly 2 shanten points back (one of
- * the classic shanten-calculator adjustments); qidui is impossible once any
- * meld exists (its hand can never be all-concealed pairs again).
+ * `memo` is optional and, when given, shared with shantenWithExposedMelds'
+ * internal recursive cache — the caller (scoreLegalActions) creates ONE memo
+ * per turn and threads it through every candidate hand it evaluates. Those
+ * hands mostly differ from each other by a single tile, so their recursive
+ * shanten sub-searches overlap heavily; sharing the memo (instead of each
+ * call starting a fresh one) turns most of that overlap into cache hits
+ * without changing any returned value — memo only affects what gets cached,
+ * not what a given recursive state computes to.
  */
-/**
- * `memo` is optional and, when given, shared with standardShanten's internal
- * recursive cache — the caller (scoreLegalActions) creates ONE memo per turn and
- * threads it through every candidate hand it evaluates. Those hands mostly differ
- * from each other by a single tile, so their recursive shanten sub-searches
- * overlap heavily; sharing the memo (instead of each call starting a fresh one,
- * standardShanten's own default) turns most of that overlap into cache hits
- * without changing any returned value — memo only affects what gets cached, not
- * what a given recursive state computes to.
- */
-const shantenOf = (input: ShapeInput, memo?: Map<string, number>): number => {
-  const meldCount = input.melds.length;
-  const standard = standardShanten(input.hand, undefined, memo);
-  const raw = meldCount > 0 ? standard : Math.min(standard, sevenPairsShanten(input.hand));
-  return raw - meldCount * 2;
-};
+const shantenOf = (input: ShapeInput, memo?: Map<string, number>): number =>
+  shantenWithExposedMelds(input.hand, input.melds.length, STANDARD_TILE_SET, memo);
 
 /**
  * Sums *remaining live copies* of each improving kind (4 minus copies already
@@ -186,6 +193,7 @@ const handQuality = (
   weights: JunkWeights,
   memo?: Map<string, number>,
   visibleDiscards: readonly TileId[] = [],
+  isolationReferenceHand: readonly TileId[] = input.hand,
 ): number => {
   const shanten = shantenOf(input, memo);
   // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
@@ -200,7 +208,7 @@ const handQuality = (
     -shanten * weights.shantenWeight +
     improvements * weights.improvementWeight +
     fanPotential(input, weights) +
-    isolationPotential(input.hand, weights)
+    isolationPotential(input.hand, weights, isolationReferenceHand)
   );
 };
 
@@ -215,7 +223,9 @@ export const scoreHandShapeAfterDiscard = (
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
-  return handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards) + safety;
+  return (
+    handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards, input.hand) + safety
+  );
 };
 
 /** Duplicate copies of the same kind produce the same resulting hand once
@@ -293,7 +303,11 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
   if (pengIndex < 0) return undefined;
   const hand = removeTiles(view.hand, [tile]);
   if (!hand) return undefined;
-  const upgraded: Meld = { ...melds[pengIndex]!, type: "buGang", tiles: [...melds[pengIndex]!.tiles, tile] };
+  const upgraded: Meld = {
+    ...melds[pengIndex]!,
+    type: "buGang",
+    tiles: [...melds[pengIndex]!.tiles, tile],
+  };
   const nextMelds = [...melds];
   nextMelds[pengIndex] = upgraded;
   return { hand, melds: nextMelds };

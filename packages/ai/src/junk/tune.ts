@@ -3,7 +3,9 @@ import { playJunkMatch, strengthPolicy, type SeatPolicy } from "./arena.ts";
 import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./strategy.ts";
 import type { MatchTask, MatchTaskResult, MatchWorkerPool } from "./tune-pool.ts";
 
-const WEIGHT_KEYS = Object.keys(DEFAULT_JUNK_WEIGHTS) as (keyof JunkWeights)[];
+/** Exported so compare-weights-cli.ts can validate an arbitrary candidate JSON
+ * file has exactly this key set without duplicating the list. */
+export const WEIGHT_KEYS = Object.keys(DEFAULT_JUNK_WEIGHTS) as (keyof JunkWeights)[];
 
 /** Deterministic [0, 1) generator, same primitive used across this package's
  * reproducible-randomness spots (see JunkStrengthConfig.random). */
@@ -247,7 +249,10 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     if (recentOutcomes.length > SUCCESS_WINDOW) recentOutcomes.shift();
     if (recentOutcomes.length >= 5) {
       const successRate = recentOutcomes.filter(Boolean).length / recentOutcomes.length;
-      sigma = Math.min(sigma * (successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25), maxSigma);
+      sigma = Math.min(
+        sigma * (successRate > TARGET_SUCCESS_RATE ? 1.2 : 1 / 1.2 ** 0.25),
+        maxSigma,
+      );
     }
 
     const log: TuneGenerationLog = {
@@ -306,11 +311,14 @@ export const evaluateTunedWeights = async (
   };
 };
 
-const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
+/** Exported so compare-weights-cli.ts can render the same "baseline -> other"
+ * delta table for an arbitrary hand-authored candidate, not just a search result. */
+export const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
   WEIGHT_KEYS.map((key) => {
     const before = baseline[key];
     const after = tuned[key];
-    const pct = before === 0 ? "n/a" : `${(((after - before) / Math.abs(before)) * 100).toFixed(1)}%`;
+    const pct =
+      before === 0 ? "n/a" : `${(((after - before) / Math.abs(before)) * 100).toFixed(1)}%`;
     return `  ${key}: ${before.toFixed(2)} -> ${after.toFixed(2)} (${pct})`;
   }).join("\n");
 
@@ -342,7 +350,8 @@ const STOP_REASON_TEXT: Record<TuneStopReason, string> = {
     "hit the max-generations cap without converging — consider raising " +
     "--max-generations, or lowering --stagnation-patience/raising " +
     "--sigma-convergence-ratio if this happens a lot",
-  "sigma-converged": "sigma shrank below the convergence threshold (mutations stopped meaningfully exploring)",
+  "sigma-converged":
+    "sigma shrank below the convergence threshold (mutations stopped meaningfully exploring)",
   stagnant: "no accepted mutation for --stagnation-patience generations in a row",
 };
 

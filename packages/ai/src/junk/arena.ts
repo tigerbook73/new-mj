@@ -14,10 +14,7 @@ import { chooseJunkAction, type JunkStrengthConfig, type JunkWeights } from "./s
 
 /** Per-seat decision function; a self-play arena plugs in one per seat so different
  * seats can play at different strength or with different tuned weights. */
-export type SeatPolicy = (
-  view: JunkPlayerView,
-  legalActions: readonly JunkAction[],
-) => JunkAction;
+export type SeatPolicy = (view: JunkPlayerView, legalActions: readonly JunkAction[]) => JunkAction;
 
 /** Wraps a strength config (and optional weight override) as a SeatPolicy backed by
  * the production decision function; omitting `weights` uses DEFAULT_JUNK_WEIGHTS. */

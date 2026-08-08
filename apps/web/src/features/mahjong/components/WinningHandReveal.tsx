@@ -64,7 +64,8 @@ export function WinningHandReveal({ groups, winTile }: WinningHandRevealProps) {
                   // elsewhere on the live table — this project's established
                   // "the noteworthy tile" visual language, reused here since
                   // this strip doesn't route through TileFace/cva at all.
-                  isWinTile && "z-10 ring-2 ring-red-500 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)]",
+                  isWinTile &&
+                    "z-10 ring-2 ring-red-500 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)]",
                 )}
               />
             );
