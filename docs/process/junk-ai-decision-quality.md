@@ -198,14 +198,17 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   的首层覆盖面仍可能更宽）。反例锁定所有 `4m/5m` 已可见时探针不再将其列为进张，
   另有立即自摸和牌分支测试。
 
-  **性能门槛未通过，暂不接入默认评分**：上述目标 fixture 的两次完整 13 张探针在
-  Vitest 中约 370ms（约 185ms/候选手牌）；若每回合为约 14 个弃牌候选都跑一次，
-  即已是秒级，不能进入 bot 决策或自对弈闭环。已用 `node --cpu-prof` 包住该测试，
-  但短样本由 Vitest/Vite 编译与 idle 主导，未采到足以归因到探针内部的热点，不能
-  据此猜测优化方向。下一步第一个具体动作：新增可重复多轮调用探针的独立微基准
-  入口，再对它 profile，确认热点及 memo 命中情况；只有能在不改变 fixture 语义的
-  前提下通过缓存/安全剪枝降至可接受预算，才评估接入范围，否则保留为诊断工具并
-  暂停本线。
+  **性能门槛未通过，暂不接入默认评分（2026-08-08）**：新增
+  `pnpm bench:junk-two-ply [iterations]` 独立微基准入口，固定使用上述桥接
+  fixture；100 次热态调用为 1508ms，约 **15.1ms/探针**（5 次冷态平均约
+  85.9ms，主要含模块/表初始化）。`node --cpu-prof ...two-ply-benchmark-cli.ts 100`
+  的有效样本集中在 core `ukeire`、其花色 DP（`applyTransition`/`buildSuitTable`）
+  与 AI 的 `liveUkeireCount`；不再是 Vitest/Vite 噪声。约 14 个弃牌候选若都跑
+  探针仍约 210ms/回合，不能进入 bot 决策或自对弈闭环。已有跨候选的 shanten memo
+  不覆盖 `ukeire` 内部的主要成本，未发现不改变 fixture 语义的简单缓存/剪枝。
+  **Phase 2 暂停**：探针保留作诊断工具；若重启，先向 Claude Project 提出 core
+  "批量候选/多进张 ukeire 评估" API 与性能边界的架构提案，再决定是否实施，不能
+  在 AI 层自行发明跨 core 的缓存契约。
 
 - **自我优化基础设施推广到 hangzhou/bloodbattle**：可复用部分是 Layer
   B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属

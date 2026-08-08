@@ -8,9 +8,10 @@
 （专题推演页，按 `doc-map.md` 分流规则单独整理，避免本文件堆积）。当前进度：
 验证档（④+④-b）、自摸概率修正（③）与迟疑阈值 δ 已完成；Phase 2 的轻量
 2-ply 自摸诊断探针及目标/反例 fixture 已完成，但性能门槛未通过，尚未接入默认
-评分。下一步第一个具体动作：新增可重复多轮调用探针的独立微基准入口后再用
-`node --cpu-prof` profile，确认能否以不改变 fixture 语义的缓存/安全剪枝降至
-可接受预算；否则暂停本线。
+评分。独立微基准热态约 15.1ms/探针、全弃牌候选约 210ms/回合，热点在 core
+`ukeire`/花色 DP，Phase 2 已暂停。下一步第一个具体动作：若决定重启本线，先向
+Claude Project 提出 core 批量候选/多进张 ukeire 评估 API 与性能边界的架构提案；
+否则从专题文档“待选”节另选下一项。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
