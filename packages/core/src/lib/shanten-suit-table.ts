@@ -38,9 +38,41 @@
  *      mirrorVectorIndexOf(counts)` 的一半向量真正调用 `solveSuitVector`，
  *      结果直接镜像复制给另一半。
  * 两条叠加后，数牌表全量建表实测从约 1.1 秒降到约 **290ms**（约 3.8x），
- * 字牌表从约 20ms 降到约 15ms，内存占用没有变化。多线程建表（复用
- * `packages/ai/src/junk/tune-pool.ts` 的 worker_threads 池模式）仍留作后续
- * 按需追加，目前的数字已经足够好，没有必要再加这层复杂度。
+ * 字牌表从约 20ms 降到约 15ms。
+ *
+ * 再往后一轮：`SuitTable` 从"稠密数组，`data[vectorIndex*15]` 直接寻址"
+ * 改成两级存储（`indexMap: Int32Array` 做 `vectorIndex→紧凑下标`，紧凑
+ * `data` 只存"至少有一个 vectorIndex 需要"的结果）。起因是 >14 剪枝 +
+ * 镜像去重之后，稠密数组里 89.6% 都是从未写过的哨兵值——数牌表实测两级
+ * 布局体积从 27.9MB 降到约 10.9MB（约 2.7x）。查表吞吐量交替对照测量下
+ * 跟稠密布局基本打平（约 1.01x，噪声范围内；第一次未交替测量时误判为快
+ * 22%，是 JIT 预热/顺序偏差，不是真实效应，交替测量后予以纠正）——两级
+ * 布局的紧凑数组体积小，更容易被 CPU 缓存命中，抵消了多一次间接寻址的
+ * 理论开销。`indexMap[vectorIndex]===-1`（从未建过）时下游 `base` 变负数，
+ * 越界读 `data[base+...]` 返回 `undefined`，`computeShantenViaTable` 里的
+ * `>= 0` 判断天然把它当"不可达"处理，查询路径不需要额外判空分支。
+ *
+ * 再往后一轮：发现两级布局里 `data` 记录之间的内容重复率也极高——实测
+ * 数牌表 203,122 条紧凑记录只有 **1,119** 种不同内容（99.45% 是重复），
+ * 字牌表 21,735 条只有 **47** 种（99.78%）。原因是 `Δmelds/Δtatsu` 的取值
+ * 范围本身很窄，不同的计数向量大量收敛到同一套"能拼几副面子、剩几个
+ * 搭子"的结果模式。`buildSuitTable` 因此在原有 >14 剪枝 + 镜像去重之上再
+ * 加一层内容级 hash-cons：`contentKeyOf` 把一条 15 元素的 `Int8` 记录编码
+ * 成一个 base-6 整数（每个值先 `+1` 映射到 `[0,5]`，`6^15≈4.7e11` 远小于
+ * `Number.MAX_SAFE_INTEGER`，可以安全当 `Map<number, number>` 的 key，不用
+ * 有 GC 开销的字符串 key）——内容第一次出现才追加进 `data`，重复内容直接
+ * 复用已有下标。`data` 因此从约 2.91MB 压到约 17KB（数牌表）；连带效应是
+ * `indexMap` 里存的下标上限从 203,122 骤降到 1,118，远小于 `Int16Array`
+ * 上限，`indexMap` 也从 `Int32Array` 收窄成 `Int16Array`，从约 7.45MB 降到
+ * 约 3.72MB。两处叠加，数牌表总大小从约 10.9MB 降到约 **3.74MB**（约
+ * 2.9x），字牌表从约 638KB 降到约 150KB（约 4.25x）。内容去重给建表循环
+ * 多加了一次 `Map` 查找/写入（数牌表约 20 万次、字牌表约 2 万次），交替
+ * 对照测量下建表总耗时落在原有运行间噪声范围内，没有观测到显著变化——这
+ * 部分开销相对 `solveSuitVector` 的递归计算量可以忽略。
+ *
+ * 多线程建表（复用 `packages/ai/src/junk/tune-pool.ts` 的 worker_threads
+ * 池模式）仍留作后续按需追加，目前的数字已经足够好，没有必要再加这层
+ * 复杂度。
  */
 
 import type { TileId } from "./ids.ts";
@@ -234,8 +266,22 @@ export const SLOTS_PER_VECTOR = 15;
 export type SuitTable = {
   suitLength: number;
   hasRunLogic: boolean;
-  /** 每个 vectorIndex 存 15 个 Int8：`[0..4]`=withEntryPair1，
-   * `[5..9]`=entryPair0ExitPair0，`[10..14]`=entryPair0ExitPair1。 */
+  /** vectorIndex → `data` 里的第几份（不是字节偏移，乘 `SLOTS_PER_VECTOR`
+   * 才是）。这个值是内容去重后的 contentId，不是"第几个 canonical
+   * vectorIndex"这个序号——很多 vectorIndex 算出的 15 元素结果内容完全一样
+   * （见 `buildSuitTable` 文档），会共享同一个 contentId，所以上限远小于
+   * canonical vectorIndex 的数量（数牌表实测上限仅 1,118），`Int16Array`
+   * 足够存下。-1 表示这个 vectorIndex 从未建过（总张数 >14，被剪掉；真实
+   * 手牌的查询路径不会用到）——`contentId=-1` 时下游 `base = -1 *
+   * SLOTS_PER_VECTOR` 是负数，读 `data[base+...]` 会越界返回 `undefined`，
+   * `computeShantenViaTable` 里的 `>= 0` 判断天然把 `undefined` 当"不可达"
+   * 处理，不需要在查询路径里额外判空。 */
+  indexMap: Int16Array;
+  /** 紧凑数据：只存"至少有一个 vectorIndex 需要"的**不同内容**，数量远小于
+   * `5^suitLength`，也远小于剪枝+镜像去重后的 vectorIndex 数量（数牌表实测
+   * 仅 1,119 条，见 `buildSuitTable` 文档）。每份 15 个 Int8：
+   * `[0..4]`=withEntryPair1，`[5..9]`=entryPair0ExitPair0，
+   * `[10..14]`=entryPair0ExitPair1。 */
   data: Int8Array;
 };
 
@@ -244,24 +290,58 @@ export type SuitTable = {
  * 剪枝）。导出给测试用，确保测试断言的边界和实现用的是同一个数。 */
 export const MAX_REAL_HAND_TILES = 14;
 
-/** 全量建表：对 `[0, 5^suitLength)` 每个向量都算出 withEntryPair1/
- * entryPair0ExitPair0/entryPair0ExitPair1 三组结果并写进一张扁平 `Int8Array`。
- * m/p/s 传 `(9, true)` 共用同一张表；z 传 `(7, false)`。全程只分配一块 flat
- * memo + 一个复用的 `counts` 缓冲区，不逐向量/逐分支分配新对象。
+/**
+ * 把 `data` 里从 `base` 开始的一条 15 元素记录编码成一个 base-6 整数，
+ * 用作 `buildSuitTable` 内容去重 `Map` 的 key：每个值先 `+1`（原始取值范围
+ * 是 `[SENTINEL, MAX_DELTA_MELDS] = [-1,4]`，共 6 种）映射到 `[0,5]`，再按
+ * base-6 累乘。`6^15 ≈ 4.7e11`，远小于 `Number.MAX_SAFE_INTEGER`（约 9e15），
+ * 可以安全当 JS number 用、直接做 `Map<number, number>` 的 key——比拼字符串
+ * key 省掉了字符串分配/GC 开销。
+ */
+const contentKeyOf = (data: Int8Array, base: number): number => {
+  let key = 0;
+  for (let i = 0; i < SLOTS_PER_VECTOR; i += 1) key = key * 6 + (data[base + i]! + 1);
+  return key;
+};
+
+/**
+ * 全量建表：对 `[0, 5^suitLength)` 每个向量算出 withEntryPair1/
+ * entryPair0ExitPair0/entryPair0ExitPair1 三组结果。m/p/s 传 `(9, true)`
+ * 共用同一张表；z 传 `(7, false)`。
  *
- * 两个剪枝（均已验证安全，见文件顶部注释）：
- * 1. 总张数 >14 的向量不计算，直接留哨兵值——任何分支都是从 counts 里
- *    减牌再递归，子状态总张数只会更少不会更多，>14 的向量不可能是任何
- *    合法向量的必经之路，也不会被查询路径（真实手牌）用到。
+ * 两级存储（`indexMap` + 紧凑 `data`），而不是直接 `data[vectorIndex*15]`
+ * 稠密存储：数牌表实测两级布局体积从 27.9MB 降到约 10.9MB（约 2.7x），
+ * 查表吞吐量交替对照测量下跟稠密布局基本打平（1.01x，噪声范围内）——稠密
+ * 数组里 89.6% 都是从未写过的哨兵值（要么 >14 被剪，要么是镜像对里非代表
+ * 的一侧），两级布局的紧凑数组更容易被 CPU 缓存命中，抵消了多一次间接寻址
+ * 的开销。
+ *
+ * 三层去重（均已验证安全，见文件顶部注释）叠加决定了 `data` 的真实大小：
+ * 1. 总张数 >14 的向量不计算——不可能是任何合法向量的必经之路，也不会被
+ *    查询路径（真实手牌）用到，`indexMap` 里这类下标保持初始值 -1。
  * 2. rank 反转对称：只对 `vectorIndex <= mirrorVectorIndexOf(counts)` 的
- *    向量真正调用 `solveSuitVector`，算完顺手把同一份结果写进它的镜像
- *    位置；轮到镜像那个下标自己被遍历到时，直接跳过（结果已经在算原始
- *    向量时写过了）。 */
+ *    向量真正调用 `solveSuitVector`。
+ * 3. 内容级 hash-cons：不同 vectorIndex 算出的 15 元素结果大量重复（数牌表
+ *    实测 203,122 个 canonical 向量只有 1,119 种不同内容），用
+ *    `contentKeyOf` 查 `contentMap`，内容第一次出现才追加进 `data`、分配
+ *    新 contentId；重复内容直接复用已有 contentId，不重复存一份。
+ *
+ * `data` 用 `vectorCount * SLOTS_PER_VECTOR`（不剪枝、不去重、不做内容去重
+ * 时的稠密上界）分配，建完后按实际写入的 contentCount slice 成一份新的、
+ * 更小的 Int8Array（slice 是拷贝，会真正释放多余内存，不是 subarray 那种
+ * 仍然拴着整块大 buffer 的视图）。每个候选内容先写进
+ * `contentCount * SLOTS_PER_VECTOR` 这个尚未确认的槽位再算 key——如果判定
+ * 是重复内容，contentCount 不递增，这个槽位会被下一次迭代的候选内容原地
+ * 覆盖，不需要额外的 scratch buffer。
+ */
 export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTable => {
   const vectorCount = 5 ** suitLength;
   const flat = new Int8Array(vectorCount * 2 * 10).fill(UNSET);
+  const indexMap = new Int16Array(vectorCount).fill(-1);
   const data = new Int8Array(vectorCount * SLOTS_PER_VECTOR).fill(SENTINEL);
+  const contentMap = new Map<number, number>();
   const counts = new Array<number>(suitLength).fill(0);
+  let contentCount = 0;
   for (let vectorIndex = 0; vectorIndex < vectorCount; vectorIndex += 1) {
     let remaining = vectorIndex;
     let total = 0;
@@ -273,21 +353,33 @@ export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTa
     if (total > MAX_REAL_HAND_TILES) continue;
 
     const mirrorIndex = mirrorVectorIndexOf(counts);
-    if (mirrorIndex < vectorIndex) continue; // 镜像那边已经算过、写过这份结果了
+    if (mirrorIndex < vectorIndex) {
+      indexMap[vectorIndex] = indexMap[mirrorIndex]!; // 镜像那边已经算过、分配过 contentId 了
+      continue;
+    }
 
     const base0 = solveSuitVector(flat, counts, 0, hasRunLogic);
     const base1 = solveSuitVector(flat, counts, 1, hasRunLogic);
-    const outBase = vectorIndex * SLOTS_PER_VECTOR;
+
+    const candidateBase = contentCount * SLOTS_PER_VECTOR;
     for (let dm = 0; dm <= MAX_DELTA_MELDS; dm += 1) {
-      data[outBase + dm] = flat[base1 + 5 + dm]!; // withEntryPair1
-      data[outBase + 5 + dm] = flat[base0 + dm]!; // entryPair0ExitPair0
-      data[outBase + 10 + dm] = flat[base0 + 5 + dm]!; // entryPair0ExitPair1
+      data[candidateBase + dm] = flat[base1 + 5 + dm]!; // withEntryPair1
+      data[candidateBase + 5 + dm] = flat[base0 + dm]!; // entryPair0ExitPair0
+      data[candidateBase + 10 + dm] = flat[base0 + 5 + dm]!; // entryPair0ExitPair1
     }
-    if (mirrorIndex !== vectorIndex) {
-      data.copyWithin(mirrorIndex * SLOTS_PER_VECTOR, outBase, outBase + SLOTS_PER_VECTOR);
+
+    const key = contentKeyOf(data, candidateBase);
+    let contentId = contentMap.get(key);
+    if (contentId === undefined) {
+      contentId = contentCount;
+      contentMap.set(key, contentId);
+      contentCount += 1;
     }
+
+    indexMap[vectorIndex] = contentId;
+    if (mirrorIndex !== vectorIndex) indexMap[mirrorIndex] = contentId;
   }
-  return { suitLength, hasRunLogic, data };
+  return { suitLength, hasRunLogic, indexMap, data: data.slice(0, contentCount * SLOTS_PER_VECTOR) };
 };
 
 let numberSuitTableSingleton: SuitTable | undefined;
@@ -299,7 +391,8 @@ let honorSuitTableSingleton: SuitTable | undefined;
  * `packages/core/vitest.config.ts` 没有关掉 test isolation，Vitest 4 默认
  * 每个测试文件独立 worker/模块注册表——若 import 时就建表，大量测试文件、
  * 以及不需要 shanten 的进程都会各自付一次建表成本。数牌表（m/p/s 共用）
- * 实测约 1.1 秒/9MB，字牌表约 20ms/1MB（具体数字见
+ * 实测约 290ms、两级存储合计约 3.74MB（`indexMap` Int16Array 约 3.72MB +
+ * 内容去重后的紧凑 `data` 约 17KB），字牌表约 20ms、约 150KB（具体数字见
  * `docs/process/shanten-architecture-plan.md` §6）。
  */
 export const getNumberSuitTable = (): SuitTable =>
@@ -368,7 +461,8 @@ export const computeShantenViaTable = (
 
   for (const block of blocks) {
     const vectorIndex = vectorIndexOfRange(counts, block.start, block.table.suitLength);
-    const base = vectorIndex * SLOTS_PER_VECTOR;
+    const contentId = block.table.indexMap[vectorIndex]!;
+    const base = contentId * SLOTS_PER_VECTOR;
     const data = block.table.data;
     next.fill(DP_UNREACHED);
     for (let tm = 0; tm <= MAX_TOTAL_MELDS; tm += 1) {

@@ -7,6 +7,7 @@ import {
   MAX_REAL_HAND_TILES,
   NUMBER_SUIT_LENGTH,
   SLOTS_PER_VECTOR,
+  type SuitTable,
 } from "./shanten-suit-table.ts";
 
 /**
@@ -123,11 +124,18 @@ const referenceSolve = (
   return result;
 };
 
-/** 把 buildSuitTable 的 15-slot 布局重建成跟 referenceSolve 一样的
- * 10-slot [exit0(5),exit1(5)] 格式，方便直接比较。 */
-const extractResult = (data: Int8Array, vectorIndex: number, pair: 0 | 1): Int8Array => {
-  const base = vectorIndex * SLOTS_PER_VECTOR;
+/** 把 buildSuitTable 的两级存储（indexMap + 紧凑 data）重建成跟
+ * referenceSolve 一样的 10-slot [exit0(5),exit1(5)] 格式，方便直接比较。
+ * `indexMap[vectorIndex] === -1`（从未建过，总张数 >14 被剪掉）时显式返回
+ * 全哨兵——不能让它落到下面的越界读取里：越界读 `Int8Array` 返回
+ * `undefined`，再赋值进新建的 `Int8Array` 会被强制转成 0，不是 -1，会跟
+ * "全哨兵"这个预期悄悄对不上。 */
+const extractResult = (table: SuitTable, vectorIndex: number, pair: 0 | 1): Int8Array => {
   const out = new Int8Array(10).fill(-1);
+  const compactIndex = table.indexMap[vectorIndex]!;
+  if (compactIndex < 0) return out;
+  const base = compactIndex * SLOTS_PER_VECTOR;
+  const data = table.data;
   if (pair === 1) {
     for (let dm = 0; dm <= 4; dm += 1) out[5 + dm] = data[base + dm]!; // withEntryPair1
   } else {
@@ -161,7 +169,7 @@ test("honor table matches the reference implementation for hand-picked vectors",
     const vectorIndex = counts.reduceRight((acc, count) => acc * 5 + count, 0);
     for (const pair of [0, 1] as const) {
       assert.deepEqual(
-        [...extractResult(table.data, vectorIndex, pair)],
+        [...extractResult(table, vectorIndex, pair)],
         [...referenceSolve(counts, pair, false, memo)],
       );
     }
@@ -185,7 +193,7 @@ test(
       const counts = countsFromIndex(vectorIndex, HONOR_SUIT_LENGTH);
       const total = counts.reduce((sum, count) => sum + count, 0);
       for (const pair of [0, 1] as const) {
-        const actual = [...extractResult(table.data, vectorIndex, pair)];
+        const actual = [...extractResult(table, vectorIndex, pair)];
         if (total > MAX_REAL_HAND_TILES) {
           assert.deepEqual(
             actual,
@@ -224,7 +232,7 @@ test(
       }
       const vectorIndex = counts.reduceRight((acc, count) => acc * 5 + count, 0);
       for (const pair of [0, 1] as const) {
-        const actual = [...extractResult(table.data, vectorIndex, pair)];
+        const actual = [...extractResult(table, vectorIndex, pair)];
         if (total > MAX_REAL_HAND_TILES) {
           assert.deepEqual(
             actual,
@@ -253,8 +261,8 @@ test("buildSuitTable: mirror symmetry — a vector and its rank-reversed counter
   const mirroredIndex = mirrored.reduceRight((acc, count) => acc * 5 + count, 0);
   for (const pair of [0, 1] as const) {
     assert.deepEqual(
-      [...extractResult(table.data, originalIndex, pair)],
-      [...extractResult(table.data, mirroredIndex, pair)],
+      [...extractResult(table, originalIndex, pair)],
+      [...extractResult(table, mirroredIndex, pair)],
     );
   }
 });
@@ -264,6 +272,6 @@ test("buildSuitTable: vectors with total tile count over 14 are left as sentinel
   const maxedOut = new Array<number>(NUMBER_SUIT_LENGTH).fill(4); // 36 张，远超 14
   const vectorIndex = maxedOut.reduceRight((acc, count) => acc * 5 + count, 0);
   for (const pair of [0, 1] as const) {
-    assert.deepEqual([...extractResult(table.data, vectorIndex, pair)], ALL_SENTINEL);
+    assert.deepEqual([...extractResult(table, vectorIndex, pair)], ALL_SENTINEL);
   }
 });
