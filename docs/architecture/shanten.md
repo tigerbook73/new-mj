@@ -21,7 +21,8 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
 - Layer 1 仅在 `tileSet === STANDARD_TILE_SET`（引用相等）时走 Layer 0 查表
   快路径；任何非标准 `TileSet` 回退到保留的递归实现，保持通用性。
 - 当前量级：数牌表（m/p/s 共用）建表约 280ms、总内存约 1.9MB，字牌表约
-  20ms、约 78KB；单次整手查询约 0.8µs。
+  20ms、约 78KB；单次整手查询约 0.8µs，`ukeire`（约 34 种候选批量试探，
+  经 `createShantenProber` 的前缀/后缀 DP 分解）约 14µs。
 
 ## 长期决策
 

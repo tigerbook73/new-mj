@@ -427,15 +427,94 @@ const getBlocks = (): readonly SuitBlock[] => {
 let countsScratch: number[] | undefined;
 
 /**
- * Layer B：拆出 m/p/s/z 四个花色的计数向量分别查表，严格按 `tileSet.kinds`
- * 的物理顺序（m→p→s→z）跑一个 `(totalMelds, pairFlag)` 的小型 DP（复用两块
- * 模块级 scratch buffer 乒乓切换，不逐次调用分配新数组），最后对每个可达
- * 组合套用跟 `standardShantenByRecursion` 终态完全一样的公式取 min。
+ * 把一条 15-slot 转移记录（表里的单花色结果，或 `composeTransitions` 合成
+ * 的多花色转移）应用到 DP 状态上：`dp`（`(tm*2+pairFlag)` → 累计最大
+ * tatsu，`DP_UNREACHED`=不可达）经 `rec[base..base+14]` 转移写进 `next`。
+ * `base` 为负（花色总张数 >14 被剪，真实手牌不会出现）时越界读返回
+ * `undefined`，`>= 0` 判断把它当不可达处理，无需判空。
+ */
+const applyTransition = (dp: Int16Array, next: Int16Array, rec: Int8Array, base: number): void => {
+  next.fill(DP_UNREACHED);
+  for (let tm = 0; tm <= MAX_TOTAL_MELDS; tm += 1) {
+    const fromNoPair = dp[tm * 2]!;
+    const fromPair = dp[tm * 2 + 1]!;
+    for (let dm = 0; dm <= MAX_DELTA_MELDS && tm + dm <= MAX_TOTAL_MELDS; dm += 1) {
+      if (fromNoPair !== DP_UNREACHED) {
+        const dtNoJiang = rec[base + 5 + dm]!; // entryPair0ExitPair0：不认雀头
+        if (dtNoJiang >= 0) {
+          const outIndex = (tm + dm) * 2;
+          const candidate = fromNoPair + dtNoJiang;
+          if (candidate > next[outIndex]!) next[outIndex] = candidate;
+        }
+        const dtJiang = rec[base + 10 + dm]!; // entryPair0ExitPair1：认雀头
+        if (dtJiang >= 0) {
+          const outIndex = (tm + dm) * 2 + 1;
+          const candidate = fromNoPair + dtJiang;
+          if (candidate > next[outIndex]!) next[outIndex] = candidate;
+        }
+      }
+      if (fromPair !== DP_UNREACHED) {
+        const dt = rec[base + dm]!; // withEntryPair1：雀头已被更早花色认领
+        if (dt >= 0) {
+          const outIndex = (tm + dm) * 2 + 1;
+          const candidate = fromPair + dt;
+          if (candidate > next[outIndex]!) next[outIndex] = candidate;
+        }
+      }
+    }
+  }
+};
+
+/** 对每个可达 (tm,pairFlag) 套用跟 `standardShantenByRecursion` 终态完全
+ * 一样的公式取 min。 */
+const finalizeDp = (dp: Int16Array, existingMelds: number): number => {
+  let best = Number.POSITIVE_INFINITY;
+  for (let tm = 0; tm <= MAX_TOTAL_MELDS; tm += 1) {
+    for (let pairFlag = 0; pairFlag <= 1; pairFlag += 1) {
+      const totalTatsu = dp[tm * 2 + pairFlag]!;
+      if (totalTatsu === DP_UNREACHED) continue;
+      const totalMelds = existingMelds + tm;
+      const usableTatsu = Math.min(totalTatsu, MAX_DELTA_MELDS - totalMelds);
+      const shanten = 8 - totalMelds * 2 - usableTatsu - pairFlag;
+      if (shanten < best) best = shanten;
+    }
+  }
+  return best;
+};
+
+/**
+ * Layer B 的 DP 核心：直接接受调用方已经数好的 34 长度计数向量（m→p→s→z
+ * 标准顺序），拆出四个花色分别查表，按物理顺序跑 `(totalMelds, pairFlag)`
+ * 的小型 DP（复用两块模块级 scratch buffer 乒乓切换），最后套终态公式取
+ * min。`counts` 只读不改。
  *
- * 只应该在 `tileSet` 确实是 34 种、`m→p→s→z` 各 9/9/9/7 这个标准形状时调用
- * ——调用方（`shanten.ts` 的 `standardShanten`）只在
- * `tileSet === STANDARD_TILE_SET`（引用相等）时才应该走这条路径，非标准
- * `TileSet` 回退到 `standardShantenByRecursion`，这里不做形状校验。
+ * 单独导出是给"同一手牌反复试探 ±1 张"的调用方（如 `ukeire`）用的：建一次
+ * counts、试探时原地 ±1 再调这里，避免每个候选都重建数组/反查牌种；批量
+ * 试探还有更省的 `createShantenProber`。
+ */
+export const computeShantenFromCounts = (
+  counts: readonly number[],
+  existingMelds: number,
+): number => {
+  const blocks = getBlocks();
+  let [dp, next] = getDpScratch();
+  dp.fill(DP_UNREACHED);
+  dp[0] = 0; // tm=0, pairFlag=0 -> 累计 tatsu=0
+  for (const block of blocks) {
+    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    applyTransition(dp, next, block.table.data, base);
+    [dp, next] = [next, dp];
+  }
+  return finalizeDp(dp, existingMelds);
+};
+
+/**
+ * 从 TileId 数组入口的包装：数出 counts（复用模块级 scratch）后走
+ * `computeShantenFromCounts`。只应该在 `tileSet` 确实是 34 种、`m→p→s→z`
+ * 各 9/9/9/7 这个标准形状时调用——调用方（`shanten.ts` 的 `standardShanten`）
+ * 只在 `tileSet === STANDARD_TILE_SET`（引用相等）时才应该走这条路径，
+ * 非标准 `TileSet` 回退到 `standardShantenByRecursion`，这里不做形状校验。
  */
 export const computeShantenViaTable = (
   tiles: readonly TileId[],
@@ -451,60 +530,102 @@ export const computeShantenViaTable = (
     const index = tileSet.kindIndexOf(tileSet.kindOf(tile));
     counts[index] = (counts[index] ?? 0) + 1;
   }
+  return computeShantenFromCounts(counts, existingMelds);
+};
 
+/**
+ * 把两条 15-slot 转移记录（`a` 先、`b` 后）合成一条等价的复合转移，写进
+ * `out`。转移在 (Δmelds, pair) 上构成 max-plus 半环，天然可结合：
+ *   - withEntryPair1 链：两段都在"雀头已认领"轨道上。
+ *   - entryPair0ExitPair0 链：两段都不认雀头。
+ *   - entryPair0ExitPair1：雀头在 `a` 段认领（之后 `b` 走 withEntryPair1），
+ *     或 `a` 段不认、`b` 段认领——取两者较大。
+ * Δmelds 超过 4 的组合照旧丢弃（与不变量 3 同构）。`aBase` 允许指向表
+ * `data` 里的一条记录；越界（负 base）读 `undefined` 时 `>= 0` 判断天然
+ * 跳过，语义与 `applyTransition` 一致。
+ */
+const composeTransitions = (
+  a: Int8Array,
+  aBase: number,
+  b: Int8Array,
+  bBase: number,
+  out: Int8Array,
+): void => {
+  out.fill(SENTINEL);
+  for (let dm1 = 0; dm1 <= MAX_DELTA_MELDS; dm1 += 1) {
+    for (let dm2 = 0; dm1 + dm2 <= MAX_DELTA_MELDS; dm2 += 1) {
+      const dm = dm1 + dm2;
+      const aPair1 = a[aBase + dm1]!;
+      const bPair1 = b[bBase + dm2]!;
+      if (aPair1 >= 0 && bPair1 >= 0 && aPair1 + bPair1 > out[dm]!) out[dm] = aPair1 + bPair1;
+      const a00 = a[aBase + 5 + dm1]!;
+      const b00 = b[bBase + 5 + dm2]!;
+      if (a00 >= 0 && b00 >= 0 && a00 + b00 > out[5 + dm]!) out[5 + dm] = a00 + b00;
+      const b01 = b[bBase + 10 + dm2]!;
+      if (a00 >= 0 && b01 >= 0 && a00 + b01 > out[10 + dm]!) out[10 + dm] = a00 + b01;
+      const a01 = a[aBase + 10 + dm1]!;
+      if (a01 >= 0 && bPair1 >= 0 && a01 + bPair1 > out[10 + dm]!) out[10 + dm] = a01 + bPair1;
+    }
+  }
+};
+
+/** 恒等转移：Δmelds=0、Δtatsu=0、pair 状态原样穿过。 */
+const IDENTITY_TRANSITION = (() => {
+  const identity = new Int8Array(SLOTS_PER_VECTOR).fill(SENTINEL);
+  identity[0] = 0; // withEntryPair1
+  identity[5] = 0; // entryPair0ExitPair0
+  return identity;
+})();
+
+/**
+ * 批量试探器：对固定手牌预计算每个花色 block 前的 DP 前缀状态与其后所有
+ * block 合成的后缀转移，之后 `probe(kindIndex)` 与"`counts[kindIndex]+1`
+ * 后调 `computeShantenFromCounts`"逐位等价，但每次只需重查改动花色的一条
+ * 记录 + 两次转移应用（前缀状态 ⊗ 改动花色 ⊗ 后缀转移），不用重跑全部
+ * 4 个 block。`ukeire` 对同一手牌试探 30 余种进张时用。
+ *
+ * `countsSource` 在构造时拷贝，构造后调用方的修改不影响试探结果；返回的
+ * probe 闭包持有自己的 scratch，不与 `computeShantenFromCounts` 共享，
+ * 两者可交错调用。
+ */
+export const createShantenProber = (
+  countsSource: readonly number[],
+  existingMelds: number,
+): ((kindIndex: number) => number) => {
   const blocks = getBlocks();
-
-  let [dp, next] = getDpScratch();
-  dp.fill(DP_UNREACHED);
-  dp[0] = 0; // tm=0, pairFlag=0 -> 累计 tatsu=0
-
+  const counts = [...countsSource];
+  const prefix: Int16Array[] = [];
+  let state = new Int16Array(10).fill(DP_UNREACHED);
+  state[0] = 0;
   for (const block of blocks) {
+    prefix.push(state);
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
-    const contentId = block.table.indexMap[slot]!;
-    const base = contentId * SLOTS_PER_VECTOR;
-    const data = block.table.data;
-    next.fill(DP_UNREACHED);
-    for (let tm = 0; tm <= MAX_TOTAL_MELDS; tm += 1) {
-      const fromNoPair = dp[tm * 2]!;
-      const fromPair = dp[tm * 2 + 1]!;
-      for (let dm = 0; dm <= MAX_DELTA_MELDS && tm + dm <= MAX_TOTAL_MELDS; dm += 1) {
-        if (fromNoPair !== DP_UNREACHED) {
-          const dtNoJiang = data[base + 5 + dm]!; // entryPair0ExitPair0：本花色不认雀头
-          if (dtNoJiang >= 0) {
-            const outIndex = (tm + dm) * 2;
-            const candidate = fromNoPair + dtNoJiang;
-            if (candidate > next[outIndex]!) next[outIndex] = candidate;
-          }
-          const dtJiang = data[base + 10 + dm]!; // entryPair0ExitPair1：本花色认雀头
-          if (dtJiang >= 0) {
-            const outIndex = (tm + dm) * 2 + 1;
-            const candidate = fromNoPair + dtJiang;
-            if (candidate > next[outIndex]!) next[outIndex] = candidate;
-          }
-        }
-        if (fromPair !== DP_UNREACHED) {
-          const dt = data[base + dm]!; // withEntryPair1：雀头已被更早花色认领
-          if (dt >= 0) {
-            const outIndex = (tm + dm) * 2 + 1;
-            const candidate = fromPair + dt;
-            if (candidate > next[outIndex]!) next[outIndex] = candidate;
-          }
-        }
-      }
-    }
-    [dp, next] = [next, dp];
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const next = new Int16Array(10);
+    applyTransition(state, next, block.table.data, base);
+    state = next;
   }
-
-  let best = Number.POSITIVE_INFINITY;
-  for (let tm = 0; tm <= MAX_TOTAL_MELDS; tm += 1) {
-    for (let pairFlag = 0; pairFlag <= 1; pairFlag += 1) {
-      const totalTatsu = dp[tm * 2 + pairFlag]!;
-      if (totalTatsu === DP_UNREACHED) continue;
-      const totalMelds = existingMelds + tm;
-      const usableTatsu = Math.min(totalTatsu, MAX_DELTA_MELDS - totalMelds);
-      const shanten = 8 - totalMelds * 2 - usableTatsu - pairFlag;
-      if (shanten < best) best = shanten;
-    }
+  const suffix: Int8Array[] = new Array<Int8Array>(blocks.length + 1);
+  suffix[blocks.length] = IDENTITY_TRANSITION;
+  for (let i = blocks.length - 1; i >= 1; i -= 1) {
+    const block = blocks[i]!;
+    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const out = new Int8Array(SLOTS_PER_VECTOR);
+    composeTransitions(block.table.data, base, suffix[i + 1]!, 0, out);
+    suffix[i] = out;
   }
-  return best;
+  const mid = new Int16Array(10);
+  const fin = new Int16Array(10);
+  return (kindIndex: number): number => {
+    const blockIndex = kindIndex < NUMBER_SUIT_LENGTH * 3 ? Math.floor(kindIndex / NUMBER_SUIT_LENGTH) : 3;
+    const block = blocks[blockIndex]!;
+    counts[kindIndex] = (counts[kindIndex] ?? 0) + 1;
+    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    counts[kindIndex] = (counts[kindIndex] ?? 0) - 1;
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    applyTransition(prefix[blockIndex]!, mid, block.table.data, base);
+    applyTransition(mid, fin, suffix[blockIndex + 1]!, 0);
+    return finalizeDp(fin, existingMelds);
+  };
 };

@@ -1,6 +1,9 @@
 import type { TileId, TileKind } from "./ids.ts";
-import { computeShantenViaTable } from "./shanten-suit-table.ts";
-import { isSevenPairsWinningHand, isStandardWinningHand } from "./standard-hand.ts";
+import {
+  computeShantenFromCounts,
+  computeShantenViaTable,
+  createShantenProber,
+} from "./shanten-suit-table.ts";
 import { STANDARD_TILE_SET, type TileSet } from "./tiles.ts";
 
 export type ShantenOptions = Readonly<{
@@ -99,12 +102,14 @@ const standardShantenByRecursion = (
  * `standardShantenByRecursion`，保持通用性不受影响。
  *
  * `memo` 只在回退路径上有意义（见 `standardShantenByRecursion` 的文档）；
- * 快路径本身就是 O(1) 查表 + 一个很小的合并 DP，不需要、也不使用 memo。
+ * 快路径本身就是 O(1) 查表 + 一个很小的合并 DP，不需要、也不使用 memo——
+ * 所以这里不给 memo 默认值（默认值在回退实现里），避免快路径每次调用都
+ * 白白分配一个 Map。
  */
 export const standardShanten = (
   tiles: readonly TileId[],
   tileSet: TileSet = STANDARD_TILE_SET,
-  memo: Map<string, number> = new Map(),
+  memo?: Map<string, number>,
   existingMelds = 0,
 ): number =>
   tileSet === STANDARD_TILE_SET
@@ -131,15 +136,20 @@ export const shantenWithExposedMelds = (
     : Math.min(standard, sevenPairsShanten(concealedTiles, tileSet));
 };
 
+const sevenPairsShantenFromCounts = (counts: readonly number[]): number => {
+  let pairs = 0;
+  let kinds = 0;
+  for (const count of counts) {
+    if (count >= 2) pairs += 1;
+    if (count > 0) kinds += 1;
+  }
+  return 6 - pairs + Math.max(0, 7 - kinds);
+};
+
 export const sevenPairsShanten = (
   tiles: readonly TileId[],
   tileSet: TileSet = STANDARD_TILE_SET,
-): number => {
-  const counts = countsOf(tiles, tileSet);
-  const pairs = counts.filter((count) => count >= 2).length;
-  const kinds = counts.filter((count) => count > 0).length;
-  return 6 - pairs + Math.max(0, 7 - kinds);
-};
+): number => sevenPairsShantenFromCounts(countsOf(tiles, tileSet));
 
 /**
  * 玩法无关的标准型/七对二选一向听数：`sevenPairs` 只是一个开关，函数本身
@@ -158,19 +168,48 @@ export const computeShanten = (
 /**
  * 会令向听数下降的牌种；不报告手中已经拿满的牌种。
  *
- * 这里要为同一手牌反复试探 30 余种候选进张，每种候选只比原手牌多一张牌，
- * 递归子状态高度重叠——共享同一个 memo（而不是让 computeShanten 内部各自新建）
- * 把这些搜索之间的重复计算省下来，结果不受影响（memo 只影响缓存命中，不
- * 影响 search 的返回值本身）。
+ * 这里要为同一手牌反复试探 30 余种候选进张，每种候选只比原手牌多一张牌。
+ * 标准 `TileSet` 走查表快路径：counts 只数一次，标准型用
+ * `createShantenProber`（前缀状态/后缀转移预计算，每个候选只重算改动花色
+ * 那一段 DP），七对用 counts 增量公式 O(1) 修正——不为每个候选拷贝手牌
+ * 数组、不重复反查牌种、不重跑全部 4 个花色。非标准 `TileSet` 走递归回退：
+ * 候选间的递归子状态高度重叠，共享同一个 memo 把重复搜索省下来（memo 只
+ * 影响缓存命中，不影响结果）。
  */
 export const ukeire = (
   tiles: readonly TileId[],
   options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
 ): TileKind[] => {
+  const counts = countsOf(tiles, tileSet);
+  if (tileSet === STANDARD_TILE_SET) {
+    const standardCurrent = computeShantenFromCounts(counts, 0);
+    // 七对基线只算一次；加一张第 k 种牌后 pairs/kinds 的变化只取决于
+    // counts[k] 原值（0→新增一种，1→新增一对），可 O(1) 修正。
+    let pairs = 0;
+    let kindsHeld = 0;
+    for (const count of counts) {
+      if (count >= 2) pairs += 1;
+      if (count > 0) kindsHeld += 1;
+    }
+    const current = options.sevenPairs
+      ? Math.min(standardCurrent, 6 - pairs + Math.max(0, 7 - kindsHeld))
+      : standardCurrent;
+    const probe = createShantenProber(counts, 0);
+    return tileSet.kinds.filter((kind, index) => {
+      const held = counts[index] ?? 0;
+      if (held >= tileSet.copiesPerKind) return false;
+      let candidate = probe(index);
+      if (options.sevenPairs) {
+        const sevenPairsCandidate =
+          6 - (pairs + (held === 1 ? 1 : 0)) + Math.max(0, 7 - (kindsHeld + (held === 0 ? 1 : 0)));
+        if (sevenPairsCandidate < candidate) candidate = sevenPairsCandidate;
+      }
+      return candidate < current;
+    });
+  }
   const memo = new Map<string, number>();
   const current = computeShanten(tiles, options, tileSet, memo);
-  const counts = countsOf(tiles, tileSet);
   return tileSet.kinds.filter((kind, index) => {
     if ((counts[index] ?? 0) >= tileSet.copiesPerKind) return false;
     const candidate = (index * tileSet.copiesPerKind) as TileId;
@@ -178,17 +217,17 @@ export const ukeire = (
   });
 };
 
-/** 听牌只描述下一张摸牌能否直接胡，不把普通进张误判为听牌。 */
+/**
+ * 听牌只描述下一张摸牌能否直接胡，不把普通进张误判为听牌。
+ *
+ * 等价推导：听牌 ⟺ 当前向听为 0 且存在可摸的进张——任何进张都把向听从 0
+ * 降到 -1，而向听 -1 与"直接胡牌"等价（shanten.test.ts 的 property 用例
+ * 断言了这条等价性）；ukeire 已经过滤了手里拿满四张、摸不到的牌种，所以
+ * 不需要再对每个候选做一次完整的胡牌回溯。
+ */
 export const isTingpai = (
   tiles: readonly TileId[],
   options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
 ): boolean =>
-  ukeire(tiles, options, tileSet).some((kind) => {
-    const index = tileSet.kindIndexOf(kind);
-    const candidate = (index * tileSet.copiesPerKind) as TileId;
-    return (
-      isStandardWinningHand([...tiles, candidate], tileSet) ||
-      (options.sevenPairs && isSevenPairsWinningHand([...tiles, candidate], tileSet))
-    );
-  });
+  computeShanten(tiles, options, tileSet) === 0 && ukeire(tiles, options, tileSet).length > 0;
