@@ -69,6 +69,28 @@ test("isTingpai and ukeire report only tiles that can immediately win", () => {
   assert.deepEqual(ukeire(hand, standardOnly), ["1p", "1s"]);
 });
 
+test("ukeire: existingMelds caps usable tatsu the same way shantenWithExposedMelds does", () => {
+  // 2 副露 + 2s3s4s（面子）+ 5m7m（嵌张搭子，缺6m）+ 9m9m（雀头），7 张手牌 —
+  // 2 副露 + 1 手牌内面子 = 3 面子，只差 5m7m 补 6m 就是 4 面子 + 雀头，向听 0。
+  // 2026-08-08 修复前：ukeire 内部硬编码 existingMelds=0 去算候选，把手牌当成
+  // 独立的 0 副露 7 张牌评估，摸 9m（凑成 9m9m9m 刻子）在这个错误基准下被判定
+  // "降向听"，但按真实的 2 副露基准复算，摸 9m 后向听仍是 0（见下方精确验证），
+  // 不该出现在 ukeire 里——只有 6m 才是真正的听牌。
+  const concealed = ids(["2s", "3s", "4s", "5m", "7m", "9m", "9m"]);
+  assert.equal(shantenWithExposedMelds(concealed, 2), 0);
+  assert.equal(
+    shantenWithExposedMelds([...concealed, id("9m", 2)], 2),
+    0,
+    "drawing a third 9m must NOT reduce shanten below 0 with 2 exposed melds",
+  );
+  assert.equal(shantenWithExposedMelds([...concealed, id("6m")], 2), -1);
+  assert.deepEqual(ukeire(concealed, standardOnly, STANDARD_TILE_SET, 2), ["6m"]);
+  // existingMelds defaults to 0 — matches the (buggy but now-explicit) behavior
+  // for callers that genuinely have no exposed melds, and is what makes this a
+  // non-breaking default for every pre-existing call site in this file.
+  assert.deepEqual(ukeire(concealed, standardOnly), ["6m", "9m"]);
+});
+
 test("shantenWithExposedMelds: usable tatsu is capped by exposed melds, not just concealed melds", () => {
   // 1 副露 + 4 搭子（1m2m/4m5m/7m8m/1p2p，互不相邻不会拼成面子）+ 1 雀头（1s1s），
   // 10 张手牌。standardShanten 内部 `min(tatsu, 4-melds)` 只看得到手牌自己找到

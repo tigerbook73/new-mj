@@ -160,13 +160,23 @@ export const computeShanten = (
   options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
   memo?: Map<string, number>,
+  existingMelds = 0,
 ): number =>
   options.sevenPairs
-    ? Math.min(standardShanten(tiles, tileSet, memo), sevenPairsShanten(tiles, tileSet))
-    : standardShanten(tiles, tileSet, memo);
+    ? Math.min(
+        standardShanten(tiles, tileSet, memo, existingMelds),
+        sevenPairsShanten(tiles, tileSet),
+      )
+    : standardShanten(tiles, tileSet, memo, existingMelds);
 
 /**
  * 会令向听数下降的牌种；不报告手中已经拿满的牌种。
+ *
+ * `existingMelds` 语义与 `shantenWithExposedMelds` 一致：副露的面子不在
+ * `tiles` 里，必须单独传入才能让内部的搭子上限 `min(tatsu, 4-melds)` 与已报
+ * 副露共同封顶——遗漏它会让候选进张相对于*未封顶*的基准比较，可能把实际不
+ * 降向听的牌种也报告出来（副露越多，这个偏差越明显）。默认 0 保持对已有调用
+ * 方（纯手牌、无副露场景）行为不变。
  *
  * 这里要为同一手牌反复试探 30 余种候选进张，每种候选只比原手牌多一张牌。
  * 标准 `TileSet` 走查表快路径：counts 只数一次，标准型用
@@ -180,12 +190,15 @@ export const ukeire = (
   tiles: readonly TileId[],
   options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
 ): TileKind[] => {
   const counts = countsOf(tiles, tileSet);
   if (tileSet === STANDARD_TILE_SET) {
-    const standardCurrent = computeShantenFromCounts(counts, 0);
+    const standardCurrent = computeShantenFromCounts(counts, existingMelds);
     // 七对基线只算一次；加一张第 k 种牌后 pairs/kinds 的变化只取决于
-    // counts[k] 原值（0→新增一种，1→新增一对），可 O(1) 修正。
+    // counts[k] 原值（0→新增一种，1→新增一对），可 O(1) 修正。sevenPairs 不与
+    // 副露共存（调用方约定，见 shantenWithExposedMelds 的文档），这里不重复
+    // 校验 existingMelds。
     let pairs = 0;
     let kindsHeld = 0;
     for (const count of counts) {
@@ -195,7 +208,7 @@ export const ukeire = (
     const current = options.sevenPairs
       ? Math.min(standardCurrent, 6 - pairs + Math.max(0, 7 - kindsHeld))
       : standardCurrent;
-    const probe = createShantenProber(counts, 0);
+    const probe = createShantenProber(counts, existingMelds);
     return tileSet.kinds.filter((kind, index) => {
       const held = counts[index] ?? 0;
       if (held >= tileSet.copiesPerKind) return false;
@@ -209,11 +222,13 @@ export const ukeire = (
     });
   }
   const memo = new Map<string, number>();
-  const current = computeShanten(tiles, options, tileSet, memo);
+  const current = computeShanten(tiles, options, tileSet, memo, existingMelds);
   return tileSet.kinds.filter((kind, index) => {
     if ((counts[index] ?? 0) >= tileSet.copiesPerKind) return false;
     const candidate = (index * tileSet.copiesPerKind) as TileId;
-    return computeShanten([...tiles, candidate], options, tileSet, memo) < current;
+    return (
+      computeShanten([...tiles, candidate], options, tileSet, memo, existingMelds) < current
+    );
   });
 };
 
@@ -229,5 +244,7 @@ export const isTingpai = (
   tiles: readonly TileId[],
   options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
 ): boolean =>
-  computeShanten(tiles, options, tileSet) === 0 && ukeire(tiles, options, tileSet).length > 0;
+  computeShanten(tiles, options, tileSet, undefined, existingMelds) === 0 &&
+  ukeire(tiles, options, tileSet, existingMelds).length > 0;
