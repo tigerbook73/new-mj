@@ -45,7 +45,7 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
   **消融实验补充验证**（2026-08-08，`compare-weights-cli.ts` 手工构造权重文件、其余
   12 项权重清零，只留 `shantenWeight`/`tenpaiProbabilityWeight`/`menqing`，逐点扫描
   `tenpaiProbabilityWeight` ∈ {5,10,...,100}，每点 1000 场）：① 保留 `menqing=8` 时，
-  5~40 区间稳定赢纯 shanten 基线约 52~53%（这次会话里信噪比最干净的一次正向信号），
+  5–40 区间稳定赢纯 shanten 基线约 52–53%（这次会话里信噪比最干净的一次正向信号），
   但过 40 后逐渐回落、100 时跌破 50%；② 把 `menqing` 也清零后，5~100 全部固定在
   54.8%，权重大小完全不影响结果——数学上可解释：向听打平时的概率项是单调标度，权重
   多大都不改变候选间的相对排序，只有在"要不要为了概率提升而开手（牺牲 menqing）"这类
@@ -68,7 +68,7 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
   redundant tatsu..."，断言从 `toBe(discardTatsuTile)` 改成两种列表顺序下都
   `toBe(discardHonor)`）。`pnpm --filter @new-mj/ai verify:full` 全绿。
 
-- Phase 2（Monte Carlo rollout + 真实番数期望，呼应 `docs/architecture/shanten.md` "Layer 3 远期方向"）评估级，暂不实现：已确认 `scoreJunkHand`/`decomposeStandardWinningHand`/`decomposeSevenPairsWinningHand` 已是 `@new-mj/core` 公开导出，不需要新增 core API。未解决问题：① rollout 内部"打哪张"用什么策略模拟——递归调用当前评分函数最准确但成本比 Phase 1 高一个数量级以上，需要先做基准测试才知道能否进自对弈/调参闭环；② rollout 只在什么 shanten 区间触发，避免全量候选都跑一遍；③ "D 层后是否到达和牌"这类链式结果没有闭式解，只能靠构造场景的 fixture 断言，不能指望自对弈胜率（原因与 Phase 1 相同、且样本需求更大）。建议 Phase 1 上线观察一段时间后再评估是否启动 Phase 2；启动时第一步是先解决①的性能基准，不要直接写 rollout 主体代码。
+- Phase 2（远期 EV：轻量 2-ply → 必要时 Monte Carlo rollout + 真实番数期望，呼应 `docs/architecture/shanten.md` "Layer 3 远期方向"）评估级，暂不实现：已确认 `scoreJunkHand`/`decomposeStandardWinningHand`/`decomposeSevenPairsWinningHand` 已是 `@new-mj/core` 公开导出，不需要新增 core API。`2-ply` 是评估框架（当前弃牌 → 按活牌概率枚举下一摸 → 此时选最佳弃牌 → 评估叶子手牌）；"进张后形状质量"是叶子评分手段，两者不是二选一——优先组合为轻量 2-ply + 少量经独立 fixture 验证的形状特征，而不是给间距本身加静态分。它应只在实际进张令后续搭子/二次进张/番型路线变好时奖励桥接价值；fixture 同时覆盖目标牌型与死桥接、边张、番型受损等反例，不能以自对弈胜率代替。未解决问题：① 2-ply/rollout 内部"打哪张"用什么策略模拟——递归调用当前评分函数最准确但成本比 Phase 1 高一个数量级以上，需要先做基准测试才知道能否进自对弈/调参闭环；② 只在什么 shanten 区间触发，避免全量候选都跑一遍；③ 完整 rollout 是否及如何模拟对手行动与真实番数；④ "D 层后是否到达和牌"这类链式结果没有闭式解。建议 Phase 1 上线观察一段时间后再评估是否启动；启动时第一步是先基准测试轻量 2-ply 探针（而非直接写完整 rollout），并先写目标/反例 fixtures。
 - Junk AI「阻挡低价值吃碰」专题（2026-08-08 讨论记录，未启动，未选定方案）：现状 `scoreAction`（`strategy.ts:385-431`）里吃/碰分支与打牌共用同一套 `handQuality`（向听 + 进张概率 + `fanPotential` + `isolationPotential`），没有专门的吃碰价值判断——`fanPotential`（83-102行）虽然对 chi 有常量惩罚（关闭 `pengpenghu`/`pairBonus`/`meldBonus` track、开口扣 `menqing`），但都是人工挑的静态权重，不是"吃碰后期望得分会掉多少"的真实估算；`recommendJunkAction` 对 claim 和 pass 直接 argmax 比大小，没有阈值、没有机会成本概念。候选方向：① 给 chi/peng 分支加显式迟疑阈值（δ hurdle，claim 分数需比 pass 基线高出 δ 才通过），δ 按关闭的番型 track 数量、并随 `gameProgress`（残局放宽）动态调整，改动小风险低；② 把 `fanPotential` 换成真正的期望倍数（EV）模型（枚举收尾番型分支×达成概率求和，复用 core `scoring.ts` 倍数计算），更准确但改动面大、单次决策计算量上升——与本条上方 Phase 2 rollout 方向一致，可合并考虑；③ chi 与 peng 应设不同门槛（chi 同时伤门清+碰碰胡+清一色三条线，peng 只伤门清）；④ 用已有 `decision-diff-cli`/`compare-weights-cli` A/B 工具量化任一改动对"低价值吃碰频率"与实际胜率/得分的影响，避免主观调参。下一步第一个具体动作（若启动）：先做①（成本最低），跑 A/B 工具验证效果后再决定是否投入②。
 
   **权重之外的基本逻辑缺口审计**（2026-08-08，讨论记录，未启动，未定优先级）：排查权重
@@ -115,8 +115,11 @@ Junk AI 自我优化基础设施专题（强度旋钮 / 自对弈 session 驱动
     `liveUkeireCount` 统计的是"能让向听下降的不同牌种"这种广度，两个孤立牌越
     接近（尤其同花色）各自 ±2 邻域重叠越多，并集反而变小；"双向搭桥牌效率更高"
     这个真实存在的麻将常识，在这套单步广度指标里没有被建模成正向因素。**不要
-    加"间距"或"同花色集中度"权重**——真要建模这个效应需要多步前瞻（2-ply/
-    rollout），属于已暂缓的 Phase 2 范畴，不是简单加权重能解决的。
+    加"间距"或"同花色集中度"权重**——真要建模这个效应需要多步前瞻：优先用
+    "按进张枚举 → 最佳后续弃牌 → 叶子形状质量"的轻量 2-ply 探针；叶子特征须经
+    独立目标/反例 fixture 验证，完整 rollout 仅在该方案证明不足时再评估。属于已暂缓的
+    Phase 2 范畴，不是简单加权重能解决的。
+
 - 评估 Junk AI 自我优化基础设施（Feature 参数化 + 自对弈 arena + 调参脚本这套结构）是否推广到 hangzhou/bloodbattle：可复用部分是 Layer B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属的 Feature 抽取（对应各玩法番型/规则）仍需各自单独做，不会自动免掉。
 - Junk AI `handQuality` 打分两处升级已完成（`packages/ai/src/junk/strategy.ts`，`pnpm --filter @new-mj/ai verify:full` 全绿）：① `improvements` 项从"ukeire 种类数"改为"剩余活牌数求和"（新增 `liveUkeireCount`，按自己手牌/副露+全桌牌河扣减，已知缺口：不扣他家 anGang/buGang 锁死的牌，因为这些牌没经过牌河、看不到）；② 新增 `isolationPotential` 权重修复"孤立字牌不优先打出"盲点（字牌不加分，数牌按"无同花色 ±2 内邻居"给固定分，不依赖 `shanten<=1` 门槛）。上线后实战中发现 ② 引入了新回归：判断"是否有邻居"用的是弃牌之后的手牌，导致打散一个本来多余的搭子（如 5p6p 拆掉 6p）会让剩下那张牌看起来"新孤立"、反而拿到孤立分，AI 因此更愿意拆搭子也不愿打真正没用的字牌；已修（判断邻居时改用弃牌前的手牌做参照，`isolationPotential`/`handQuality` 新增 `referenceHand` 参数），并补了对应 fixture 回归测试。`isolationPotential`（初始 1.5）仍是保守起始值，没有做过定量验证——已确认自对弈胜率信噪比不够，分不出"合理 vs 更优"，后续要调这个权重应该靠场景化 fixture 测试（构造具体牌型断言推荐动作），不要跑 `tune:junk` 去微调。原 `improvementWeight` 已被 `tenpaiProbabilityWeight` 结构性取代（见下方 Junk AI Phase 1 记录），不再适用本条提醒。
 - 结算展示优化（剩余）：已完成结果 panel 的赢家/和牌/番型与庄家倍率/积分阅读顺序、赢家积分置顶、“我”命名和并列操作按钮；已完成胡牌/流局大字提示（`ResultBanner.tsx`，900ms 后过渡到 panel，仅对本局实时结果播放、重连不重放）与赢家手牌胡牌张高亮（`WinningHandReveal` 新增 `winTile`，复用 `justDiscarded` 同款红环，与财神环冲突时 `cn()` 保留后者）。下一步第一个具体动作：放铳牌从牌河落入结算展示区——需要新的飞行动画（可参照 `ClaimFlipGhost.tsx`/`DiscardFlipGhost.tsx` 的 `TileFlightPortal` 模式），并先定义清楚"目标位置"具体指结算展示里的什么地方（`WinningHandReveal` 没有 `HandRow` 那种摸牌区概念，需要设计落点）。
