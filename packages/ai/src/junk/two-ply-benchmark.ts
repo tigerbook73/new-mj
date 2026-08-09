@@ -183,6 +183,7 @@ const evaluateRankedCandidates = (
   gameProgress: GameProgress,
   candidateLimit: number,
   analysisCache?: JunkAnalysisCache,
+  secondDiscardKindsForDraw?: (drawnKind: TileKind) => ReadonlySet<TileKind>,
 ): SelfDrawTwoPlyCandidateEvaluation => {
   const startedAt = performance.now();
   const candidates = ranked.slice(0, candidateLimit).map(({ kind, discard, rankScore }) => {
@@ -196,6 +197,7 @@ const evaluateRankedCandidates = (
       weights,
       gameProgress,
       analysisCache,
+      secondDiscardKindsForDraw,
     );
     return {
       discard,
@@ -377,6 +379,109 @@ export const evaluateWeightedTrajectoryWithSharedCache = (
     cacheHits: structuralCache.hits,
     cacheMisses: structuralCache.misses,
     cacheSize: structuralCache.size,
+  };
+};
+
+export type SecondDiscardWhitelistEvaluation = Readonly<{
+  evaluation: SelfDrawTwoPlyCandidateEvaluation;
+  averageSecondDiscardCandidates: number;
+}>;
+
+/**
+ * Diagnostic only: reuse the first discard ranking as a second-ply whitelist.
+ * The newly drawn kind is always added because it did not exist in the first
+ * ranking and may immediately change the shape. This deliberately keeps the
+ * first-discard budget separate from the second-discard budget.
+ */
+export const evaluateWeightedTrajectoryWithSecondDiscardWhitelist = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  firstDiscardLimit = 4,
+  secondDiscardWhitelistSize = 4,
+): SecondDiscardWhitelistEvaluation => {
+  if (!(firstDiscardLimit > 0) || !(secondDiscardWhitelistSize > 0))
+    throw new Error("discard limits must be positive");
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    Number.POSITIVE_INFINITY,
+  );
+  const firstCandidates = ranked.slice(0, Math.min(firstDiscardLimit, ranked.length));
+  const secondWhitelist = new Set(
+    ranked.slice(0, secondDiscardWhitelistSize).map(({ kind }) => kind),
+  );
+  const evaluation = evaluateRankedCandidates(
+    input,
+    firstCandidates,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    firstCandidates.length,
+    undefined,
+    (drawnKind) => new Set([...secondWhitelist, drawnKind]),
+  );
+  const totalDraws = evaluation.candidates.reduce(
+    (sum, candidate) => sum + candidate.probe.outcomes.length,
+    0,
+  );
+  const totalCandidates = evaluation.candidates.reduce(
+    (sum, candidate) => sum + candidate.probe.secondDiscardCandidateCount,
+    0,
+  );
+  return {
+    evaluation,
+    averageSecondDiscardCandidates: totalDraws === 0 ? 0 : totalCandidates / totalDraws,
+  };
+};
+
+export const evaluateWeightedTrajectoryWithDynamicSecondDiscardWhitelist = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  firstDiscardLimit = 4,
+  config: DynamicWeightedTrajectoryConfig = {
+    minN: 2,
+    maxN: Number.MAX_SAFE_INTEGER,
+    scoreWindow: 4,
+    elbowGap: 12,
+  },
+): SecondDiscardWhitelistEvaluation => {
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    Number.POSITIVE_INFINITY,
+  );
+  const firstCandidates = ranked.slice(0, Math.min(firstDiscardLimit, ranked.length));
+  const secondLimit = chooseDynamicTrajectoryLimit(ranked, config);
+  const secondWhitelist = new Set(ranked.slice(0, secondLimit).map(({ kind }) => kind));
+  const evaluation = evaluateRankedCandidates(
+    input,
+    firstCandidates,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    firstCandidates.length,
+    undefined,
+    (drawnKind) => new Set([...secondWhitelist, drawnKind]),
+  );
+  const totalDraws = evaluation.candidates.reduce(
+    (sum, candidate) => sum + candidate.probe.outcomes.length,
+    0,
+  );
+  const totalCandidates = evaluation.candidates.reduce(
+    (sum, candidate) => sum + candidate.probe.secondDiscardCandidateCount,
+    0,
+  );
+  return {
+    evaluation,
+    averageSecondDiscardCandidates: totalDraws === 0 ? 0 : totalCandidates / totalDraws,
   };
 };
 
@@ -987,6 +1092,126 @@ export const benchmarkDynamicWeightedTrajectorySuite = (
     fixtureCount: inputs.length,
     config,
     averageCandidates: candidates / cases,
+    elapsedMs,
+    msPerCase: elapsedMs / cases,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
+  };
+};
+
+export type SecondDiscardWhitelistSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  firstDiscardLimit: number;
+  secondDiscardWhitelistSize: number;
+  averageSecondDiscardCandidates: number;
+  elapsedMs: number;
+  msPerCase: number;
+  winnerAgreement: number;
+  meanScoreGap: number;
+}>;
+
+/** Compares full second-ply discard enumeration with the first-ranking whitelist. */
+export const benchmarkSecondDiscardWhitelistSuite = (
+  iterations: number,
+  firstDiscardLimit = 4,
+  secondDiscardWhitelistSize = 4,
+  fixtureCount = 8,
+): SecondDiscardWhitelistSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let candidates = 0;
+  let elapsedMs = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      const bounded = evaluateWeightedTrajectoryWithSecondDiscardWhitelist(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        firstDiscardLimit,
+        secondDiscardWhitelistSize,
+      );
+      candidates += bounded.averageSecondDiscardCandidates;
+      elapsedMs += bounded.evaluation.elapsedMs;
+      if (bounded.evaluation.bestKind === full.bestKind) agreement += 1;
+      scoreGap += (full.bestValue ?? 0) - (bounded.evaluation.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    firstDiscardLimit,
+    secondDiscardWhitelistSize,
+    averageSecondDiscardCandidates: candidates / cases,
+    elapsedMs,
+    msPerCase: elapsedMs / cases,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
+  };
+};
+
+export const benchmarkDynamicSecondDiscardWhitelistSuite = (
+  iterations: number,
+  firstDiscardLimit = 4,
+  config: DynamicWeightedTrajectoryConfig = {
+    minN: 2,
+    maxN: Number.MAX_SAFE_INTEGER,
+    scoreWindow: 4,
+    elbowGap: 12,
+  },
+  fixtureCount = 8,
+): SecondDiscardWhitelistSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let candidates = 0;
+  let elapsedMs = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      const bounded = evaluateWeightedTrajectoryWithDynamicSecondDiscardWhitelist(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        firstDiscardLimit,
+        config,
+      );
+      candidates += bounded.averageSecondDiscardCandidates;
+      elapsedMs += bounded.evaluation.elapsedMs;
+      if (bounded.evaluation.bestKind === full.bestKind) agreement += 1;
+      scoreGap += (full.bestValue ?? 0) - (bounded.evaluation.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    firstDiscardLimit,
+    secondDiscardWhitelistSize: -1,
+    averageSecondDiscardCandidates: candidates / cases,
     elapsedMs,
     msPerCase: elapsedMs / cases,
     winnerAgreement: agreement / cases,

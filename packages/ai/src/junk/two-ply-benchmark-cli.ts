@@ -9,6 +9,8 @@ import {
   benchmarkDynamicWeightedTrajectorySuite,
   benchmarkSharedStructuralCacheSuite,
   benchmarkCrossCandidateDrawOverlap,
+  benchmarkSecondDiscardWhitelistSuite,
+  benchmarkDynamicSecondDiscardWhitelistSuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -47,6 +49,17 @@ if (candidateLimitArgument === "blacklist") {
   const candidateLimit = budget === undefined ? 4 : budget;
   process.stdout.write(
     `${JSON.stringify(benchmarkCrossCandidateDrawOverlap(iterations, candidateLimit, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "second-whitelist") {
+  const firstLimit = budget === undefined ? 4 : budget;
+  const whitelistSize = Number(process.argv[5] ?? 4);
+  process.stdout.write(
+    `${JSON.stringify(benchmarkSecondDiscardWhitelistSuite(iterations, firstLimit, whitelistSize, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "dynamic-second-whitelist") {
+  const firstLimit = budget === undefined ? 4 : budget;
+  process.stdout.write(
+    `${JSON.stringify(benchmarkDynamicSecondDiscardWhitelistSuite(iterations, firstLimit, undefined, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(

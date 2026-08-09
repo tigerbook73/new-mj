@@ -446,11 +446,13 @@ const bestDiscardScore = (
   gameProgress: GameProgress,
   liveCopyContext?: LiveCopyContext,
   analysisCache?: HandAnalysisCache,
+  allowedKinds?: ReadonlySet<TileKind>,
 ): number => {
   const scores = new Map<TileKind, number>();
   let best = Number.NEGATIVE_INFINITY;
   for (const tile of input.hand) {
     const kind = kindOf(tile);
+    if (allowedKinds && !allowedKinds.has(kind)) continue;
     const score =
       scores.get(kind) ??
       (() => {
@@ -489,6 +491,8 @@ export type SelfDrawTwoPlyProbe = Readonly<{
   continuationValue: number;
   /** Probability that the next self-draw immediately wins. */
   winProbability: number;
+  /** Number of second-discard candidates actually scored across non-winning draws. */
+  secondDiscardCandidateCount: number;
   outcomes: readonly SelfDrawTwoPlyOutcome[];
 }>;
 
@@ -517,9 +521,16 @@ export const probeSelfDrawTwoPly = (
   weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
   gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
   analysisCache?: JunkAnalysisCache,
+  secondDiscardKindsForDraw?: (drawnKind: TileKind) => ReadonlySet<TileKind>,
 ): SelfDrawTwoPlyProbe => {
   if (gameProgress.unseenPoolSize <= 0 || gameProgress.wallCount <= 0)
-    return { continuationProbability: 0, continuationValue: 0, winProbability: 0, outcomes: [] };
+    return {
+      continuationProbability: 0,
+      continuationValue: 0,
+      winProbability: 0,
+      secondDiscardCandidateCount: 0,
+      outcomes: [],
+    };
 
   const memo = new Map<string, number>();
   const structuralCache = analysisCache ?? createJunkAnalysisCache();
@@ -530,6 +541,7 @@ export const probeSelfDrawTwoPly = (
   let continuationProbability = 0;
   let continuationValue = 0;
   let winProbability = 0;
+  let secondDiscardCandidateCount = 0;
   const outcomes: SelfDrawTwoPlyOutcome[] = [];
   const occupied = new Set([
     ...input.hand,
@@ -571,6 +583,16 @@ export const probeSelfDrawTwoPly = (
       continue;
     }
 
+    const allowedSecondDiscardKinds = secondDiscardKindsForDraw?.(kind);
+    if (allowedSecondDiscardKinds) {
+      secondDiscardCandidateCount += new Set(
+        afterDraw.hand
+          .filter((tile) => allowedSecondDiscardKinds.has(kindOf(tile)))
+          .map((tile) => kindOf(tile)),
+      ).size;
+    } else {
+      secondDiscardCandidateCount += new Set(afterDraw.hand.map((tile) => kindOf(tile))).size;
+    }
     const leafScore = bestDiscardScore(
       afterDraw,
       visibleDiscards,
@@ -579,12 +601,19 @@ export const probeSelfDrawTwoPly = (
       gameProgress,
       liveCopyContext,
       structuralCache,
+      allowedSecondDiscardKinds,
     );
     continuationProbability += probability;
     continuationValue += probability * leafScore;
     outcomes.push({ kind, probability, leafScore });
   }
-  return { continuationProbability, continuationValue, winProbability, outcomes };
+  return {
+    continuationProbability,
+    continuationValue,
+    winProbability,
+    secondDiscardCandidateCount,
+    outcomes,
+  };
 };
 
 const simulatedClaim = (view: JunkPlayerView, action: JunkAction): ShapeInput | undefined => {

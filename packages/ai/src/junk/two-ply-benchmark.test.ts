@@ -11,6 +11,8 @@ import {
   evaluateDynamicWeightedTrajectoryCandidates,
   evaluateWeightedTrajectoryWithSharedCache,
   benchmarkCrossCandidateDrawOverlap,
+  benchmarkSecondDiscardWhitelistSuite,
+  benchmarkDynamicSecondDiscardWhitelistSuite,
   chooseDynamicTrajectoryLimit,
   DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
@@ -92,6 +94,21 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(result.averageDrawStates).toBeGreaterThan(result.averageUniqueDrawStates);
     expect(result.overlapRate).toBeGreaterThanOrEqual(0);
     expect(result.overlapRate).toBeLessThan(1);
+  });
+
+  it("keeps the newly drawn kind in the second-discard whitelist", () => {
+    const result = benchmarkSecondDiscardWhitelistSuite(1, 4, 4, 2);
+    expect(result.averageSecondDiscardCandidates).toBeGreaterThan(0);
+    expect(result.averageSecondDiscardCandidates).toBeLessThan(14);
+    expect(result.winnerAgreement).toBeGreaterThanOrEqual(0);
+    expect(result.winnerAgreement).toBeLessThanOrEqual(1);
+  });
+
+  it("expands the second-discard whitelist on a flat score curve", () => {
+    const result = benchmarkDynamicSecondDiscardWhitelistSuite(1, 4, undefined, 2);
+    expect(result.averageSecondDiscardCandidates).toBeGreaterThan(0);
+    expect(result.winnerAgreement).toBeGreaterThanOrEqual(0);
+    expect(result.winnerAgreement).toBeLessThanOrEqual(1);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {
