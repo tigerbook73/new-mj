@@ -231,11 +231,12 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   不能把旧局面结论当成当前事实。
 
   当前先落地第①层：`createJunkAnalysisCache` 提供有上限 LRU，`arena` 的每个
-  `SeatPolicy` 独占一个 cache；缓存不含可见牌墙、活牌概率、安全度或隔离度结果，
-  因而不会把过期局面分数直接复用。后续应记录早/中/残局的 hit/miss、size 与耗时，
-  再决定是否把 cache/context 显式接入 server 的 seat lifecycle；不先引入隐式全局
-  cache，避免跨玩家/跨牌局污染。趋势概率模型列为独立的决策质量课题，不与结构缓存
-  混在一起验证。
+  `SeatPolicy` 独占一个 cache，并在每局开始清空；单局默认上限从 8192 收敛为 256
+  （小样本容量曲线显示 64 已接近饱和）。缓存不含可见牌墙、活牌概率、安全度或隔离度
+  结果，因而不会把过期局面分数直接复用。后续应记录早/中/残局的 hit/miss、size
+  与耗时，再决定是否把 cache/context 显式接入 server 的 seat lifecycle；不先引入
+  隐式全局 cache，避免跨玩家/跨牌局污染。趋势概率模型列为独立的决策质量课题，
+  不与结构缓存混在一起验证。
 
 - **自我优化基础设施推广到 hangzhou/bloodbattle**：可复用部分是 Layer
   B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属

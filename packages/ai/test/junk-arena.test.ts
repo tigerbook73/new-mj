@@ -61,7 +61,7 @@ describe("junk self-play arena", () => {
     if ("error" in result) throw new Error(result.error);
 
     expect(caches.some((cache) => cache.hits > 0)).toBe(true);
-    expect(caches.every((cache) => cache.size > 0 && cache.size <= 8192)).toBe(true);
+    expect(caches.every((cache) => cache.size > 0 && cache.size <= 256)).toBe(true);
   });
 
   it(

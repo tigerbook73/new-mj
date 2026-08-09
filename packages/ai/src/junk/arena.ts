@@ -19,7 +19,13 @@ import {
 
 /** Per-seat decision function; a self-play arena plugs in one per seat so different
  * seats can play at different strength or with different tuned weights. */
-export type SeatPolicy = (view: JunkPlayerView, legalActions: readonly JunkAction[]) => JunkAction;
+export type SeatPolicy = ((
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+) => JunkAction) & {
+  /** Arena-only lifecycle hook; production callers may ignore it. */
+  resetAnalysisContext?: () => void;
+};
 
 /** Wraps a strength config (and optional weight override) as a SeatPolicy backed by
  * the production decision function; omitting `weights` uses DEFAULT_JUNK_WEIGHTS. */
@@ -28,8 +34,10 @@ export const strengthPolicy = (
   weights?: JunkWeights,
 ): SeatPolicy => {
   const analysisCache = strength.analysisCache ?? createJunkAnalysisCache();
-  return (view, legalActions) =>
-    chooseJunkAction(view, legalActions, { ...strength, analysisCache }, weights);
+  const policy = ((view, legalActions) =>
+    chooseJunkAction(view, legalActions, { ...strength, analysisCache }, weights)) as SeatPolicy;
+  policy.resetAnalysisContext = () => analysisCache.clear();
+  return policy;
 };
 
 export type JunkMatchResult = {
@@ -98,6 +106,7 @@ const playPolicyHand = (
   policies: SeatPolicies,
   onDecision?: (info: DecisionInfo & { step: number }) => void,
 ): JunkState | { error: string } => {
+  for (const policy of policies) policy.resetAnalysisContext?.();
   const started = junkRuleSet.createGame(seed, dealer);
   if ("error" in started) return { error: started.error.code };
   let state = started.state;

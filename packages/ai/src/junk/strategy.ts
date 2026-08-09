@@ -94,13 +94,14 @@ type LiveCopyContext = Readonly<{
 export type JunkAnalysisCache = Readonly<{
   get: (key: string) => UkeireEvaluation | undefined;
   set: (key: string, value: UkeireEvaluation) => void;
+  clear: () => void;
   readonly hits: number;
   readonly misses: number;
   readonly size: number;
 }>;
 
 /** 创建一个有上限的结构分析 LRU；只缓存纯 hand-shape 结果，不持有局面状态。 */
-export const createJunkAnalysisCache = (maxEntries = 8192): JunkAnalysisCache => {
+export const createJunkAnalysisCache = (maxEntries = 256): JunkAnalysisCache => {
   if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0)
     throw new Error("maxEntries must be a positive safe integer");
   const entries = new Map<string, UkeireEvaluation>();
@@ -122,6 +123,11 @@ export const createJunkAnalysisCache = (maxEntries = 8192): JunkAnalysisCache =>
       entries.delete(key);
       entries.set(key, value);
       while (entries.size > maxEntries) entries.delete(entries.keys().next().value!);
+    },
+    clear() {
+      entries.clear();
+      hits = 0;
+      misses = 0;
     },
     get hits() {
       return hits;
