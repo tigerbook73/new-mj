@@ -74,6 +74,54 @@ const fixtures: readonly Fixture[] = [
     },
     visibleDiscards: [],
   },
+  {
+    name: "pure-suit-drift",
+    input: {
+      hand: ids(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "5z", "7z"]),
+      melds: [],
+    },
+    visibleDiscards: [],
+  },
+  {
+    name: "mixed-one-suit-pair",
+    input: {
+      hand: ids(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "5s", "7z"]),
+      melds: [],
+    },
+    visibleDiscards: ids(["1p", "5s", "7z"]),
+  },
+  {
+    name: "honor-triplet-future",
+    input: {
+      hand: ids(["1m", "1m", "1m", "2p", "2p", "2p", "3s", "3s", "3s", "7z", "7z", "5z", "6z"]),
+      melds: [],
+    },
+    visibleDiscards: ids(["1z", "2z", "3z", "4z"]),
+  },
+  {
+    name: "seven-pairs-versus-suit",
+    input: {
+      hand: ids(["1m", "1m", "2m", "2m", "3m", "3m", "4m", "4m", "5m", "5m", "6p", "6p", "7z"]),
+      melds: [],
+    },
+    visibleDiscards: ids(["1p", "2p", "3p", "4p", "5p"]),
+  },
+  {
+    name: "terminal-heavy-future",
+    input: {
+      hand: ids(["1m", "1m", "9m", "9m", "1p", "1p", "9p", "9p", "1s", "9s", "1z", "1z", "7z"]),
+      melds: [],
+    },
+    visibleDiscards: ids(["2m", "3m", "7m", "8m", "2p", "8p", "2s", "8s"]),
+  },
+  {
+    name: "open-pure-suit-drift",
+    input: {
+      hand: ids(["4m", "5m", "6m", "7m", "8m", "2m", "3m", "9m", "9m", "1p"]),
+      melds: [meld("chi", ["1m", "2m", "3m"])],
+    },
+    visibleDiscards: ids(["1p", "5z", "6z"]),
+  },
 ];
 
 for (const fixture of fixtures) {

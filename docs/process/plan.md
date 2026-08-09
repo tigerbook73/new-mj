@@ -16,13 +16,13 @@
 - 结构副产品筛选已完成 1000 个确定性随机手牌 A/B：结构 Top-4 一致率 93.1%、约 34.13ms/case；全量约 97.15ms/case，约 2.85x，但仍有 6.9% 漂移，暂不接入默认评分。
 - “最低弃牌后向听层”黑名单已完成 1000 个确定性随机手牌 A/B：平均保留 7.233 个候选，一致率 100%、平均分差 0，约 60.06ms/case 对全量 97.15ms/case；随机样本约 1.62x，但待结构化/对抗性 fixture 验证，暂不默认接入。
 - 已生成可复用的 10000 case 全量 2-ply 基准数据：[`junk-two-ply-baseline.jsonl`](../../packages/ai/benchmark-data/junk-two-ply-baseline.jsonl) 和 [`manifest`](../../packages/ai/benchmark-data/junk-two-ply-baseline.manifest.json)，由 8 个 worker 生成，数值统一保留 9 位小数；重生成命令为 `pnpm --filter @new-mj/ai generate:two-ply-baseline [count] [output] [workers]`。
-- JSONL loader/A-B runner 已接通；`compare:two-ply-baseline` 复用全量基准，只计算候选方案。最低向听黑名单复用 1000 case 的一致率为 100%、平均候选 7.233 个，平均分差约 0。
-- 结构化 fixture 已新增并验证：刻子/字牌、234 顺子块、七对子、开口吃、死牌和同向听不同 ukeire 共 6 类，结构 Top-4 与最低向听黑名单均与全量 2-ply 一致；最低向听层在部分 fixture 可将候选降至 1–2 个，但并非普遍有效。
+- JSONL loader/A-B runner 已接通；`compare:two-ply-baseline` 复用全量基准，只计算候选方案。最新 1000 case 复用结果的最低向听黑名单一致率为 100%、平均候选 7.233 个、平均分差约 0，耗时 60.852ms/case。
+- 结构化 fixture 已新增并验证共 12 类：原有 6 类加清一色倾向、混一色倾向、字牌刻子、七对子/单色取舍、幺九未来形状、开口清一色；结构 Top-4 与最低向听黑名单均与全量 2-ply 一致，最低向听层在部分 fixture 可将候选降至 1–5 个，但并非普遍有效。
 - 已新增对抗性搜索工具并运行 1000 个确定性样本：覆盖 0–2 个固定吃副露、随机手牌、最多 9 张可见弃牌；最低向听黑名单与全量 2-ply 一致率 100%，未发现反例，耗时 88.703 秒；结果保存在 `packages/ai/benchmark-data/junk-two-ply-adversarial-cases.json`，但仍不能替代穷举证明。
 - core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
 - 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及待架构确认的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。
 
-下一步第一个具体动作：继续补充会主动牺牲向听换番型/未来形状的定向 fixture，并用 baseline loader 批量比较；core batch API 继续等待架构确认。
+下一步第一个具体动作：用 baseline loader 批量比较这些定向 fixture 和随机样本，并继续寻找真正会牺牲向听换番型/未来形状的反例；core batch API 继续等待架构确认。
 
 ## 阻塞与遗留问题
 
