@@ -34,8 +34,8 @@ export type TwoPlyBaselineCase = Readonly<{
   bestValue: number | undefined;
 }>;
 
-export type TwoPlyBaselineFile = Readonly<{
-  format: "new-mj.junk-two-ply-baseline";
+export type TwoPlyBaselineManifest = Readonly<{
+  format: "new-mj.junk-two-ply-baseline-manifest";
   version: number;
   generatedAt: string;
   gitRevision: string;
@@ -44,6 +44,10 @@ export type TwoPlyBaselineFile = Readonly<{
   workers: number;
   progress: typeof BENCHMARK_PROGRESS;
   weights: typeof DEFAULT_JUNK_WEIGHTS;
+}>;
+
+export type TwoPlyBaselineFile = Readonly<{
+  manifest: TwoPlyBaselineManifest;
   cases: readonly TwoPlyBaselineCase[];
 }>;
 
@@ -53,7 +57,10 @@ export type TwoPlyBaselineTask = Readonly<{
   seed: number;
 }>;
 
-const summarize = (index: number, evaluation: SelfDrawTwoPlyCandidateEvaluation): TwoPlyBaselineCase => ({
+const summarize = (
+  index: number,
+  evaluation: SelfDrawTwoPlyCandidateEvaluation,
+): TwoPlyBaselineCase => ({
   index,
   hand: [],
   melds: [],
@@ -90,8 +97,7 @@ export const runTwoPlyBaselineTask = (task: TwoPlyBaselineTask): TwoPlyBaselineC
   });
 
 type WorkerMessage =
-  | { type: "result"; cases: TwoPlyBaselineCase[] }
-  | { type: "error"; message: string };
+  { type: "result"; cases: TwoPlyBaselineCase[] } | { type: "error"; message: string };
 
 const runWorkerTask = (workerUrl: URL, task: TwoPlyBaselineTask): Promise<TwoPlyBaselineCase[]> =>
   new Promise((resolve, reject) => {
@@ -132,15 +138,17 @@ export const generateTwoPlyBaseline = async (
   const chunks = await Promise.all(tasks.map((task) => runWorkerTask(workerUrl, task)));
   const cases = chunks.flat().sort((left, right) => left.index - right.index);
   return {
-    format: "new-mj.junk-two-ply-baseline",
-    version: TWO_PLY_BASELINE_VERSION,
-    generatedAt: new Date().toISOString(),
-    gitRevision,
-    seed,
-    count,
-    workers: actualWorkers,
-    progress: BENCHMARK_PROGRESS,
-    weights: DEFAULT_JUNK_WEIGHTS,
+    manifest: {
+      format: "new-mj.junk-two-ply-baseline-manifest",
+      version: TWO_PLY_BASELINE_VERSION,
+      generatedAt: new Date().toISOString(),
+      gitRevision,
+      seed,
+      count,
+      workers: actualWorkers,
+      progress: BENCHMARK_PROGRESS,
+      weights: DEFAULT_JUNK_WEIGHTS,
+    },
     cases,
   };
 };
