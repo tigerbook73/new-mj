@@ -518,8 +518,11 @@ type TwoChangeBatchSource = Readonly<{
  * evaluating a candidate discard must append that tile before calling this
  * probe, otherwise the just-discarded physical copy would be counted as drawable.
  *
- * This is not wired into default policy yet. Its fixture behavior and benchmark
- * are the evidence gate for deciding whether it may become a scoring feature.
+ * The default discard policy uses this probe after the first-round weighted
+ * ranking and cliff filter. Direct callers may still omit the batch source;
+ * that compatibility path uses the general batch evaluator, while the formal
+ * policy path supplies the discard/draw source so core can reuse its two-change
+ * shanten table.
  */
 export const probeSelfDrawTwoPly = (
   input: ShapeInput,
@@ -716,6 +719,174 @@ const gameProgressOf = (view: JunkPlayerView): GameProgress => {
   return { wallCount: view.wallCount, unseenPoolSize: view.wallCount + othersHandCount };
 };
 
+type RankedTwoPlyDiscard = Readonly<{
+  kind: TileKind;
+  discard: TileId;
+  rankScore: number;
+}>;
+
+type TwoPlyCliffConfig = Readonly<{
+  upper: Readonly<{ minN: number; maxN: number; relativeGap: number }>;
+  lower: Readonly<{ minN: number; maxN: number | "all"; relativeGap: number }>;
+}>;
+
+const DEFAULT_TWO_PLY_CLIFF_CONFIG: TwoPlyCliffConfig = {
+  upper: { minN: 2, maxN: 4, relativeGap: 0.2 },
+  lower: { minN: 1, maxN: "all", relativeGap: 0.2 },
+};
+
+const suitTrajectoryBonusAfterDiscard = (
+  input: ShapeInput,
+  discard: TileId,
+  weights: JunkWeights,
+): number => {
+  const hand = input.hand.filter((tile) => tile !== discard);
+  const suitCounts = [0, 0, 0];
+  let honorCount = 0;
+  for (const tile of [...hand, ...input.melds.flatMap((meld) => meld.tiles)]) {
+    const kind = kindOf(tile);
+    if (kind.endsWith("z")) honorCount += 1;
+    else suitCounts[kind[1] === "m" ? 0 : kind[1] === "p" ? 1 : 2]! += 1;
+  }
+  const suitedCount = suitCounts.reduce((sum, count) => sum + count, 0);
+  if (suitedCount === 0) return 0;
+  const dominantSuitCount = Math.max(...suitCounts);
+  const offSuitCount = suitedCount - dominantSuitCount;
+  if (dominantSuitCount < 8 || dominantSuitCount <= offSuitCount) return 0;
+  const routeSignal = Math.max(
+    0,
+    (honorCount > 0 ? dominantSuitCount + honorCount : dominantSuitCount) - offSuitCount - 1,
+  );
+  return (routeSignal * (honorCount > 0 ? weights.hunyise : weights.qingyise)) / 8;
+};
+
+const validateTwoPlyCliffConfig = (config: TwoPlyCliffConfig): void => {
+  if (
+    !Number.isSafeInteger(config.upper.minN) ||
+    !Number.isSafeInteger(config.upper.maxN) ||
+    config.upper.minN <= 0 ||
+    config.upper.maxN < config.upper.minN ||
+    config.upper.relativeGap < 0 ||
+    !Number.isSafeInteger(config.lower.minN) ||
+    config.lower.minN <= 0 ||
+    (config.lower.maxN !== "all" &&
+      (!Number.isSafeInteger(config.lower.maxN) || config.lower.maxN < config.lower.minN)) ||
+    config.lower.relativeGap < 0
+  )
+    throw new Error("invalid two-ply cliff config");
+};
+
+const rankTwoPlyDiscards = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[],
+  weights: JunkWeights,
+  gameProgress: GameProgress,
+  memo: Map<string, number>,
+  analysisCache: JunkAnalysisCache,
+): RankedTwoPlyDiscard[] => {
+  const uniqueDiscards = new Map<TileKind, TileId>();
+  for (const tile of input.hand) {
+    const kind = kindOf(tile);
+    if (!uniqueDiscards.has(kind)) uniqueDiscards.set(kind, tile);
+  }
+  return [...uniqueDiscards.entries()]
+    .map(([kind, discard]) => ({
+      kind,
+      discard,
+      rankScore:
+        scoreHandShapeAfterDiscard(
+          input,
+          discard,
+          visibleDiscards,
+          weights,
+          memo,
+          gameProgress,
+          undefined,
+          analysisCache,
+        ) + suitTrajectoryBonusAfterDiscard(input, discard, weights),
+    }))
+    .sort((left, right) => right.rankScore - left.rankScore);
+};
+
+const relativeScoreRange = (ranked: readonly RankedTwoPlyDiscard[]): number =>
+  ranked.length < 2 ? 0 : ranked[0]!.rankScore - ranked[ranked.length - 1]!.rankScore;
+
+const upperTwoPlyLimit = (
+  ranked: readonly RankedTwoPlyDiscard[],
+  config: TwoPlyCliffConfig["upper"],
+): number => {
+  const minimum = Math.min(config.minN, ranked.length);
+  const maximum = Math.min(config.maxN, ranked.length);
+  if (minimum === 0) return 0;
+  const range = relativeScoreRange(ranked);
+  if (range <= 0) return maximum;
+  for (let index = minimum; index < maximum; index += 1) {
+    if ((ranked[index - 1]!.rankScore - ranked[index]!.rankScore) / range >= config.relativeGap)
+      return index;
+  }
+  return maximum;
+};
+
+const lowerTwoPlyLimit = (
+  ranked: readonly RankedTwoPlyDiscard[],
+  config: TwoPlyCliffConfig["lower"],
+): number => {
+  const minimum = Math.min(config.minN, ranked.length);
+  const maximum = config.maxN === "all" ? ranked.length : Math.min(config.maxN, ranked.length);
+  if (ranked.length === 0) return 0;
+  const range = relativeScoreRange(ranked);
+  if (range <= 0) return maximum;
+  for (let index = ranked.length - 1; index >= minimum; index -= 1) {
+    if ((ranked[index - 1]!.rankScore - ranked[index]!.rankScore) / range >= config.relativeGap)
+      return Math.min(Math.max(index, minimum), maximum);
+  }
+  return maximum;
+};
+
+const scoreTwoPlyDiscards = (
+  view: JunkPlayerView,
+  discardActions: readonly Extract<JunkAction, { type: "discard" }>[],
+  weights: JunkWeights,
+  memo: Map<string, number>,
+  analysisCache: JunkAnalysisCache,
+): Map<TileKind, number> => {
+  // The first round is intentionally cheap and bounded. The second round keeps
+  // the exact branch result, but only for the upper candidates; the lower cliff
+  // supplies a whitelist for the best subsequent discard after each draw.
+  validateTwoPlyCliffConfig(DEFAULT_TWO_PLY_CLIFF_CONFIG);
+  const input = { hand: view.hand, melds: view.seats[view.seat]!.melds };
+  const discards = visibleDiscards(view);
+  const progress = gameProgressOf(view);
+  const ranked = rankTwoPlyDiscards(input, discards, weights, progress, memo, analysisCache);
+  const upperLimit = upperTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.upper);
+  const lowerLimit = lowerTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.lower);
+  const secondWhitelist = new Set(ranked.slice(0, lowerLimit).map(({ kind }) => kind));
+  const scores = new Map<TileKind, number>();
+  const actionKinds = new Set(discardActions.map(({ tile }) => kindOf(tile)));
+  for (const { kind, discard } of ranked.slice(0, upperLimit)) {
+    if (!actionKinds.has(kind)) continue;
+    const afterDiscard = {
+      hand: input.hand.filter((tile) => tile !== discard),
+      melds: input.melds,
+    };
+    const probe = probeSelfDrawTwoPly(
+      afterDiscard,
+      [...discards, discard],
+      weights,
+      progress,
+      analysisCache,
+      (drawnKind) => new Set([...secondWhitelist, drawnKind]),
+      {
+        tiles: input.hand,
+        discardKindIndex: STANDARD_TILE_SET.kindIndexOf(kind),
+      },
+    );
+    const discardSafety = discards.includes(discard) ? weights.safetyBonus : 0;
+    scores.set(kind, probe.continuationValue + probe.winProbability + discardSafety);
+  }
+  return scores;
+};
+
 const scoreAction = (
   view: JunkPlayerView,
   action: JunkAction,
@@ -821,6 +992,13 @@ export const scoreLegalActions = (
   const memo = new Map<string, number>();
   const structuralCache = analysisCache ?? createJunkAnalysisCache();
   const discardScores = new Map<TileKind, number>();
+  const discardActions = legalActions.filter(
+    (action): action is Extract<JunkAction, { type: "discard" }> => action.type === "discard",
+  );
+  const twoPlyScores =
+    discardActions.length > 0
+      ? scoreTwoPlyDiscards(view, discardActions, weights, memo, structuralCache)
+      : new Map<TileKind, number>();
   return legalActions.map((action) => ({
     action,
     score:
@@ -828,7 +1006,9 @@ export const scoreLegalActions = (
         ? scoreAction(view, action, weights, memo, structuralCache)
         : (discardScores.get(kindOf(action.tile)) ??
           (() => {
-            const calculated = scoreAction(view, action, weights, memo, structuralCache);
+            const calculated =
+              twoPlyScores.get(kindOf(action.tile)) ??
+              scoreAction(view, action, weights, memo, structuralCache);
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
           })()),

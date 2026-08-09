@@ -1,72 +1,79 @@
 # 待完成任务与当前状态
 
-> 本文件只记录当前工作、阻塞/遗留问题、下一步和 Backlog；专题证据与详细提案见专题文档。
+> 本文件只记录当前工作、阻塞/遗留问题、下一步和 Backlog；最终决策证据见 [`junk-ai-decision-quality.md`](./junk-ai-decision-quality.md)。
 
 ## 当前任务
 
-当前专题：Junk AI 决策质量优化，详见 [`junk-ai-decision-quality.md`](./junk-ai-decision-quality.md)。
+当前专题：关闭 Junk AI 决策质量优化分支，并准备人工合并到 `main`。
 
-当前状态：
+当前实现目标：
 
-- Phase 1 的概率评分、迟疑阈值、既有副露 ukeire 修复和有界结构缓存已完成。
-- 2-ply 自摸诊断探针已有目标/反例 fixture，但尚未接入默认评分；当前完整探针约 13.3–13.6ms/probe。
-- Top-N 2-ply 已完成修正概率模型后的 32 手牌/96 case A/B：1-ply/Top-1/Top-2/Top-3 相对全量 2-ply 一致率为 71.9%/71.9%/87.5%/93.8%，存在明显决策漂移，拒绝直接接入默认评分。
-- Top-2 分差触发全量的分级 2-ply 已评估：阈值 0–2 仅约 96.9% 一致且回退约 69%–72%；阈值 5 才全一致但回退 90.6%、估算更慢，拒绝该判据。
-- 以 1-ply 排名/分数作为 2-ply 安全上界的剪枝已否定：修正后 Top-1 相对全量 2-ply 仅 71.9% 一致，不能证明未评估候选不可能胜出。
-- 结构副产品筛选已完成 1000 个确定性随机手牌 A/B：结构 Top-4 一致率 93.1%、约 34.13ms/case；全量约 97.15ms/case，约 2.85x，但仍有 6.9% 漂移，暂不接入默认评分。
-- “最低弃牌后向听层”黑名单已完成 1000 个确定性随机手牌 A/B：平均保留 7.233 个候选，一致率 100%、平均分差 0，约 60.06ms/case 对全量 97.15ms/case；随机样本约 1.62x，但待结构化/对抗性 fixture 验证，暂不默认接入。
-- 已生成可复用的 10000 case 全量 2-ply 基准数据：[`junk-two-ply-baseline.jsonl`](../../packages/ai/benchmark-data/junk-two-ply-baseline.jsonl) 和 [`manifest`](../../packages/ai/benchmark-data/junk-two-ply-baseline.manifest.json)，由 8 个 worker 生成，数值统一保留 9 位小数；重生成命令为 `pnpm --filter @new-mj/ai generate:two-ply-baseline [count] [output] [workers]`。
-- JSONL loader/A-B runner 已接通；`compare:two-ply-baseline` 复用全量基准，只计算候选方案。最新 1000 case 复用结果的最低向听黑名单一致率为 100%、平均候选 7.233 个、平均分差约 0，耗时 60.852ms/case。
-- 结构化 fixture 已新增并验证共 12 类：原有 6 类加清一色倾向、混一色倾向、字牌刻子、七对子/单色取舍、幺九未来形状、开口清一色；结构 Top-4 与最低向听黑名单均与全量 2-ply 一致，最低向听层在部分 fixture 可将候选降至 1–5 个，但并非普遍有效。
-- 已新增对抗性搜索工具并运行 1000 个确定性样本：覆盖 0–2 个固定吃副露、随机手牌、最多 9 张可见弃牌；最低向听黑名单与全量 2-ply 一致率 100%，未发现反例，耗时 88.703 秒；结果保存在 `packages/ai/benchmark-data/junk-two-ply-adversarial-cases.json`，但仍不能替代穷举证明。
-- fan-weight stress 已找到边界反例：在 `pure-suit-drift` 中将 `shantenWeight=10`、`qingyise/hunyise=160` 后，全量 2-ply 选 `1p`，最低向听黑名单选 `5z`，分差约 59.597；默认权重仍一致。因此该黑名单只可视为绑定当前权重的候选优化，不能作为跨权重安全剪枝。
-- 动态 Top-N 已纳入实验计划：按当前权重计算的预评分曲线、分数差和断崖位置决定 N，同时设置 `minN`/`maxN`；实验比较不同上下限，记录候选数、排名一致率、实际分数遗憾和总耗时，避免平坦曲线造成性能失控，也避免固定 N 的质量/性能偏差。
-- 加权预评分提升为动态 Top-N 和所有白名单/黑名单的前置条件：必须把当前权重下的向听、ukeire、番型潜力、对子/刻子保留和未来形状纳入候选筛选；最低向听只能作为信号，不能先行排除可能换取清一色/混一色路线的弃牌。
-- 加权 Top-N 1000 case 实测：Top-1/Top-2/Top-4 一致率 87.5%/100%/100%，耗时 8.554/16.796/33.338ms/case；但高番型 `pure-suit-drift` stress 中仍错过全量的 `1p`，说明现有即时 `fanPotential` 不等于番型轨道潜力。
-- 低成本轨道预评分已有诊断实现：对每个候选仅做 O(34) 牌面计数，计算主花色、杂色、字牌，再按权重形成清一色/混一色潜力分；复用已有计数，不新增 core API、不重复运行 shanten。默认权重下 1000 case 的 Top-4 一致率为 100%、35.163ms/case，12 个定向 fixture 全部一致；高番型 stress 仍有其他 fixture 漂移，暂不接入默认策略。
-- 动态 Top-N 诊断已收敛并拒绝默认接入：`minN=2`、`maxN=4`、分数窗口 4、断崖阈值 12；1000 case 平均保留 4 个候选，一致率 100%、平均分数遗憾 0、33.346ms/case，与固定加权 Top-4 基本相同；`maxN=4` 是性能护栏，不再继续探索更大的上限。12 个默认结构 fixture 全部一致，但高番型 stress 仍有个别漂移。
-- 2-ply 候选间共享纯结构缓存已完成诊断：1000 case、4 candidates 平均命中 141.75 次、未命中 1367.875 次，命中率约 9.4%，平均缓存规模 256；耗时 34.336ms/case，相对独立缓存约 35.163ms/case 只提升约 2.4%，一致率 100%、分数遗憾 0，暂不接入默认路径。
-- 候选 × 摸牌统一批处理重叠率测量已完成：4 candidates 平均 136 个摸牌后状态中只有 3 个重复，精确结构重叠率约 2.21%，拒绝继续实现该路线。
-- 第二轮复用首轮排序的固定 Top-4 白名单已完成诊断：平均仅评估 3.942 个第二轮候选、约 12.77ms/case，但相对全量 2-ply 一致率仅 87.5%、平均分差约 0.793，拒绝硬剪枝。
-- 第二轮动态断崖白名单已完成诊断：分数平坦时扩大候选、出现断崖时收缩；1000 case 平均评估 7.824 个第二轮候选、约 24.33ms/case，一致率 100%、平均分差约 0，暂作为低成本候选保留，不接入默认路径。其质量仍受启发式模型限制，随机化只能作为近似平分时的探索手段。
-- core 两变化结构矩阵已完成 AI 侧诊断：首轮 4 candidates、1000 case 共 136000 个 `(弃牌, 摸牌)` 组合，与现有 `evaluateUkeireBatch` 逐项 0 不一致；结构层耗时约 0.0786ms/case 对 2.2358ms/case，约 28.44x，但尚未证明完整 2-ply 端到端收益，暂不接入默认 AI。
-- core 两变化矩阵已完成完整动态 2-ply 诊断接入：旧结构路径 25.33ms/case，新 batch 路径 22.54ms/case，约 1.12x/减少 11%，1000 case 决策一致率 100%、平均分差 0；主要成本仍在摸牌后的叶子弃牌评分，保留诊断接入但暂不改默认 AI。
-- full-result 矩阵实验已完成并拒绝扩展：返回 `shanten + improvingKinds` 的版本约 22.62ms/case，和 shanten-only 的 22.54ms/case 基本相同；增加字段没有额外收益，已删除该实验接口。
-- core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
-- 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及已确认边界的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。`evaluateUkeireAfterDiscardDraws` 已实现为纯 `(discardKind, drawKind) → shanten` 结构矩阵，不含概率、番型或 AI 权重。
-- 本轮优化已收敛：最终首选是“首轮加权上断崖 Top-N（minN=2,maxN=4）+ 第二轮低分端下断崖、无断崖则全量 + core shanten-only batch”，当前诊断约 22.54ms/case、100% 一致；core batch 可将完整路径约 25.33ms 降至 22.54ms。上下断崖阈值独立配置，比例采用归一化相邻下降。最低向听黑名单约 60.85ms/case、100% 一致但绑定当前权重，作为质量优先备选；其余缓存/批处理方案不再继续探索。
-- 双向相对断崖方案已完成首轮实现与 1000 case 测试：`upper={minN:2,maxN:4,relativeGap:20%}`、`lower={minN:1,maxN:all,relativeGap:20%}`；平均首轮 4、第二轮 7.875 个候选，约 21.79ms/case，对全量约 97.94ms/case 为 4.49x 加速，胜者一致率 100%，平均分差约 0。仍只保留为诊断候选，未接入默认 AI；第二轮复用首轮排序，需真实 AI 自对弈 A/B 验证。
-- 当前收尾优先级已调整：断崖上下阈值暂时固定为 20%，不继续调断崖比例；先用固定 JSONL 样本和参数 A/B 工具调现有基础评分权重，优先检查 `isolationPotential`、`tenpaiProbabilityWeight` 及其与向听权重的比例。基础权重稳定后，再决定是否恢复断崖实验；断崖方案仍不接入默认 AI。
+- 默认 Junk AI 使用两轮快速过滤的 2-ply；
+- 首轮上断崖：`minN=2`、`maxN=4`、阈值 20%；
+- 第二轮下断崖：`minN=1`、`maxN=all`、阈值 20%；
+- 2-ply 结构计算统一使用 core `evaluateUkeireAfterDiscardDraws`；
+- 当前基础权重保持不变；后续参数调优另开分支处理。
 
-下一步第一个具体动作：建立基础评分权重的固定样本 A/B 扫描，先不改变断崖 20% 配置。
+## 已完成并保留
 
-## 本次优化计划收尾步骤
+- 概率评分、墙牌比例模型、既有副露 ukeire 修复和结构分析缓存；
+- core suit table / shanten prober 优化及完整测试；
+- core 两变化结构 batch API；完整 2-ply 端到端约减少 11% 耗时，决策结果与旧路径一致；
+- 两轮断崖 2-ply 候选方案，固定上下阈值 20%；
+- 通用 arena、权重 A/B、调参和代码版本对比工具；
+- 正式策略所需的回归 fixture 和测试。
 
-本节只规划关闭本轮 Junk AI 性能/决策质量优化，不提前删除文件；每一步完成后记录接受、拒绝、保留或删除理由。
+## 本轮清理范围
 
-1. **基础权重 A/B**：固定当前 JSONL 样本、随机种子和评分口径，先扫描现有基础权重；优先 `isolationPotential`，再看 `tenpaiProbabilityWeight` 与 `shantenWeight` 的比例。记录首轮排序、与全量 2-ply 的一致率、平均/最大分差和耗时。
-2. **冻结断崖配置**：断崖上下阈值暂定 20%，只验证它在最终权重下是否仍有明显质量损失；不把断崖调参混入基础权重结论。
-3. **形成最终决策表**：对每个候选标记“接入默认 / 仅保留诊断 / 拒绝 / 删除实验材料”；默认路径必须有真实 AI A/B 和延迟证据，否则维持诊断-only。
-4. **清理范围盘点**：逐项检查 `packages/ai/src/junk/` 的 benchmark、CLI、测试、临时 fixture、JSONL 数据及相关文档引用，区分正式依赖、可复用基准工具、一次性实验工具和已拒绝方案；不修改 `docs/process/垃圾胡性能优化讨论.md`。
-5. **执行最小清理**：只删除已确认后续不会使用且无正式引用的实验代码、CLI、数据和文档段落；保留权重 A/B、自对弈验证、最终接受方案所需的最小工具和可重生成入口。删除前先保存引用关系和恢复信息。
-6. **收尾验收**：运行 `git diff --check`、AI/core 相关测试、构建和必要的基准冒烟；确认默认 AI 行为、公共接口、JSONL 生成入口和工作区边界没有意外变化。
-7. **关闭计划**：将最终结论、保留工具、删除材料、未解决限制和后续第一个具体动作写回本文件，提交一次收尾 commit；本轮结束后不再自动扩展新的性能优化议题。
+删除未采用路线的过程实现和专用材料：
+
+- 固定 Top-N、结构 Top-4、最低向听黑名单等实验代码；
+- 共享缓存、摸牌状态重叠、full-result batch 等实验代码；
+- two-ply benchmark、baseline、对抗性搜索、结构化 runner 及其 CLI、worker、测试和数据；
+- 对应 package/root 脚本和失效文档引用。
+
+保留后续参数和代码 A/B 所需的 arena、tune、compare-weights、decision-diff、policy-loader、snapshot 及其测试。
+
+## 收尾步骤
+
+1. [x] 完成正式 2-ply + core batch 的生产路径重构。
+2. [x] 完成未采用实验代码、数据、CLI 和文档引用清理。
+3. [x] 既有正式路径回归测试通过：非弃牌动作、胜牌、声明、缓存和温度采样均有覆盖。
+4. [x] 完成 AI/core 类型检查、lint、测试和构建；验证结果见下文。
+5. [x] 将保留内容、删除内容、限制和验证结果写回本文件。
+6. [ ] 提交当前分支的最终整理提交，确认工作区干净。
+7. [ ] 停在人工合并前：不切换 `main`、不执行 merge/squash merge、不推送、不删除当前分支。
+
+## 验收标准
+
+- 默认 Junk AI 确实走两轮 2-ply；
+- 默认 2-ply 路径使用 core batch；直接 probe 调用保留兼容性 fallback；
+- 未采用实验材料已清理；
+- 后续参数 A/B 工具仍可运行；
+- `pnpm --filter @new-mj/ai verify:full` 通过；
+- `pnpm --filter @new-mj/core verify:full` 通过；
+- `git diff --check` 通过且工作区干净；
+- 输出人工合并命令和注意事项，但不执行最终合并。
+
+## 本轮验证记录
+
+- AI typecheck：通过。
+- AI lint：通过。
+- AI strategy 定向测试：32/32 通过。
+- AI build：通过。
+- AI 全量测试：业务测试通过；`policy-loader.test.ts` 的 2 个测试在受限环境中因 `spawnSync git EPERM` 失败，随后测试进程未正常退出，未将该环境问题伪装成全绿。
+- core `verify:full`：19 个测试文件、192 个测试通过，构建通过。
+- `git diff --check`：通过。
 
 ## 阻塞与遗留问题
 
-- 庄家疑似不是每局最先出牌的人：下次处理先写最小复现用例，再定位庄家判定或出牌顺序。
+- 分支关闭后，基础权重和断崖参数需要另开独立计划；
+- 2-ply 仍是启发式评估，不是完整牌局价值证明。
 
 ## Backlog
 
-- Mobile 横屏/竖屏布局与 Expo 路线。
-- 结算展示：放铳牌从牌河飞入结算展示区，先定义结算区目标落点。
-- Junk Table UX：Replay 逐步牌面、慢网络反馈、声明超时归零行为及 E2E；逐步 god replay 受终局归档模型限制，需架构决定。
-- 评估 `immer` 替代 ruleset 手写 `cloneState`，先验证 fuzz 性能。
-- 下次改动 `hangzhou/view.ts`/`junk/view.ts` 时，评估抽取重复 PlayerView 回放逻辑。
-- 下次改动结算 Overlay 时，评估提取共享 `RoundEndOverlayShell`。
-
-## 待定内容
-
-- 血战到底专属桌面体验：换三张、定缺、血战状态与操作 UI。
-- 日麻立项时复审 `architecture/variant-boundary.md`。
-- AI Bot：杭州与血战到底的玩法专属策略；日麻立项后再实现其策略。
+- Mobile 横屏/竖屏布局与 Expo 路线；
+- Junk Table UX：Replay、慢网络反馈、声明超时行为及 E2E；
+- 评估 `immer` 替代 ruleset 手写 `cloneState`，先验证 fuzz 性能；
+- 下次改动杭州/垃圾胡 view 时评估提取共享 PlayerView 回放逻辑；
+- 下次改动结算 Overlay 时评估提取共享 `RoundEndOverlayShell`。
