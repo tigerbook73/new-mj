@@ -4,6 +4,7 @@ import { createPrng, nextInt, shuffle } from "./prng.ts";
 import {
   computeShanten,
   evaluateUkeireAfterDiscards,
+  evaluateUkeireAfterDiscardDraws,
   evaluateUkeire,
   evaluateUkeireBatch,
   isTingpai,
@@ -115,6 +116,50 @@ test("evaluateUkeireAfterDiscards matches independent leaf analysis", () => {
     const direct = evaluateUkeire(leaf, standardOnly);
     assert.deepEqual(result.shanten, direct.shanten, discardKind);
     assert.deepEqual(result.improvingKinds, direct.improvingKinds, discardKind);
+  }
+});
+
+test("evaluateUkeireAfterDiscardDraws matches independent two-change analysis", () => {
+  const hand = ids([
+    "1m",
+    "2m",
+    "3m",
+    "4m",
+    "5m",
+    "6m",
+    "7s",
+    "8s",
+    "9s",
+    "1z",
+    "1z",
+    "3m",
+    "6m",
+    "6m",
+  ]);
+  const discardKinds = [
+    STANDARD_TILE_SET.kindIndexOf("1m"),
+    STANDARD_TILE_SET.kindIndexOf("6m"),
+    STANDARD_TILE_SET.kindIndexOf("1z"),
+  ];
+  const drawKinds = [
+    STANDARD_TILE_SET.kindIndexOf("1m"),
+    STANDARD_TILE_SET.kindIndexOf("4m"),
+    STANDARD_TILE_SET.kindIndexOf("1z"),
+    STANDARD_TILE_SET.kindIndexOf("7z"),
+  ];
+  const batch = evaluateUkeireAfterDiscardDraws(hand, discardKinds, drawKinds, standardOnly);
+  assert.equal(batch.length, 12);
+  for (const result of batch) {
+    const discardKind = STANDARD_TILE_SET.kinds[result.discardKindIndex]!;
+    const drawKind = STANDARD_TILE_SET.kinds[result.drawKindIndex]!;
+    const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
+    const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
+    const heldDraws = leaf.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === drawKind).length;
+    const direct = evaluateUkeire(
+      [...leaf, tileIdOf(drawKind, heldDraws)],
+      standardOnly,
+    );
+    assert.equal(result.shanten, direct.shanten, `${discardKind}/${drawKind}`);
   }
 });
 

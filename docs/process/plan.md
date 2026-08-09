@@ -30,9 +30,9 @@
 - 第二轮复用首轮排序的固定 Top-4 白名单已完成诊断：平均仅评估 3.942 个第二轮候选、约 12.77ms/case，但相对全量 2-ply 一致率仅 87.5%、平均分差约 0.793，拒绝硬剪枝。
 - 第二轮动态断崖白名单已完成诊断：分数平坦时扩大候选、出现断崖时收缩；1000 case 平均评估 7.824 个第二轮候选、约 24.33ms/case，一致率 100%、平均分差约 0，暂作为低成本候选保留，不接入默认路径。其质量仍受启发式模型限制，随机化只能作为近似平分时的探索手段。
 - core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
-- 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及待架构确认的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。core 方案草案已写入 [`architecture/shanten.md`](../architecture/shanten.md)，未实现。
+- 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及已确认边界的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。`evaluateUkeireAfterDiscardDraws` 已实现为纯 `(discardKind, drawKind) → shanten` 结构矩阵，不含概率、番型或 AI 权重。
 
-下一步第一个具体动作：将 [`architecture/shanten.md`](../architecture/shanten.md) 中的 core batch API 备选形状和确认门槛提交 Claude Project；确认前不改 core 公共接口，动态 2-ply 自对弈 A/B 暂排在架构确认之后。
+下一步第一个具体动作：在 AI 诊断路径中对比现有 `evaluateUkeireBatch` 组合与 `evaluateUkeireAfterDiscardDraws` 的性能/结果，确认是否值得消费新 API；不接入默认 AI 策略。
 
 ## 阻塞与遗留问题
 

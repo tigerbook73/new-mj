@@ -24,6 +24,12 @@ export type UkeireAfterDiscardEvaluation = Readonly<{
   improvingKinds: readonly TileKind[];
 }>;
 
+export type UkeireAfterDiscardDrawEvaluation = Readonly<{
+  discardKindIndex: number;
+  drawKindIndex: number;
+  shanten: number;
+}>;
+
 const isSuit = (kind: string): boolean =>
   kind.endsWith("m") || kind.endsWith("p") || kind.endsWith("s");
 
@@ -342,6 +348,64 @@ export const evaluateUkeireAfterDiscards = (
         improvingKinds.push(tileSet.kinds[addKindIndex]!);
     }
     return { discardKindIndex, shanten: current, improvingKinds };
+  });
+};
+
+/**
+ * 以同一组手牌为基准，批量返回“先弃一种牌、再加入一种牌”后的结构结果。
+ * 只返回向听与进张，不涉及概率、番型、牌墙或任何玩法评分；调用方负责传入
+ * 想要试探的弃牌/加入牌种。标准牌集合复用两次修改 prober，避免为每个组合
+ * 重建四个花色的 DP。
+ */
+export const evaluateUkeireAfterDiscardDraws = (
+  tiles: readonly TileId[],
+  discardKindIndexes: readonly number[],
+  drawKindIndexes: readonly number[],
+  options: ShantenOptions,
+  tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
+): UkeireAfterDiscardDrawEvaluation[] => {
+  if (tileSet !== STANDARD_TILE_SET) {
+    return discardKindIndexes.flatMap((discardKindIndex) => {
+      const discardTileIndex = tiles.findIndex(
+        (tile) => tileSet.kindIndexOf(tileSet.kindOf(tile)) === discardKindIndex,
+      );
+      if (discardTileIndex < 0) throw new Error("INVALID_DISCARD_KIND");
+      const leaf = [...tiles];
+      leaf.splice(discardTileIndex, 1);
+      return drawKindIndexes.flatMap((drawKindIndex) => {
+        const held = leaf.filter(
+          (tile) => tileSet.kindIndexOf(tileSet.kindOf(tile)) === drawKindIndex,
+        ).length;
+        if (held >= tileSet.copiesPerKind) return [];
+        const added = (drawKindIndex * tileSet.copiesPerKind) as TileId;
+        const evaluation = evaluateUkeire(
+          [...leaf, added],
+          options,
+          tileSet,
+          existingMelds,
+        );
+        return [{ discardKindIndex, drawKindIndex, shanten: evaluation.shanten }];
+      });
+    });
+  }
+
+  const counts = countsOf(tiles, tileSet);
+  const probe = createTwoChangeShantenProber(counts, existingMelds);
+  return discardKindIndexes.flatMap((discardKindIndex) => {
+    if ((counts[discardKindIndex] ?? 0) <= 0) throw new Error("INVALID_DISCARD_KIND");
+    const leafCounts = [...counts];
+    leafCounts[discardKindIndex] = (leafCounts[discardKindIndex] ?? 0) - 1;
+    return drawKindIndexes.flatMap((drawKindIndex) => {
+      if ((leafCounts[drawKindIndex] ?? 0) >= tileSet.copiesPerKind) return [];
+      const standard = probe(discardKindIndex, drawKindIndex);
+      leafCounts[drawKindIndex] = (leafCounts[drawKindIndex] ?? 0) + 1;
+      const sevenPairs = options.sevenPairs
+        ? sevenPairsShantenFromCounts(leafCounts)
+        : Number.POSITIVE_INFINITY;
+      leafCounts[drawKindIndex] = (leafCounts[drawKindIndex] ?? 0) - 1;
+      return [{ discardKindIndex, drawKindIndex, shanten: Math.min(standard, sevenPairs) }];
+    });
   });
 };
 
