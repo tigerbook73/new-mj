@@ -9,6 +9,7 @@ import {
   evaluateStructuralTwoPlyCandidates,
   evaluateWeightedTrajectoryTwoPlyCandidates,
   evaluateDynamicWeightedTrajectoryCandidates,
+  evaluateWeightedTrajectoryWithSharedCache,
   chooseDynamicTrajectoryLimit,
   DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
@@ -63,6 +64,26 @@ describe("benchmarkSelfDrawTwoPly", () => {
       DEFAULT_DYNAMIC_TRAJECTORY_CONFIG.maxN,
     );
     expect(chooseDynamicTrajectoryLimit([], DEFAULT_DYNAMIC_TRAJECTORY_CONFIG)).toBe(0);
+  });
+
+  it("shares only pure structure results without changing the two-ply winner", () => {
+    const full = evaluateSelfDrawTwoPlyCandidates(
+      BENCHMARK_INPUT,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      BENCHMARK_PROGRESS,
+      Number.POSITIVE_INFINITY,
+    );
+    const shared = evaluateWeightedTrajectoryWithSharedCache(
+      BENCHMARK_INPUT,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      BENCHMARK_PROGRESS,
+      4,
+    );
+    expect(shared.evaluation.bestKind).toBe(full.bestKind);
+    expect(shared.cacheHits).toBeGreaterThan(0);
+    expect(shared.cacheMisses).toBeGreaterThan(shared.cacheHits);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {

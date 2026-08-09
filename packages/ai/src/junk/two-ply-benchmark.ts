@@ -9,12 +9,14 @@ import {
   type Meld,
 } from "@new-mj/core";
 import {
+  createJunkAnalysisCache,
   DEFAULT_JUNK_WEIGHTS,
   probeSelfDrawTwoPly,
   scoreHandShapeAfterDiscard,
   type GameProgress,
   type JunkWeights,
   type SelfDrawTwoPlyProbe,
+  type JunkAnalysisCache,
 } from "./strategy.ts";
 
 const ids = (kinds: readonly TileKind[]): TileId[] => {
@@ -180,6 +182,7 @@ const evaluateRankedCandidates = (
   weights: JunkWeights,
   gameProgress: GameProgress,
   candidateLimit: number,
+  analysisCache?: JunkAnalysisCache,
 ): SelfDrawTwoPlyCandidateEvaluation => {
   const startedAt = performance.now();
   const candidates = ranked.slice(0, candidateLimit).map(({ kind, discard, rankScore }) => {
@@ -192,6 +195,7 @@ const evaluateRankedCandidates = (
       [...visibleDiscards, discard],
       weights,
       gameProgress,
+      analysisCache,
     );
     return {
       discard,
@@ -333,6 +337,115 @@ export const evaluateDynamicWeightedTrajectoryCandidates = (
     candidateLimit,
   );
   return { ...result, elapsedMs: performance.now() - startedAt };
+};
+
+export type SharedStructuralCacheEvaluation = Readonly<{
+  evaluation: SelfDrawTwoPlyCandidateEvaluation;
+  cacheHits: number;
+  cacheMisses: number;
+  cacheSize: number;
+}>;
+
+/** Compares candidates with one pure-structure cache owned by this decision. */
+export const evaluateWeightedTrajectoryWithSharedCache = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  candidateLimit = Number.POSITIVE_INFINITY,
+  cacheSize = 256,
+): SharedStructuralCacheEvaluation => {
+  const structuralCache = createJunkAnalysisCache(cacheSize);
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    candidateLimit,
+  );
+  const evaluation = evaluateRankedCandidates(
+    input,
+    ranked,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    candidateLimit,
+    structuralCache,
+  );
+  return {
+    evaluation,
+    cacheHits: structuralCache.hits,
+    cacheMisses: structuralCache.misses,
+    cacheSize: structuralCache.size,
+  };
+};
+
+export type SharedStructuralCacheSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  candidateLimit: number;
+  averageCacheHits: number;
+  averageCacheMisses: number;
+  averageCacheSize: number;
+  elapsedMs: number;
+  msPerCase: number;
+  winnerAgreement: number;
+  meanScoreGap: number;
+}>;
+
+export const benchmarkSharedStructuralCacheSuite = (
+  iterations: number,
+  candidateLimit = 4,
+  fixtureCount = 8,
+): SharedStructuralCacheSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let elapsedMs = 0;
+  let hits = 0;
+  let misses = 0;
+  let size = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      const startedAt = performance.now();
+      const shared = evaluateWeightedTrajectoryWithSharedCache(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        candidateLimit,
+      );
+      elapsedMs += performance.now() - startedAt;
+      hits += shared.cacheHits;
+      misses += shared.cacheMisses;
+      size += shared.cacheSize;
+      if (shared.evaluation.bestKind === full.bestKind) agreement += 1;
+      scoreGap += (full.bestValue ?? 0) - (shared.evaluation.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    candidateLimit,
+    averageCacheHits: hits / cases,
+    averageCacheMisses: misses / cases,
+    averageCacheSize: size / cases,
+    elapsedMs,
+    msPerCase: elapsedMs / cases,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
+  };
 };
 
 export const evaluateConservativeStructuralCandidates = (

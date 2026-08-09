@@ -516,12 +516,13 @@ export const probeSelfDrawTwoPly = (
   visibleDiscards: readonly TileId[] = [],
   weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
   gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+  analysisCache?: JunkAnalysisCache,
 ): SelfDrawTwoPlyProbe => {
   if (gameProgress.unseenPoolSize <= 0 || gameProgress.wallCount <= 0)
     return { continuationProbability: 0, continuationValue: 0, winProbability: 0, outcomes: [] };
 
   const memo = new Map<string, number>();
-  const analysisCache = createJunkAnalysisCache();
+  const structuralCache = analysisCache ?? createJunkAnalysisCache();
   const liveCopyContext: LiveCopyContext = {
     meldCounts: countsOf(input.melds.flatMap((meld) => meld.tiles)),
     discardCounts: countsOf(visibleDiscards),
@@ -563,7 +564,7 @@ export const probeSelfDrawTwoPly = (
   );
   for (const [index, { kind, probability, afterDraw }] of drawCandidates.entries()) {
     const analysis = drawAnalyses[index]!;
-    analysisCache.set(handAnalysisKey(afterDraw), analysis);
+    structuralCache.set(handAnalysisKey(afterDraw), analysis);
     if (analysis.shanten < 0) {
       winProbability += probability;
       outcomes.push({ kind, probability });
@@ -577,7 +578,7 @@ export const probeSelfDrawTwoPly = (
       memo,
       gameProgress,
       liveCopyContext,
-      analysisCache,
+      structuralCache,
     );
     continuationProbability += probability;
     continuationValue += probability * leafScore;

@@ -7,6 +7,7 @@ import {
   benchmarkStructuralTwoPlyCandidateSuite,
   benchmarkWeightedTrajectoryTwoPlyCandidateSuite,
   benchmarkDynamicWeightedTrajectorySuite,
+  benchmarkSharedStructuralCacheSuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -35,6 +36,11 @@ if (candidateLimitArgument === "blacklist") {
 } else if (candidateLimitArgument === "dynamic") {
   process.stdout.write(
     `${JSON.stringify(benchmarkDynamicWeightedTrajectorySuite(iterations, undefined, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "shared-cache") {
+  const candidateLimit = budget === undefined ? 4 : budget;
+  process.stdout.write(
+    `${JSON.stringify(benchmarkSharedStructuralCacheSuite(iterations, candidateLimit, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(
