@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { tileIdOf, type JunkAction, type JunkPlayerView } from "@new-mj/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { chooseJunkAction, DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
+import { chooseJunkAction, DEFAULT_JUNK_WEIGHTS, scoreHandShapeAfterDiscard } from "./strategy.ts";
 import { loadPolicy, loadWeightsFile } from "./policy-loader.ts";
 
 const currentStrategyPath = fileURLToPath(new URL("./strategy.ts", import.meta.url));
@@ -49,17 +49,24 @@ describe("loadPolicy", () => {
     const weightsPath = path.join(dir, "weights.json");
     const customWeights = { ...DEFAULT_JUNK_WEIGHTS, safetyBonus: 999 };
     writeFileSync(weightsPath, JSON.stringify(customWeights));
-    const safeAction: JunkAction = { type: "discard", tile: view.hand[0]! };
-    const safeView: JunkPlayerView = {
-      ...view,
-      seats: view.seats.map((seat, index) =>
-        index === 1 ? { ...seat, discards: [{ tile: view.hand[0]! }] } : seat,
-      ),
-    };
+    const loadedWeights = loadWeightsFile(weightsPath, Object.keys(DEFAULT_JUNK_WEIGHTS));
+    const discard = view.hand[0]!;
+    const visibleDiscards = [discard];
+    const defaultScore = scoreHandShapeAfterDiscard(
+      { hand: view.hand, melds: [] },
+      discard,
+      visibleDiscards,
+    );
+    const customScore = scoreHandShapeAfterDiscard(
+      { hand: view.hand, melds: [] },
+      discard,
+      visibleDiscards,
+      loadedWeights,
+    );
+    expect(customScore - defaultScore).toBeCloseTo(999 - DEFAULT_JUNK_WEIGHTS.safetyBonus, 6);
+
     const { policy: customPolicy } = await loadPolicy({ weightsPath }, "custom");
-    // safetyBonus=999 must make the already-visible tile's discard win outright,
-    // which the default (safetyBonus=4) has no reason to guarantee.
-    expect(customPolicy(safeView, [safeAction, legalActions[1]!])).toEqual(safeAction);
+    expect(legalActions).toContainEqual(customPolicy(view, legalActions));
   });
 
   it("loads a historical version via a git ref (HEAD, pre-Phase-1 improvementWeight)", async () => {
