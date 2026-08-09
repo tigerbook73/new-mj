@@ -586,22 +586,22 @@ export const probeSelfDrawTwoPly = (
         ).map((analysis) => [analysis.drawKindIndex, analysis] as const),
       )
     : undefined;
-  const directDrawAnalyses = evaluateUkeireBatch(
-    twoChangeBatchSource
-      ? []
-      : drawCandidates.map(({ afterDraw }) => ({
+  const directDrawAnalyses = !twoChangeBatchSource
+    ? evaluateUkeireBatch(
+        drawCandidates.map(({ afterDraw }) => ({
           tiles: afterDraw.hand,
           options: { sevenPairs: afterDraw.melds.length === 0 },
           existingMelds: afterDraw.melds.length,
         })),
-  );
+      )
+    : undefined;
   for (const [index, { kind, probability, afterDraw }] of drawCandidates.entries()) {
     const analysis = twoChangeBatchSource
-      ? drawAnalyses?.get(STANDARD_TILE_SET.kindIndexOf(kind))
-      : directDrawAnalyses[index];
+        ? drawAnalyses?.get(STANDARD_TILE_SET.kindIndexOf(kind))
+        : directDrawAnalyses?.[index];
     if (!analysis) throw new Error("MISSING_TWO_CHANGE_ANALYSIS");
     if (!twoChangeBatchSource) {
-      structuralCache.set(handAnalysisKey(afterDraw), directDrawAnalyses[index]!);
+      structuralCache.set(handAnalysisKey(afterDraw), directDrawAnalyses![index]!);
     }
     if (analysis.shanten < 0) {
       winProbability += probability;
