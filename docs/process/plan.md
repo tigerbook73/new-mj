@@ -22,10 +22,14 @@ LRU，每局开始清空；只缓存手牌 count signature 对应的 shanten/uke
 2.4%，且 `verify:full` 全绿；随后跳过未使用的 `baseSuffix[0]`，再取得约 4.2%，
 `verify:full` 仍全绿。已完成并接受嵌套 tail 合成优化：同一个 remove context 的更早
 add 花色从右向左复用嵌套 transition，减少重复 `composeTransitions` 与临时分配；
-等价测试和 core `verify:full` 全绿。完整 AI 2-ply 当前仍约 13.60ms/探针，且 batch
-接入没有端到端净收益证据，继续拒绝接入默认评分。下一步第一个具体动作：暂停 Phase 2，
-将已验证的 core batch API 与性能边界提为独立架构提案，未获边界决定前不再在 AI 层
-增加缓存或评分路径。
+等价测试和 core `verify:full` 全绿。AI 优化尚未结束，只是从 AI 层微优化转入 core
+批量算法阶段。后续按专题计划的 Phase 2 路线执行：固定完整 2-ply 基线；提 core
+“弃牌候选 × 34 种摸牌”共享 DP API；用独立正确性/性能 A/B 对比逐叶分析与 batch；
+先只接入诊断探针，达到完整探针基线且 checksum/叶子结果一致后，才评估默认评分准入。
+若局部 batch 变快但完整 probe 变慢，继续拒绝接入；只有在仍有必要时才升级到整批结构
+分析、增量活牌概率或专用 DP 查询。x10 仅是理论空间，不是承诺结果。下一步第一个
+具体动作：把 core 批量 API 与性能边界提为独立架构提案；提案明确前不在 AI 层增加
+缓存或评分路径。`垃圾胡性能优化讨论.md` 的进取/保守策略不纳入本阶段。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
