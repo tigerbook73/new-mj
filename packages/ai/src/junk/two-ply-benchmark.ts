@@ -151,6 +151,78 @@ export type SelfDrawTwoPlyCandidateSuite = Readonly<{
   }>;
 }>;
 
+export type TieredTwoPlyCandidateSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  results: readonly Readonly<{
+    threshold: number;
+    fallbackRate: number;
+    winnerAgreement: number;
+    meanScoreGap: number;
+    estimatedMsPerCase: number;
+  }>[];
+}>;
+
+/** Evaluates a Top-2-first policy that expands to all candidates when its two
+ * best 2-ply values are too close to trust the bounded result. */
+export const benchmarkTieredTwoPlyCandidateSuite = (
+  iterations: number,
+  thresholds: readonly number[] = [0, 0.5, 1, 2, 5, 10],
+  fixtureCount = 8,
+): TieredTwoPlyCandidateSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  const totals = thresholds.map(() => ({
+    fallback: 0,
+    agreement: 0,
+    scoreGap: 0,
+    elapsedMs: 0,
+  }));
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      const topTwo = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        2,
+      );
+      const first = topTwo.candidates[0];
+      const second = topTwo.candidates[1];
+      const margin = first && second ? first.twoPlyValue - second.twoPlyValue : Infinity;
+      for (const [index, threshold] of thresholds.entries()) {
+        const fallback = margin <= threshold;
+        const selected = fallback ? full : topTwo;
+        totals[index]!.fallback += fallback ? 1 : 0;
+        totals[index]!.agreement += selected.bestKind === full.bestKind ? 1 : 0;
+        totals[index]!.scoreGap += (full.bestValue ?? 0) - (selected.bestValue ?? 0);
+        totals[index]!.elapsedMs += topTwo.elapsedMs + (fallback ? full.elapsedMs : 0);
+      }
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    results: thresholds.map((threshold, index) => ({
+      threshold,
+      fallbackRate: totals[index]!.fallback / cases,
+      winnerAgreement: totals[index]!.agreement / cases,
+      meanScoreGap: totals[index]!.scoreGap / cases,
+      estimatedMsPerCase: totals[index]!.elapsedMs / cases,
+    })),
+  };
+};
+
 /** Compares bounded candidate budgets with the full diagnostic probe suite. */
 export const benchmarkSelfDrawTwoPlyCandidateSuite = (
   iterations: number,

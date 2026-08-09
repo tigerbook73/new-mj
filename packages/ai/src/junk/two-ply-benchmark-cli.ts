@@ -3,6 +3,7 @@ import {
   BENCHMARK_PROGRESS,
   benchmarkSelfDrawTwoPly,
   benchmarkSelfDrawTwoPlyCandidateSuite,
+  benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
 
@@ -11,7 +12,11 @@ const iterations = iterationsArgument === undefined ? 25 : Number(iterationsArgu
 const fixtureCount = fixtureCountArgument === undefined ? 8 : Number(fixtureCountArgument);
 const candidateLimit =
   candidateLimitArgument === undefined ? undefined : Number(candidateLimitArgument);
-if (candidateLimitArgument === "suite") {
+if (candidateLimitArgument === "tiered") {
+  process.stdout.write(
+    `${JSON.stringify(benchmarkTieredTwoPlyCandidateSuite(iterations, undefined, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "suite") {
   process.stdout.write(
     `${JSON.stringify(benchmarkSelfDrawTwoPlyCandidateSuite(iterations, undefined, fixtureCount))}\n`,
   );
