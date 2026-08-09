@@ -269,6 +269,18 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   composition 后，固定 core fixture 从 14.34ms 降至 13.73ms/100 次，约 **4.2%**；
   checksum 一致，core `verify:full`（19 文件、191 测试、build）全通过，已接受。
 
+  **嵌套 tail 合成优化（2026-08-09）**：继续 profile 后确认，同一个 remove
+  context 的更早 add 花色 tail 是嵌套的。改为从 remove block 向左只合成一次链，
+  消除重复的 `composeTransitions` 与临时 transition 分配；已有
+  `evaluateUkeireAfterDiscards` 等价测试保持通过，独立 fixture 的 checksum 为
+  `13800`。这是 core 内部语义等价优化，**接受并保留**。
+
+  但完整 AI 2-ply benchmark 在当前运行态仍约 **13.60ms/probe**，且该 batch
+  API 尚未接入默认评分，因此没有证据证明这条局部优化能让默认 AI 变快；“接入
+  batch 到默认 2-ply”继续**拒绝**，Phase 2 仍暂停。AI `verify:full` 本轮未能作为
+  通过证据：`policy-loader` 测试受沙箱 `spawnSync git EPERM` 阻塞，另一个
+  `decision-diff` 测试在并行运行期间超出 5 秒时限；core `verify:full` 已全绿。
+
   **候选剪枝反例（2026-08-09）**：尝试跳过“弃掉某牌后再摸回同一牌种”，认为它
   恢复原计数、不可能优于叶子；等价测试发现该判断错误——相对于弃牌后的 13 张手牌，
   摸回同牌完全可能降低向听，因此该候选必须保留。剪枝只能基于实际的下界/支配证明，

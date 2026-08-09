@@ -704,12 +704,13 @@ export const createTwoChangeShantenProber = (
       state = next;
     }
     const tail = new Array<Int8Array>(blocks.length);
-    for (let addBlock = 0; addBlock < blocks.length; addBlock += 1) {
-      let transition = IDENTITY_TRANSITION;
-      if (addBlock >= removeBlock) {
-        tail[addBlock] = baseSuffix[addBlock + 1]!;
-        continue;
-      }
+    for (let addBlock = removeBlock; addBlock < blocks.length; addBlock += 1)
+      tail[addBlock] = baseSuffix[addBlock + 1]!;
+
+    // 更早 add 花色的 tail 互相嵌套：每一层只需把右侧已构造的 tail 前面再接上
+    // 一个未改变的花色块。由右向左构造一次，避免为每个 add 花色重复合成同一段
+    // remove-to-end 后缀。
+    if (removeBlock > 0) {
       const removeTable = blocks[removeBlock]!;
       const removeSlot = indexMapSlotOfRange(
         counts,
@@ -725,19 +726,16 @@ export const createTwoChangeShantenProber = (
         0,
         afterRemove,
       );
-      transition = afterRemove;
-      for (let blockIndex = removeBlock - 1; blockIndex > addBlock; blockIndex -= 1) {
+      let transition = afterRemove;
+      tail[removeBlock - 1] = transition;
+      for (let addBlock = removeBlock - 2; addBlock >= 0; addBlock -= 1) {
+        const blockIndex = addBlock + 1;
+        const block = blocks[blockIndex]!;
         const out = new Int8Array(SLOTS_PER_VECTOR);
-        composeTransitions(
-          blocks[blockIndex]!.table.data,
-          baseBases[blockIndex]!,
-          transition,
-          0,
-          out,
-        );
+        composeTransitions(block.table.data, baseBases[blockIndex]!, transition, 0, out);
         transition = out;
+        tail[addBlock] = transition;
       }
-      tail[addBlock] = transition;
     }
     const result = finalizeDp(state, existingMelds);
     const context = { counts, prefix, tail, result };
