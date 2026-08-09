@@ -292,6 +292,13 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   与拆分前约 13.60ms/probe 在运行波动范围内，无性能回归证据。后续若继续拆分，
   只考虑把单花色 solver/table-builder 再分离，不做机械式常量碎片化。
 
+  **第二次拆分评估（2026-08-09）**：评估了继续把单花色 solver、索引和 table
+  builder 拆成更多文件的方案。该方案需要再引入共享的索引/表类型模块，主要收益是
+  文件长度下降，不能直接改善算法或 2-ply 性能，也会扩大内部导出和 import 边界。
+  **拒绝继续拆分**；当前 `shanten-prober.ts` 已隔离变化最快的 2-ply 查询层，剩余
+  `shanten-suit-table.ts` 是同一套 Layer 0 表构建与查询基础设施，保持在一起更容易
+  审查不变量。后续只有在 batch API 明确需要独立的表构建生命周期时才重新评估。
+
 ### Phase 2 后续优化计划：从 AI 层微优化转向 core 批量算法
 
 Phase 2 **尚未结束**。此前的 cache、count 预计算、remove-context、suffix 和

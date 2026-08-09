@@ -35,8 +35,10 @@ Phase 2 进入 core 批量 API 前置清理：已将 `createShantenProber` 与
 `createTwoChangeShantenProber` 从 `shanten-suit-table.ts` 拆到
 `packages/core/src/lib/shanten-prober.ts`，旧文件从 771 行降至 580 行；算法、表结构
 和调用语义不变。core `verify:full` 全绿，2-ply checksum 不变，benchmark 约
-13.28ms/probe，无性能回归证据。下一步第一个具体动作：评估是否还需要把单花色
-solver/table-builder 分离；若没有明确收益则停止清理，进入 core 批量 API 提案。
+13.28ms/probe，无性能回归证据。已评估继续拆分单花色 solver/table-builder：需要
+额外引入共享索引/表类型模块，只有文件长度收益，没有明确性能或边界收益，已拒绝
+继续拆分。当前清理阶段收束，下一步第一个具体动作：进入 core 批量 API 提案，定义
+其性能边界和最小结果接口。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
