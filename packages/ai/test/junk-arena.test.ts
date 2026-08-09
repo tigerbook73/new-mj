@@ -50,7 +50,7 @@ describe("junk self-play arena", () => {
   });
 
   it("keeps structural analysis context across a seat's decisions", () => {
-    const caches = [0, 1, 2, 3].map(() => createJunkAnalysisCache(8192));
+    const caches = [0, 1, 2, 3].map(() => createJunkAnalysisCache(256));
     const policies = caches.map((cache) => strengthPolicy({ analysisCache: cache })) as [
       SeatPolicy,
       SeatPolicy,
