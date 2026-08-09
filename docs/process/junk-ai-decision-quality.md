@@ -249,6 +249,14 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   约 17.07%。因此命中主要来自跨决策的同局结构复现，不值得再为同一回合增加一层
   AI 外壳 cache；下一步直接转向 core batch 的 prefix/tail 与 transition profile。
 
+  **batch 接入试验（2026-08-09）**：在独立 core fixture 上，
+  `evaluateUkeireAfterDiscards` 约 14.24ms/100 次，逐弃牌 `evaluateUkeire` 约
+  24.40ms/100 次，局部约 1.7x；但把 batch 结果预填入完整 2-ply 的叶子分析 cache
+  后，固定 benchmark 从约 9.97ms/probe 变为 10.90ms/probe，checksum 一致。
+  说明 batch 算法本身有效，但当前批量构造成本与 cache/live-copy 交互抵消了收益，
+  实验已撤回，暂不接入 AI 路径。下一步只在 core 内 profile remove-context、
+  prefix/tail 和 transition 分配。
+
 - **自我优化基础设施推广到 hangzhou/bloodbattle**：可复用部分是 Layer
   B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属
   Feature 抽取（对应各玩法番型/规则）仍需各自单独做，不会自动免掉。
