@@ -379,12 +379,7 @@ export const evaluateUkeireAfterDiscardDraws = (
         ).length;
         if (held >= tileSet.copiesPerKind) return [];
         const added = (drawKindIndex * tileSet.copiesPerKind) as TileId;
-        const evaluation = evaluateUkeire(
-          [...leaf, added],
-          options,
-          tileSet,
-          existingMelds,
-        );
+        const evaluation = evaluateUkeire([...leaf, added], options, tileSet, existingMelds);
         return [{ discardKindIndex, drawKindIndex, shanten: evaluation.shanten }];
       });
     });

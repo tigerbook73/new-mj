@@ -155,10 +155,7 @@ test("evaluateUkeireAfterDiscardDraws matches independent two-change analysis", 
     const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
     const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
     const heldDraws = leaf.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === drawKind).length;
-    const direct = evaluateUkeire(
-      [...leaf, tileIdOf(drawKind, heldDraws)],
-      standardOnly,
-    );
+    const direct = evaluateUkeire([...leaf, tileIdOf(drawKind, heldDraws)], standardOnly);
     assert.equal(result.shanten, direct.shanten, `${discardKind}/${drawKind}`);
   }
 });

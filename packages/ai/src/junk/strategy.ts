@@ -600,8 +600,8 @@ export const probeSelfDrawTwoPly = (
     : undefined;
   for (const [index, { kind, probability, afterDraw }] of drawCandidates.entries()) {
     const analysis = twoChangeBatchSource
-        ? drawAnalyses?.get(STANDARD_TILE_SET.kindIndexOf(kind))
-        : directDrawAnalyses?.[index];
+      ? drawAnalyses?.get(STANDARD_TILE_SET.kindIndexOf(kind))
+      : directDrawAnalyses?.[index];
     if (!analysis) throw new Error("MISSING_TWO_CHANGE_ANALYSIS");
     if (!twoChangeBatchSource) {
       structuralCache.set(handAnalysisKey(afterDraw), directDrawAnalyses![index]!);
