@@ -15,10 +15,11 @@
 - 以 1-ply 排名/分数作为 2-ply 安全上界的剪枝已否定：修正后 Top-1 相对全量 2-ply 仅 71.9% 一致，不能证明未评估候选不可能胜出。
 - 结构副产品筛选已完成 1000 个确定性随机手牌 A/B：结构 Top-4 一致率 93.1%、约 34.13ms/case；全量约 97.15ms/case，约 2.85x，但仍有 6.9% 漂移，暂不接入默认评分。
 - “最低弃牌后向听层”黑名单已完成 1000 个确定性随机手牌 A/B：平均保留 7.233 个候选，一致率 100%、平均分差 0，约 60.06ms/case 对全量 97.15ms/case；随机样本约 1.62x，但待结构化/对抗性 fixture 验证，暂不默认接入。
+- 已生成可复用的 10000 case 全量 2-ply 基准数据：[`junk-two-ply-baseline.json`](../../packages/ai/benchmark-data/junk-two-ply-baseline.json)，由 8 个 worker 生成；重生成命令为 `pnpm --filter @new-mj/ai generate:two-ply-baseline [count] [output] [workers]`。
 - core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
 - 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及待架构确认的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。
 
-下一步第一个具体动作：为“最低向听层黑名单”补充副露、七对子、刻子/顺子块、死牌和边界 tie fixture；若仍无漂移，再评估是否接入诊断路径。core batch API 继续等待架构确认。
+下一步第一个具体动作：基于已固化的 10000 case 基准，补充副露、七对子、刻子/顺子块、死牌和边界 tie fixture；若仍无漂移，再评估是否接入诊断路径。core batch API 继续等待架构确认。
 
 ## 阻塞与遗留问题
 

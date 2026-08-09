@@ -50,6 +50,13 @@ ukeire，先按向听、再按扣除已知牌后的加权 ukeire 排序。1000 �
 当前结论为**暂不接入默认评分，保留为候选筛选实验**。此前 96 case 的 Top-4 全一致
 不作为最终依据。
 
+为避免后续每个候选都重复计算全量基准，已保留多线程生成器
+`packages/ai/src/junk/two-ply-baseline-cli.ts`，并生成
+[`packages/ai/benchmark-data/junk-two-ply-baseline.json`](../../packages/ai/benchmark-data/junk-two-ply-baseline.json)。
+数据保存实际手牌而不只保存 seed，并记录每个弃牌的 1-ply/2-ply 汇总、继续概率、自摸和牌
+概率、叶子数量、最佳弃牌和生成元数据；不保存完整摸牌叶子，以控制文件大小。后续质量 A/B
+应复用这批全量结果；真实性能 benchmark 仍需偶尔重新跑全量。
+
 ## 已接受结论
 
 | 主题                      | 决策与证据                                                                                                                                                               |
