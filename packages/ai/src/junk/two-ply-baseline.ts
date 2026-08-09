@@ -8,8 +8,9 @@ import {
   type SelfDrawTwoPlyCandidateEvaluation,
 } from "./two-ply-benchmark.ts";
 
-export const TWO_PLY_BASELINE_VERSION = 1;
+export const TWO_PLY_BASELINE_VERSION = 2;
 export const TWO_PLY_BASELINE_SEED = 0x2f_2a1e;
+export const TWO_PLY_BASELINE_NUMERIC_PRECISION = 9;
 export const DEFAULT_BASELINE_WORKERS = Math.min(8, Math.max(1, cpus().length - 1));
 
 export type TwoPlyBaselineCandidate = Readonly<{
@@ -42,9 +43,16 @@ export type TwoPlyBaselineManifest = Readonly<{
   seed: number;
   count: number;
   workers: number;
+  numericPrecision: number;
   progress: typeof BENCHMARK_PROGRESS;
   weights: typeof DEFAULT_JUNK_WEIGHTS;
 }>;
+
+const roundBaselineNumber = (value: number | undefined): number | undefined =>
+  value === undefined
+    ? undefined
+    : Math.round(value * 10 ** TWO_PLY_BASELINE_NUMERIC_PRECISION) /
+      10 ** TWO_PLY_BASELINE_NUMERIC_PRECISION;
 
 export type TwoPlyBaselineFile = Readonly<{
   manifest: TwoPlyBaselineManifest;
@@ -70,14 +78,14 @@ const summarize = (
   candidates: evaluation.candidates.map((candidate) => ({
     discard: candidate.discard,
     kind: candidate.kind,
-    onePlyScore: candidate.onePlyScore,
-    twoPlyValue: candidate.twoPlyValue,
-    continuationProbability: candidate.probe.continuationProbability,
-    winProbability: candidate.probe.winProbability,
+    onePlyScore: roundBaselineNumber(candidate.onePlyScore)!,
+    twoPlyValue: roundBaselineNumber(candidate.twoPlyValue)!,
+    continuationProbability: roundBaselineNumber(candidate.probe.continuationProbability)!,
+    winProbability: roundBaselineNumber(candidate.probe.winProbability)!,
     outcomeCount: candidate.probe.outcomes.length,
   })),
   bestKind: evaluation.bestKind,
-  bestValue: evaluation.bestValue,
+  bestValue: roundBaselineNumber(evaluation.bestValue),
 });
 
 export const runTwoPlyBaselineTask = (task: TwoPlyBaselineTask): TwoPlyBaselineCase[] =>
@@ -146,6 +154,7 @@ export const generateTwoPlyBaseline = async (
       seed,
       count,
       workers: actualWorkers,
+      numericPrecision: TWO_PLY_BASELINE_NUMERIC_PRECISION,
       progress: BENCHMARK_PROGRESS,
       weights: DEFAULT_JUNK_WEIGHTS,
     },

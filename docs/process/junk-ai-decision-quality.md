@@ -56,7 +56,7 @@ ukeire，先按向听、再按扣除已知牌后的加权 ukeire 排序。1000 �
 和独立的 [`manifest`](../../packages/ai/benchmark-data/junk-two-ply-baseline.manifest.json)。
 JSONL 每行保存一个实际 case，manifest 保存 seed、权重、Git revision、worker 数等元数据；
 数据保存实际手牌而不只保存 seed，并记录每个弃牌的 1-ply/2-ply 汇总、继续概率、自摸和牌
-概率、叶子数量和最佳弃牌。不保存完整摸牌叶子，以控制文件大小。后续质量 A/B 应复用这批
+概率、叶子数量和最佳弃牌；数值统一保留 9 位小数。不保存完整摸牌叶子，以控制文件大小。后续质量 A/B 应复用这批
 全量结果；真实性能 benchmark 仍需偶尔重新跑全量。
 
 ## 已接受结论
