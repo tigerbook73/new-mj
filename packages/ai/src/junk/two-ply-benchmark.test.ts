@@ -10,6 +10,7 @@ import {
   evaluateWeightedTrajectoryTwoPlyCandidates,
   evaluateDynamicWeightedTrajectoryCandidates,
   evaluateWeightedTrajectoryWithSharedCache,
+  benchmarkCrossCandidateDrawOverlap,
   chooseDynamicTrajectoryLimit,
   DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
@@ -84,6 +85,13 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(shared.evaluation.bestKind).toBe(full.bestKind);
     expect(shared.cacheHits).toBeGreaterThan(0);
     expect(shared.cacheMisses).toBeGreaterThan(shared.cacheHits);
+  });
+
+  it("measures cross-candidate draw-state overlap", () => {
+    const result = benchmarkCrossCandidateDrawOverlap(1, 4, 2);
+    expect(result.averageDrawStates).toBeGreaterThan(result.averageUniqueDrawStates);
+    expect(result.overlapRate).toBeGreaterThanOrEqual(0);
+    expect(result.overlapRate).toBeLessThan(1);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {

@@ -8,6 +8,7 @@ import {
   benchmarkWeightedTrajectoryTwoPlyCandidateSuite,
   benchmarkDynamicWeightedTrajectorySuite,
   benchmarkSharedStructuralCacheSuite,
+  benchmarkCrossCandidateDrawOverlap,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -41,6 +42,11 @@ if (candidateLimitArgument === "blacklist") {
   const candidateLimit = budget === undefined ? 4 : budget;
   process.stdout.write(
     `${JSON.stringify(benchmarkSharedStructuralCacheSuite(iterations, candidateLimit, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "overlap") {
+  const candidateLimit = budget === undefined ? 4 : budget;
+  process.stdout.write(
+    `${JSON.stringify(benchmarkCrossCandidateDrawOverlap(iterations, candidateLimit, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(

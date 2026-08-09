@@ -448,6 +448,87 @@ export const benchmarkSharedStructuralCacheSuite = (
   };
 };
 
+export type CrossCandidateDrawOverlapSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  candidateLimit: number;
+  averageDrawStates: number;
+  averageUniqueDrawStates: number;
+  averageDuplicateDrawStates: number;
+  overlapRate: number;
+}>;
+
+const handShapeKeyForBenchmark = (input: BenchmarkShape): string => {
+  const counts = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+  for (const tile of input.hand) counts[STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile))]! += 1;
+  return `${input.melds.length}/${counts.join("")}`;
+};
+
+const countCrossCandidateDrawOverlap = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[],
+  candidateLimit: number,
+): { drawStates: number; uniqueDrawStates: number } => {
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    DEFAULT_JUNK_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    candidateLimit,
+  );
+  const keys = new Set<string>();
+  let drawStates = 0;
+  for (const { discard } of ranked) {
+    const afterDiscard = input.hand.filter((tile) => tile !== discard);
+    const known = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+    for (const tile of [
+      ...input.hand,
+      ...input.melds.flatMap((meld) => meld.tiles),
+      ...visibleDiscards,
+      discard,
+    ]) {
+      known[STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile))]! += 1;
+    }
+    for (const kind of STANDARD_TILE_SET.kinds) {
+      const kindIndex = STANDARD_TILE_SET.kindIndexOf(kind);
+      if (STANDARD_TILE_SET.copiesPerKind - known[kindIndex]! <= 0) continue;
+      drawStates += 1;
+      keys.add(handShapeKeyForBenchmark({ hand: [...afterDiscard, tileIdOf(kind, 0)], melds: input.melds }));
+    }
+  }
+  return { drawStates, uniqueDrawStates: keys.size };
+};
+
+export const benchmarkCrossCandidateDrawOverlap = (
+  iterations: number,
+  candidateLimit = 4,
+  fixtureCount = 8,
+): CrossCandidateDrawOverlapSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let drawStates = 0;
+  let uniqueDrawStates = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const result = countCrossCandidateDrawOverlap(input, [], candidateLimit);
+      drawStates += result.drawStates;
+      uniqueDrawStates += result.uniqueDrawStates;
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    candidateLimit,
+    averageDrawStates: drawStates / cases,
+    averageUniqueDrawStates: uniqueDrawStates / cases,
+    averageDuplicateDrawStates: (drawStates - uniqueDrawStates) / cases,
+    overlapRate: 1 - uniqueDrawStates / drawStates,
+  };
+};
+
 export const evaluateConservativeStructuralCandidates = (
   input: BenchmarkShape,
   visibleDiscards: readonly TileId[] = [],
