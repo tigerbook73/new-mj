@@ -59,6 +59,10 @@ JSONL 每行保存一个实际 case，manifest 保存 seed、权重、Git revisi
 概率、叶子数量和最佳弃牌；数值统一保留 9 位小数。不保存完整摸牌叶子，以控制文件大小。后续质量 A/B 应复用这批
 全量结果；真实性能 benchmark 仍需偶尔重新跑全量。
 
+基准复用命令为 `pnpm --filter @new-mj/ai compare:two-ply-baseline benchmark-data/junk-two-ply-baseline.jsonl [limit]`。
+它流式读取 JSONL，只执行候选方案的计算；1000 case 复用结果的最低向听黑名单仍为 100%
+一致、平均保留 7.233 个候选、平均分差约 0。
+
 ## 已接受结论
 
 | 主题                      | 决策与证据                                                                                                                                                               |

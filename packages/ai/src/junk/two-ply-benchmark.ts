@@ -35,7 +35,7 @@ export const BENCHMARK_INPUT = {
 
 export const BENCHMARK_PROGRESS: GameProgress = { wallCount: 84, unseenPoolSize: 123 };
 
-type BenchmarkShape = Readonly<{
+export type BenchmarkShape = Readonly<{
   hand: readonly TileId[];
   melds: readonly Meld[];
 }>;
@@ -179,6 +179,24 @@ export const evaluateStructuralTwoPlyCandidates = (
   return { ...result, elapsedMs: performance.now() - startedAt };
 };
 
+export const evaluateConservativeStructuralCandidates = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+): SelfDrawTwoPlyCandidateEvaluation => {
+  const ranked = rankStructuralDiscards(input, visibleDiscards, Number.POSITIVE_INFINITY);
+  const minShanten = Math.min(...ranked.map(({ shanten }) => shanten));
+  return evaluateRankedCandidates(
+    input,
+    ranked.filter(({ shanten }) => shanten === minShanten),
+    visibleDiscards,
+    weights,
+    gameProgress,
+    Number.POSITIVE_INFINITY,
+  );
+};
+
 export type ConservativeStructuralSuite = Readonly<{
   iterations: number;
   fixtureCount: number;
@@ -212,19 +230,14 @@ export const benchmarkConservativeStructuralSuite = (
         Number.POSITIVE_INFINITY,
       );
       const startedAt = performance.now();
-      const ranked = rankStructuralDiscards(input, [], Number.POSITIVE_INFINITY);
-      const minShanten = Math.min(...ranked.map(({ shanten }) => shanten));
-      const survivors = ranked.filter(({ shanten }) => shanten === minShanten);
-      const bounded = evaluateRankedCandidates(
+      const bounded = evaluateConservativeStructuralCandidates(
         input,
-        survivors,
         [],
         DEFAULT_JUNK_WEIGHTS,
         BENCHMARK_PROGRESS,
-        Number.POSITIVE_INFINITY,
       );
       elapsedMs += performance.now() - startedAt;
-      candidates += survivors.length;
+      candidates += bounded.candidates.length;
       if (bounded.bestKind === full.bestKind) agreement += 1;
       scoreGap += (full.bestValue ?? 0) - (bounded.bestValue ?? 0);
       cases += 1;
