@@ -11,10 +11,9 @@
 - Phase 1 的概率评分、迟疑阈值、既有副露 ukeire 修复和有界结构缓存已完成。
 - 2-ply 自摸诊断探针已有目标/反例 fixture，但尚未接入默认评分；当前完整探针约 13.3–13.6ms/probe。
 - core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
-- core batch API 提案已写入专题文档，待架构边界确认；确认前不实现、不接入默认 AI。
+- 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及待架构确认的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。
 
-下一步第一个具体动作：将 core batch API 的接口形状和性能边界提回 Claude Project，
-确认后再执行“实现 API → 逐叶正确性 A/B → 诊断接入 → 默认准入”流程。
+下一步第一个具体动作：先对不改公共接口的 Top-N 2-ply、分级 2-ply 和 core 内部增量/缓存优化做性能与决策质量 A/B；core batch API 同步提回 Claude Project，确认后再实现并测试。
 
 ## 阻塞与遗留问题
 
