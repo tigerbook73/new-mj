@@ -95,7 +95,12 @@ export const evaluateSelfDrawTwoPlyCandidates = (
       hand: input.hand.filter((tile) => tile !== discard),
       melds: input.melds,
     };
-    const probe = probeSelfDrawTwoPly(afterDiscard, visibleDiscards, weights, gameProgress);
+    const probe = probeSelfDrawTwoPly(
+      afterDiscard,
+      [...visibleDiscards, discard],
+      weights,
+      gameProgress,
+    );
     return {
       discard,
       kind,

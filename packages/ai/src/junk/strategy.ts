@@ -504,6 +504,9 @@ export type SelfDrawTwoPlyProbe = Readonly<{
  * unseenPoolSize. Opponent discards, chi/peng opportunities, and terminal win
  * payouts are intentionally outside this probe; immediate wins are reported
  * separately rather than incorrectly forcing a discard from the winning hand.
+ * `visibleDiscards` must include the discard that produced `input`; callers
+ * evaluating a candidate discard must append that tile before calling this
+ * probe, otherwise the just-discarded physical copy would be counted as drawable.
  *
  * This is not wired into default policy yet. Its fixture behavior and benchmark
  * are the evidence gate for deciding whether it may become a scoring feature.

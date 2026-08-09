@@ -34,4 +34,18 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(full.candidates.length).toBeGreaterThan(topOne.candidates.length);
     expect(topOne.bestKind).toBe(full.bestKind);
   });
+
+  it("removes the candidate discard from the next-draw probability pool", () => {
+    const result = evaluateSelfDrawTwoPlyCandidates(
+      BENCHMARK_INPUT,
+      [],
+      undefined,
+      BENCHMARK_PROGRESS,
+      Number.POSITIVE_INFINITY,
+    );
+    const threeMeters = result.candidates.find((candidate) => candidate.kind === "3m");
+    expect(threeMeters?.probe.outcomes.find(({ kind }) => kind === "3m")?.probability).toBe(
+      3 / BENCHMARK_PROGRESS.unseenPoolSize,
+    );
+  });
 });
