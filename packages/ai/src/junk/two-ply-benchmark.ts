@@ -49,6 +49,8 @@ export type SelfDrawTwoPlyCandidate = Readonly<{
 export type SelfDrawTwoPlyCandidateEvaluation = Readonly<{
   candidateLimit: number;
   candidates: readonly SelfDrawTwoPlyCandidate[];
+  onePlyBestKind: TileKind | undefined;
+  onePlyBestValue: number | undefined;
   bestKind: TileKind | undefined;
   bestValue: number | undefined;
   elapsedMs: number;
@@ -110,6 +112,8 @@ export const evaluateSelfDrawTwoPlyCandidates = (
   return {
     candidateLimit,
     candidates,
+    onePlyBestKind: ranked[0]?.kind,
+    onePlyBestValue: ranked[0]?.onePlyScore,
     bestKind: best?.kind,
     bestValue: best?.twoPlyValue,
     elapsedMs: performance.now() - startedAt,
@@ -141,6 +145,10 @@ export type SelfDrawTwoPlyCandidateSuite = Readonly<{
     winnerAgreement: number;
     meanScoreGap: number;
   }>[];
+  onePly: Readonly<{
+    winnerAgreement: number;
+    meanScoreGap: number;
+  }>;
 }>;
 
 /** Compares bounded candidate budgets with the full diagnostic probe suite. */
@@ -153,6 +161,7 @@ export const benchmarkSelfDrawTwoPlyCandidateSuite = (
     throw new Error("iterations must be a positive safe integer");
   const inputs = benchmarkInputs(fixtureCount);
   const totals = candidateLimits.map(() => ({ elapsedMs: 0, agreement: 0, scoreGap: 0 }));
+  const onePly = { agreement: 0, scoreGap: 0 };
   let cases = 0;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     for (const input of inputs) {
@@ -163,6 +172,11 @@ export const benchmarkSelfDrawTwoPlyCandidateSuite = (
         BENCHMARK_PROGRESS,
         Number.POSITIVE_INFINITY,
       );
+      if (full.onePlyBestKind === full.bestKind) onePly.agreement += 1;
+      const onePlyCandidate = full.candidates.find(
+        (candidate) => candidate.kind === full.onePlyBestKind,
+      );
+      onePly.scoreGap += (full.bestValue ?? 0) - (onePlyCandidate?.twoPlyValue ?? 0);
       for (const [index, candidateLimit] of candidateLimits.entries()) {
         const bounded = evaluateSelfDrawTwoPlyCandidates(
           input,
@@ -181,6 +195,10 @@ export const benchmarkSelfDrawTwoPlyCandidateSuite = (
   return {
     iterations,
     fixtureCount: inputs.length,
+    onePly: {
+      winnerAgreement: onePly.agreement / cases,
+      meanScoreGap: onePly.scoreGap / cases,
+    },
     results: candidateLimits.map((candidateLimit, index) => ({
       candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : "all",
       elapsedMs: totals[index]!.elapsedMs,
