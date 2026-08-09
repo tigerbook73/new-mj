@@ -91,7 +91,51 @@ type LiveCopyContext = Readonly<{
   discardCounts: Uint8Array;
 }>;
 
-type HandAnalysisCache = Map<string, UkeireEvaluation>;
+export type JunkAnalysisCache = Readonly<{
+  get: (key: string) => UkeireEvaluation | undefined;
+  set: (key: string, value: UkeireEvaluation) => void;
+  readonly hits: number;
+  readonly misses: number;
+  readonly size: number;
+}>;
+
+/** 创建一个有上限的结构分析 LRU；只缓存纯 hand-shape 结果，不持有局面状态。 */
+export const createJunkAnalysisCache = (maxEntries = 8192): JunkAnalysisCache => {
+  if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0)
+    throw new Error("maxEntries must be a positive safe integer");
+  const entries = new Map<string, UkeireEvaluation>();
+  let hits = 0;
+  let misses = 0;
+  return {
+    get(key) {
+      const value = entries.get(key);
+      if (!value) {
+        misses += 1;
+        return undefined;
+      }
+      hits += 1;
+      entries.delete(key);
+      entries.set(key, value);
+      return value;
+    },
+    set(key, value) {
+      entries.delete(key);
+      entries.set(key, value);
+      while (entries.size > maxEntries) entries.delete(entries.keys().next().value!);
+    },
+    get hits() {
+      return hits;
+    },
+    get misses() {
+      return misses;
+    },
+    get size() {
+      return entries.size;
+    },
+  };
+};
+
+type HandAnalysisCache = JunkAnalysisCache;
 
 const kindOf = (tile: TileId): TileKind => STANDARD_TILE_SET.kindOf(tile);
 const kindIndexOf = (kind: TileKind): number => STANDARD_TILE_SET.kindIndexOf(kind);
@@ -468,7 +512,7 @@ export const probeSelfDrawTwoPly = (
     return { continuationProbability: 0, continuationValue: 0, winProbability: 0, outcomes: [] };
 
   const memo = new Map<string, number>();
-  const analysisCache: HandAnalysisCache = new Map();
+  const analysisCache = createJunkAnalysisCache();
   const liveCopyContext: LiveCopyContext = {
     meldCounts: countsOf(input.melds.flatMap((meld) => meld.tiles)),
     discardCounts: countsOf(visibleDiscards),
@@ -612,6 +656,7 @@ const scoreAction = (
   action: JunkAction,
   weights: JunkWeights,
   memo: Map<string, number>,
+  analysisCache?: HandAnalysisCache,
 ): number => {
   const discards = visibleDiscards(view);
   const currentMelds = view.seats[view.seat]!.melds;
@@ -624,6 +669,8 @@ const scoreAction = (
       weights,
       memo,
       gameProgress,
+      undefined,
+      analysisCache,
     );
   }
   // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
@@ -636,24 +683,47 @@ const scoreAction = (
       discards,
       undefined,
       gameProgress,
+      undefined,
+      analysisCache,
     );
   if (action.type === "anGang") {
     const claim = simulatedAnGang(view, action.kind);
     return claim
-      ? handQuality(claim, weights, memo, discards, undefined, gameProgress) + weights.gangkai
+      ? handQuality(
+          claim,
+          weights,
+          memo,
+          discards,
+          undefined,
+          gameProgress,
+          undefined,
+          analysisCache,
+        ) + weights.gangkai
       : -100;
   }
   if (action.type === "buGang") {
     const claim = simulatedBuGang(view, action.tile);
     return claim
-      ? handQuality(claim, weights, memo, discards, undefined, gameProgress) +
+      ? handQuality(
+          claim,
+          weights,
+          memo,
+          discards,
+          undefined,
+          gameProgress,
+          undefined,
+          analysisCache,
+        ) +
           (weights.gangkai - weights.buGangPenalty)
       : -100;
   }
   const claim = simulatedClaim(view, action);
   if (!claim) return -100;
   const hurdle = action.type === "chi" ? weights.chiHurdle : weights.pengHurdle;
-  return bestDiscardScore(claim, discards, weights, memo, gameProgress) - hurdle;
+  return (
+    bestDiscardScore(claim, discards, weights, memo, gameProgress, undefined, analysisCache) -
+    hurdle
+  );
 };
 
 /**
@@ -666,6 +736,7 @@ const scoreAction = (
 export type JunkStrengthConfig = {
   temperature?: number;
   random?: () => number;
+  analysisCache?: JunkAnalysisCache;
 };
 
 export type ScoredAction = { action: JunkAction; score: number };
@@ -677,20 +748,22 @@ export const scoreLegalActions = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
   weights: JunkWeights,
+  analysisCache?: JunkAnalysisCache,
 ): ScoredAction[] => {
   // One memo shared across every candidate this turn evaluates — see shantenOf's
   // doc comment for why that turns overlapping recursive sub-searches into cache
   // hits instead of each candidate re-deriving them from scratch.
   const memo = new Map<string, number>();
+  const structuralCache = analysisCache ?? createJunkAnalysisCache();
   const discardScores = new Map<TileKind, number>();
   return legalActions.map((action) => ({
     action,
     score:
       action.type !== "discard"
-        ? scoreAction(view, action, weights, memo)
+        ? scoreAction(view, action, weights, memo, structuralCache)
         : (discardScores.get(kindOf(action.tile)) ??
           (() => {
-            const calculated = scoreAction(view, action, weights, memo);
+            const calculated = scoreAction(view, action, weights, memo, structuralCache);
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
           })()),
@@ -740,7 +813,7 @@ export const recommendJunkAction = (
 ): JunkAction | undefined => {
   const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
   if (winning) return winning;
-  const scored = scoreLegalActions(view, legalActions, weights);
+  const scored = scoreLegalActions(view, legalActions, weights, strength.analysisCache);
   const temperature = strength.temperature ?? 0;
   if (temperature <= 0) return argmaxAction(scored);
   return sampleSoftmax(scored, temperature, strength.random ?? Math.random);

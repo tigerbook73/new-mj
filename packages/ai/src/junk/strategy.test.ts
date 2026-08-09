@@ -11,9 +11,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import {
   chooseJunkAction,
+  createJunkAnalysisCache,
   DEFAULT_JUNK_WEIGHTS,
   probeSelfDrawTwoPly,
   recommendJunkAction,
+  scoreLegalActions,
   scoreHandShapeAfterDiscard,
   type GameProgress,
   type JunkWeights,
@@ -135,6 +137,34 @@ describe("junk strategy", () => {
   it("always takes a legal win and preserves its original reference", () => {
     const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
     expect(recommendJunkAction(view(["1m"]), actions)).toBe(actions[1]);
+  });
+
+  it("reuses bounded structural analysis across calls without reusing live-state scores", () => {
+    const player = view([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1z",
+      "2z",
+    ]);
+    const actions: JunkAction[] = player.hand.map((tile) => ({ type: "discard", tile }));
+    const cache = createJunkAnalysisCache(32);
+    const first = scoreLegalActions(player, actions, DEFAULT_JUNK_WEIGHTS, cache);
+    const hitsAfterFirstCall = cache.hits;
+    const second = scoreLegalActions(player, actions, DEFAULT_JUNK_WEIGHTS, cache);
+
+    expect(hitsAfterFirstCall).toBe(0);
+    expect(cache.hits).toBeGreaterThan(hitsAfterFirstCall);
+    expect(cache.size).toBeLessThanOrEqual(32);
+    expect(second).toEqual(first);
   });
 
   it("keeps a one-away hand instead of breaking it", () => {

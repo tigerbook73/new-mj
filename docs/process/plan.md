@@ -11,9 +11,11 @@
 评分。性能优化已重启：第一轮完成 34 种牌计数预计算、hand analysis 复用及
 `evaluateUkeire`/`evaluateUkeireBatch` 基础 API；固定 fixture 热态约
 10.1ms/探针（此前约 15.1ms），热点仍在 core `ukeire`/花色 DP，尚未达到默认
-评分门槛。下一步第一个具体动作：将 batch API 推进为共享候选花色 DP，先完成
-“同一 14 张牌分别弃掉每种牌”的 core 批量评估测试与基准，再决定是否继续接入
-2-ply。
+评分门槛。当前新增一项低风险准备：由每个 arena `SeatPolicy` 持有有界结构分析
+LRU；只缓存手牌 count signature 对应的 shanten/ukeire，不缓存牌墙、活牌概率、
+安全度或趋势判断。下一步第一个具体动作：跑早/中/残局跨回合场景，记录 LRU
+hit/miss、容量和端到端耗时；若有稳定收益，再评估把 context 显式接入 server
+seat lifecycle，再决定是否继续接入 2-ply。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
