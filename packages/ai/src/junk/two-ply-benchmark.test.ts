@@ -8,6 +8,9 @@ import {
   benchmarkConservativeStructuralSuite,
   evaluateStructuralTwoPlyCandidates,
   evaluateWeightedTrajectoryTwoPlyCandidates,
+  evaluateDynamicWeightedTrajectoryCandidates,
+  chooseDynamicTrajectoryLimit,
+  DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
 } from "./two-ply-benchmark.ts";
 import { DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
@@ -46,6 +49,20 @@ describe("benchmarkSelfDrawTwoPly", () => {
     );
     expect(full.bestKind).toBe("1p");
     expect(bounded.bestKind).toBe(full.bestKind);
+  });
+
+  it("bounds dynamic trajectory candidate selection", () => {
+    const result = evaluateDynamicWeightedTrajectoryCandidates(
+      BENCHMARK_INPUT,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      BENCHMARK_PROGRESS,
+      DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
+    );
+    expect(result.candidates.length).toBeLessThanOrEqual(
+      DEFAULT_DYNAMIC_TRAJECTORY_CONFIG.maxN,
+    );
+    expect(chooseDynamicTrajectoryLimit([], DEFAULT_DYNAMIC_TRAJECTORY_CONFIG)).toBe(0);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {

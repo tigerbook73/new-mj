@@ -5,6 +5,8 @@ import {
   evaluateSelfDrawTwoPlyCandidates,
   evaluateStructuralTwoPlyCandidates,
   evaluateWeightedTrajectoryTwoPlyCandidates,
+  evaluateDynamicWeightedTrajectoryCandidates,
+  DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   type BenchmarkShape,
 } from "./two-ply-benchmark.ts";
 import { DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
@@ -169,6 +171,13 @@ for (const fixture of fixtures) {
     BENCHMARK_PROGRESS,
     4,
   );
+  const dynamicTrajectory = evaluateDynamicWeightedTrajectoryCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    DEFAULT_JUNK_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
+  );
   const stressFull = evaluateSelfDrawTwoPlyCandidates(
     fixture.input,
     fixture.visibleDiscards,
@@ -196,6 +205,13 @@ for (const fixture of fixtures) {
     BENCHMARK_PROGRESS,
     4,
   );
+  const stressDynamicTrajectory = evaluateDynamicWeightedTrajectoryCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    STRESS_FAN_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
+  );
   process.stdout.write(
     `${JSON.stringify({
       name: fixture.name,
@@ -215,6 +231,10 @@ for (const fixture of fixtures) {
       weightedTrajectoryTop4Match: weightedTrajectoryTop4.bestKind === full.bestKind,
       weightedTrajectoryTop4Gap:
         (full.bestValue ?? 0) - (weightedTrajectoryTop4.bestValue ?? 0),
+      dynamicTrajectoryCandidates: dynamicTrajectory.candidates.length,
+      dynamicTrajectoryBest: dynamicTrajectory.bestKind,
+      dynamicTrajectoryMatch: dynamicTrajectory.bestKind === full.bestKind,
+      dynamicTrajectoryGap: (full.bestValue ?? 0) - (dynamicTrajectory.bestValue ?? 0),
       stressFanFullBest: stressFull.bestKind,
       stressFanConservativeBest: stressConservative.bestKind,
       stressFanMatch: stressFull.bestKind === stressConservative.bestKind,
@@ -227,6 +247,11 @@ for (const fixture of fixtures) {
       stressFanTrajectoryTop4Match: stressTrajectoryTop4.bestKind === stressFull.bestKind,
       stressFanTrajectoryTop4Gap:
         (stressFull.bestValue ?? 0) - (stressTrajectoryTop4.bestValue ?? 0),
+      stressDynamicTrajectoryCandidates: stressDynamicTrajectory.candidates.length,
+      stressDynamicTrajectoryBest: stressDynamicTrajectory.bestKind,
+      stressDynamicTrajectoryMatch: stressDynamicTrajectory.bestKind === stressFull.bestKind,
+      stressDynamicTrajectoryGap:
+        (stressFull.bestValue ?? 0) - (stressDynamicTrajectory.bestValue ?? 0),
       elapsedMs: performance.now() - startedAt,
     })}\n`,
   );

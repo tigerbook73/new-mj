@@ -6,6 +6,7 @@ import {
   benchmarkConservativeStructuralSuite,
   benchmarkStructuralTwoPlyCandidateSuite,
   benchmarkWeightedTrajectoryTwoPlyCandidateSuite,
+  benchmarkDynamicWeightedTrajectorySuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -30,6 +31,10 @@ if (candidateLimitArgument === "blacklist") {
   const limits = budget === undefined ? undefined : [budget, Number.POSITIVE_INFINITY];
   process.stdout.write(
     `${JSON.stringify(benchmarkWeightedTrajectoryTwoPlyCandidateSuite(iterations, limits, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "dynamic") {
+  process.stdout.write(
+    `${JSON.stringify(benchmarkDynamicWeightedTrajectorySuite(iterations, undefined, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(

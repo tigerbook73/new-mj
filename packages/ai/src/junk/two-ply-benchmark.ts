@@ -266,6 +266,75 @@ export const evaluateWeightedTrajectoryTwoPlyCandidates = (
   return { ...result, elapsedMs: performance.now() - startedAt };
 };
 
+export type DynamicWeightedTrajectoryConfig = Readonly<{
+  minN: number;
+  maxN: number;
+  scoreWindow: number;
+  elbowGap: number;
+}>;
+
+export const DEFAULT_DYNAMIC_TRAJECTORY_CONFIG: DynamicWeightedTrajectoryConfig = {
+  minN: 2,
+  maxN: 8,
+  scoreWindow: 4,
+  elbowGap: 12,
+};
+
+export const chooseDynamicTrajectoryLimit = (
+  ranked: readonly RankedDiscard[],
+  config: DynamicWeightedTrajectoryConfig,
+): number => {
+  if (
+    !Number.isSafeInteger(config.minN) ||
+    !Number.isSafeInteger(config.maxN) ||
+    config.minN <= 0 ||
+    config.maxN < config.minN ||
+    config.scoreWindow < 0 ||
+    config.elbowGap < 0
+  )
+    throw new Error("invalid dynamic trajectory config");
+  const lower = Math.min(config.minN, ranked.length);
+  const upper = Math.min(config.maxN, ranked.length);
+  if (lower === 0) return 0;
+  let limit = lower;
+  const bestScore = ranked[0]!.rankScore;
+  while (limit < upper && ranked[limit]!.rankScore >= bestScore - config.scoreWindow) limit += 1;
+  for (let index = lower; index < limit; index += 1) {
+    if (ranked[index - 1]!.rankScore - ranked[index]!.rankScore >= config.elbowGap) {
+      return index;
+    }
+  }
+  return limit;
+};
+
+/** Diagnostic dynamic-N evaluator with explicit minimum and maximum budgets. */
+export const evaluateDynamicWeightedTrajectoryCandidates = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  config: DynamicWeightedTrajectoryConfig = DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
+): SelfDrawTwoPlyCandidateEvaluation => {
+  const startedAt = performance.now();
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    Number.POSITIVE_INFINITY,
+  );
+  const candidateLimit = chooseDynamicTrajectoryLimit(ranked, config);
+  const result = evaluateRankedCandidates(
+    input,
+    ranked.slice(0, candidateLimit),
+    visibleDiscards,
+    weights,
+    gameProgress,
+    candidateLimit,
+  );
+  return { ...result, elapsedMs: performance.now() - startedAt };
+};
+
 export const evaluateConservativeStructuralCandidates = (
   input: BenchmarkShape,
   visibleDiscards: readonly TileId[] = [],
@@ -669,6 +738,65 @@ export const benchmarkWeightedTrajectoryTwoPlyCandidateSuite = (
       winnerAgreement: totals[index]!.agreement / cases,
       meanScoreGap: totals[index]!.scoreGap / cases,
     })),
+  };
+};
+
+export type DynamicWeightedTrajectorySuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  config: DynamicWeightedTrajectoryConfig;
+  averageCandidates: number;
+  elapsedMs: number;
+  msPerCase: number;
+  winnerAgreement: number;
+  meanScoreGap: number;
+}>;
+
+export const benchmarkDynamicWeightedTrajectorySuite = (
+  iterations: number,
+  config: DynamicWeightedTrajectoryConfig = DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
+  fixtureCount = 8,
+): DynamicWeightedTrajectorySuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let candidates = 0;
+  let elapsedMs = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      const dynamic = evaluateDynamicWeightedTrajectoryCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        config,
+      );
+      candidates += dynamic.candidates.length;
+      elapsedMs += dynamic.elapsedMs;
+      if (dynamic.bestKind === full.bestKind) agreement += 1;
+      scoreGap += (full.bestValue ?? 0) - (dynamic.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    config,
+    averageCandidates: candidates / cases,
+    elapsedMs,
+    msPerCase: elapsedMs / cases,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
   };
 };
 
