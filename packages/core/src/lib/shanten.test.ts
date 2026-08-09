@@ -3,6 +3,7 @@ import { test } from "vitest";
 import { createPrng, nextInt, shuffle } from "./prng.ts";
 import {
   computeShanten,
+  evaluateUkeireAfterDiscards,
   evaluateUkeire,
   evaluateUkeireBatch,
   isTingpai,
@@ -84,6 +85,37 @@ test("evaluateUkeire combines shanten and ukeire, and batch evaluation deduplica
   });
   assert.deepEqual(batch[0], single);
   assert.strictEqual(batch[1], batch[0]);
+});
+
+test("evaluateUkeireAfterDiscards matches independent leaf analysis", () => {
+  const hand = ids([
+    "1m",
+    "2m",
+    "3m",
+    "4m",
+    "5m",
+    "6m",
+    "7s",
+    "8s",
+    "9s",
+    "1z",
+    "1z",
+    "3m",
+    "6m",
+    "6m",
+  ]);
+  const discardKinds = [
+    ...new Set(hand.map((tile) => STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile)))),
+  ];
+  const batch = evaluateUkeireAfterDiscards(hand, discardKinds, standardOnly);
+  for (const result of batch) {
+    const discardKind = STANDARD_TILE_SET.kinds[result.discardKindIndex]!;
+    const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
+    const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
+    const direct = evaluateUkeire(leaf, standardOnly);
+    assert.deepEqual(result.shanten, direct.shanten, discardKind);
+    assert.deepEqual(result.improvingKinds, direct.improvingKinds, discardKind);
+  }
 });
 
 test("ukeire: existingMelds caps usable tatsu the same way shantenWithExposedMelds does", () => {

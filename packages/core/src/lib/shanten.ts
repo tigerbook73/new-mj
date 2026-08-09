@@ -3,6 +3,7 @@ import {
   computeShantenFromCounts,
   computeShantenViaTable,
   createShantenProber,
+  createTwoChangeShantenProber,
 } from "./shanten-suit-table.ts";
 import { STANDARD_TILE_SET, type TileSet } from "./tiles.ts";
 
@@ -19,6 +20,12 @@ export type UkeireBatchInput = Readonly<{
   tiles: readonly TileId[];
   options: ShantenOptions;
   existingMelds?: number;
+}>;
+
+export type UkeireAfterDiscardEvaluation = Readonly<{
+  discardKindIndex: number;
+  shanten: number;
+  improvingKinds: readonly TileKind[];
 }>;
 
 const isSuit = (kind: string): boolean =>
@@ -283,6 +290,62 @@ export const evaluateUkeireBatch = (
     const evaluation = evaluateUkeire(input.tiles, input.options, tileSet, existingMelds);
     cache.set(key, evaluation);
     return evaluation;
+  });
+};
+
+/**
+ * 以同一组 14 张牌为基准，批量返回“弃掉某种牌后”的向听与进张。标准牌集合
+ * 使用两次修改 prober：同一花色只重算一段 DP，跨花色时共享基础 prefix/suffix，
+ * 避免每个弃牌候选重新建立完整 ukeire prober。
+ */
+export const evaluateUkeireAfterDiscards = (
+  tiles: readonly TileId[],
+  discardKindIndexes: readonly number[],
+  options: ShantenOptions,
+  tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
+): UkeireAfterDiscardEvaluation[] => {
+  if (tileSet !== STANDARD_TILE_SET) {
+    return discardKindIndexes.map((discardKindIndex) => {
+      const hand = [...tiles];
+      const tileIndex = hand.findIndex(
+        (tile) => tileSet.kindIndexOf(tileSet.kindOf(tile)) === discardKindIndex,
+      );
+      if (tileIndex < 0) throw new Error("INVALID_DISCARD_KIND");
+      hand.splice(tileIndex, 1);
+      const evaluation = evaluateUkeire(hand, options, tileSet, existingMelds);
+      return {
+        discardKindIndex,
+        shanten: evaluation.shanten,
+        improvingKinds: evaluation.improvingKinds,
+      };
+    });
+  }
+
+  const counts = countsOf(tiles, tileSet);
+  const probe = createTwoChangeShantenProber(counts, existingMelds);
+  return discardKindIndexes.map((discardKindIndex) => {
+    if ((counts[discardKindIndex] ?? 0) <= 0) throw new Error("INVALID_DISCARD_KIND");
+    const leafCounts = [...counts];
+    leafCounts[discardKindIndex] = (leafCounts[discardKindIndex] ?? 0) - 1;
+    const currentStandard = probe(discardKindIndex);
+    const currentSevenPairs = options.sevenPairs
+      ? sevenPairsShantenFromCounts(leafCounts)
+      : Number.POSITIVE_INFINITY;
+    const current = Math.min(currentStandard, currentSevenPairs);
+    const improvingKinds: TileKind[] = [];
+    for (let addKindIndex = 0; addKindIndex < tileSet.kinds.length; addKindIndex += 1) {
+      if ((leafCounts[addKindIndex] ?? 0) >= tileSet.copiesPerKind) continue;
+      const standard = probe(discardKindIndex, addKindIndex);
+      leafCounts[addKindIndex] = (leafCounts[addKindIndex] ?? 0) + 1;
+      const sevenPairs = options.sevenPairs
+        ? sevenPairsShantenFromCounts(leafCounts)
+        : Number.POSITIVE_INFINITY;
+      leafCounts[addKindIndex] = (leafCounts[addKindIndex] ?? 0) - 1;
+      if (Math.min(standard, sevenPairs) < current)
+        improvingKinds.push(tileSet.kinds[addKindIndex]!);
+    }
+    return { discardKindIndex, shanten: current, improvingKinds };
   });
 };
 

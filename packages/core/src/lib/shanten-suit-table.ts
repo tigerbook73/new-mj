@@ -635,3 +635,103 @@ export const createShantenProber = (
     return finalizeDp(fin, existingMelds);
   };
 };
+
+/**
+ * 在同一组基础计数上批量试探“先删一张、再加一张”。两次修改最多影响两个
+ * 花色，因此复用基础手牌的 prefix/suffix；调用方不需要为每个删牌结果重新
+ * 建一套四花色 prober。用于 2-ply 的叶子进张评估。
+ */
+export const createTwoChangeShantenProber = (
+  countsSource: readonly number[],
+  existingMelds: number,
+): ((removeKindIndex: number, addKindIndex?: number) => number) => {
+  const blocks = getBlocks();
+  const counts = [...countsSource];
+  const baseBases: number[] = [];
+  const prefix: Int16Array[] = [];
+  let state = new Int16Array(10).fill(DP_UNREACHED);
+  state[0] = 0;
+  for (const block of blocks) {
+    prefix.push(state);
+    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    baseBases.push(base);
+    const next = new Int16Array(10);
+    applyTransition(state, next, block.table.data, base);
+    state = next;
+  }
+  const suffix: Int8Array[] = new Array<Int8Array>(blocks.length + 1);
+  suffix[blocks.length] = IDENTITY_TRANSITION;
+  for (let i = blocks.length - 1; i >= 0; i -= 1) {
+    const block = blocks[i]!;
+    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const out = new Int8Array(SLOTS_PER_VECTOR);
+    composeTransitions(block.table.data, base, suffix[i + 1]!, 0, out);
+    suffix[i] = out;
+  }
+  const changedCounts = [...counts];
+  const first = new Int16Array(10);
+  const second = new Int16Array(10);
+  const third = new Int16Array(10);
+  const blockOf = (kindIndex: number): number =>
+    kindIndex < NUMBER_SUIT_LENGTH * 3 ? Math.floor(kindIndex / NUMBER_SUIT_LENGTH) : 3;
+  const transitionBase = (blockIndex: number): number => {
+    const block = blocks[blockIndex]!;
+    const slot = indexMapSlotOfRange(changedCounts, block.start, block.table.suitLength);
+    return block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+  };
+  const applyBlock = (from: Int16Array, to: Int16Array, blockIndex: number): void => {
+    const block = blocks[blockIndex]!;
+    applyTransition(from, to, block.table.data, transitionBase(blockIndex));
+  };
+  const applyBaseBlock = (from: Int16Array, to: Int16Array, blockIndex: number): void => {
+    const block = blocks[blockIndex]!;
+    applyTransition(from, to, block.table.data, baseBases[blockIndex]!);
+  };
+  const applySuffix = (from: Int16Array, to: Int16Array, blockIndex: number): void => {
+    applyTransition(from, to, suffix[blockIndex]!, 0);
+  };
+  const finish = (dp: Int16Array): number => finalizeDp(dp, existingMelds);
+  const baseResult = finish(state);
+  return (removeKindIndex: number, addKindIndex?: number): number => {
+    if (addKindIndex === removeKindIndex) return baseResult;
+    const removeBlock = blockOf(removeKindIndex);
+    const addBlock = addKindIndex === undefined ? -1 : blockOf(addKindIndex);
+    const firstBlock = addBlock < 0 ? removeBlock : Math.min(removeBlock, addBlock);
+    const secondBlock =
+      addBlock < 0 || addBlock === removeBlock ? -1 : Math.max(removeBlock, addBlock);
+
+    changedCounts[removeKindIndex] = (changedCounts[removeKindIndex] ?? 0) - 1;
+    if (addKindIndex !== undefined)
+      changedCounts[addKindIndex] = (changedCounts[addKindIndex] ?? 0) + 1;
+
+    applyTransition(
+      prefix[firstBlock]!,
+      first,
+      blocks[firstBlock]!.table.data,
+      transitionBase(firstBlock),
+    );
+    if (secondBlock < 0) {
+      applySuffix(first, second, firstBlock + 1);
+      const result = finish(second);
+      changedCounts[removeKindIndex] = (changedCounts[removeKindIndex] ?? 0) + 1;
+      if (addKindIndex !== undefined)
+        changedCounts[addKindIndex] = (changedCounts[addKindIndex] ?? 0) - 1;
+      return result;
+    }
+    applyBlock(first, second, secondBlock);
+    let middle = second;
+    let next = third;
+    for (let blockIndex = firstBlock + 1; blockIndex < secondBlock; blockIndex += 1) {
+      applyBaseBlock(middle, next, blockIndex);
+      [middle, next] = [next, middle];
+    }
+    applySuffix(middle, next, secondBlock + 1);
+    const result = finish(next);
+    changedCounts[removeKindIndex] = (changedCounts[removeKindIndex] ?? 0) + 1;
+    if (addKindIndex !== undefined)
+      changedCounts[addKindIndex] = (changedCounts[addKindIndex] ?? 0) - 1;
+    return result;
+  };
+};
