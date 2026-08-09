@@ -2,14 +2,20 @@ import {
   BENCHMARK_INPUT,
   BENCHMARK_PROGRESS,
   benchmarkSelfDrawTwoPly,
+  benchmarkSelfDrawTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
 
-const [iterationsArgument, candidateLimitArgument] = process.argv.slice(2);
+const [iterationsArgument, candidateLimitArgument, fixtureCountArgument] = process.argv.slice(2);
 const iterations = iterationsArgument === undefined ? 25 : Number(iterationsArgument);
+const fixtureCount = fixtureCountArgument === undefined ? 8 : Number(fixtureCountArgument);
 const candidateLimit =
   candidateLimitArgument === undefined ? undefined : Number(candidateLimitArgument);
-if (candidateLimit !== undefined) {
+if (candidateLimitArgument === "suite") {
+  process.stdout.write(
+    `${JSON.stringify(benchmarkSelfDrawTwoPlyCandidateSuite(iterations, undefined, fixtureCount))}\n`,
+  );
+} else if (candidateLimit !== undefined) {
   const results = Array.from({ length: iterations }, () =>
     evaluateSelfDrawTwoPlyCandidates(
       BENCHMARK_INPUT,

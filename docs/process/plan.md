@@ -10,11 +10,11 @@
 
 - Phase 1 的概率评分、迟疑阈值、既有副露 ukeire 修复和有界结构缓存已完成。
 - 2-ply 自摸诊断探针已有目标/反例 fixture，但尚未接入默认评分；当前完整探针约 13.3–13.6ms/probe。
-- Top-N 2-ply 已加入仅诊断的候选预算 benchmark；固定 fixture 初测 N=1/2/3/全部约 33.5/42.7/51.3/137.7ms，最佳弃牌一致，但样本不足，暂不接纳。
+- Top-N 2-ply 已完成 32 手牌/96 case A/B：N=1/2/3 一致率 78.1%/90.6%/93.8%，约快 11.1x/5.6x/3.8x；存在明显决策漂移，拒绝直接接入默认评分。
 - core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
 - 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及待架构确认的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。
 
-下一步第一个具体动作：扩展 Top-N benchmark 到多 fixture/随机 A/B，记录最佳弃牌一致率、评分差异和端到端耗时；完成后再评估分级 2-ply，core batch API 同步提回 Claude Project。
+下一步第一个具体动作：实现分级 2-ply A/B，在候选接近或高风险局面补跑更多候选；core batch API 同步提回 Claude Project。
 
 ## 阻塞与遗留问题
 

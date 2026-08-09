@@ -1,4 +1,11 @@
-import { STANDARD_TILE_SET, tileIdOf, type TileId, type TileKind } from "@new-mj/core";
+import {
+  STANDARD_TILE_SET,
+  createPrng,
+  shuffle,
+  tileIdOf,
+  type TileId,
+  type TileKind,
+} from "@new-mj/core";
 import {
   DEFAULT_JUNK_WEIGHTS,
   probeSelfDrawTwoPly,
@@ -43,6 +50,7 @@ export type SelfDrawTwoPlyCandidateEvaluation = Readonly<{
   candidateLimit: number;
   candidates: readonly SelfDrawTwoPlyCandidate[];
   bestKind: TileKind | undefined;
+  bestValue: number | undefined;
   elapsedMs: number;
 }>;
 
@@ -103,7 +111,83 @@ export const evaluateSelfDrawTwoPlyCandidates = (
     candidateLimit,
     candidates,
     bestKind: best?.kind,
+    bestValue: best?.twoPlyValue,
     elapsedMs: performance.now() - startedAt,
+  };
+};
+
+const allPhysicalTiles = (): TileId[] =>
+  STANDARD_TILE_SET.kinds.flatMap((kind) =>
+    Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) => tileIdOf(kind, copy)),
+  );
+
+/** Deterministic random-hand suite for candidate-budget A/B measurements. */
+export const benchmarkInputs = (count: number, seed = 0x2f_2a1e): BenchmarkShape[] => {
+  if (!Number.isSafeInteger(count) || count <= 0) throw new Error("count must be positive");
+  const tiles = allPhysicalTiles();
+  return Array.from({ length: count }, (_, index) => ({
+    hand: shuffle(tiles, createPrng(seed + index)).items.slice(0, 13),
+    melds: [],
+  }));
+};
+
+export type SelfDrawTwoPlyCandidateSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  results: readonly Readonly<{
+    candidateLimit: number | "all";
+    elapsedMs: number;
+    msPerCase: number;
+    winnerAgreement: number;
+    meanScoreGap: number;
+  }>[];
+}>;
+
+/** Compares bounded candidate budgets with the full diagnostic probe suite. */
+export const benchmarkSelfDrawTwoPlyCandidateSuite = (
+  iterations: number,
+  candidateLimits: readonly number[] = [1, 2, 3, Number.POSITIVE_INFINITY],
+  fixtureCount = 8,
+): SelfDrawTwoPlyCandidateSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  const totals = candidateLimits.map(() => ({ elapsedMs: 0, agreement: 0, scoreGap: 0 }));
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      for (const [index, candidateLimit] of candidateLimits.entries()) {
+        const bounded = evaluateSelfDrawTwoPlyCandidates(
+          input,
+          [],
+          DEFAULT_JUNK_WEIGHTS,
+          BENCHMARK_PROGRESS,
+          candidateLimit,
+        );
+        totals[index]!.elapsedMs += bounded.elapsedMs;
+        if (bounded.bestKind === full.bestKind) totals[index]!.agreement += 1;
+        totals[index]!.scoreGap += (full.bestValue ?? 0) - (bounded.bestValue ?? 0);
+      }
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    results: candidateLimits.map((candidateLimit, index) => ({
+      candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : "all",
+      elapsedMs: totals[index]!.elapsedMs,
+      msPerCase: totals[index]!.elapsedMs / cases,
+      winnerAgreement: totals[index]!.agreement / cases,
+      meanScoreGap: totals[index]!.scoreGap / cases,
+    })),
   };
 };
 
