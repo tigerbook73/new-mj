@@ -154,6 +154,13 @@ for (const fixture of fixtures) {
     undefined,
     BENCHMARK_PROGRESS,
   );
+  const weightedTop4 = evaluateSelfDrawTwoPlyCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    DEFAULT_JUNK_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    4,
+  );
   const stressFull = evaluateSelfDrawTwoPlyCandidates(
     fixture.input,
     fixture.visibleDiscards,
@@ -167,6 +174,13 @@ for (const fixture of fixtures) {
     STRESS_FAN_WEIGHTS,
     BENCHMARK_PROGRESS,
   );
+  const stressWeightedTop4 = evaluateSelfDrawTwoPlyCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    STRESS_FAN_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    4,
+  );
   process.stdout.write(
     `${JSON.stringify({
       name: fixture.name,
@@ -179,10 +193,17 @@ for (const fixture of fixtures) {
       conservativeMatch: conservative.bestKind === full.bestKind,
       structuralTop4Gap: (full.bestValue ?? 0) - (structuralTop4.bestValue ?? 0),
       conservativeGap: (full.bestValue ?? 0) - (conservative.bestValue ?? 0),
+      weightedTop4Best: weightedTop4.bestKind,
+      weightedTop4Match: weightedTop4.bestKind === full.bestKind,
+      weightedTop4Gap: (full.bestValue ?? 0) - (weightedTop4.bestValue ?? 0),
       stressFanFullBest: stressFull.bestKind,
       stressFanConservativeBest: stressConservative.bestKind,
       stressFanMatch: stressFull.bestKind === stressConservative.bestKind,
       stressFanGap: (stressFull.bestValue ?? 0) - (stressConservative.bestValue ?? 0),
+      stressFanWeightedTop4Best: stressWeightedTop4.bestKind,
+      stressFanWeightedTop4Match: stressWeightedTop4.bestKind === stressFull.bestKind,
+      stressFanWeightedTop4Gap:
+        (stressFull.bestValue ?? 0) - (stressWeightedTop4.bestValue ?? 0),
       elapsedMs: performance.now() - startedAt,
     })}\n`,
   );
