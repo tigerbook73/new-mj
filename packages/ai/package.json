@@ -21,6 +21,7 @@
     "generate:two-ply-baseline": "node src/junk/two-ply-baseline-cli.ts",
     "compare:two-ply-baseline": "node src/junk/two-ply-baseline-ab-cli.ts",
     "bench:two-ply-structured": "node src/junk/two-ply-structured-cli.ts",
+    "search:two-ply-adversarial": "node src/junk/two-ply-adversarial-search-cli.ts",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "verify:full": "pnpm typecheck && pnpm lint && pnpm test:full && pnpm build"
   },

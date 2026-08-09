@@ -1,1 +1,29 @@
-{"format":"new-mj.junk-two-ply-baseline-manifest","version":2,"generatedAt":"2026-08-09T07:50:15.039Z","gitRevision":"e15d2a897bf05540c6a7c81610bd4fcefb9f488c","seed":3090974,"count":10000,"workers":8,"progress":{"wallCount":84,"unseenPoolSize":123},"weights":{"qidui":14,"pengpenghu":10,"menqing":8,"qingyise":20,"hunyise":9,"gangkai":5,"buGangPenalty":2,"pairBonus":2,"meldBonus":3,"qiduiPotential":3.5,"shantenWeight":100,"tenpaiProbabilityWeight":25,"safetyBonus":4,"isolationPotential":1.5,"chiHurdle":8,"pengHurdle":4},"numericPrecision":9}
+{
+  "format": "new-mj.junk-two-ply-baseline-manifest",
+  "version": 2,
+  "generatedAt": "2026-08-09T07:50:15.039Z",
+  "gitRevision": "e15d2a897bf05540c6a7c81610bd4fcefb9f488c",
+  "seed": 3090974,
+  "count": 10000,
+  "workers": 8,
+  "progress": { "wallCount": 84, "unseenPoolSize": 123 },
+  "weights": {
+    "qidui": 14,
+    "pengpenghu": 10,
+    "menqing": 8,
+    "qingyise": 20,
+    "hunyise": 9,
+    "gangkai": 5,
+    "buGangPenalty": 2,
+    "pairBonus": 2,
+    "meldBonus": 3,
+    "qiduiPotential": 3.5,
+    "shantenWeight": 100,
+    "tenpaiProbabilityWeight": 25,
+    "safetyBonus": 4,
+    "isolationPotential": 1.5,
+    "chiHurdle": 8,
+    "pengHurdle": 4
+  },
+  "numericPrecision": 9
+}
