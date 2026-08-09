@@ -281,6 +281,17 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   通过证据：`policy-loader` 测试受沙箱 `spawnSync git EPERM` 阻塞，另一个
   `decision-diff` 测试在并行运行期间超出 5 秒时限；core `verify:full` 已全绿。
 
+  **Phase 2 前置结构清理（2026-08-09）**：在继续设计 core 批量 API 前，接受先做
+  无语义变化的模块拆分。`shanten-suit-table.ts` 原本同时承载单花色表构建、四花色
+  DP 和 2-ply prober；已将 `createShantenProber`/`createTwoChangeShantenProber`
+  移至 `shanten-prober.ts`，旧文件从 771 行降至 580 行。保留算法、表结构和调用
+  语义，不删除未确认的内部导出，不引入新 2-ply 行为。
+
+  验证结果：core `verify:full` 通过（19 文件、191 测试、slow fuzz、build），2-ply
+  checksum 仍为 `-2411.856290493658`，100 次 benchmark 为约 **13.28ms/probe**，
+  与拆分前约 13.60ms/probe 在运行波动范围内，无性能回归证据。后续若继续拆分，
+  只考虑把单花色 solver/table-builder 再分离，不做机械式常量碎片化。
+
 ### Phase 2 后续优化计划：从 AI 层微优化转向 core 批量算法
 
 Phase 2 **尚未结束**。此前的 cache、count 预计算、remove-context、suffix 和

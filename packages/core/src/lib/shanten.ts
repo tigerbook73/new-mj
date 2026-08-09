@@ -1,10 +1,6 @@
 import type { TileId, TileKind } from "./ids.ts";
-import {
-  computeShantenFromCounts,
-  computeShantenViaTable,
-  createShantenProber,
-  createTwoChangeShantenProber,
-} from "./shanten-suit-table.ts";
+import { computeShantenFromCounts, computeShantenViaTable } from "./shanten-suit-table.ts";
+import { createShantenProber, createTwoChangeShantenProber } from "./shanten-prober.ts";
 import { STANDARD_TILE_SET, type TileSet } from "./tiles.ts";
 
 export type ShantenOptions = Readonly<{

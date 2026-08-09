@@ -31,6 +31,13 @@ add 花色从右向左复用嵌套 transition，减少重复 `composeTransitions
 具体动作：把 core 批量 API 与性能边界提为独立架构提案；提案明确前不在 AI 层增加
 缓存或评分路径。`垃圾胡性能优化讨论.md` 的进取/保守策略不纳入本阶段。
 
+Phase 2 进入 core 批量 API 前置清理：已将 `createShantenProber` 与
+`createTwoChangeShantenProber` 从 `shanten-suit-table.ts` 拆到
+`packages/core/src/lib/shanten-prober.ts`，旧文件从 771 行降至 580 行；算法、表结构
+和调用语义不变。core `verify:full` 全绿，2-ply checksum 不变，benchmark 约
+13.28ms/probe，无性能回归证据。下一步第一个具体动作：评估是否还需要把单花色
+solver/table-builder 分离；若没有明确收益则停止清理，进入 core 批量 API 提案。
+
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/
 lib/shanten-suit-table.ts` 顶部注释，性能演进见 git history（`perf(core):`
