@@ -56,7 +56,7 @@ export type JunkWeights = {
    * by any amount. handQuality already prices in chi's certain costs (loses
    * menqing, forecloses pengpenghu), but that point estimate carries real
    * uncertainty (known gaps: no opponent-behavior model, no zimo/peng/chi
-   * channel split — see docs/process/junk-ai-decision-quality.md); requiring a
+   * channel split — see docs/process/plan.md); requiring a
    * clear margin guards against committing to an irreversible open hand over a
    * claim that only *looks* better because of the formula's own noise. */
   chiHurdle: number;

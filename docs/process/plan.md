@@ -1,6 +1,6 @@
 # 待完成任务与当前状态
 
-> 本文件只记录当前工作、阻塞/遗留问题、下一步和 Backlog；最终决策证据见 [`junk-ai-decision-quality.md`](./junk-ai-decision-quality.md)。
+> 本文件只记录当前工作、阻塞/遗留问题、下一步和 Backlog；专题完成后的耐久结论归档到对应架构/契约文档。
 
 ## 当前任务
 
