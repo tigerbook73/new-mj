@@ -6,6 +6,7 @@ import {
   evaluateStructuralTwoPlyCandidates,
   type BenchmarkShape,
 } from "./two-ply-benchmark.ts";
+import { DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
 
 type Fixture = Readonly<{
   name: string;
@@ -124,6 +125,13 @@ const fixtures: readonly Fixture[] = [
   },
 ];
 
+const STRESS_FAN_WEIGHTS = {
+  ...DEFAULT_JUNK_WEIGHTS,
+  shantenWeight: 10,
+  qingyise: 160,
+  hunyise: 160,
+};
+
 for (const fixture of fixtures) {
   const startedAt = performance.now();
   const full = evaluateSelfDrawTwoPlyCandidates(
@@ -146,6 +154,19 @@ for (const fixture of fixtures) {
     undefined,
     BENCHMARK_PROGRESS,
   );
+  const stressFull = evaluateSelfDrawTwoPlyCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    STRESS_FAN_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    Number.POSITIVE_INFINITY,
+  );
+  const stressConservative = evaluateConservativeStructuralCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    STRESS_FAN_WEIGHTS,
+    BENCHMARK_PROGRESS,
+  );
   process.stdout.write(
     `${JSON.stringify({
       name: fixture.name,
@@ -158,6 +179,10 @@ for (const fixture of fixtures) {
       conservativeMatch: conservative.bestKind === full.bestKind,
       structuralTop4Gap: (full.bestValue ?? 0) - (structuralTop4.bestValue ?? 0),
       conservativeGap: (full.bestValue ?? 0) - (conservative.bestValue ?? 0),
+      stressFanFullBest: stressFull.bestKind,
+      stressFanConservativeBest: stressConservative.bestKind,
+      stressFanMatch: stressFull.bestKind === stressConservative.bestKind,
+      stressFanGap: (stressFull.bestValue ?? 0) - (stressConservative.bestValue ?? 0),
       elapsedMs: performance.now() - startedAt,
     })}\n`,
   );
