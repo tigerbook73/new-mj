@@ -34,7 +34,7 @@
 - full-result 矩阵实验已完成并拒绝扩展：返回 `shanten + improvingKinds` 的版本约 22.62ms/case，和 shanten-only 的 22.54ms/case 基本相同；增加字段没有额外收益，已删除该实验接口。
 - core prober 已完成无语义拆分；继续拆单花色 solver/table-builder 已拒绝。
 - 高潜候选已拆成两条路线：不改公共接口的 AI/内部实现路线，以及已确认边界的 core batch API 路线；所有候选先评估/测试，再决定接受或拒绝。`evaluateUkeireAfterDiscardDraws` 已实现为纯 `(discardKind, drawKind) → shanten` 结构矩阵，不含概率、番型或 AI 权重。
-- 本轮优化已收敛：最有接入潜力的是“首轮加权 Top-4 + 第二轮动态断崖白名单 + core shanten-only batch”，约 24.33ms/case、100% 一致；core batch 可将完整路径约 25.33ms 降至 22.54ms。最低向听黑名单约 60.85ms/case、100% 一致但绑定当前权重，作为第二候选保留；其余缓存/批处理方案不再继续探索。
+- 本轮优化已收敛：最终首选是“首轮加权上断崖 Top-N（minN=2,maxN=4）+ 第二轮低分端下断崖、无断崖则全量 + core shanten-only batch”，当前诊断约 22.54ms/case、100% 一致；core batch 可将完整路径约 25.33ms 降至 22.54ms。上下断崖阈值独立配置，比例采用归一化相邻下降。最低向听黑名单约 60.85ms/case、100% 一致但绑定当前权重，作为质量优先备选；其余缓存/批处理方案不再继续探索。
 
 下一步第一个具体动作：若继续实施，只做最佳候选与当前 1-ply 的真实 AI 自对弈 A/B；不再新增性能优化，不接入默认 AI，除非 A/B 证明质量和延迟均满足门槛。
 
