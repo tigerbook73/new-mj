@@ -3,6 +3,8 @@ import { test } from "vitest";
 import { createPrng, nextInt, shuffle } from "./prng.ts";
 import {
   computeShanten,
+  evaluateUkeire,
+  evaluateUkeireBatch,
   isTingpai,
   sevenPairsShanten,
   shantenWithExposedMelds,
@@ -67,6 +69,21 @@ test("isTingpai and ukeire report only tiles that can immediately win", () => {
   const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "1s", "1s"]);
   assert.equal(isTingpai(hand, standardOnly), true);
   assert.deepEqual(ukeire(hand, standardOnly), ["1p", "1s"]);
+});
+
+test("evaluateUkeire combines shanten and ukeire, and batch evaluation deduplicates hands", () => {
+  const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "1s", "1s"]);
+  const single = evaluateUkeire(hand, standardOnly);
+  const batch = evaluateUkeireBatch([
+    { tiles: hand, options: standardOnly },
+    { tiles: [...hand].reverse(), options: standardOnly },
+  ]);
+  assert.deepEqual(single, {
+    shanten: 0,
+    improvingKinds: ["1p", "1s"],
+  });
+  assert.deepEqual(batch[0], single);
+  assert.strictEqual(batch[1], batch[0]);
 });
 
 test("ukeire: existingMelds caps usable tatsu the same way shantenWithExposedMelds does", () => {

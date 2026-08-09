@@ -1,5 +1,7 @@
 import {
   STANDARD_TILE_SET,
+  evaluateUkeireBatch,
+  evaluateUkeire,
   shantenWithExposedMelds,
   tileIdOf,
   ukeire,
@@ -8,6 +10,7 @@ import {
   type Meld,
   type TileId,
   type TileKind,
+  type UkeireEvaluation,
 } from "@new-mj/core";
 import defaultWeightsData from "./default-weights.json" with { type: "json" };
 import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
@@ -83,7 +86,48 @@ export const JUNK_FAN_WEIGHTS = {
 
 type ShapeInput = Readonly<{ hand: readonly TileId[]; melds: readonly Meld[] }>;
 
+type LiveCopyContext = Readonly<{
+  meldCounts: Uint8Array;
+  discardCounts: Uint8Array;
+}>;
+
+type HandAnalysisCache = Map<string, UkeireEvaluation>;
+
 const kindOf = (tile: TileId): TileKind => STANDARD_TILE_SET.kindOf(tile);
+const kindIndexOf = (kind: TileKind): number => STANDARD_TILE_SET.kindIndexOf(kind);
+
+const countsOf = (tiles: readonly TileId[]): Uint8Array => {
+  const counts = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+  for (const tile of tiles) counts[kindIndexOf(kindOf(tile))]! += 1;
+  return counts;
+};
+
+const handAnalysisKey = (input: ShapeInput): string => {
+  const counts = countsOf(input.hand);
+  return `${input.melds.length}/${input.melds.length === 0 ? 1 : 0}/${counts.join("")}`;
+};
+
+const handAnalysisOf = (input: ShapeInput, cache?: HandAnalysisCache): UkeireEvaluation => {
+  if (!cache) {
+    return evaluateUkeire(
+      input.hand,
+      { sevenPairs: input.melds.length === 0 },
+      STANDARD_TILE_SET,
+      input.melds.length,
+    );
+  }
+  const key = handAnalysisKey(input);
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const analysis = evaluateUkeire(
+    input.hand,
+    { sevenPairs: input.melds.length === 0 },
+    STANDARD_TILE_SET,
+    input.melds.length,
+  );
+  cache.set(key, analysis);
+  return analysis;
+};
 const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[] | undefined => {
   const remaining = [...hand];
   for (const tile of tiles) {
@@ -189,10 +233,12 @@ const liveUkeireCount = (
   input: ShapeInput,
   kinds: readonly TileKind[],
   visibleDiscards: readonly TileId[],
+  context?: LiveCopyContext,
 ): number => {
+  const handCounts = countsOf(input.hand);
   let total = 0;
   for (const kind of kinds) {
-    total += remainingLiveCopies(input, kind, visibleDiscards);
+    total += remainingLiveCopies(input, kind, visibleDiscards, context, handCounts);
   }
   return total;
 };
@@ -201,11 +247,17 @@ const remainingLiveCopies = (
   input: ShapeInput,
   kind: TileKind,
   visibleDiscards: readonly TileId[],
+  context?: LiveCopyContext,
+  handCounts?: Uint8Array,
 ): number => {
-  const known =
-    input.hand.filter((tile) => kindOf(tile) === kind).length +
-    input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
-    visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
+  const index = kindIndexOf(kind);
+  const known = context
+    ? (handCounts ?? countsOf(input.hand))[index]! +
+      context.meldCounts[index]! +
+      context.discardCounts[index]!
+    : input.hand.filter((tile) => kindOf(tile) === kind).length +
+      input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
+      visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
   return Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
 };
 
@@ -253,8 +305,11 @@ const handQuality = (
   visibleDiscards: readonly TileId[] = [],
   isolationReferenceHand: readonly TileId[] = input.hand,
   gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+  liveCopyContext?: LiveCopyContext,
+  analysisCache?: HandAnalysisCache,
 ): number => {
-  const shanten = shantenOf(input, memo);
+  const analysis = handAnalysisOf(input, analysisCache);
+  const shanten = analysis.shanten;
   // 曾经只在 shanten<=1 时才算 ukeire（避免中局无收益穷举），实测这个门槛让
   // 中局"留一手换未来更多可能性"这类判断完全看不到进张信号——shanten/ukeire
   // 性能提升后，无条件计算的开销经基准测试确认可接受（1000 场自对弈从 10.5s
@@ -266,13 +321,12 @@ const handQuality = (
   // min(tatsu, 4-已有面子数)"给候选封顶，遗漏这个偏移会让有副露的手牌把不
   // 真正降向听的牌种也报成进张（2026-08-08 修复，见 shanten.ts ukeire 的
   // 文档注释与 shanten.test.ts 的回归用例）。
-  const improvingKinds = ukeire(
-    input.hand,
-    { sevenPairs: input.melds.length === 0 },
-    STANDARD_TILE_SET,
-    input.melds.length,
+  const improvements = liveUkeireCount(
+    input,
+    analysis.improvingKinds,
+    visibleDiscards,
+    liveCopyContext,
   );
-  const improvements = liveUkeireCount(input, improvingKinds, visibleDiscards);
   const remainingDraws = Math.ceil(gameProgress.wallCount / 4);
   // Self-draws physically only pull from the wall — never from an opponent's
   // concealed hand — so the draw simulation must sample from `wallCount`, not
@@ -311,6 +365,8 @@ export const scoreHandShapeAfterDiscard = (
   weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
   memo?: Map<string, number>,
   gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+  liveCopyContext?: LiveCopyContext,
+  analysisCache?: HandAnalysisCache,
 ): number => {
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
@@ -323,6 +379,8 @@ export const scoreHandShapeAfterDiscard = (
       visibleDiscards,
       input.hand,
       gameProgress,
+      liveCopyContext,
+      analysisCache,
     ) + safety
   );
 };
@@ -336,6 +394,8 @@ const bestDiscardScore = (
   weights: JunkWeights,
   memo: Map<string, number> | undefined,
   gameProgress: GameProgress,
+  liveCopyContext?: LiveCopyContext,
+  analysisCache?: HandAnalysisCache,
 ): number => {
   const scores = new Map<TileKind, number>();
   let best = Number.NEGATIVE_INFINITY;
@@ -351,6 +411,8 @@ const bestDiscardScore = (
           weights,
           memo,
           gameProgress,
+          liveCopyContext,
+          analysisCache,
         );
         scores.set(kind, calculated);
         return calculated;
@@ -406,6 +468,11 @@ export const probeSelfDrawTwoPly = (
     return { continuationProbability: 0, continuationValue: 0, winProbability: 0, outcomes: [] };
 
   const memo = new Map<string, number>();
+  const analysisCache: HandAnalysisCache = new Map();
+  const liveCopyContext: LiveCopyContext = {
+    meldCounts: countsOf(input.melds.flatMap((meld) => meld.tiles)),
+    discardCounts: countsOf(visibleDiscards),
+  };
   let continuationProbability = 0;
   let continuationValue = 0;
   let winProbability = 0;
@@ -415,24 +482,50 @@ export const probeSelfDrawTwoPly = (
     ...input.melds.flatMap((meld) => meld.tiles),
     ...visibleDiscards,
   ]);
-
+  const drawCandidates: {
+    kind: TileKind;
+    probability: number;
+    afterDraw: ShapeInput;
+  }[] = [];
   for (const kind of STANDARD_TILE_SET.kinds) {
-    const remaining = remainingLiveCopies(input, kind, visibleDiscards);
+    const remaining = remainingLiveCopies(input, kind, visibleDiscards, liveCopyContext);
     if (remaining === 0) continue;
     const probability = remaining / gameProgress.unseenPoolSize;
     const drawnTile = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
       tileIdOf(kind, copy),
     ).find((tile) => !occupied.has(tile));
     if (drawnTile === undefined) continue;
-
-    const afterDraw: ShapeInput = { hand: [...input.hand, drawnTile], melds: input.melds };
-    if (shantenOf(afterDraw, memo) < 0) {
+    drawCandidates.push({
+      kind,
+      probability,
+      afterDraw: { hand: [...input.hand, drawnTile], melds: input.melds },
+    });
+  }
+  const drawAnalyses = evaluateUkeireBatch(
+    drawCandidates.map(({ afterDraw }) => ({
+      tiles: afterDraw.hand,
+      options: { sevenPairs: afterDraw.melds.length === 0 },
+      existingMelds: afterDraw.melds.length,
+    })),
+  );
+  for (const [index, { kind, probability, afterDraw }] of drawCandidates.entries()) {
+    const analysis = drawAnalyses[index]!;
+    analysisCache.set(handAnalysisKey(afterDraw), analysis);
+    if (analysis.shanten < 0) {
       winProbability += probability;
       outcomes.push({ kind, probability });
       continue;
     }
 
-    const leafScore = bestDiscardScore(afterDraw, visibleDiscards, weights, memo, gameProgress);
+    const leafScore = bestDiscardScore(
+      afterDraw,
+      visibleDiscards,
+      weights,
+      memo,
+      gameProgress,
+      liveCopyContext,
+      analysisCache,
+    );
     continuationProbability += probability;
     continuationValue += probability * leafScore;
     outcomes.push({ kind, probability, leafScore });

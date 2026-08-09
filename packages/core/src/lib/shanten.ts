@@ -10,6 +10,17 @@ export type ShantenOptions = Readonly<{
   sevenPairs: boolean;
 }>;
 
+export type UkeireEvaluation = Readonly<{
+  shanten: number;
+  improvingKinds: readonly TileKind[];
+}>;
+
+export type UkeireBatchInput = Readonly<{
+  tiles: readonly TileId[];
+  options: ShantenOptions;
+  existingMelds?: number;
+}>;
+
 const isSuit = (kind: string): boolean =>
   kind.endsWith("m") || kind.endsWith("p") || kind.endsWith("s");
 
@@ -186,12 +197,12 @@ export const computeShanten = (
  * 候选间的递归子状态高度重叠，共享同一个 memo 把重复搜索省下来（memo 只
  * 影响缓存命中，不影响结果）。
  */
-export const ukeire = (
+const evaluateUkeireInternal = (
   tiles: readonly TileId[],
   options: ShantenOptions,
   tileSet: TileSet = STANDARD_TILE_SET,
   existingMelds = 0,
-): TileKind[] => {
+): UkeireEvaluation => {
   const counts = countsOf(tiles, tileSet);
   if (tileSet === STANDARD_TILE_SET) {
     const standardCurrent = computeShantenFromCounts(counts, existingMelds);
@@ -209,7 +220,7 @@ export const ukeire = (
       ? Math.min(standardCurrent, 6 - pairs + Math.max(0, 7 - kindsHeld))
       : standardCurrent;
     const probe = createShantenProber(counts, existingMelds);
-    return tileSet.kinds.filter((kind, index) => {
+    const improvingKinds = tileSet.kinds.filter((kind, index) => {
       const held = counts[index] ?? 0;
       if (held >= tileSet.copiesPerKind) return false;
       let candidate = probe(index);
@@ -220,13 +231,58 @@ export const ukeire = (
       }
       return candidate < current;
     });
+    return { shanten: current, improvingKinds };
   }
   const memo = new Map<string, number>();
   const current = computeShanten(tiles, options, tileSet, memo, existingMelds);
-  return tileSet.kinds.filter((kind, index) => {
+  const improvingKinds = tileSet.kinds.filter((kind, index) => {
     if ((counts[index] ?? 0) >= tileSet.copiesPerKind) return false;
     const candidate = (index * tileSet.copiesPerKind) as TileId;
     return computeShanten([...tiles, candidate], options, tileSet, memo, existingMelds) < current;
+  });
+  return { shanten: current, improvingKinds };
+};
+
+export const ukeire = (
+  tiles: readonly TileId[],
+  options: ShantenOptions,
+  tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
+): TileKind[] => [...evaluateUkeireInternal(tiles, options, tileSet, existingMelds).improvingKinds];
+
+const tileCountsKey = (tiles: readonly TileId[], tileSet: TileSet): string => {
+  const counts = countsOf(tiles, tileSet);
+  return counts.join("");
+};
+
+/**
+ * 一次返回向听数和进张，避免调用方先算一次向听、再让 ukeire 再算一遍基线。
+ * 结果只读；数组仍由本函数独立生成，调用方可以安全缓存整个结果。
+ */
+export const evaluateUkeire = (
+  tiles: readonly TileId[],
+  options: ShantenOptions,
+  tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
+): UkeireEvaluation => evaluateUkeireInternal(tiles, options, tileSet, existingMelds);
+
+/**
+ * 批量分析一组手牌。标准牌集合下按 34 种牌的计数去重，避免不同 TileId 排列
+ * 或重复叶子手牌重复建表；非标准牌集合也复用相同的去重语义。
+ */
+export const evaluateUkeireBatch = (
+  inputs: readonly UkeireBatchInput[],
+  tileSet: TileSet = STANDARD_TILE_SET,
+): UkeireEvaluation[] => {
+  const cache = new Map<string, UkeireEvaluation>();
+  return inputs.map((input) => {
+    const existingMelds = input.existingMelds ?? 0;
+    const key = `${existingMelds}/${input.options.sevenPairs ? 1 : 0}/${tileCountsKey(input.tiles, tileSet)}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const evaluation = evaluateUkeire(input.tiles, input.options, tileSet, existingMelds);
+    cache.set(key, evaluation);
+    return evaluation;
   });
 };
 

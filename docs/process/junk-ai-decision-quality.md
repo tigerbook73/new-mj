@@ -210,6 +210,17 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   "批量候选/多进张 ukeire 评估" API 与性能边界的架构提案，再决定是否实施，不能
   在 AI 层自行发明跨 core 的缓存契约。
 
+  **性能优化重启（2026-08-09，进行中）**：按“先不改变语义的准备工作，再做
+  core 批量 API”的顺序实施。第一轮已完成：core 新增 `evaluateUkeire`（一次返回
+  shanten 与 improving kinds）及 `evaluateUkeireBatch`（按牌种 count signature
+  去重）；AI probe 预计算副露/弃牌的 34 种牌计数，并在同一次 probe 中复用手牌
+  分析。目标 fixture 的热态 benchmark 从约 15.1ms 降至约 10.1ms/probe，约
+  1.5x，说明主要成本仍在重复的花色 DP，而不是 live-copy 扫描。
+
+  下一步第一个具体动作：把 `evaluateUkeireBatch` 从当前的批量去重包装推进为
+  真正共享候选花色 DP 的 API，并新增“同一 14 张牌、分别弃掉每种牌”的批量
+  评估测试与基准；在此之前不把 2-ply 接入默认策略。
+
 - **自我优化基础设施推广到 hangzhou/bloodbattle**：可复用部分是 Layer
   B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属
   Feature 抽取（对应各玩法番型/规则）仍需各自单独做，不会自动免掉。
