@@ -4,6 +4,7 @@ import {
   evaluateConservativeStructuralCandidates,
   evaluateSelfDrawTwoPlyCandidates,
   evaluateStructuralTwoPlyCandidates,
+  evaluateWeightedTrajectoryTwoPlyCandidates,
   type BenchmarkShape,
 } from "./two-ply-benchmark.ts";
 import { DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
@@ -161,6 +162,13 @@ for (const fixture of fixtures) {
     BENCHMARK_PROGRESS,
     4,
   );
+  const weightedTrajectoryTop4 = evaluateWeightedTrajectoryTwoPlyCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    DEFAULT_JUNK_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    4,
+  );
   const stressFull = evaluateSelfDrawTwoPlyCandidates(
     fixture.input,
     fixture.visibleDiscards,
@@ -175,6 +183,13 @@ for (const fixture of fixtures) {
     BENCHMARK_PROGRESS,
   );
   const stressWeightedTop4 = evaluateSelfDrawTwoPlyCandidates(
+    fixture.input,
+    fixture.visibleDiscards,
+    STRESS_FAN_WEIGHTS,
+    BENCHMARK_PROGRESS,
+    4,
+  );
+  const stressTrajectoryTop4 = evaluateWeightedTrajectoryTwoPlyCandidates(
     fixture.input,
     fixture.visibleDiscards,
     STRESS_FAN_WEIGHTS,
@@ -196,6 +211,10 @@ for (const fixture of fixtures) {
       weightedTop4Best: weightedTop4.bestKind,
       weightedTop4Match: weightedTop4.bestKind === full.bestKind,
       weightedTop4Gap: (full.bestValue ?? 0) - (weightedTop4.bestValue ?? 0),
+      weightedTrajectoryTop4Best: weightedTrajectoryTop4.bestKind,
+      weightedTrajectoryTop4Match: weightedTrajectoryTop4.bestKind === full.bestKind,
+      weightedTrajectoryTop4Gap:
+        (full.bestValue ?? 0) - (weightedTrajectoryTop4.bestValue ?? 0),
       stressFanFullBest: stressFull.bestKind,
       stressFanConservativeBest: stressConservative.bestKind,
       stressFanMatch: stressFull.bestKind === stressConservative.bestKind,
@@ -204,6 +223,10 @@ for (const fixture of fixtures) {
       stressFanWeightedTop4Match: stressWeightedTop4.bestKind === stressFull.bestKind,
       stressFanWeightedTop4Gap:
         (stressFull.bestValue ?? 0) - (stressWeightedTop4.bestValue ?? 0),
+      stressFanTrajectoryTop4Best: stressTrajectoryTop4.bestKind,
+      stressFanTrajectoryTop4Match: stressTrajectoryTop4.bestKind === stressFull.bestKind,
+      stressFanTrajectoryTop4Gap:
+        (stressFull.bestValue ?? 0) - (stressTrajectoryTop4.bestValue ?? 0),
       elapsedMs: performance.now() - startedAt,
     })}\n`,
   );

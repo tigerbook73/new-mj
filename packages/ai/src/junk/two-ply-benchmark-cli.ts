@@ -5,6 +5,7 @@ import {
   benchmarkSelfDrawTwoPlyCandidateSuite,
   benchmarkConservativeStructuralSuite,
   benchmarkStructuralTwoPlyCandidateSuite,
+  benchmarkWeightedTrajectoryTwoPlyCandidateSuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -24,6 +25,11 @@ if (candidateLimitArgument === "blacklist") {
   const limits = budget === undefined ? undefined : [budget, Number.POSITIVE_INFINITY];
   process.stdout.write(
     `${JSON.stringify(benchmarkStructuralTwoPlyCandidateSuite(iterations, limits, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "trajectory") {
+  const limits = budget === undefined ? undefined : [budget, Number.POSITIVE_INFINITY];
+  process.stdout.write(
+    `${JSON.stringify(benchmarkWeightedTrajectoryTwoPlyCandidateSuite(iterations, limits, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { tileIdOf } from "@new-mj/core";
 import {
   BENCHMARK_INPUT,
   BENCHMARK_PROGRESS,
@@ -6,9 +7,47 @@ import {
   evaluateSelfDrawTwoPlyCandidates,
   benchmarkConservativeStructuralSuite,
   evaluateStructuralTwoPlyCandidates,
+  evaluateWeightedTrajectoryTwoPlyCandidates,
+  suitTrajectoryBonusAfterDiscard,
 } from "./two-ply-benchmark.ts";
+import { DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
 
 describe("benchmarkSelfDrawTwoPly", () => {
+  it("keeps a strong pure-suit route in the weighted trajectory shortlist", () => {
+    const copies = new Map<string, number>();
+    const hand = ["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "5z", "7z"].map(
+      (kind) => {
+        const copy = copies.get(kind) ?? 0;
+        copies.set(kind, copy + 1);
+        return tileIdOf(kind as Parameters<typeof tileIdOf>[0], copy);
+      },
+    );
+    const input = { hand, melds: [] } as const;
+    const stressWeights = {
+      ...DEFAULT_JUNK_WEIGHTS,
+      shantenWeight: 10,
+      qingyise: 160,
+      hunyise: 160,
+    };
+    expect(suitTrajectoryBonusAfterDiscard(input, hand[9]!, stressWeights)).toBeGreaterThan(0);
+    const full = evaluateSelfDrawTwoPlyCandidates(
+      input,
+      [],
+      stressWeights,
+      BENCHMARK_PROGRESS,
+      Number.POSITIVE_INFINITY,
+    );
+    const bounded = evaluateWeightedTrajectoryTwoPlyCandidates(
+      input,
+      [],
+      stressWeights,
+      BENCHMARK_PROGRESS,
+      4,
+    );
+    expect(full.bestKind).toBe("1p");
+    expect(bounded.bestKind).toBe(full.bestKind);
+  });
+
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {
     const result = benchmarkSelfDrawTwoPly(1);
     expect(result.iterations).toBe(1);

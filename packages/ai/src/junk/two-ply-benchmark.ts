@@ -114,6 +114,65 @@ const rankStructuralDiscards = (
     .slice(0, Math.min(candidateLimit, ranked.length));
 };
 
+/** Cheap, diagnostic-only suit-trajectory bonus. It is intentionally not the
+ * final fan evaluator: it rewards a post-discard hand whose dominant suit is
+ * already ahead of its off-suit tiles, with honors contributing to a mixed
+ * one-suit route. The divisor keeps the trajectory signal below a complete
+ * fan's weight while still allowing a strong route to affect candidate order. */
+export const suitTrajectoryBonusAfterDiscard = (
+  input: BenchmarkShape,
+  discard: TileId,
+  weights: JunkWeights,
+): number => {
+  const hand = input.hand.filter((tile) => tile !== discard);
+  const suitCounts = [0, 0, 0];
+  let honorCount = 0;
+  for (const tile of [...hand, ...input.melds.flatMap((meld) => meld.tiles)]) {
+    const kind = STANDARD_TILE_SET.kindOf(tile);
+    if (kind.endsWith("z")) {
+      honorCount += 1;
+    } else {
+      suitCounts[kind[1] === "m" ? 0 : kind[1] === "p" ? 1 : 2]! += 1;
+    }
+  }
+  const suitedCount = suitCounts.reduce((sum, count) => sum + count, 0);
+  if (suitedCount === 0) return 0;
+  const dominantSuitCount = Math.max(...suitCounts);
+  const offSuitCount = suitedCount - dominantSuitCount;
+  if (dominantSuitCount < 8 || dominantSuitCount <= offSuitCount) return 0;
+  const routeSignal = Math.max(
+    0,
+    (honorCount > 0 ? dominantSuitCount + honorCount : dominantSuitCount) - offSuitCount - 1,
+  );
+  const routeWeight = honorCount > 0 ? weights.hunyise : weights.qingyise;
+  return (routeSignal * routeWeight) / 8;
+};
+
+const rankWeightedTrajectoryDiscards = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[],
+  weights: JunkWeights,
+  gameProgress: GameProgress,
+  candidateLimit: number,
+): RankedDiscard[] => {
+  const uniqueDiscards = new Map<TileKind, TileId>();
+  for (const tile of input.hand) {
+    const kind = STANDARD_TILE_SET.kindOf(tile);
+    if (!uniqueDiscards.has(kind)) uniqueDiscards.set(kind, tile);
+  }
+  return [...uniqueDiscards.entries()]
+    .map(([kind, discard]) => ({
+      kind,
+      discard,
+      rankScore:
+        scoreHandShapeAfterDiscard(input, discard, visibleDiscards, weights, undefined, gameProgress) +
+        suitTrajectoryBonusAfterDiscard(input, discard, weights),
+      shanten: 0,
+    }))
+    .sort((left, right) => right.rankScore - left.rankScore)
+    .slice(0, Math.min(candidateLimit, uniqueDiscards.size));
+};
+
 const evaluateRankedCandidates = (
   input: BenchmarkShape,
   ranked: readonly RankedDiscard[],
@@ -168,6 +227,34 @@ export const evaluateStructuralTwoPlyCandidates = (
   if (!(candidateLimit > 0)) throw new Error("candidateLimit must be positive");
   const startedAt = performance.now();
   const ranked = rankStructuralDiscards(input, visibleDiscards, candidateLimit);
+  const result = evaluateRankedCandidates(
+    input,
+    ranked,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    candidateLimit,
+  );
+  return { ...result, elapsedMs: performance.now() - startedAt };
+};
+
+/** Diagnostic candidate evaluator using the cheap weighted suit trajectory. */
+export const evaluateWeightedTrajectoryTwoPlyCandidates = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  candidateLimit = Number.POSITIVE_INFINITY,
+): SelfDrawTwoPlyCandidateEvaluation => {
+  if (!(candidateLimit > 0)) throw new Error("candidateLimit must be positive");
+  const startedAt = performance.now();
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    candidateLimit,
+  );
   const result = evaluateRankedCandidates(
     input,
     ranked,
@@ -526,6 +613,55 @@ export const benchmarkStructuralTwoPlyCandidateSuite = (
       winnerAgreement: 0,
       meanScoreGap: 0,
     },
+    results: candidateLimits.map((candidateLimit, index) => ({
+      candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : "all",
+      elapsedMs: totals[index]!.elapsedMs,
+      msPerCase: totals[index]!.elapsedMs / cases,
+      winnerAgreement: totals[index]!.agreement / cases,
+      meanScoreGap: totals[index]!.scoreGap / cases,
+    })),
+  };
+};
+
+/** Compares the cheap weighted suit-trajectory ranking with the full probe. */
+export const benchmarkWeightedTrajectoryTwoPlyCandidateSuite = (
+  iterations: number,
+  candidateLimits: readonly number[] = [1, 2, 3, 4, 5, Number.POSITIVE_INFINITY],
+  fixtureCount = 8,
+): SelfDrawTwoPlyCandidateSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  const totals = candidateLimits.map(() => ({ elapsedMs: 0, agreement: 0, scoreGap: 0 }));
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      for (const [index, candidateLimit] of candidateLimits.entries()) {
+        const bounded = evaluateWeightedTrajectoryTwoPlyCandidates(
+          input,
+          [],
+          DEFAULT_JUNK_WEIGHTS,
+          BENCHMARK_PROGRESS,
+          candidateLimit,
+        );
+        totals[index]!.elapsedMs += bounded.elapsedMs;
+        if (bounded.bestKind === full.bestKind) totals[index]!.agreement += 1;
+        totals[index]!.scoreGap += (full.bestValue ?? 0) - (bounded.bestValue ?? 0);
+      }
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    onePly: { winnerAgreement: 0, meanScoreGap: 0 },
     results: candidateLimits.map((candidateLimit, index) => ({
       candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : "all",
       elapsedMs: totals[index]!.elapsedMs,
