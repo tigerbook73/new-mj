@@ -50,7 +50,7 @@ describe("junk self-play arena", () => {
   });
 
   it("keeps structural analysis context across a seat's decisions", () => {
-    const caches = [0, 1, 2, 3].map(() => createJunkAnalysisCache(256));
+    const caches = [0, 1, 2, 3].map(() => createJunkAnalysisCache(32));
     const policies = caches.map((cache) => strengthPolicy({ analysisCache: cache })) as [
       SeatPolicy,
       SeatPolicy,
@@ -61,7 +61,7 @@ describe("junk self-play arena", () => {
     if ("error" in result) throw new Error(result.error);
 
     expect(caches.some((cache) => cache.hits > 0)).toBe(true);
-    expect(caches.every((cache) => cache.size > 0 && cache.size <= 256)).toBe(true);
+    expect(caches.every((cache) => cache.size > 0 && cache.size <= 32)).toBe(true);
   });
 
   it(

@@ -101,7 +101,7 @@ export type JunkAnalysisCache = Readonly<{
 }>;
 
 /** 创建一个有上限的结构分析 LRU；只缓存纯 hand-shape 结果，不持有局面状态。 */
-export const createJunkAnalysisCache = (maxEntries = 256): JunkAnalysisCache => {
+export const createJunkAnalysisCache = (maxEntries = 32): JunkAnalysisCache => {
   if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0)
     throw new Error("maxEntries must be a positive safe integer");
   const entries = new Map<string, UkeireEvaluation>();
