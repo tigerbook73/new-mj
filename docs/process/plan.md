@@ -19,8 +19,9 @@ LRU，每局开始清空；只缓存手牌 count signature 对应的 shanten/uke
 仅约 0.26%，主要命中来自跨决策的同局复现，因此不再增加 AI 外壳缓存。下一步第一个
 具体动作：core 独立 batch 已比逐候选约快 1.7x，但接入完整 2-ply 反而慢约 9%，
 因此暂不接入 AI。已完成 remove-context 的 base prefix 复用，core fixture 约提升
-2.4%，且 `verify:full` 全绿；下一步继续 profile core batch 的 transition 分配与
-remove/add 花色组合共享，确认能否消除更多批量构造成本，再决定是否继续接入 2-ply。
+2.4%，且 `verify:full` 全绿；随后跳过未使用的 `baseSuffix[0]`，再取得约 4.2%，
+`verify:full` 仍全绿。下一步继续 profile core batch 的 transition 分配与 remove/add
+花色组合共享，确认能否消除更多批量构造成本，再决定是否继续接入 2-ply。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/

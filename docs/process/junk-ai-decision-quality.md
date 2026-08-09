@@ -263,6 +263,12 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   收益有限但风险低，已保留；下一步继续检查 transition 分配与 remove/add 花色组合
   的共享，仍不接入 AI 主路径。
 
+  **无用 suffix 优化（2026-08-09）**：`createTwoChangeShantenProber` 原本构造
+  `baseSuffix[0]`，但所有路径只访问 `baseSuffix[addBlock + 1]` 或
+  `baseSuffix[removeBlock + 1]`，因此下标 0 永远不会读取。跳过这一次 transition
+  composition 后，固定 core fixture 从 14.34ms 降至 13.73ms/100 次，约 **4.2%**；
+  checksum 一致，core `verify:full`（19 文件、191 测试、build）全通过，已接受。
+
   **候选剪枝反例（2026-08-09）**：尝试跳过“弃掉某牌后再摸回同一牌种”，认为它
   恢复原计数、不可能优于叶子；等价测试发现该判断错误——相对于弃牌后的 13 张手牌，
   摸回同牌完全可能降低向听，因此该候选必须保留。剪枝只能基于实际的下界/支配证明，

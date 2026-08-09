@@ -662,7 +662,8 @@ export const createTwoChangeShantenProber = (
   }
   const baseSuffix: Int8Array[] = new Array<Int8Array>(blocks.length + 1);
   baseSuffix[blocks.length] = IDENTITY_TRANSITION;
-  for (let i = blocks.length - 1; i >= 0; i -= 1) {
+  // suffix[0] is never queried: every add/remove path starts at block + 1.
+  for (let i = blocks.length - 1; i >= 1; i -= 1) {
     const block = blocks[i]!;
     const slot = indexMapSlotOfRange(baseCounts, block.start, block.table.suitLength);
     const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
