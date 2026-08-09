@@ -1,10 +1,12 @@
 import {
   STANDARD_TILE_SET,
   createPrng,
+  evaluateUkeireAfterDiscards,
   shuffle,
   tileIdOf,
   type TileId,
   type TileKind,
+  type Meld,
 } from "@new-mj/core";
 import {
   DEFAULT_JUNK_WEIGHTS,
@@ -35,7 +37,7 @@ export const BENCHMARK_PROGRESS: GameProgress = { wallCount: 84, unseenPoolSize:
 
 type BenchmarkShape = Readonly<{
   hand: readonly TileId[];
-  melds: readonly [];
+  melds: readonly Meld[];
 }>;
 
 export type SelfDrawTwoPlyCandidate = Readonly<{
@@ -55,6 +57,126 @@ export type SelfDrawTwoPlyCandidateEvaluation = Readonly<{
   bestValue: number | undefined;
   elapsedMs: number;
 }>;
+
+type RankedDiscard = Readonly<{
+  kind: TileKind;
+  discard: TileId;
+  rankScore: number;
+}>;
+
+const rankStructuralDiscards = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[],
+  candidateLimit: number,
+): RankedDiscard[] => {
+  const uniqueDiscards = new Map<TileKind, TileId>();
+  for (const tile of input.hand) {
+    const kind = STANDARD_TILE_SET.kindOf(tile);
+    if (!uniqueDiscards.has(kind)) uniqueDiscards.set(kind, tile);
+  }
+  const discardKinds = [...uniqueDiscards.keys()];
+  const discardIndexes = discardKinds.map((kind) => STANDARD_TILE_SET.kindIndexOf(kind));
+  const evaluations = evaluateUkeireAfterDiscards(
+    input.hand,
+    discardIndexes,
+    { sevenPairs: input.melds.length === 0 },
+    STANDARD_TILE_SET,
+    input.melds.length,
+  );
+  const knownCounts = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+  for (const tile of [
+    ...input.hand,
+    ...input.melds.flatMap((meld) => meld.tiles),
+    ...visibleDiscards,
+  ]) {
+    knownCounts[STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile))]! += 1;
+  }
+  const ranked = evaluations.map((evaluation, index) => {
+    const discard = uniqueDiscards.get(discardKinds[index]!)!;
+    let liveUkeire = 0;
+    for (const kind of evaluation.improvingKinds) {
+      const kindIndex = STANDARD_TILE_SET.kindIndexOf(kind);
+      // The candidate is still known after it leaves the hand, so the input
+      // hand count already represents the post-discard known total.
+      liveUkeire += Math.max(0, STANDARD_TILE_SET.copiesPerKind - knownCounts[kindIndex]!);
+    }
+    return {
+      kind: discardKinds[index]!,
+      discard,
+      rankScore: -evaluation.shanten * 1000 + liveUkeire,
+      shanten: evaluation.shanten,
+      liveUkeire,
+    };
+  });
+  return ranked
+    .sort((left, right) => right.rankScore - left.rankScore || right.liveUkeire - left.liveUkeire)
+    .slice(0, Math.min(candidateLimit, ranked.length));
+};
+
+const evaluateRankedCandidates = (
+  input: BenchmarkShape,
+  ranked: readonly RankedDiscard[],
+  visibleDiscards: readonly TileId[],
+  weights: JunkWeights,
+  gameProgress: GameProgress,
+  candidateLimit: number,
+): SelfDrawTwoPlyCandidateEvaluation => {
+  const startedAt = performance.now();
+  const candidates = ranked.slice(0, candidateLimit).map(({ kind, discard, rankScore }) => {
+    const afterDiscard = {
+      hand: input.hand.filter((tile) => tile !== discard),
+      melds: input.melds,
+    };
+    const probe = probeSelfDrawTwoPly(
+      afterDiscard,
+      [...visibleDiscards, discard],
+      weights,
+      gameProgress,
+    );
+    return {
+      discard,
+      kind,
+      onePlyScore: rankScore,
+      twoPlyValue: probe.continuationValue + probe.winProbability,
+      probe,
+    };
+  });
+  const best = candidates.reduce<SelfDrawTwoPlyCandidate | undefined>(
+    (current, candidate) =>
+      current === undefined || candidate.twoPlyValue > current.twoPlyValue ? candidate : current,
+    undefined,
+  );
+  return {
+    candidateLimit,
+    candidates,
+    onePlyBestKind: ranked[0]?.kind,
+    onePlyBestValue: ranked[0]?.rankScore,
+    bestKind: best?.kind,
+    bestValue: best?.twoPlyValue,
+    elapsedMs: performance.now() - startedAt,
+  };
+};
+
+export const evaluateStructuralTwoPlyCandidates = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  candidateLimit = Number.POSITIVE_INFINITY,
+): SelfDrawTwoPlyCandidateEvaluation => {
+  if (!(candidateLimit > 0)) throw new Error("candidateLimit must be positive");
+  const startedAt = performance.now();
+  const ranked = rankStructuralDiscards(input, visibleDiscards, candidateLimit);
+  const result = evaluateRankedCandidates(
+    input,
+    ranked,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    candidateLimit,
+  );
+  return { ...result, elapsedMs: performance.now() - startedAt };
+};
 
 /**
  * Evaluates a bounded number of discard candidates for the diagnostic 2-ply
@@ -231,7 +353,7 @@ export const benchmarkTieredTwoPlyCandidateSuite = (
 /** Compares bounded candidate budgets with the full diagnostic probe suite. */
 export const benchmarkSelfDrawTwoPlyCandidateSuite = (
   iterations: number,
-  candidateLimits: readonly number[] = [1, 2, 3, Number.POSITIVE_INFINITY],
+  candidateLimits: readonly number[] = [1, 2, 3, 4, 5, Number.POSITIVE_INFINITY],
   fixtureCount = 8,
 ): SelfDrawTwoPlyCandidateSuite => {
   if (!Number.isSafeInteger(iterations) || iterations <= 0)
@@ -275,6 +397,58 @@ export const benchmarkSelfDrawTwoPlyCandidateSuite = (
     onePly: {
       winnerAgreement: onePly.agreement / cases,
       meanScoreGap: onePly.scoreGap / cases,
+    },
+    results: candidateLimits.map((candidateLimit, index) => ({
+      candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : "all",
+      elapsedMs: totals[index]!.elapsedMs,
+      msPerCase: totals[index]!.elapsedMs / cases,
+      winnerAgreement: totals[index]!.agreement / cases,
+      meanScoreGap: totals[index]!.scoreGap / cases,
+    })),
+  };
+};
+
+/** Compares the structural shanten/ukeire ranking with the existing 1-ply ranking. */
+export const benchmarkStructuralTwoPlyCandidateSuite = (
+  iterations: number,
+  candidateLimits: readonly number[] = [1, 2, 3, 4, 5, Number.POSITIVE_INFINITY],
+  fixtureCount = 8,
+): SelfDrawTwoPlyCandidateSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  const totals = candidateLimits.map(() => ({ elapsedMs: 0, agreement: 0, scoreGap: 0 }));
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      for (const [index, candidateLimit] of candidateLimits.entries()) {
+        const bounded = evaluateStructuralTwoPlyCandidates(
+          input,
+          [],
+          DEFAULT_JUNK_WEIGHTS,
+          BENCHMARK_PROGRESS,
+          candidateLimit,
+        );
+        totals[index]!.elapsedMs += bounded.elapsedMs;
+        if (bounded.bestKind === full.bestKind) totals[index]!.agreement += 1;
+        totals[index]!.scoreGap += (full.bestValue ?? 0) - (bounded.bestValue ?? 0);
+      }
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    onePly: {
+      winnerAgreement: 0,
+      meanScoreGap: 0,
     },
     results: candidateLimits.map((candidateLimit, index) => ({
       candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : "all",

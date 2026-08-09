@@ -4,6 +4,7 @@ import {
   BENCHMARK_PROGRESS,
   benchmarkSelfDrawTwoPly,
   evaluateSelfDrawTwoPlyCandidates,
+  evaluateStructuralTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
 
 describe("benchmarkSelfDrawTwoPly", () => {
@@ -47,5 +48,17 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(threeMeters?.probe.outcomes.find(({ kind }) => kind === "3m")?.probability).toBe(
       3 / BENCHMARK_PROGRESS.unseenPoolSize,
     );
+  });
+
+  it("ranks structural candidates from core shanten and live ukeire", () => {
+    const result = evaluateStructuralTwoPlyCandidates(
+      BENCHMARK_INPUT,
+      [],
+      undefined,
+      BENCHMARK_PROGRESS,
+      2,
+    );
+    expect(result.candidates).toHaveLength(2);
+    expect(result.candidates.every(({ onePlyScore }) => Number.isFinite(onePlyScore))).toBe(true);
   });
 });
