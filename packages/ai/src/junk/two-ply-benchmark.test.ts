@@ -4,6 +4,7 @@ import {
   BENCHMARK_PROGRESS,
   benchmarkSelfDrawTwoPly,
   evaluateSelfDrawTwoPlyCandidates,
+  benchmarkConservativeStructuralSuite,
   evaluateStructuralTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
 
@@ -60,5 +61,12 @@ describe("benchmarkSelfDrawTwoPly", () => {
     );
     expect(result.candidates).toHaveLength(2);
     expect(result.candidates.every(({ onePlyScore }) => Number.isFinite(onePlyScore))).toBe(true);
+  });
+
+  it("can keep only the minimum post-discard shanten layer", () => {
+    const result = benchmarkConservativeStructuralSuite(1, 2);
+    expect(result.averageCandidates).toBeGreaterThan(0);
+    expect(result.averageCandidates).toBeLessThan(BENCHMARK_INPUT.hand.length);
+    expect(Number.isFinite(result.msPerCase)).toBe(true);
   });
 });

@@ -62,6 +62,7 @@ type RankedDiscard = Readonly<{
   kind: TileKind;
   discard: TileId;
   rankScore: number;
+  shanten: number;
 }>;
 
 const rankStructuralDiscards = (
@@ -176,6 +177,68 @@ export const evaluateStructuralTwoPlyCandidates = (
     candidateLimit,
   );
   return { ...result, elapsedMs: performance.now() - startedAt };
+};
+
+export type ConservativeStructuralSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  averageCandidates: number;
+  elapsedMs: number;
+  msPerCase: number;
+  winnerAgreement: number;
+  meanScoreGap: number;
+}>;
+
+/** Keeps only discards with the minimum post-discard shanten before 2-ply. */
+export const benchmarkConservativeStructuralSuite = (
+  iterations: number,
+  fixtureCount = 8,
+): ConservativeStructuralSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let elapsedMs = 0;
+  let candidates = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      const startedAt = performance.now();
+      const ranked = rankStructuralDiscards(input, [], Number.POSITIVE_INFINITY);
+      const minShanten = Math.min(...ranked.map(({ shanten }) => shanten));
+      const survivors = ranked.filter(({ shanten }) => shanten === minShanten);
+      const bounded = evaluateRankedCandidates(
+        input,
+        survivors,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      elapsedMs += performance.now() - startedAt;
+      candidates += survivors.length;
+      if (bounded.bestKind === full.bestKind) agreement += 1;
+      scoreGap += (full.bestValue ?? 0) - (bounded.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    averageCandidates: candidates / cases,
+    elapsedMs,
+    msPerCase: elapsedMs / cases,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
+  };
 };
 
 /**

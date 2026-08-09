@@ -3,6 +3,7 @@ import {
   BENCHMARK_PROGRESS,
   benchmarkSelfDrawTwoPly,
   benchmarkSelfDrawTwoPlyCandidateSuite,
+  benchmarkConservativeStructuralSuite,
   benchmarkStructuralTwoPlyCandidateSuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
@@ -15,7 +16,11 @@ const fixtureCount = fixtureCountArgument === undefined ? 8 : Number(fixtureCoun
 const budget = budgetArgument === undefined ? undefined : Number(budgetArgument);
 const candidateLimit =
   candidateLimitArgument === undefined ? undefined : Number(candidateLimitArgument);
-if (candidateLimitArgument === "structural") {
+if (candidateLimitArgument === "blacklist") {
+  process.stdout.write(
+    `${JSON.stringify(benchmarkConservativeStructuralSuite(iterations, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "structural") {
   const limits = budget === undefined ? undefined : [budget, Number.POSITIVE_INFINITY];
   process.stdout.write(
     `${JSON.stringify(benchmarkStructuralTwoPlyCandidateSuite(iterations, limits, fixtureCount))}\n`,
