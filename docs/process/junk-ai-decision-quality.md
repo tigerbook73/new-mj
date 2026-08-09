@@ -63,6 +63,11 @@ JSONL 每行保存一个实际 case，manifest 保存 seed、权重、Git revisi
 它流式读取 JSONL，只执行候选方案的计算；1000 case 复用结果的最低向听黑名单仍为 100%
 一致、平均保留 7.233 个候选、平均分差约 0。
 
+结构化 fixture runner 为 `pnpm --filter @new-mj/ai bench:two-ply-structured`，当前覆盖
+刻子/字牌、234 顺子块、七对子、开口吃、死牌、同向听不同 ukeire 六类手牌；6 类中结构
+Top-4 和最低向听黑名单均与全量 2-ply 一致。该结果只证明已知边界没有立即反例，不能替代
+更大规模的对抗性搜索。
+
 ## 已接受结论
 
 | 主题                      | 决策与证据                                                                                                                                                               |
