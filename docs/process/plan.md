@@ -37,8 +37,11 @@ Phase 2 进入 core 批量 API 前置清理：已将 `createShantenProber` 与
 和调用语义不变。core `verify:full` 全绿，2-ply checksum 不变，benchmark 约
 13.28ms/probe，无性能回归证据。已评估继续拆分单花色 solver/table-builder：需要
 额外引入共享索引/表类型模块，只有文件长度收益，没有明确性能或边界收益，已拒绝
-继续拆分。当前清理阶段收束，下一步第一个具体动作：进入 core 批量 API 提案，定义
-其性能边界和最小结果接口。
+继续拆分。当前清理阶段收束，已在专题文档写出 core 批量 API 提案：以标准 34 种牌
+count/index 为输入，返回弃牌×摸牌叶子的向听与进张种类；不承载 TileId、活牌概率、
+番型或 AI 权重。正确性要求逐叶等价，性能要求完整 probe 不慢于约 13.3–13.6ms 基线。
+下一步第一个具体动作：将该 core 接口形状和性能边界提回 Claude Project 做架构确认，
+确认前不实现、不导出到默认 AI 路径。
 
 Shanten/Ukeire 共享底层重构 Phase 1 已全部完成并收档：分层设计与长期决策
 沉淀至 `docs/architecture/shanten.md`，算法/存储细节在 `packages/core/src/

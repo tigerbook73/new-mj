@@ -327,6 +327,66 @@ AI 优化已经收尾，也不属于本阶段。
 当前状态：第 1 步已具备历史基线，第 2 步待提案；在提案边界明确前，Phase 2
 保持暂停，`垃圾胡性能优化讨论.md` 中的进取/保守策略不纳入本阶段。
 
+### core 批量 API 提案（待架构确认）
+
+**目标**：把当前 2-ply 中重复的“每个弃牌候选再枚举 34 种摸牌并独立分析”变为
+一次共享结构计算；只提供 core 能证明正确的牌型距离结果，不把 AI 评分搬进 core。
+
+**建议的最小输入**：
+
+```ts
+type TwoPlyStructureBatchInput = Readonly<{
+  counts: readonly number[]; // STANDARD_TILE_SET 的 34 种牌计数
+  discardKindIndexes: readonly number[];
+  sevenPairs: boolean;
+  existingMelds: number;
+}>;
+```
+
+使用 count/index 而不是每个叶子重新传 TileId，目的是让 core 直接复用 remove/add
+DP 状态；第一版只接受标准 34 种牌和显式 `existingMelds`，非标准 TileSet 继续走
+现有通用路径，不在本提案中扩大范围。
+
+**建议的最小输出**：每个弃牌候选返回自身的向听数，以及所有合法摸牌种类对应的
+叶子结构分析：
+
+```ts
+type TwoPlyStructureBatchResult = Readonly<{
+  discardKindIndex: number;
+  afterDiscardShanten: number;
+  draws: readonly Readonly<{
+    addKindIndex: number;
+    shanten: number;
+    improvingKindIndexes: readonly number[];
+  }>[];
+}>;
+```
+
+实现可以用扁平数组或内部 scratch 降低分配，但对外必须返回独立、只读的结果，不能
+暴露模块级 scratch 的引用。`improvingKindIndexes` 保留所有严格降低向听的摸牌种类，
+包括“弃掉后又摸回同一种牌”的情况；此前反例已经证明不能凭直觉剪掉它。
+
+**明确不放进 core 的内容**：
+
+- `TileId` 选择、可见牌/活牌数量和墙中概率；
+- `fanPotential`、安全度、门清损失、claim hurdle 与任何 `JunkWeights`；
+- 对手行动、吃碰杠、终局番数、rollout 和动态攻守策略；
+- 跨调用、跨玩家或跨牌局的隐式缓存。
+
+**正确性门槛**：对固定 fixture、随机标准手牌和已有副露场景，将每个
+`(discardKindIndex, addKindIndex)` 结果与独立构造叶子后调用现有
+`evaluateUkeire` 的结果逐项比较；同时覆盖七对子开关、四张已满、立即和牌和
+无效候选。core 改动必须通过 `verify:full`，其中包含至少 1000 局 fuzz。
+
+**性能门槛**：先比较新 API 自身与逐叶 `evaluateUkeire`，再把它接到诊断用
+`probeSelfDrawTwoPly` 做端到端比较。只有完整 probe 不慢于当前约 13.3–13.6ms 的
+基线、checksum 与叶子结果一致，才有资格进入下一轮多 seed 测量；若局部 batch 变快
+但完整 probe 变慢，拒绝接入。x10 仍是待测理论空间，不作为 API 的承诺目标。
+
+**边界状态**：这是 core 性能/接口形状的架构提案，先标记 TODO 提回 Claude Project
+确认；确认前不实现、不导出到默认 AI 路径。确认后再按“实现 API → 独立 A/B → 诊断
+接入 → 默认准入”顺序推进。
+
 **候选剪枝反例（2026-08-09）**：尝试跳过“弃掉某牌后再摸回同一牌种”，认为它
 恢复原计数、不可能优于叶子；等价测试发现该判断错误——相对于弃牌后的 13 张手牌，
 摸回同牌完全可能降低向听，因此该候选必须保留。剪枝只能基于实际的下界/支配证明，
