@@ -14,6 +14,7 @@ import {
   benchmarkSecondDiscardWhitelistSuite,
   benchmarkDynamicSecondDiscardWhitelistSuite,
   benchmarkTwoChangeBatchSuite,
+  benchmarkCoreBatchTwoPlySuite,
   chooseDynamicTrajectoryLimit,
   DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
@@ -117,6 +118,13 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(result.comparisons).toBeGreaterThan(0);
     expect(result.mismatches).toBe(0);
     expect(result.twoChangeMsPerCase).toBeGreaterThan(0);
+  });
+
+  it("keeps the complete dynamic probe equivalent with the core batch path", () => {
+    const result = benchmarkCoreBatchTwoPlySuite(1, 2, 2);
+    expect(result.winnerAgreement).toBe(1);
+    expect(result.meanScoreGap).toBe(0);
+    expect(result.coreBatchMsPerCase).toBeGreaterThan(0);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {

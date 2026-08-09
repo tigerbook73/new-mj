@@ -1,6 +1,7 @@
 import {
   STANDARD_TILE_SET,
   evaluateUkeireBatch,
+  evaluateUkeireAfterDiscardDraws,
   evaluateUkeire,
   shantenWithExposedMelds,
   tileIdOf,
@@ -496,6 +497,11 @@ export type SelfDrawTwoPlyProbe = Readonly<{
   outcomes: readonly SelfDrawTwoPlyOutcome[];
 }>;
 
+type TwoChangeBatchSource = Readonly<{
+  tiles: readonly TileId[];
+  discardKindIndex: number;
+}>;
+
 /**
  * A deliberately narrow 2-ply probe for Phase 2 exploration:
  *
@@ -522,6 +528,7 @@ export const probeSelfDrawTwoPly = (
   gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
   analysisCache?: JunkAnalysisCache,
   secondDiscardKindsForDraw?: (drawnKind: TileKind) => ReadonlySet<TileKind>,
+  twoChangeBatchSource?: TwoChangeBatchSource,
 ): SelfDrawTwoPlyProbe => {
   if (gameProgress.unseenPoolSize <= 0 || gameProgress.wallCount <= 0)
     return {
@@ -567,16 +574,35 @@ export const probeSelfDrawTwoPly = (
       afterDraw: { hand: [...input.hand, drawnTile], melds: input.melds },
     });
   }
-  const drawAnalyses = evaluateUkeireBatch(
-    drawCandidates.map(({ afterDraw }) => ({
-      tiles: afterDraw.hand,
-      options: { sevenPairs: afterDraw.melds.length === 0 },
-      existingMelds: afterDraw.melds.length,
-    })),
+  const drawAnalyses = twoChangeBatchSource
+    ? new Map(
+        evaluateUkeireAfterDiscardDraws(
+          twoChangeBatchSource.tiles,
+          [twoChangeBatchSource.discardKindIndex],
+          drawCandidates.map(({ kind }) => STANDARD_TILE_SET.kindIndexOf(kind)),
+          { sevenPairs: input.melds.length === 0 },
+          STANDARD_TILE_SET,
+          input.melds.length,
+        ).map((analysis) => [analysis.drawKindIndex, analysis] as const),
+      )
+    : undefined;
+  const directDrawAnalyses = evaluateUkeireBatch(
+    twoChangeBatchSource
+      ? []
+      : drawCandidates.map(({ afterDraw }) => ({
+          tiles: afterDraw.hand,
+          options: { sevenPairs: afterDraw.melds.length === 0 },
+          existingMelds: afterDraw.melds.length,
+        })),
   );
   for (const [index, { kind, probability, afterDraw }] of drawCandidates.entries()) {
-    const analysis = drawAnalyses[index]!;
-    structuralCache.set(handAnalysisKey(afterDraw), analysis);
+    const analysis = twoChangeBatchSource
+      ? drawAnalyses?.get(STANDARD_TILE_SET.kindIndexOf(kind))
+      : directDrawAnalyses[index];
+    if (!analysis) throw new Error("MISSING_TWO_CHANGE_ANALYSIS");
+    if (!twoChangeBatchSource) {
+      structuralCache.set(handAnalysisKey(afterDraw), directDrawAnalyses[index]!);
+    }
     if (analysis.shanten < 0) {
       winProbability += probability;
       outcomes.push({ kind, probability });

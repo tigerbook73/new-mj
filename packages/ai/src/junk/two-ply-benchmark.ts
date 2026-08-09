@@ -303,6 +303,7 @@ const evaluateRankedCandidates = (
   candidateLimit: number,
   analysisCache?: JunkAnalysisCache,
   secondDiscardKindsForDraw?: (drawnKind: TileKind) => ReadonlySet<TileKind>,
+  useTwoChangeBatch = false,
 ): SelfDrawTwoPlyCandidateEvaluation => {
   const startedAt = performance.now();
   const candidates = ranked.slice(0, candidateLimit).map(({ kind, discard, rankScore }) => {
@@ -317,6 +318,12 @@ const evaluateRankedCandidates = (
       gameProgress,
       analysisCache,
       secondDiscardKindsForDraw,
+      useTwoChangeBatch
+        ? {
+            tiles: input.hand,
+            discardKindIndex: STANDARD_TILE_SET.kindIndexOf(kind),
+          }
+        : undefined,
     );
     return {
       discard,
@@ -569,6 +576,7 @@ export const evaluateWeightedTrajectoryWithDynamicSecondDiscardWhitelist = (
     scoreWindow: 4,
     elbowGap: 12,
   },
+  useTwoChangeBatch = false,
 ): SecondDiscardWhitelistEvaluation => {
   const ranked = rankWeightedTrajectoryDiscards(
     input,
@@ -589,6 +597,7 @@ export const evaluateWeightedTrajectoryWithDynamicSecondDiscardWhitelist = (
     firstCandidates.length,
     undefined,
     (drawnKind) => new Set([...secondWhitelist, drawnKind]),
+    useTwoChangeBatch,
   );
   const totalDraws = evaluation.candidates.reduce(
     (sum, candidate) => sum + candidate.probe.outcomes.length,
@@ -1333,6 +1342,75 @@ export const benchmarkDynamicSecondDiscardWhitelistSuite = (
     averageSecondDiscardCandidates: candidates / cases,
     elapsedMs,
     msPerCase: elapsedMs / cases,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
+  };
+};
+
+export type CoreBatchTwoPlySuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  firstDiscardLimit: number;
+  cases: number;
+  existingMsPerCase: number;
+  coreBatchMsPerCase: number;
+  speedup: number;
+  winnerAgreement: number;
+  meanScoreGap: number;
+}>;
+
+/** Compares complete dynamic 2-ply with and without the core two-change API. */
+export const benchmarkCoreBatchTwoPlySuite = (
+  iterations: number,
+  firstDiscardLimit = 4,
+  fixtureCount = 8,
+): CoreBatchTwoPlySuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let existingElapsedMs = 0;
+  let coreBatchElapsedMs = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const existingStartedAt = performance.now();
+      const existing = evaluateWeightedTrajectoryWithDynamicSecondDiscardWhitelist(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        firstDiscardLimit,
+      );
+      existingElapsedMs += performance.now() - existingStartedAt;
+      const coreBatchStartedAt = performance.now();
+      const coreBatch = evaluateWeightedTrajectoryWithDynamicSecondDiscardWhitelist(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        firstDiscardLimit,
+        undefined,
+        true,
+      );
+      coreBatchElapsedMs += performance.now() - coreBatchStartedAt;
+      if (coreBatch.evaluation.bestKind === existing.evaluation.bestKind) agreement += 1;
+      scoreGap +=
+        (existing.evaluation.bestValue ?? 0) - (coreBatch.evaluation.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  const existingMsPerCase = existingElapsedMs / cases;
+  const coreBatchMsPerCase = coreBatchElapsedMs / cases;
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    firstDiscardLimit,
+    cases,
+    existingMsPerCase,
+    coreBatchMsPerCase,
+    speedup: existingMsPerCase / coreBatchMsPerCase,
     winnerAgreement: agreement / cases,
     meanScoreGap: scoreGap / cases,
   };
