@@ -646,92 +646,121 @@ export const createTwoChangeShantenProber = (
   existingMelds: number,
 ): ((removeKindIndex: number, addKindIndex?: number) => number) => {
   const blocks = getBlocks();
-  const counts = [...countsSource];
+  const baseCounts = [...countsSource];
   const baseBases: number[] = [];
-  const prefix: Int16Array[] = [];
+  const basePrefix: Int16Array[] = [];
   let state = new Int16Array(10).fill(DP_UNREACHED);
   state[0] = 0;
   for (const block of blocks) {
-    prefix.push(state);
-    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    basePrefix.push(state);
+    const slot = indexMapSlotOfRange(baseCounts, block.start, block.table.suitLength);
     const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
     baseBases.push(base);
     const next = new Int16Array(10);
     applyTransition(state, next, block.table.data, base);
     state = next;
   }
-  const suffix: Int8Array[] = new Array<Int8Array>(blocks.length + 1);
-  suffix[blocks.length] = IDENTITY_TRANSITION;
+  const baseSuffix: Int8Array[] = new Array<Int8Array>(blocks.length + 1);
+  baseSuffix[blocks.length] = IDENTITY_TRANSITION;
   for (let i = blocks.length - 1; i >= 0; i -= 1) {
     const block = blocks[i]!;
-    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    const slot = indexMapSlotOfRange(baseCounts, block.start, block.table.suitLength);
     const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
     const out = new Int8Array(SLOTS_PER_VECTOR);
-    composeTransitions(block.table.data, base, suffix[i + 1]!, 0, out);
-    suffix[i] = out;
+    composeTransitions(block.table.data, base, baseSuffix[i + 1]!, 0, out);
+    baseSuffix[i] = out;
   }
-  const changedCounts = [...counts];
+  const blockOf = (kindIndex: number): number =>
+    kindIndex < NUMBER_SUIT_LENGTH * 3 ? Math.floor(kindIndex / NUMBER_SUIT_LENGTH) : 3;
+  type RemoveContext = Readonly<{
+    counts: number[];
+    prefix: Int16Array[];
+    tail: Int8Array[];
+    result: number;
+  }>;
+  const contexts = new Map<number, RemoveContext>();
+  const makeRemoveContext = (removeKindIndex: number): RemoveContext => {
+    const cached = contexts.get(removeKindIndex);
+    if (cached) return cached;
+    const counts = [...baseCounts];
+    counts[removeKindIndex] = (counts[removeKindIndex] ?? 0) - 1;
+    const prefix: Int16Array[] = [];
+    let state = new Int16Array(10).fill(DP_UNREACHED);
+    state[0] = 0;
+    for (const block of blocks) {
+      prefix.push(state);
+      const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+      const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+      const next = new Int16Array(10);
+      applyTransition(state, next, block.table.data, base);
+      state = next;
+    }
+    const tail = new Array<Int8Array>(blocks.length);
+    for (let addBlock = 0; addBlock < blocks.length; addBlock += 1) {
+      let transition = IDENTITY_TRANSITION;
+      const removeBlock = blockOf(removeKindIndex);
+      if (addBlock >= removeBlock) {
+        tail[addBlock] = baseSuffix[addBlock + 1]!;
+        continue;
+      }
+      const removeTable = blocks[removeBlock]!;
+      const removeSlot = indexMapSlotOfRange(
+        counts,
+        removeTable.start,
+        removeTable.table.suitLength,
+      );
+      const removeBase = removeTable.table.indexMap[removeSlot]! * SLOTS_PER_VECTOR;
+      const afterRemove = new Int8Array(SLOTS_PER_VECTOR);
+      composeTransitions(
+        removeTable.table.data,
+        removeBase,
+        baseSuffix[removeBlock + 1]!,
+        0,
+        afterRemove,
+      );
+      transition = afterRemove;
+      for (let blockIndex = removeBlock - 1; blockIndex > addBlock; blockIndex -= 1) {
+        const out = new Int8Array(SLOTS_PER_VECTOR);
+        composeTransitions(
+          blocks[blockIndex]!.table.data,
+          baseBases[blockIndex]!,
+          transition,
+          0,
+          out,
+        );
+        transition = out;
+      }
+      tail[addBlock] = transition;
+    }
+    const result = finalizeDp(state, existingMelds);
+    const context = { counts, prefix, tail, result };
+    contexts.set(removeKindIndex, context);
+    return context;
+  };
   const first = new Int16Array(10);
   const second = new Int16Array(10);
   const third = new Int16Array(10);
-  const blockOf = (kindIndex: number): number =>
-    kindIndex < NUMBER_SUIT_LENGTH * 3 ? Math.floor(kindIndex / NUMBER_SUIT_LENGTH) : 3;
-  const transitionBase = (blockIndex: number): number => {
-    const block = blocks[blockIndex]!;
-    const slot = indexMapSlotOfRange(changedCounts, block.start, block.table.suitLength);
-    return block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
-  };
-  const applyBlock = (from: Int16Array, to: Int16Array, blockIndex: number): void => {
-    const block = blocks[blockIndex]!;
-    applyTransition(from, to, block.table.data, transitionBase(blockIndex));
-  };
-  const applyBaseBlock = (from: Int16Array, to: Int16Array, blockIndex: number): void => {
-    const block = blocks[blockIndex]!;
-    applyTransition(from, to, block.table.data, baseBases[blockIndex]!);
-  };
-  const applySuffix = (from: Int16Array, to: Int16Array, blockIndex: number): void => {
-    applyTransition(from, to, suffix[blockIndex]!, 0);
-  };
   const finish = (dp: Int16Array): number => finalizeDp(dp, existingMelds);
-  const baseResult = finish(state);
   return (removeKindIndex: number, addKindIndex?: number): number => {
-    if (addKindIndex === removeKindIndex) return baseResult;
+    const context = makeRemoveContext(removeKindIndex);
+    if (addKindIndex === undefined) return context.result;
+    if (addKindIndex === removeKindIndex) return finish(state);
     const removeBlock = blockOf(removeKindIndex);
-    const addBlock = addKindIndex === undefined ? -1 : blockOf(addKindIndex);
-    const firstBlock = addBlock < 0 ? removeBlock : Math.min(removeBlock, addBlock);
-    const secondBlock =
-      addBlock < 0 || addBlock === removeBlock ? -1 : Math.max(removeBlock, addBlock);
-
-    changedCounts[removeKindIndex] = (changedCounts[removeKindIndex] ?? 0) - 1;
-    if (addKindIndex !== undefined)
-      changedCounts[addKindIndex] = (changedCounts[addKindIndex] ?? 0) + 1;
-
-    applyTransition(
-      prefix[firstBlock]!,
-      first,
-      blocks[firstBlock]!.table.data,
-      transitionBase(firstBlock),
-    );
-    if (secondBlock < 0) {
-      applySuffix(first, second, firstBlock + 1);
-      const result = finish(second);
-      changedCounts[removeKindIndex] = (changedCounts[removeKindIndex] ?? 0) + 1;
-      if (addKindIndex !== undefined)
-        changedCounts[addKindIndex] = (changedCounts[addKindIndex] ?? 0) - 1;
-      return result;
+    const addBlock = blockOf(addKindIndex);
+    const counts = context.counts;
+    counts[addKindIndex] = (counts[addKindIndex] ?? 0) + 1;
+    const block = blocks[addBlock]!;
+    const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
+    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    if (addBlock >= removeBlock) {
+      applyTransition(context.prefix[addBlock]!, first, block.table.data, base);
+      applyTransition(first, second, baseSuffix[addBlock + 1]!, 0);
+      counts[addKindIndex] = (counts[addKindIndex] ?? 0) - 1;
+      return finish(second);
     }
-    applyBlock(first, second, secondBlock);
-    let middle = second;
-    let next = third;
-    for (let blockIndex = firstBlock + 1; blockIndex < secondBlock; blockIndex += 1) {
-      applyBaseBlock(middle, next, blockIndex);
-      [middle, next] = [next, middle];
-    }
-    applySuffix(middle, next, secondBlock + 1);
-    const result = finish(next);
-    changedCounts[removeKindIndex] = (changedCounts[removeKindIndex] ?? 0) + 1;
-    if (addKindIndex !== undefined)
-      changedCounts[addKindIndex] = (changedCounts[addKindIndex] ?? 0) - 1;
-    return result;
+    applyTransition(basePrefix[addBlock]!, first, block.table.data, base);
+    applyTransition(first, second, context.tail[addBlock]!, 0);
+    counts[addKindIndex] = (counts[addKindIndex] ?? 0) - 1;
+    return finish(second);
   };
 };

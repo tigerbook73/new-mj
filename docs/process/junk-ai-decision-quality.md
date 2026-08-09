@@ -217,10 +217,11 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   分析。目标 fixture 的热态 benchmark 从约 15.1ms 降至约 10.1ms/probe，约
   1.5x，说明主要成本仍在重复的花色 DP，而不是 live-copy 扫描。
 
-  当前实验性的“先删后加”共享 DP API 已完成等价测试，但接入固定 probe 后约
-  12.0ms/probe，慢于第一轮约 10.1ms，因此未接入 AI 评分路径。下一步第一个
-  具体动作：用 profile 拆分该批量 API 的中间花色转移成本，改成只计算必要候选
-  的共享状态，再重新跑同一基准；在取得明确收益前不把 2-ply 接入默认策略。
+  当前实验性的“先删后加”共享 DP API 已完成等价测试。初版 batch 比逐叶评估
+  慢约 1.44x；改为每个 discard 复用 removed-prefix 后，纯 core A/B 已接近持平
+  （checksum 一致），但接入完整 AI probe 仍约 10.7ms/probe，略慢于约 10.0ms
+  基线，因此未接入 AI 评分路径。下一步第一个具体动作：继续 profile batch 的
+  prefix/tail 与候选 transition，只有取得明确净收益才接入 2-ply。
 
 - **自我优化基础设施推广到 hangzhou/bloodbattle**：可复用部分是 Layer
   B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属
