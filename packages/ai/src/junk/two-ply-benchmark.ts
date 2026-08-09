@@ -275,7 +275,7 @@ export type DynamicWeightedTrajectoryConfig = Readonly<{
 
 export const DEFAULT_DYNAMIC_TRAJECTORY_CONFIG: DynamicWeightedTrajectoryConfig = {
   minN: 2,
-  maxN: 8,
+  maxN: 4,
   scoreWindow: 4,
   elbowGap: 12,
 };
