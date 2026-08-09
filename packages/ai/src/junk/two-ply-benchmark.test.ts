@@ -15,6 +15,9 @@ import {
   benchmarkDynamicSecondDiscardWhitelistSuite,
   benchmarkTwoChangeBatchSuite,
   benchmarkCoreBatchTwoPlySuite,
+  benchmarkBidirectionalCliffSuite,
+  evaluateBidirectionalCliffCandidates,
+  DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG,
   chooseDynamicTrajectoryLimit,
   DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
@@ -125,6 +128,24 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(result.winnerAgreement).toBe(1);
     expect(result.meanScoreGap).toBe(0);
     expect(result.coreBatchMsPerCase).toBeGreaterThan(0);
+  });
+
+  it("bounds the diagnostic bidirectional relative-cliff path", () => {
+    const result = benchmarkBidirectionalCliffSuite(1, DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG, 2);
+    expect(result.averageUpperCandidateCount).toBeGreaterThanOrEqual(
+      DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG.upper.minN,
+    );
+    expect(result.averageUpperCandidateCount).toBeLessThanOrEqual(
+      DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG.upper.maxN,
+    );
+    expect(result.averageLowerCandidateCount).toBeGreaterThanOrEqual(
+      DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG.lower.minN,
+    );
+    expect(result.winnerAgreement).toBeGreaterThanOrEqual(0);
+    expect(result.winnerAgreement).toBeLessThanOrEqual(1);
+    expect(result.boundedMsPerCase).toBeGreaterThan(0);
+    const evaluation = evaluateBidirectionalCliffCandidates(BENCHMARK_INPUT);
+    expect(evaluation.upperCandidateCount).toBeLessThanOrEqual(4);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {

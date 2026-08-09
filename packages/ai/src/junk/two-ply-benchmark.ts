@@ -269,6 +269,119 @@ export const suitTrajectoryBonusAfterDiscard = (
   return (routeSignal * routeWeight) / 8;
 };
 
+export type BidirectionalCliffConfig = Readonly<{
+  upper: Readonly<{
+    minN: number;
+    maxN: number;
+    relativeGap: number;
+  }>;
+  lower: Readonly<{
+    minN: number;
+    maxN: number | "all";
+    relativeGap: number;
+  }>;
+}>;
+
+export const DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG: BidirectionalCliffConfig = {
+  upper: { minN: 2, maxN: 4, relativeGap: 0.2 },
+  lower: { minN: 1, maxN: "all", relativeGap: 0.2 },
+};
+
+const validateRelativeCliffConfig = (config: BidirectionalCliffConfig): void => {
+  if (
+    !Number.isSafeInteger(config.upper.minN) ||
+    !Number.isSafeInteger(config.upper.maxN) ||
+    config.upper.minN <= 0 ||
+    config.upper.maxN < config.upper.minN ||
+    config.upper.relativeGap < 0 ||
+    !Number.isSafeInteger(config.lower.minN) ||
+    config.lower.minN <= 0 ||
+    (config.lower.maxN !== "all" &&
+      (!Number.isSafeInteger(config.lower.maxN) || config.lower.maxN < config.lower.minN)) ||
+    config.lower.relativeGap < 0
+  )
+    throw new Error("invalid bidirectional cliff config");
+};
+
+const scoreRangeOf = (ranked: readonly RankedDiscard[]): number => {
+  if (ranked.length < 2) return 0;
+  return ranked[0]!.rankScore - ranked[ranked.length - 1]!.rankScore;
+};
+
+/** 首轮从高分端找第一个相对断崖，至少保留 minN，最多保留 maxN。 */
+export const chooseUpperRelativeCliffLimit = (
+  ranked: readonly RankedDiscard[],
+  config: BidirectionalCliffConfig["upper"],
+): number => {
+  const lower = Math.min(config.minN, ranked.length);
+  const upper = Math.min(config.maxN, ranked.length);
+  if (lower === 0) return 0;
+  const range = scoreRangeOf(ranked);
+  if (range <= 0) return upper;
+  for (let index = lower; index < upper; index += 1) {
+    const relativeGap = (ranked[index - 1]!.rankScore - ranked[index]!.rankScore) / range;
+    if (relativeGap >= config.relativeGap) return index;
+  }
+  return upper;
+};
+
+/** 第二轮从低分端找第一个相对断崖，断崖后的高分候选全部保留。 */
+export const chooseLowerRelativeCliffLimit = (
+  ranked: readonly RankedDiscard[],
+  config: BidirectionalCliffConfig["lower"],
+): number => {
+  const minimum = Math.min(config.minN, ranked.length);
+  const maximum = config.maxN === "all" ? ranked.length : Math.min(config.maxN, ranked.length);
+  if (ranked.length === 0) return 0;
+  const range = scoreRangeOf(ranked);
+  if (range <= 0) return maximum;
+  for (let index = ranked.length - 1; index >= minimum; index -= 1) {
+    const relativeGap = (ranked[index - 1]!.rankScore - ranked[index]!.rankScore) / range;
+    if (relativeGap >= config.relativeGap) return Math.min(Math.max(index, minimum), maximum);
+  }
+  return maximum;
+};
+
+export type BidirectionalCliffEvaluation = Readonly<{
+  evaluation: SelfDrawTwoPlyCandidateEvaluation;
+  upperCandidateCount: number;
+  lowerCandidateCount: number;
+}>;
+
+/** 诊断版双向相对断崖候选评估，不接入默认策略。 */
+export const evaluateBidirectionalCliffCandidates = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = BENCHMARK_PROGRESS,
+  config: BidirectionalCliffConfig = DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG,
+  useTwoChangeBatch = false,
+): BidirectionalCliffEvaluation => {
+  validateRelativeCliffConfig(config);
+  const ranked = rankWeightedTrajectoryDiscards(
+    input,
+    visibleDiscards,
+    weights,
+    gameProgress,
+    Number.POSITIVE_INFINITY,
+  );
+  const upperCandidateCount = chooseUpperRelativeCliffLimit(ranked, config.upper);
+  const lowerCandidateCount = chooseLowerRelativeCliffLimit(ranked, config.lower);
+  const secondWhitelist = new Set(ranked.slice(0, lowerCandidateCount).map(({ kind }) => kind));
+  const evaluation = evaluateRankedCandidates(
+    input,
+    ranked.slice(0, upperCandidateCount),
+    visibleDiscards,
+    weights,
+    gameProgress,
+    upperCandidateCount,
+    undefined,
+    (drawnKind) => new Set([...secondWhitelist, drawnKind]),
+    useTwoChangeBatch,
+  );
+  return { evaluation, upperCandidateCount, lowerCandidateCount };
+};
+
 const rankWeightedTrajectoryDiscards = (
   input: BenchmarkShape,
   visibleDiscards: readonly TileId[],
@@ -1411,6 +1524,85 @@ export const benchmarkCoreBatchTwoPlySuite = (
     existingMsPerCase,
     coreBatchMsPerCase,
     speedup: existingMsPerCase / coreBatchMsPerCase,
+    winnerAgreement: agreement / cases,
+    meanScoreGap: scoreGap / cases,
+  };
+};
+
+export type BidirectionalCliffSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  cases: number;
+  upperRelativeGap: number;
+  lowerRelativeGap: number;
+  averageUpperCandidateCount: number;
+  averageLowerCandidateCount: number;
+  fullMsPerCase: number;
+  boundedMsPerCase: number;
+  speedup: number;
+  winnerAgreement: number;
+  meanScoreGap: number;
+}>;
+
+/** Compares the diagnostic bidirectional relative-cliff path with full 2-ply. */
+export const benchmarkBidirectionalCliffSuite = (
+  iterations: number,
+  config: BidirectionalCliffConfig = DEFAULT_BIDIRECTIONAL_CLIFF_CONFIG,
+  fixtureCount = 8,
+): BidirectionalCliffSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  validateRelativeCliffConfig(config);
+  const inputs = benchmarkInputs(fixtureCount);
+  let fullElapsedMs = 0;
+  let boundedElapsedMs = 0;
+  let upperCandidates = 0;
+  let lowerCandidates = 0;
+  let agreement = 0;
+  let scoreGap = 0;
+  let cases = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const fullStartedAt = performance.now();
+      const full = evaluateSelfDrawTwoPlyCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        Number.POSITIVE_INFINITY,
+      );
+      fullElapsedMs += performance.now() - fullStartedAt;
+
+      const boundedStartedAt = performance.now();
+      const bounded = evaluateBidirectionalCliffCandidates(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        config,
+        true,
+      );
+      boundedElapsedMs += performance.now() - boundedStartedAt;
+      upperCandidates += bounded.upperCandidateCount;
+      lowerCandidates += bounded.lowerCandidateCount;
+      if (bounded.evaluation.bestKind === full.bestKind) agreement += 1;
+      scoreGap += (full.bestValue ?? 0) - (bounded.evaluation.bestValue ?? 0);
+      cases += 1;
+    }
+  }
+  const fullMsPerCase = fullElapsedMs / cases;
+  const boundedMsPerCase = boundedElapsedMs / cases;
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    cases,
+    upperRelativeGap: config.upper.relativeGap,
+    lowerRelativeGap: config.lower.relativeGap,
+    averageUpperCandidateCount: upperCandidates / cases,
+    averageLowerCandidateCount: lowerCandidates / cases,
+    fullMsPerCase,
+    boundedMsPerCase,
+    speedup: fullMsPerCase / boundedMsPerCase,
     winnerAgreement: agreement / cases,
     meanScoreGap: scoreGap / cases,
   };

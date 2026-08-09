@@ -13,6 +13,7 @@ import {
   benchmarkDynamicSecondDiscardWhitelistSuite,
   benchmarkTwoChangeBatchSuite,
   benchmarkCoreBatchTwoPlySuite,
+  benchmarkBidirectionalCliffSuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -72,6 +73,10 @@ if (candidateLimitArgument === "blacklist") {
   const candidateLimit = budget === undefined ? 4 : budget;
   process.stdout.write(
     `${JSON.stringify(benchmarkCoreBatchTwoPlySuite(iterations, candidateLimit, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "bidirectional-cliff") {
+  process.stdout.write(
+    `${JSON.stringify(benchmarkBidirectionalCliffSuite(iterations, undefined, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(
