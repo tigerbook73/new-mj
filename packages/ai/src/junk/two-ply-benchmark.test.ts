@@ -13,6 +13,7 @@ import {
   benchmarkCrossCandidateDrawOverlap,
   benchmarkSecondDiscardWhitelistSuite,
   benchmarkDynamicSecondDiscardWhitelistSuite,
+  benchmarkTwoChangeBatchSuite,
   chooseDynamicTrajectoryLimit,
   DEFAULT_DYNAMIC_TRAJECTORY_CONFIG,
   suitTrajectoryBonusAfterDiscard,
@@ -109,6 +110,13 @@ describe("benchmarkSelfDrawTwoPly", () => {
     expect(result.averageSecondDiscardCandidates).toBeGreaterThan(0);
     expect(result.winnerAgreement).toBeGreaterThanOrEqual(0);
     expect(result.winnerAgreement).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps the core two-change matrix equivalent to the existing batch path", () => {
+    const result = benchmarkTwoChangeBatchSuite(1, 2, 2);
+    expect(result.comparisons).toBeGreaterThan(0);
+    expect(result.mismatches).toBe(0);
+    expect(result.twoChangeMsPerCase).toBeGreaterThan(0);
   });
 
   it("runs the fixed probe and rejects invalid iteration counts", { tags: ["slow"] }, () => {

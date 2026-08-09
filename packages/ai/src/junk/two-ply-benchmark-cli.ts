@@ -11,6 +11,7 @@ import {
   benchmarkCrossCandidateDrawOverlap,
   benchmarkSecondDiscardWhitelistSuite,
   benchmarkDynamicSecondDiscardWhitelistSuite,
+  benchmarkTwoChangeBatchSuite,
   benchmarkTieredTwoPlyCandidateSuite,
   evaluateSelfDrawTwoPlyCandidates,
 } from "./two-ply-benchmark.ts";
@@ -60,6 +61,11 @@ if (candidateLimitArgument === "blacklist") {
   const firstLimit = budget === undefined ? 4 : budget;
   process.stdout.write(
     `${JSON.stringify(benchmarkDynamicSecondDiscardWhitelistSuite(iterations, firstLimit, undefined, fixtureCount))}\n`,
+  );
+} else if (candidateLimitArgument === "two-change-batch") {
+  const candidateLimit = budget === undefined ? 4 : budget;
+  process.stdout.write(
+    `${JSON.stringify(benchmarkTwoChangeBatchSuite(iterations, candidateLimit, fixtureCount))}\n`,
   );
 } else if (candidateLimitArgument === "tiered") {
   process.stdout.write(

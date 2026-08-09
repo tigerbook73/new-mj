@@ -1,6 +1,8 @@
 import {
   STANDARD_TILE_SET,
   createPrng,
+  evaluateUkeireBatch,
+  evaluateUkeireAfterDiscardDraws,
   evaluateUkeireAfterDiscards,
   shuffle,
   tileIdOf,
@@ -41,6 +43,123 @@ export type BenchmarkShape = Readonly<{
   hand: readonly TileId[];
   melds: readonly Meld[];
 }>;
+
+export type TwoChangeBatchSuite = Readonly<{
+  iterations: number;
+  fixtureCount: number;
+  candidateLimit: number;
+  comparisons: number;
+  mismatches: number;
+  existingMsPerCase: number;
+  twoChangeMsPerCase: number;
+  speedup: number;
+}>;
+
+const drawableKindIndexes = (
+  input: BenchmarkShape,
+  visibleDiscards: readonly TileId[],
+): number[] => {
+  const occupied = new Set([
+    ...input.hand,
+    ...input.melds.flatMap((meld) => meld.tiles),
+    ...visibleDiscards,
+  ]);
+  return STANDARD_TILE_SET.kinds.flatMap((kind, kindIndex) => {
+    const remaining = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
+      tileIdOf(kind, copy),
+    ).some((tile) => !occupied.has(tile));
+    return remaining ? [kindIndex] : [];
+  });
+};
+
+/** Measures the new core two-change matrix against the existing AI-side batch. */
+export const benchmarkTwoChangeBatchSuite = (
+  iterations: number,
+  candidateLimit = 4,
+  fixtureCount = 8,
+): TwoChangeBatchSuite => {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0)
+    throw new Error("iterations must be a positive safe integer");
+  const inputs = benchmarkInputs(fixtureCount);
+  let existingElapsedMs = 0;
+  let twoChangeElapsedMs = 0;
+  let comparisons = 0;
+  let mismatches = 0;
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    for (const input of inputs) {
+      const ranked = rankWeightedTrajectoryDiscards(
+        input,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        BENCHMARK_PROGRESS,
+        candidateLimit,
+      );
+      const discardKindIndexes = ranked.map(({ kind }) => STANDARD_TILE_SET.kindIndexOf(kind));
+      const drawKindIndexes = drawableKindIndexes(input, []);
+      const existingInputs = ranked.flatMap(({ discard }) => {
+        const afterDiscard = input.hand.filter((tile) => tile !== discard);
+        const occupied = new Set([...afterDiscard, ...input.melds.flatMap((meld) => meld.tiles)]);
+        return drawKindIndexes.flatMap((drawKindIndex) => {
+          const kind = STANDARD_TILE_SET.kinds[drawKindIndex]!;
+          const drawTile = Array.from(
+            { length: STANDARD_TILE_SET.copiesPerKind },
+            (_, copy) => tileIdOf(kind, copy),
+          ).find((tile) => !occupied.has(tile));
+          return drawTile === undefined
+            ? []
+            : [{
+                tiles: [...afterDiscard, drawTile],
+                options: { sevenPairs: input.melds.length === 0 },
+                existingMelds: input.melds.length,
+              }];
+        });
+      });
+      const existingStartedAt = performance.now();
+      const existing = evaluateUkeireBatch(existingInputs);
+      existingElapsedMs += performance.now() - existingStartedAt;
+
+      const twoChangeStartedAt = performance.now();
+      const twoChange = evaluateUkeireAfterDiscardDraws(
+        input.hand,
+        discardKindIndexes,
+        drawKindIndexes,
+        { sevenPairs: input.melds.length === 0 },
+        STANDARD_TILE_SET,
+        input.melds.length,
+      );
+      twoChangeElapsedMs += performance.now() - twoChangeStartedAt;
+      const expected = new Map<string, number | undefined>();
+      let existingIndex = 0;
+      for (const discardKindIndex of discardKindIndexes) {
+        for (const drawKindIndex of drawKindIndexes) {
+          expected.set(
+            `${discardKindIndex}/${drawKindIndex}`,
+            existing[existingIndex]?.shanten,
+          );
+          existingIndex += 1;
+        }
+      }
+      for (const result of twoChange) {
+        comparisons += 1;
+        if (result.shanten !== expected.get(`${result.discardKindIndex}/${result.drawKindIndex}`))
+          mismatches += 1;
+      }
+    }
+  }
+  const cases = iterations * inputs.length;
+  const existingMsPerCase = existingElapsedMs / cases;
+  const twoChangeMsPerCase = twoChangeElapsedMs / cases;
+  return {
+    iterations,
+    fixtureCount: inputs.length,
+    candidateLimit,
+    comparisons,
+    mismatches,
+    existingMsPerCase,
+    twoChangeMsPerCase,
+    speedup: existingMsPerCase / twoChangeMsPerCase,
+  };
+};
 
 export type SelfDrawTwoPlyCandidate = Readonly<{
   discard: TileId;

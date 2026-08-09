@@ -19,7 +19,7 @@ Junk AI 基础设施、概率评分、迟疑阈值和结构缓存均已完成。
 
 1. 已完成无语义变化的 prober 模块拆分；
 2. 已拒绝继续机械拆分单花色 solver/table-builder；
-3. core batch API 提案已写出，待架构边界确认；
+3. core batch API 边界已确认并实现为纯结构接口，尚未接入 AI 默认路径；
 4. 不改公共接口的高潜候选可先独立评估；
 5. 任何候选均须先完成性能/质量测试，再决定接受、拒绝或暂缓。
 
@@ -118,6 +118,7 @@ Top-2/Top-4 分别为 87.5%/100%/100% 一致，耗时 8.554/16.796/33.338ms/case
 | 第二轮动态断崖白名单             | 接受为诊断候选、暂不默认。平坦时扩大候选、出现断崖时收缩；1000 case 平均评估 7.824 个候选、约 24.33ms/case，一致率 100%，平均分差约 0（约 9.5e-9 数值误差）。 |
 | 2-ply 候选间共享结构缓存         | 暂缓。命中率约 9.4%，只带来约 2.4% 局部加速；缓存已触及 256 条，继续扩大可能增加内存和淘汰开销。             |
 | 候选 × 摸牌统一批处理            | 拒绝。4 candidates 平均 136 个摸牌后状态中只有 3 个重复，精确结构重叠率约 2.21%，批处理收益不足以抵消复杂度。 |
+| core 两变化结构矩阵              | 接受为可选诊断工具、暂不接入默认 AI。`evaluateUkeireAfterDiscardDraws` 与现有 AI 侧 `evaluateUkeireBatch` 逐项一致；1000 case、4 首轮候选、136000 个组合中 0 个不一致，结构层约 28.44x 加速，但尚未证明完整 2-ply 端到端收益。 |
 
 进一步测试了保守黑名单：只把“弃牌后向听高于所有候选最低值”的弃牌排除，最低向听层
 的候选全部进入 2-ply。1000 个确定性随机手牌中平均保留 7.233 个候选，最佳弃牌一致率
@@ -193,38 +194,38 @@ Top-2/Top-4 分别为 87.5%/100%/100% 一致，耗时 8.554/16.796/33.338ms/case
 `-2411.856290493658`。机器和运行态会造成波动，后续以约 13.3–13.6ms/probe 作为
 基线区间，不把单次数字当成绝对门槛。
 
-### 阶段 2：core batch API 提案
+### 阶段 2：core batch API 实现与消费评估
 
 目标是共享“弃牌候选 × 34 种摸牌”的 remove/add DP 状态，避免每个叶子独立重建
 结构分析。第一版只处理标准 34 种牌；非标准 TileSet 继续走现有通用路径。
 
-建议的最小输入：
+已确认并实现的最小接口为：
 
 ```ts
-type TwoPlyStructureBatchInput = Readonly<{
-  counts: readonly number[];
-  discardKindIndexes: readonly number[];
-  sevenPairs: boolean;
-  existingMelds: number;
-}>;
+evaluateUkeireAfterDiscardDraws(
+  tiles,
+  discardKindIndexes,
+  drawKindIndexes,
+  options,
+  tileSet,
+  existingMelds,
+)
 ```
 
-建议的最小输出：
+返回每个合法 `(discardKindIndex, drawKindIndex)` 的：
 
 ```ts
-type TwoPlyStructureBatchResult = Readonly<{
+type UkeireAfterDiscardDrawEvaluation = Readonly<{
   discardKindIndex: number;
-  afterDiscardShanten: number;
-  draws: readonly Readonly<{
-    addKindIndex: number;
-    shanten: number;
-    improvingKindIndexes: readonly number[];
-  }>[];
+  drawKindIndex: number;
+  shanten: number;
 }>;
 ```
 
-输入使用 count/index，避免每个叶子重建 TileId。返回值必须是独立只读数据，不能暴露
-模块级 scratch。保留“弃牌后摸回同牌”候选。
+接口保留 TileId 手牌输入以兼容现有 `TileSet`/副露语义；kind 列表由调用方控制，避免
+core 隐式展开 34 种候选。返回值是独立只读数据，不暴露模块级 scratch；保留“弃牌后
+摸回同牌”候选。摸牌后的 `improvingKinds` 继续由 `evaluateUkeireBatch` 负责，因为
+它代表第三次变化，不是该矩阵的免费副产品。
 
 core 不负责：
 
