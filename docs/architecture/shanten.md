@@ -48,3 +48,35 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
   数字），迁移属于对应玩法重做阶段的决定。
 - Layer 3 的远期方向是概率/期望值驱动评分（Monte Carlo rollout 等），
   Layer 0 的结构化并行数组是为此留的扩展点。
+
+## 待架构确认：2-ply 批量结构 API
+
+当前 core 已有两层批量能力：`evaluateUkeireBatch` 可批量分析多组完整手牌，
+`evaluateUkeireAfterDiscards` 可对同一组手牌批量计算“先弃一种牌后”的向听与进张；
+内部 `createTwoChangeShantenProber` 还可复用一次删牌/加牌的花色 DP。AI 的 2-ply
+目前在这些 API 之上自行枚举摸牌、概率和下一次弃牌。
+
+因此候选不是把 AI 评分搬进 core，而是评估是否需要公开一个更贴近“删一张、再加一张”
+的结构批量接口。
+
+### 备选形状
+
+1. **保持现有接口，不新增 API**：AI 继续组合现有两个批量函数。优点是契约稳定；
+   缺点是 AI 不能直接复用 core 内部的双变化 prober，但当前动态第二轮方案已达到
+   约 24.33ms/case，尚未证明接口缺口造成了实际瓶颈。
+2. **新增纯结构矩阵 API**：输入一组 13/14 张手牌、可弃牌 kind 和可加入 kind，
+   返回每个 `(discardKind, addKind)` 的 `shanten` 与 `improvingKinds`，不包含概率、
+   番型权重、最终弃牌选择或玩法语义。该形状最直接复用 `createTwoChangeShantenProber`，
+   但结果矩阵规模约为候选数 × 34，调用方还要处理去重、非法牌和副露语义。
+3. **公开 prober/可变闭包**：直接导出 `createTwoChangeShantenProber`。性能接口简单，
+   但会把当前 DP scratch、调用顺序和实现细节变成公共契约，拒绝作为首选。
+4. **新增高层 2-ply API**：由 core 返回概率加权的最佳下一次弃牌。拒绝；概率池、
+   清一色/七对子路线和 `JunkWeights` 属于 AI，不应进入玩法无关 core。
+
+### 当前建议与确认门槛
+
+暂不实现备选 2。先把现有动态 2-ply 接入 AI 自对弈 A/B，确认真实决策耗时是否仍是
+主要瓶颈；只有在 A/B 或 profile 证明结构重复计算仍占主要耗时，才向 Claude Project
+提交备选 2 的精确接口、返回值生命周期、矩阵大小上限和标准/非标准 `TileSet` 语义。
+
+在架构确认前，禁止新增 core 公共导出、修改 `shanten.ts` 公共签名或让 core 依赖 AI。
