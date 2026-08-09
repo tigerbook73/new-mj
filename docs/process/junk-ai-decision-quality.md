@@ -49,7 +49,11 @@ Junk AI 基础设施、概率评分、迟疑阈值和结构缓存均已完成。
 ### 阶段 1：固定基线
 
 固定 2-ply fixture、checksum、完整探针耗时和决策输出。局部 core benchmark 不能替代
-完整 AI benchmark；当前完整探针基线约 13.3–13.6ms/probe。
+完整 AI benchmark。可复现实测命令为 `pnpm bench:junk-two-ply 100`，入口是
+[`two-ply-benchmark.ts`](../../packages/ai/src/junk/two-ply-benchmark.ts)；当前一次
+100 次热态测量为 `1360.544ms`、`13.60544ms/probe`，checksum 为
+`-2411.856290493658`。机器和运行态会造成波动，后续以约 13.3–13.6ms/probe 作为
+基线区间，不把单次数字当成绝对门槛。
 
 ### 阶段 2：core batch API 提案
 
