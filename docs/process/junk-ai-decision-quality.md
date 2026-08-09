@@ -257,6 +257,12 @@ verify:full` 全绿（74 用例，含慢速 arena）。
   实验已撤回，暂不接入 AI 路径。下一步只在 core 内 profile remove-context、
   prefix/tail 和 transition 分配。
 
+  **core 微优化（2026-08-09）**：`createTwoChangeShantenProber` 的每个 remove
+  context 复用被删花色之前的 base prefix，只重放被改花色及其后缀；等价测试与
+  `verify:full` 通过，固定 core fixture 从 14.24ms 降至 13.90ms/100 次，约 2.4%。
+  收益有限但风险低，已保留；下一步继续检查 transition 分配与 remove/add 花色组合
+  的共享，仍不接入 AI 主路径。
+
 - **自我优化基础设施推广到 hangzhou/bloodbattle**：可复用部分是 Layer
   B（打分求和）/C（强度旋钮）/D（自对弈引擎+调参算法）的实现模式，玩法专属
   Feature 抽取（对应各玩法番型/规则）仍需各自单独做，不会自动免掉。

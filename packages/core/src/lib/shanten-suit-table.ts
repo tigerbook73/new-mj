@@ -685,10 +685,17 @@ export const createTwoChangeShantenProber = (
     const counts = [...baseCounts];
     counts[removeKindIndex] = (counts[removeKindIndex] ?? 0) - 1;
     const prefix: Int16Array[] = [];
-    let state = new Int16Array(10).fill(DP_UNREACHED);
-    state[0] = 0;
-    for (const block of blocks) {
+    const removeBlock = blockOf(removeKindIndex);
+    // Removing a tile only changes its own suit block. Reuse the immutable base
+    // prefix before that block; only the changed block and its suffix need to be
+    // replayed for this remove context.
+    let state = basePrefix[removeBlock]!;
+    for (let blockIndex = 0; blockIndex < removeBlock; blockIndex += 1) {
+      prefix.push(basePrefix[blockIndex]!);
+    }
+    for (let blockIndex = removeBlock; blockIndex < blocks.length; blockIndex += 1) {
       prefix.push(state);
+      const block = blocks[blockIndex]!;
       const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
       const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
       const next = new Int16Array(10);
@@ -698,7 +705,6 @@ export const createTwoChangeShantenProber = (
     const tail = new Array<Int8Array>(blocks.length);
     for (let addBlock = 0; addBlock < blocks.length; addBlock += 1) {
       let transition = IDENTITY_TRANSITION;
-      const removeBlock = blockOf(removeKindIndex);
       if (addBlock >= removeBlock) {
         tail[addBlock] = baseSuffix[addBlock + 1]!;
         continue;
