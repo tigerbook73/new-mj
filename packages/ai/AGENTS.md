@@ -26,7 +26,16 @@
   - `compare-weights-cli.ts`/`decision-diff-cli.ts` 都支持 `--baseline-ref <git-ref>`/`--baseline-module <path>`（candidate 同理）——不只能换权重文件，也能换整份 `strategy.ts` 实现，跨代码版本对比。`ref` 用 `git show` 逐文件取快照（不需要 `git worktree`/`pnpm install`，见 `policy-loader.ts` 顶部注释），只适用于"改动没跨到 `@new-mj/core`"的场景（本来就是 AI 改进类改动的常态）。
   - `compare-weights-cli.ts`（胜率/积分对比，权重幅度类改动的主证据）和 `decision-diff:junk`（决策分歧对比，不比胜率、比"同一局面会不会选不同动作"，公式类改动的侦察工具，见上条）是互补的两个工具，不是二选一。
   - 两个都没提交、想互相对比的实验版本（还没到"哪个是历史哪个是新版"的地步，`ref` 用不上）：`pnpm snapshot:junk-ai <label>` 把当前 `src/junk/` 复制到 `packages/ai/.compare-scratch/<label>/junk/`（gitignored，刻意放在 `src`/`test` 外，不会被 `tsconfig.json`/`eslint src test` 扫到），之后继续在 `src/junk/` 原地改，用 `--baseline-module .compare-scratch/<label>/junk/strategy.ts` 对比——不需要复制完再恢复的手工操作。
-  - **以上所有工具（`tune-cli.ts --write` 除外）只打印报告，从不自动合并/覆盖任何文件**；`--write` 本身也要求人工显式传参且 held-out 评估不能变差。是否采纳某个候选，永远是人工看完报告后的手动决定，不存在任何自动合并路径。
+- **以上所有工具（`tune-cli.ts --write` 除外）只打印报告，从不自动合并/覆盖任何文件**；`--write` 本身也要求人工显式传参且 held-out 评估不能变差。是否采纳某个候选，永远是人工看完报告后的手动决定，不存在任何自动合并路径。
+
+## Calibration bench 框架
+
+- `packages/ai/src/junk/calibration/` 是诊断/基线工具，不改变生产策略；`manifest`/`scenario` 是纯数据，执行逻辑由 provider、evaluator、runner 和 report 层承担。
+- provider 负责来源数据的 schema/版本校验、TileKind→TileId 转换、`JunkPlayerView`/合法动作构造和 `contentHash`；evaluator 只负责评估已构造的输入；runner 只负责编排，不把领域评分、并发或文件 I/O 混入 evaluator。
+- 少量 canonical manifest/fixture 使用 JSON；大量 generated、snapshot、replay 输入使用 JSONL。JSONL 首个非空行为 header，后续是自包含 scenario record；记录必须带 `schemaVersion`/`scenarioId`，文件按 manifest 版本和 shard 编号命名。
+- JSONL reader 只做流式解析和基础字段校验，领域合法性仍由 provider 负责；批量聚合按 `scenarioId` 稳定排序，不能依赖输入或 worker 完成顺序。
+- baseline 是版本化、不可由运行结果覆盖的资产，至少绑定 manifest/scenario 版本、`contentHash`、evaluator 版本和可比较决策；耗时等易波动指标默认只作信息记录。
+- `evaluate` CLI 属于本 package；新增场景或 evaluator 应复用现有 provider/runner/report 契约，不复制临时命令、报告格式或 bench 框架代码。worker、重试、断点恢复属于 executor 层，不能散落在测试或 evaluator 中。
 
 ## DoD
 
