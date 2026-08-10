@@ -30,16 +30,22 @@ header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，
 ## 使用
 
 ```bash
-pnpm --filter @new-mj/ai evaluate list
-pnpm --filter @new-mj/ai evaluate run discard-001
-pnpm --filter @new-mj/ai evaluate run discard-001 \
+pnpm --filter @new-mj/ai evaluate --help
+pnpm --filter @new-mj/ai evaluate scenario list
+pnpm --filter @new-mj/ai evaluate scenario run discard-001
+pnpm --filter @new-mj/ai evaluate scenario run discard-001 \
   --baseline src/junk/evaluation/fixtures/baselines/discard-001.production-weighted.v1.baseline.json
-pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
+pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
   --evaluator two-ply-all --workers 4 --chunk-size 64 \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
+pnpm --filter @new-mj/ai evaluate policy diff --help
+pnpm --filter @new-mj/ai evaluate policy capture --help
+pnpm --filter @new-mj/ai evaluate weights compare --help
+pnpm --filter @new-mj/ai evaluate weights tune --help
+pnpm --filter @new-mj/ai evaluate arena run --help
 ```
 
-`run` 对同一个规范化输入执行三路 evaluator，并写入同一份 JSON/Markdown 报告：
+`scenario run` 对同一个规范化输入执行三路 evaluator，并写入同一份 JSON/Markdown 报告：
 
 - `production-weighted`：当前生产混合路径，作为行为基线；
 - `one-ply-all`：全部合法动作的一轮生产加权评分，不执行 2-ply/cliff；
@@ -48,7 +54,7 @@ pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
 这三路仍使用当前生产权重，不代表无权重结构指标；后者属于后续 `StructuralMetrics`
 步骤。
 
-`batch` 当前消费外部 manifest 和自包含 snapshot JSONL。一次 batch 只运行一个 evaluator，
+`scenario batch` 当前消费外部 manifest 和自包含 snapshot JSONL。一次 batch 只运行一个 evaluator，
 使 checkpoint 明确绑定一种计算语义；需要三路结果时用相同输入分别运行三次。`--workers`
 使用已有 worker_threads executor，`--chunk-size` 决定每次交付 checkpoint 的场景数。
 `--checkpoint` 在每个 chunk 后写入包含 manifest 版本、evaluator 和已完成 evaluations 的完整
@@ -64,7 +70,7 @@ production-weighted/one-ply-all/two-ply-all。它们保存输入内容哈希、�
 期望动作、候选 ID，并可选择保存候选分数及容差；baseline 文件作为版本化资产，不由运行
 结果覆盖。通用 comparator 将结果分类为 matched、changed 或 incompatible，并分别报告
 动作、候选集合和分数变化；输入 hash/evaluator 不一致视为 incompatible。耗时只作信息记录。
-`run --baseline <file>` 是只读比较入口：matched 返回 0，质量变化返回 2，不兼容或运行错误
+`scenario run --baseline <file>` 是只读比较入口：matched 返回 0，质量变化返回 2，不兼容或运行错误
 返回 1；比较结果写入同一 JSON/Markdown report，命令不会创建或更新 baseline。
 
 文件名固定为 `<scenario-id>.<evaluator>.v<baseline-revision>.baseline.json`；点分段区分

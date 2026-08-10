@@ -55,9 +55,9 @@ describe("Junk evaluation command suite", () => {
     expect(result.output).toContain("discard-001");
   });
 
-  it("keeps the old scenario command as a temporary compatibility alias", async () => {
+  it("rejects removed short scenario aliases", async () => {
     const result = await runEvaluationCli(["list"]);
-    expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("discard-snapshot-001");
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("Unknown command: evaluate list");
   });
 });

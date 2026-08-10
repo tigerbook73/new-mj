@@ -78,7 +78,7 @@ Junk adapter 负责：
 - 保留 CLI entry 与算法/handler 分离；
 - 先注册现有 scenario `list/run/batch`，验证新路由不改变报告与退出码。
 
-已完成：六类工具盘点和迁移矩阵；通用 registry 只定义 command path、summary/help、异步 handler 与退出结果；scenario 三个命令已接入 `evaluate scenario list/run/batch`，旧短命令暂作隐藏兼容别名。通用 registry 单测、实际 help/list、AI verify 均通过。
+已完成：六类工具盘点和迁移矩阵；通用 registry 只定义 command path、summary/help、异步 handler 与退出结果；scenario 三个命令已接入 `evaluate scenario list/run/batch`。通用 registry 单测、实际 help/list、AI verify 均通过；所有工具迁移完成后旧短命令兼容 alias 已删除。
 
 ### 2. 迁移 decision-diff 竖切
 

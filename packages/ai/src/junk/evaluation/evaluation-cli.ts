@@ -50,7 +50,4 @@ const registry = createEvaluationCommandRegistry([
   },
 ]);
 
-const legacyCommand = (argv: readonly string[]): readonly string[] =>
-  ["list", "run", "batch"].includes(argv[0] ?? "") ? ["scenario", ...argv] : argv;
-
-export const runEvaluationCli = (argv: readonly string[]) => registry.dispatch(legacyCommand(argv));
+export const runEvaluationCli = (argv: readonly string[]) => registry.dispatch(argv);

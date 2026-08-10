@@ -53,7 +53,7 @@
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
-工具收口检查点：六类 CLI 迁移矩阵和最小 typed command registry 已完成；`evaluate scenario list/run/batch` 已接入，旧短命令暂作隐藏兼容别名；`evaluate policy diff` 已接入无顶层副作用的 handler。最小真实运行同策略 1 seed 共评估 674 个决策点、0 分歧；AI verify 通过（23 files passed、3 skipped；112 tests passed、11 skipped；build 成功）。
+工具收口检查点：六类 CLI 迁移矩阵和最小 typed command registry 已完成；`evaluate scenario list/run/batch` 已接入；`evaluate policy diff` 已接入无顶层副作用的 handler。最小真实运行同策略 1 seed 共评估 674 个决策点、0 分歧；AI verify 通过（23 files passed、3 skipped；112 tests passed、11 skipped；build 成功）。所有工具迁移完成后，scenario 旧短命令兼容 alias 已删除。
 
 `policy diff` 竖切已完成：通用文本产物层统一 run metadata、JSON 摘要、文本报告和计算前防覆盖；大体量全量记录预留 JSONL，不塞入单个 JSON。真实同策略 1 seed 仍为 674 个决策点、0 分歧；旧 `decision-diff:junk` 双入口已删除。
 
@@ -67,9 +67,11 @@
 
 `policy capture` 迁移完成：`evaluate policy capture` 保持只复制三项 policy 依赖到 `.compare-scratch/<label>/junk/`、非法 label 拒绝和目标防覆盖边界；filesystem 注入测试取代了会删除整个共享 scratch root 的旧测试清理，避免误碰人工 capture。旧 `capture:junk-policy` root alias/entry 已删除。AI fast verify 全绿（27 files passed、3 skipped；123 tests passed、11 skipped；build 成功）。
 
+统一命令面收尾完成：scenario 旧 `evaluate list/run/batch` 短 alias 已删除，README 和测试只使用 `evaluate scenario ...`；root help 可发现 scenario、policy、weights、arena 全部离线工具。
+
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
 
-下一步第一个具体动作：清理 scenario `list/run/batch` 的旧短命令兼容 alias，更新 evaluation README 和最终 `evaluate --help` 契约，确认所有离线工具只从统一命令族发现。
+下一步第一个具体动作：执行 evaluation 工具物理目录收口，先建立 `junk/evaluation/{commands,policy,match}` 边界并机械迁移对应文件/引用，再增加生产路径不得 import `junk/evaluation/**` 的依赖测试和显式公共 barrel。
 
 ## 专题路线图
 
