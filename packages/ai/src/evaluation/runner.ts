@@ -1,5 +1,6 @@
 import { createCalibrationBatchSummary, createCalibrationReport } from "./report.ts";
 import type { CalibrationJsonlRecord } from "./jsonl.ts";
+import type { CalibrationTask } from "./executor.ts";
 import type {
   CalibrationEvaluationResult,
   CalibrationEvaluatorKind,
@@ -46,6 +47,67 @@ export type CalibrationJsonlRecordResolver<TRecordData, TInput> = (
   scenario: CalibrationManifest["scenarios"][number],
   data: TRecordData,
 ) => NormalizedCalibrationScenario<TInput>;
+
+export type CalibrationEvaluationTaskInput<TInput> = Readonly<{
+  scenarioId: string;
+  input: TInput;
+  contentHash: string;
+}>;
+
+export type CalibrationEvaluationTaskExecutor<TInput> = (
+  tasks: readonly CalibrationTask<CalibrationEvaluationTaskInput<TInput>>[],
+) => Promise<readonly Readonly<{ taskId: string; result: CalibrationEvaluationResult }>[]>;
+
+export const runCalibrationEvaluationsWithExecutor = async <TInput>(
+  manifest: CalibrationManifest,
+  scenarios: readonly NormalizedCalibrationScenario<TInput>[],
+  execute: CalibrationEvaluationTaskExecutor<TInput>,
+  run: CalibrationRun,
+): Promise<CalibrationReport> => {
+  const startedAt = performance.now();
+  const tasks = scenarios.map((scenario) => ({
+    taskId: scenario.scenario.id,
+    input: {
+      scenarioId: scenario.scenario.id,
+      input: scenario.input,
+      contentHash: scenario.contentHash,
+    },
+  }));
+  const results = await execute(tasks);
+  const evaluations = results.map(({ taskId, result }) => {
+    const task = tasks.find(({ taskId: id }) => id === taskId);
+    if (!task) throw new Error(`TASK_RESULT_NOT_FOUND: ${taskId}`);
+    return {
+      ...result,
+      scenarioId: taskId,
+      scenarioContentHash: result.scenarioContentHash ?? task.input.contentHash,
+    };
+  });
+  const report = createCalibrationReport(run, manifest, evaluations);
+  return {
+    ...report,
+    batch: createCalibrationBatchSummary(evaluations, performance.now() - startedAt),
+  };
+};
+
+export const runCalibrationJsonlBatchWithExecutor = async <TRecordData, TInput>(
+  manifest: CalibrationManifest,
+  records: AsyncIterable<CalibrationJsonlRecord<TRecordData>>,
+  resolveRecord: CalibrationJsonlRecordResolver<TRecordData, TInput>,
+  execute: CalibrationEvaluationTaskExecutor<TInput>,
+  run: CalibrationRun,
+): Promise<CalibrationReport> => {
+  const scenarios: NormalizedCalibrationScenario<TInput>[] = [];
+  const seen = new Set<string>();
+  for await (const record of records) {
+    if (seen.has(record.scenarioId)) throw new Error(`DUPLICATE_SCENARIO: ${record.scenarioId}`);
+    seen.add(record.scenarioId);
+    const scenario = manifest.scenarios.find(({ id }) => id === record.scenarioId);
+    if (!scenario) throw new Error(`SCENARIO_NOT_FOUND: ${record.scenarioId}`);
+    scenarios.push(resolveRecord(scenario, record.data));
+  }
+  return runCalibrationEvaluationsWithExecutor(manifest, scenarios, execute, run);
+};
 
 /**
  * Sequential streaming runner. It consumes JSONL records without materializing

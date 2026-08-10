@@ -77,11 +77,12 @@
 - 批量报告已增加聚合指标：场景数、ok/failed/skipped、总耗时、吞吐、p50/p95 evaluator 延迟和失败摘要；单个 evaluator 异常保留为 failed evaluation，不丢弃整批结果，未知/重复 scenario 仍快速失败。
 - executor 边界已初步落地：task 使用稳定 `taskId` 和共享纯函数，顺序/有界并发模式保持相同输入顺序和结果聚合；当前只是 async executor seam，尚未宣称获得 worker 多核收益。
 - 通用 `worker_threads` adapter 已落地并通过等价性测试：worker 只接收可结构化克隆的 task input，按 module URL/export name 调用纯函数，主线程按输入顺序聚合并负责终止 worker；CLI 默认仍不切换并发。
+- evaluator task 已接入批量 runner：主线程负责 JSONL resolver，顺序/worker executor 运行同一个可序列化 production evaluator task，完整 report 的 scenario、选中动作和 content hash 等价；当前 worker batch 会先收集 normalized tasks，超大数据的分块流式调度仍待补充。
 - fixture 元数据去重已完成：fixture JSON 不再重复保存 `id/version/seed`；registry 的 `fixtureId` 是输入资产身份，manifest scenario 的 `version` 是场景版本，fixture source 不使用 seed，避免多个权威来源漂移。
 - ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case（如 `canonical-baseline`、`discard-001`、`hand-shape-001`、`discard-001-production-v1`）；CLI 输出文件使用 `junk-` 前缀，便于跨玩法汇总。
 - seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不再保存无效 seed。
 
-下一步第一个具体动作：把可序列化的 evaluator task 接入批量 runner，比较顺序/worker 的完整 evaluation report；先不切换 CLI 默认并发。
+下一步第一个具体动作：为 worker batch 增加分块调度和 progress/failure resume 边界，避免超大 JSONL 一次性收集 normalized tasks；先不切换 CLI 默认并发。
 
 ## 专题路线图
 

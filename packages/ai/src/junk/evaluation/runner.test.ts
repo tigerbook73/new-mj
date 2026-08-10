@@ -4,7 +4,13 @@ import { CANONICAL_PRODUCTION_SELECTION } from "./canonical-fixtures.ts";
 import { createJunkFixtureProvider } from "./fixture-provider.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
-import { runSingleCalibrationScenario, runCalibrationJsonlBatch } from "../../evaluation/runner.ts";
+import {
+  runSingleCalibrationScenario,
+  runCalibrationJsonlBatch,
+  runCalibrationJsonlBatchWithExecutor,
+} from "../../evaluation/runner.ts";
+import { executeCalibrationTasks, executeCalibrationTasksInWorkers } from "../../evaluation/executor.ts";
+import { evaluateProductionTask } from "./production-evaluator-task.ts";
 import { parseCalibrationJsonl } from "../../evaluation/jsonl.ts";
 import { CALIBRATION_SCHEMA_VERSION, type CalibrationManifest, type CalibrationRun } from "../../evaluation/types.ts";
 
@@ -124,5 +130,43 @@ describe("JSONL batch runner", () => {
     expect(report.batch?.failures).toEqual([
       { scenarioId: "scenario-a", message: "synthetic evaluator failure" },
     ]);
+  });
+
+  it("produces the same full report through sequential and worker executors", async () => {
+    const recordsText =
+      '{"type":"header","schemaVersion":1,"manifestId":"m","manifestVersion":1,"shardId":"part-0000","shardIndex":0}\n' +
+      '{"type":"scenario","schemaVersion":1,"scenarioId":"discard-001","data":{}}';
+    const parseRecords = () => parseCalibrationJsonl<Record<string, never>>(recordsText);
+    const resolve = (scenario: typeof fixture.scenario) => ({
+      scenario,
+      input: fixture.input,
+      contentHash: fixture.contentHash!,
+    });
+    const sequential = await runCalibrationJsonlBatchWithExecutor(
+      { ...manifest, scenarios: [fixture.scenario] },
+      (async function* () { for (const record of parseRecords()) yield record; })(),
+      (scenario) => resolve(scenario),
+      (tasks) => executeCalibrationTasks(tasks, (task) => evaluateProductionTask(task)),
+      run,
+    );
+    const worker = await runCalibrationJsonlBatchWithExecutor(
+      { ...manifest, scenarios: [fixture.scenario] },
+      (async function* () { for (const record of parseRecords()) yield record; })(),
+      (scenario) => resolve(scenario),
+      (tasks) => executeCalibrationTasksInWorkers(tasks, {
+        workerCount: 1,
+        workerUrl: new URL("../../evaluation/worker.ts", import.meta.url),
+        moduleUrl: new URL("./production-evaluator-task.ts", import.meta.url),
+        exportName: "evaluateProductionTask",
+      }),
+      run,
+    );
+    expect(worker.evaluations[0]?.scenarioId).toBe(sequential.evaluations[0]?.scenarioId);
+    expect(worker.evaluations[0]?.selectedCandidateId).toBe(
+      sequential.evaluations[0]?.selectedCandidateId,
+    );
+    expect(worker.evaluations[0]?.scenarioContentHash).toBe(
+      sequential.evaluations[0]?.scenarioContentHash,
+    );
   });
 });
