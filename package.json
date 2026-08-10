@@ -22,7 +22,7 @@
     "fuzz:junk": "node packages/core/src/rulesets/junk/cli.ts fuzz",
     "tune:junk": "node packages/ai/src/junk/tune-cli.ts",
     "compare:junk-weights": "node packages/ai/src/junk/compare-weights-cli.ts",
-    "decision-diff:junk": "node packages/ai/src/junk/decision-diff-cli.ts",
+    "decision-diff:junk": "node packages/ai/src/junk/decision-diff-entry.ts",
     "capture:junk-policy": "node packages/ai/src/junk/capture-policy-cli-entry.ts",
     "sb:start": "supabase start",
     "sb:stop": "supabase stop",

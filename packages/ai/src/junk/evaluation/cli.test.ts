@@ -17,22 +17,32 @@ describe("evaluation CLI", () => {
       schemaVersion: 1,
       baselineId: "changed-baseline",
       scenarioId: "discard-001",
-      scenarioContentHash: "sha256:fd10b00c285fc0f6521a373c9a967afd1d61eb25e4665ebd65a6b1da3fc3c4d8",
+      scenarioContentHash:
+        "sha256:fd10b00c285fc0f6521a373c9a967afd1d61eb25e4665ebd65a6b1da3fc3c4d8",
       evaluator: "production-weighted",
       evaluatorVersion: "v1",
       expected: { selectedCandidateId: "different" },
     };
-    const result = runCalibrationCli([
-      "run", "discard-001", "--baseline", "baseline.json",
-      "--output-dir", "/tmp/evaluation-cli-baseline", "--run-id", "compare-001",
-    ], {
-      now: () => new Date("2026-08-10T00:00:00.000Z"),
-      gitSha: "abc1234",
-      read: () => JSON.stringify(baseline),
-      exists: () => false,
-      makeDirectory: () => undefined,
-      write: (filePath, content) => files.set(filePath, content),
-    });
+    const result = runCalibrationCli(
+      [
+        "run",
+        "discard-001",
+        "--baseline",
+        "baseline.json",
+        "--output-dir",
+        "/tmp/evaluation-cli-baseline",
+        "--run-id",
+        "compare-001",
+      ],
+      {
+        now: () => new Date("2026-08-10T00:00:00.000Z"),
+        gitSha: "abc1234",
+        read: () => JSON.stringify(baseline),
+        exists: () => false,
+        makeDirectory: () => undefined,
+        write: (filePath, content) => files.set(filePath, content),
+      },
+    );
     expect(result.exitCode).toBe(2);
     expect(result.output).toContain("changed-baseline: changed");
     expect(files.get("/tmp/evaluation-cli-baseline/junk-compare-001.json")).toContain(
@@ -44,7 +54,7 @@ describe("evaluation CLI", () => {
   it("accepts help as a subcommand", () => {
     const result = runCalibrationCli(["help"]);
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("evaluate list");
+    expect(result.output).toContain("evaluate scenario list");
   });
 
   it("lists stable canonical scenario IDs", () => {
@@ -83,9 +93,7 @@ describe("evaluation CLI", () => {
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"evaluator": "two-ply-all"',
     );
-    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.md")).toContain(
-      "discard-001",
-    );
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.md")).toContain("discard-001");
     expect(directories).toEqual(["/tmp/evaluation-cli-test"]);
 
     const second = runCalibrationCli(args, {

@@ -59,19 +59,34 @@ Junk adapter 负责：
 
 ## 执行顺序
 
+### 迁移矩阵
+
+| 命令族                    | 当前入口/任务模型                              | 并发                           | 产物与写权限                        | 收口方式                                             |
+| ------------------------- | ---------------------------------------------- | ------------------------------ | ----------------------------------- | ---------------------------------------------------- |
+| `scenario list/run/batch` | package `evaluate`；fixture/snapshot evaluator | batch 使用通用 worker executor | JSON/Markdown、checkpoint；不覆盖   | 只迁移路由，沿用 runner/report/batch                 |
+| `policy diff`             | root script；同局面决策分歧抽样                | 当前顺序执行                   | 文本报告；只读                      | 首个完整竖切，接 policy source 与统一 run envelope   |
+| `weights compare`         | root script；完整对局 A/B                      | `MatchWorkerPool`              | 文本报告；只读                      | 保留 match task，迁移参数、进度与产物生命周期        |
+| `weights tune`            | root script；(1+1)-ES 搜索                     | `MatchWorkerPool`              | 报告；仅显式 `--write` 可写默认权重 | 保留搜索和 held-out 门槛，只统一外壳                 |
+| `policy capture`          | root script；复制三项 policy 依赖              | 无                             | gitignored scratch；有界写入        | 迁移为 policy adapter，不纳入通用只读报告            |
+| `arena run`               | 尚无独立 CLI；完整自对弈 driver                | 可复用 match worker            | 排名/对局摘要；只读                 | 新增薄 adapter，不把 arena task 改造成 scenario task |
+
+结论：通用契约只统一命令发现/分发、退出码、run metadata、进度和产物生命周期；scenario evaluator、match task、调参搜索继续是不同的 typed payload/handler。worker 复用执行协议，不强求共用一种任务数据结构。
+
 ### 1. 建立最小 typed command registry
 
 - 从现有 `evaluate` 提取无玩法假设的 command path、help 和 dispatch 契约；
 - 保留 CLI entry 与算法/handler 分离；
 - 先注册现有 scenario `list/run/batch`，验证新路由不改变报告与退出码。
 
-第一个具体动作：盘点现有六类 CLI 的参数、I/O、worker、报告和写文件权限，形成迁移矩阵；据此定义 command registry 最小接口，不先移动算法文件。
+已完成：六类工具盘点和迁移矩阵；通用 registry 只定义 command path、summary/help、异步 handler 与退出结果；scenario 三个命令已接入 `evaluate scenario list/run/batch`，旧短命令暂作隐藏兼容别名。通用 registry 单测、实际 help/list、AI verify 均通过。
 
 ### 2. 迁移 decision-diff 竖切
 
 - 注册 `evaluate policy diff`，复用 policy-loader、arena driver 和现有 slow smoke；
 - 使用统一 run/output envelope，但保留 decision-diff 专属报告字段；
 - 与现有 `decision-diff:junk` 做参数、结果和失败行为等价测试；通过后删除旧 entry/root script。
+
+进行中：`evaluate policy diff` 已注册，原 CLI 已拆为无顶层副作用的 handler 与临时兼容 entry；命令专属 help 和最小真实 self-play 已通过（同策略、1 seed：674 个决策点、0 分歧）。下一步先定义可复用的 run metadata/文本产物 envelope，再接入该 handler；完成等价测试后删除兼容 root script。
 
 这个竖切同时覆盖 policy source、完整引擎、slow 工具和只读报告，是验证统一结构是否足够的最小代表。
 

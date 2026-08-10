@@ -2,17 +2,23 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CANONICAL_JUNK_SCENARIO_PROVIDER, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
+import {
+  CANONICAL_JUNK_SCENARIO_PROVIDER,
+  JUNK_CALIBRATION_MANIFEST,
+} from "./canonical-fixtures.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../../evaluation/runner.ts";
-import { compareCalibrationBaseline, type CalibrationBaseline } from "../../evaluation/comparator.ts";
+import {
+  compareCalibrationBaseline,
+  type CalibrationBaseline,
+} from "../../evaluation/comparator.ts";
 
 const packageRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 const usage =
-  "Usage: pnpm --filter @new-mj/ai evaluate <command> [options]\n\n" +
+  "Usage: pnpm --filter @new-mj/ai evaluate scenario <command> [options]\n\n" +
   "Commands:\n" +
   "  list                                        List available evaluation scenarios\n" +
   "  run <scenario-id>                           Run one scenario\n" +
@@ -25,8 +31,8 @@ const usage =
   "  --baseline <file>                           Compare without modifying baseline\n" +
   "  --help                                      Show this help\n\n" +
   "Examples:\n" +
-  "  pnpm --filter @new-mj/ai evaluate list\n" +
-  "  pnpm --filter @new-mj/ai evaluate run discard-001\n";
+  "  pnpm --filter @new-mj/ai evaluate scenario list\n" +
+  "  pnpm --filter @new-mj/ai evaluate scenario run discard-001\n";
 
 type Arguments = Readonly<{
   list: boolean;
@@ -133,18 +139,20 @@ export const runCalibrationCli = (
       },
     );
     const baseline = args.baselinePath
-      ? JSON.parse((runtime.read ?? ((filePath) => readFileSync(filePath, "utf8")))(args.baselinePath)) as CalibrationBaseline
+      ? (JSON.parse(
+          (runtime.read ?? ((filePath) => readFileSync(filePath, "utf8")))(args.baselinePath),
+        ) as CalibrationBaseline)
       : undefined;
     const comparison = baseline
       ? compareCalibrationBaseline(
-        baseline,
-        rawReport.evaluations.find(({ evaluator }) => evaluator === baseline.evaluator) ??
-          (() => { throw new Error(`EVALUATOR_RESULT_NOT_FOUND: ${baseline.evaluator}`); })(),
-      )
+          baseline,
+          rawReport.evaluations.find(({ evaluator }) => evaluator === baseline.evaluator) ??
+            (() => {
+              throw new Error(`EVALUATOR_RESULT_NOT_FOUND: ${baseline.evaluator}`);
+            })(),
+        )
       : undefined;
-    const report = comparison
-      ? { ...rawReport, baselineComparisons: [comparison] }
-      : rawReport;
+    const report = comparison ? { ...rawReport, baselineComparisons: [comparison] } : rawReport;
     const outputDir = path.resolve(args.outputDir);
     const jsonPath = path.join(outputDir, `junk-${runId}.json`);
     const markdownPath = path.join(outputDir, `junk-${runId}.md`);
@@ -152,12 +160,15 @@ export const runCalibrationCli = (
     if (exists(jsonPath) || exists(markdownPath)) {
       throw new Error(`OUTPUT_ALREADY_EXISTS: ${runId}`);
     }
-    (runtime.makeDirectory ?? ((directory) => mkdirSync(directory, { recursive: true })))(outputDir);
+    (runtime.makeDirectory ?? ((directory) => mkdirSync(directory, { recursive: true })))(
+      outputDir,
+    );
     const write = runtime.write ?? ((filePath, content) => writeFileSync(filePath, content));
     write(jsonPath, serializeCalibrationReport(report));
     write(markdownPath, formatCalibrationSummary(report));
     return {
-      exitCode: comparison?.status === "changed" ? 2 : comparison?.status === "incompatible" ? 1 : 0,
+      exitCode:
+        comparison?.status === "changed" ? 2 : comparison?.status === "incompatible" ? 1 : 0,
       output: `${formatCalibrationSummary(report)}json: ${jsonPath}\nmarkdown: ${markdownPath}\n`,
     };
   } catch (error) {

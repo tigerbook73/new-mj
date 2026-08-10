@@ -29,7 +29,7 @@ type Arguments = {
 };
 
 const usage =
-  "Usage: junk/decision-diff-cli.ts\n" +
+  "Usage: pnpm --filter @new-mj/ai evaluate policy diff\n" +
   "  [--baseline-ref <git-ref> | --baseline-module <path>] [--baseline-weights <path>]\n" +
   "  [--candidate-ref <git-ref> | --candidate-module <path>] [--candidate-weights <path>]\n" +
   "  [--seed <int>] [--seeds <int>] [--sample-size <int>]\n";
@@ -126,11 +126,12 @@ const formatReport = (
 };
 
 export const runDecisionDiffCli = async (
-  argv: string[],
+  argv: readonly string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
 ): Promise<{ exitCode: number; output: string }> => {
+  if (argv.includes("--help")) return { exitCode: 0, output: usage };
   try {
-    const args = parseArguments(argv);
+    const args = parseArguments([...argv]);
     log(`[decision-diff] loading baseline/candidate policies (seeds=${args.seeds})...\n`);
     const [baseline, candidate] = await Promise.all([
       loadPolicy(
@@ -166,7 +167,3 @@ export const runDecisionDiffCli = async (
     };
   }
 };
-
-const output = await runDecisionDiffCli(process.argv.slice(2));
-process.stdout.write(output.output);
-process.exitCode = output.exitCode;

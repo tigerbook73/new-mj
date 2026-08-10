@@ -53,24 +53,26 @@
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
-下一步第一个具体动作：盘点 scenario、arena、decision-diff、compare-weights、tune、capture 六类 CLI 的参数、I/O、worker、报告和写权限，形成迁移矩阵并定义最小 typed command registry。
+工具收口检查点：六类 CLI 迁移矩阵和最小 typed command registry 已完成；`evaluate scenario list/run/batch` 已接入，旧短命令暂作隐藏兼容别名；`evaluate policy diff` 已接入无顶层副作用的 handler。最小真实运行同策略 1 seed 共评估 674 个决策点、0 分歧；AI verify 通过（23 files passed、3 skipped；112 tests passed、11 skipped；build 成功）。
+
+下一步第一个具体动作：为只读文本评估定义最小 run metadata/产物 envelope，并接入 `policy diff`；完成参数、结果和失败行为等价测试后删除 `decision-diff:junk` 兼容入口。
 
 ## 专题路线图
 
 每一步开始前，结合当时状态补充该步骤的专门计划；未开始的步骤不提前实现或标记完成。步骤完成后，只在本文件保留结果、证据、限制和对后续步骤有影响的判断。
 
-0. 已完成：可重复的基线 bench 与验证平台
-0b. [当前纠偏：AI evaluation 工具统一收口](junk-ai-evaluation-tooling-consolidation.md)
-1. 已暂停待收尾：AI/Junk 测试盘点与职责重分类
-2. 待开始：只读 StructuralMetrics 诊断契约
-3. 待开始：结构分析、2-ply 与动作评分模块边界
-4. 待开始：人工确认的 canonical fixtures
-5. 待开始：自动牌型生成器与样本报告
-6. 待开始：保守 Pareto 支配诊断/过滤
-7. 待开始：无权重全量 2-ply 三路诊断对照
-8. 待开始：isolationPotential 影响边界校准
-9. 待开始：普通路线的 paired-seed 与 held-out 验证
-10. 后续独立专题候选：番型路线收益模型可行性；不在本专题自动启动
+- 0 已完成：可重复的基线 bench 与验证平台
+- 0b [当前纠偏：AI evaluation 工具统一收口](junk-ai-evaluation-tooling-consolidation.md)
+- 1 已暂停待收尾：AI/Junk 测试盘点与职责重分类
+- 2 待开始：只读 StructuralMetrics 诊断契约
+- 3 待开始：结构分析、2-ply 与动作评分模块边界
+- 4 待开始：人工确认的 canonical fixtures
+- 5 待开始：自动牌型生成器与样本报告
+- 6 待开始：保守 Pareto 支配诊断/过滤
+- 7 待开始：无权重全量 2-ply 三路诊断对照
+- 8 待开始：isolationPotential 影响边界校准
+- 9 待开始：普通路线的 paired-seed 与 held-out 验证
+- 10 后续独立专题候选：番型路线收益模型可行性；不在本专题自动启动
 
 ## 阻塞与遗留问题
 

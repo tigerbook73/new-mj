@@ -9,15 +9,12 @@ import {
 import { readCalibrationJsonl, type CalibrationJsonlRecord } from "../../evaluation/jsonl.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import type { CalibrationEvaluationTaskExecutor } from "../../evaluation/runner.ts";
-import type {
-  CalibrationEvaluatorKind,
-  CalibrationManifest,
-} from "../../evaluation/types.ts";
+import type { CalibrationEvaluatorKind, CalibrationManifest } from "../../evaluation/types.ts";
 import { normalizeJunkSnapshot, type JunkProductionSnapshotData } from "./snapshot-provider.ts";
 import type { JunkEvaluationTaskInput } from "./evaluation-task.ts";
 
 export const batchUsage =
-  "Usage: pnpm --filter @new-mj/ai evaluate batch <manifest.json> <scenarios.jsonl> [options]\n\n" +
+  "Usage: pnpm --filter @new-mj/ai evaluate scenario batch <manifest.json> <scenarios.jsonl> [options]\n\n" +
   "Options:\n" +
   "  --evaluator <production-weighted|one-ply-all|two-ply-all>\n" +
   "  --workers <n>                 Worker thread count (default: 1)\n" +
@@ -45,8 +42,11 @@ const positiveInteger = (value: string | undefined, name: string): number => {
 };
 
 const gitSha = (): string => {
-  try { return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); }
-  catch { return "unknown"; }
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
 };
 
 export const runBatchCalibrationCli = async (
@@ -80,7 +80,8 @@ export const runBatchCalibrationCli = async (
     if (!["production-weighted", "one-ply-all", "two-ply-all"].includes(evaluator))
       throw new Error(`UNSUPPORTED_BATCH_EVALUATOR: ${evaluator}`);
     const read = runtime.read ?? ((filePath: string) => readFileSync(filePath, "utf8"));
-    const write = runtime.write ?? ((filePath: string, content: string) => writeFileSync(filePath, content));
+    const write =
+      runtime.write ?? ((filePath: string, content: string) => writeFileSync(filePath, content));
     const manifest = JSON.parse(read(manifestPath)) as CalibrationManifest;
     const startedAt = (runtime.now ?? (() => new Date()))();
     const stableRunId = runId ?? `batch-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
@@ -90,27 +91,35 @@ export const runBatchCalibrationCli = async (
     const exists = runtime.exists ?? existsSync;
     if (exists(jsonPath) || exists(markdownPath))
       throw new Error(`OUTPUT_ALREADY_EXISTS: ${stableRunId}`);
-    const execute = runtime.execute ?? ((tasks) => executeCalibrationTasksInWorkers(
-      tasks.map((task) => ({ ...task, input: { ...task.input, evaluator } })),
-      {
-        workerCount: workers,
-        workerUrl: new URL("../../evaluation/worker.ts", import.meta.url),
-        moduleUrl: new URL("./evaluation-task.ts", import.meta.url),
-        exportName: "evaluateJunkTask",
-      },
-    ));
-    const sourceRecords = (runtime.records ?? readCalibrationJsonl<JunkProductionSnapshotData>)(recordsPath);
-    const checkpointStore = checkpointPath || resumePath ? {
-      load: (): CalibrationBatchCheckpoint | undefined =>
-        resumePath ? JSON.parse(read(resumePath)) as CalibrationBatchCheckpoint : undefined,
-      save: (checkpoint: CalibrationBatchCheckpoint): void => {
-        if (!checkpointPath) return;
-        (runtime.makeDirectory ?? ((value) => mkdirSync(value, { recursive: true })))(
-          path.dirname(path.resolve(checkpointPath)),
-        );
-        write(checkpointPath, `${JSON.stringify(checkpoint, null, 2)}\n`);
-      },
-    } : undefined;
+    const execute =
+      runtime.execute ??
+      ((tasks) =>
+        executeCalibrationTasksInWorkers(
+          tasks.map((task) => ({ ...task, input: { ...task.input, evaluator } })),
+          {
+            workerCount: workers,
+            workerUrl: new URL("../../evaluation/worker.ts", import.meta.url),
+            moduleUrl: new URL("./evaluation-task.ts", import.meta.url),
+            exportName: "evaluateJunkTask",
+          },
+        ));
+    const sourceRecords = (runtime.records ?? readCalibrationJsonl<JunkProductionSnapshotData>)(
+      recordsPath,
+    );
+    const checkpointStore =
+      checkpointPath || resumePath
+        ? {
+            load: (): CalibrationBatchCheckpoint | undefined =>
+              resumePath ? (JSON.parse(read(resumePath)) as CalibrationBatchCheckpoint) : undefined,
+            save: (checkpoint: CalibrationBatchCheckpoint): void => {
+              if (!checkpointPath) return;
+              (runtime.makeDirectory ?? ((value) => mkdirSync(value, { recursive: true })))(
+                path.dirname(path.resolve(checkpointPath)),
+              );
+              write(checkpointPath, `${JSON.stringify(checkpoint, null, 2)}\n`);
+            },
+          }
+        : undefined;
     const report = await runResumableCalibrationBatch(
       manifest,
       sourceRecords,
@@ -119,7 +128,7 @@ export const runBatchCalibrationCli = async (
       {
         runId: stableRunId,
         gitSha: runtime.gitSha ?? gitSha(),
-        command: `pnpm --filter @new-mj/ai evaluate batch ${argv.join(" ")}`,
+        command: `pnpm --filter @new-mj/ai evaluate scenario batch ${argv.join(" ")}`,
         configHash: `${manifest.id}@${manifest.version}:${evaluator}`,
         startedAt: startedAt.toISOString(),
         workerCount: workers,
@@ -133,8 +142,14 @@ export const runBatchCalibrationCli = async (
     (runtime.makeDirectory ?? ((value) => mkdirSync(value, { recursive: true })))(directory);
     write(jsonPath, serializeCalibrationReport(report));
     write(markdownPath, formatCalibrationSummary(report));
-    return { exitCode: 0, output: `${formatCalibrationSummary(report)}json: ${jsonPath}\nmarkdown: ${markdownPath}\n` };
+    return {
+      exitCode: 0,
+      output: `${formatCalibrationSummary(report)}json: ${jsonPath}\nmarkdown: ${markdownPath}\n`,
+    };
   } catch (error) {
-    return { exitCode: 1, output: `${error instanceof Error ? error.message : "UNKNOWN"}\n${batchUsage}` };
+    return {
+      exitCode: 1,
+      output: `${error instanceof Error ? error.message : "UNKNOWN"}\n${batchUsage}`,
+    };
   }
 };

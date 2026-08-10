@@ -1,9 +1,5 @@
-import { runCalibrationCli } from "./cli.ts";
-import { runBatchCalibrationCli } from "./batch-cli.ts";
+import { runEvaluationCli } from "./evaluation-cli.ts";
 
-const argv = process.argv.slice(2);
-const result = argv[0] === "batch"
-  ? await runBatchCalibrationCli(argv.slice(1))
-  : runCalibrationCli(argv);
+const result = await runEvaluationCli(process.argv.slice(2));
 process.stdout.write(result.output);
 process.exitCode = result.exitCode;
