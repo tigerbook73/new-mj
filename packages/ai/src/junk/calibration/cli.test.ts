@@ -5,13 +5,19 @@ describe("calibration CLI", () => {
   it("prints help successfully", () => {
     const result = runCalibrationCli(["--help"]);
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("--scenario <id>");
+    expect(result.output).toContain("run <scenario-id>");
     expect(result.output).toContain("--output-dir <dir>");
     expect(result.output).toContain("--run-id <id>");
   });
 
+  it("accepts help as a subcommand", () => {
+    const result = runCalibrationCli(["help"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("evaluate list");
+  });
+
   it("lists stable canonical scenario IDs", () => {
-    const result = runCalibrationCli(["--list"]);
+    const result = runCalibrationCli(["list"]);
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("canonical-production-selection-001");
   });
@@ -20,7 +26,7 @@ describe("calibration CLI", () => {
     const files = new Map<string, string>();
     const directories: string[] = [];
     const args = [
-      "--scenario",
+      "run",
       "canonical-production-selection-001",
       "--output-dir",
       "/tmp/calibration-cli-test",

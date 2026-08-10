@@ -13,16 +13,17 @@ const defaultOutputDir = path.join(packageRoot, ".calibration-runs");
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate <command> [options]\n\n" +
   "Commands:\n" +
-  "  --list                                      List available calibration scenarios\n" +
-  "  --scenario <id>                             Run one scenario\n\n" +
+  "  list                                        List available evaluation scenarios\n" +
+  "  run <scenario-id>                           Run one scenario\n" +
+  "  help                                        Show this help\n\n" +
   "Options:\n" +
   "  --output-dir <dir>                          Write JSON/Markdown reports here\n" +
   "                                              (default: packages/ai/.calibration-runs)\n" +
   "  --run-id <id>                               Stable report filename prefix\n" +
   "  --help                                      Show this help\n\n" +
   "Examples:\n" +
-  "  pnpm --filter @new-mj/ai evaluate --list\n" +
-  "  pnpm --filter @new-mj/ai evaluate --scenario canonical-production-selection-001\n";
+  "  pnpm --filter @new-mj/ai evaluate list\n" +
+  "  pnpm --filter @new-mj/ai evaluate run canonical-production-selection-001\n";
 
 type Arguments = Readonly<{
   list: boolean;
@@ -40,21 +41,25 @@ type Runtime = Readonly<{
 }>;
 
 const parseArguments = (argv: readonly string[]): Arguments => {
-  let list = false;
-  let scenarioId: string | undefined;
+  const command = argv[0];
+  if (command === "help" || command === "--help") throw new Error(usage);
+  if (command !== "list" && command !== "run") {
+    throw new Error(`UNKNOWN_COMMAND: ${command ?? "(missing)"}\n${usage}`);
+  }
+  const list = command === "list";
+  const scenarioId: string | undefined = command === "run" ? argv[1] : undefined;
   let outputDir = defaultOutputDir;
   let runId: string | undefined;
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
-    if (flag === "--list") list = true;
-    else if (flag === "--scenario") scenarioId = argv[++index];
-    else if (flag === "--output-dir") outputDir = argv[++index] ?? "";
-    else if (flag === "--run-id") runId = argv[++index];
+  const options = command === "run" ? argv.slice(2) : argv.slice(1);
+  for (let index = 0; index < options.length; index += 1) {
+    const flag = options[index];
+    if (flag === "--output-dir") outputDir = options[++index] ?? "";
+    else if (flag === "--run-id") runId = options[++index];
     else if (flag === "--help") throw new Error(usage);
     else throw new Error(`UNKNOWN_ARGUMENT: ${flag}`);
   }
   if (!list && !scenarioId) throw new Error("MISSING_SCENARIO\n" + usage);
-  if (list && scenarioId) throw new Error("LIST_AND_SCENARIO_ARE_MUTUALLY_EXCLUSIVE");
+  if (list && scenarioId) throw new Error("LIST_DOES_NOT_ACCEPT_SCENARIO");
   if (!outputDir) throw new Error("MISSING_OUTPUT_DIR");
   if (runId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(runId)) {
     throw new Error("INVALID_RUN_ID");
@@ -86,7 +91,7 @@ export const runCalibrationCli = (
   runtime: Runtime = {},
 ): { exitCode: number; output: string } => {
   try {
-    if (argv.includes("--help")) return { exitCode: 0, output: usage };
+    if (argv.includes("--help") || argv[0] === "help") return { exitCode: 0, output: usage };
     const args = parseArguments(argv);
     if (args.list) return { exitCode: 0, output: listScenarios() };
     const now = runtime.now ?? (() => new Date());

@@ -62,8 +62,8 @@
 - 上一轮验证结果：calibration 2 个测试文件、4/4 测试通过，AI typecheck 通过，AI lint 通过；当时仍未串接完整单场景 report runner，也未接入批量 runner/worker pool。
 - 单场景 runner 已落地：按 manifest 查找 scenario，调用 provider 和 evaluator，再生成统一 JSON/Markdown report；runner 不包含业务评分、并发、重试或文件 I/O。
 - 本轮验证结果：calibration 3 个测试文件、6/6 测试通过，AI typecheck 通过，AI lint 通过；报告链路已用真实 fixture 验证，仍未接入稳定 CLI、批量 runner、baseline 存储或 worker pool。
-- canonical fixture 已提取为 registry 和稳定 manifest；AI 包内 CLI 现支持 `--list`、`--scenario <id>`、`--output-dir <dir>`、`--run-id <id>`，同时写 JSON 原始报告和 Markdown 摘要，已有 run ID 不覆盖，默认临时产物目录为 `packages/ai/.calibration-runs/`。
-- 本轮验证结果：calibration 4 个测试文件、8/8 测试通过，AI typecheck/lint 通过；真实命令 `pnpm --filter @new-mj/ai evaluate --list` 与单 scenario 输出冒烟均通过。CLI 仍是单线程，不负责 baseline 登记/比较、批量调度或 worker pool。
+- canonical fixture 已提取为 registry 和稳定 manifest；AI 包内 CLI 现支持 `list`、`run <scenario-id>`、`--output-dir <dir>`、`--run-id <id>`，同时写 JSON 原始报告和 Markdown 摘要，已有 run ID 不覆盖，默认临时产物目录为 `packages/ai/.calibration-runs/`。
+- 本轮验证结果：calibration 4 个测试文件、8/8 测试通过，AI typecheck/lint 通过；真实命令 `pnpm --filter @new-mj/ai evaluate list` 与单 scenario 输出冒烟均通过。CLI 仍是单线程，不负责 baseline 登记/比较、批量调度或 worker pool。
 - 命令归属结论：calibration 是 `@new-mj/ai` 的包内能力，canonical script 放在 `packages/ai/package.json`；root 不新增快捷命令，临时输出忽略规则也放在 `packages/ai/.gitignore`。
 
 下一步第一个具体动作：定义小规模 canonical baseline 的登记、元数据和比较入口，先禁止覆盖历史 baseline，再考虑批量 runner 和 worker pool。
