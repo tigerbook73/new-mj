@@ -12,11 +12,15 @@ import {
   assertTextEvaluationArtifactsAvailable,
   writeTextEvaluationArtifacts,
   type TextArtifactRuntime,
-} from "../evaluation/text-artifacts.ts";
-import { loadPolicy, type PolicySource } from "./policy-loader.ts";
-import { runDecisionDiff, type DecisionDiffReport, type Divergence } from "./decision-diff.ts";
+} from "../../../evaluation/text-artifacts.ts";
+import { loadPolicy, type PolicySource } from "../policy/policy-loader.ts";
+import {
+  runDecisionDiff,
+  type DecisionDiffReport,
+  type Divergence,
+} from "../policy/decision-diff.ts";
 
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 /** exactOptionalPropertyTypes rejects `{ ref: undefined }` — build the source

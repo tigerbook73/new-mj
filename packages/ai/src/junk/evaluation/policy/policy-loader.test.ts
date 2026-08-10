@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_JUNK_WEIGHTS } from "./strategy.ts";
+import { DEFAULT_JUNK_WEIGHTS } from "../../strategy.ts";
 import { loadWeightsFile, resolveModulePath } from "./policy-loader.ts";
 
 const scratchFiles: string[] = [];

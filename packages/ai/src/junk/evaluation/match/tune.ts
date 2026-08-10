@@ -1,7 +1,7 @@
 import { createPrng, nextUint32, SEAT_IDS, type SeatId } from "@new-mj/core";
 import { playJunkMatch, strengthPolicy, type JunkMatchResult, type SeatPolicy } from "./arena.ts";
-import { buildPolicy } from "./policy-loader.ts";
-import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./strategy.ts";
+import { buildPolicy } from "../policy/policy-loader.ts";
+import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "../../strategy.ts";
 import type { MatchTask, MatchTaskResult, MatchWorkerPool, PolicyMatchTask } from "./tune-pool.ts";
 
 /** Two MatchWorkerPool instantiations flow through this file: the weight-based

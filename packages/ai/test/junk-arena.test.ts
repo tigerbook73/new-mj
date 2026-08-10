@@ -1,6 +1,10 @@
 import { createPrng, nextUint32, SEAT_IDS } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
-import { playJunkMatch, strengthPolicy, type SeatPolicy } from "../src/junk/arena.ts";
+import {
+  playJunkMatch,
+  strengthPolicy,
+  type SeatPolicy,
+} from "../src/junk/evaluation/match/arena.ts";
 import { createJunkAnalysisCache } from "../src/junk/strategy.ts";
 
 const GAMES = 30;

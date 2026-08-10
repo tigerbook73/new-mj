@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 import type { SeatId } from "@new-mj/core";
-import type { JunkWeights } from "./strategy.ts";
+import type { JunkWeights } from "../../strategy.ts";
 
 /** Weight-based match task (weights tune / compare-weights-cli.ts's same-code
  * path, dispatched to tune-worker.ts). See policy-match-worker.ts's

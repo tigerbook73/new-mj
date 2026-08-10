@@ -1,9 +1,9 @@
-import { createEvaluationCommandRegistry } from "../../evaluation/commands.ts";
-import { runArenaCli } from "../arena-cli.ts";
-import { runCaptureJunkPolicyCli } from "../capture-policy-cli.ts";
-import { runDecisionDiffCli } from "../decision-diff-cli.ts";
-import { runCompareWeightsCli } from "../compare-weights-cli.ts";
-import { runTuneCli } from "../tune-cli.ts";
+import { createEvaluationCommandRegistry } from "../../../evaluation/commands.ts";
+import { runArenaCli } from "./arena-cli.ts";
+import { runCaptureJunkPolicyCli } from "./capture-policy-cli.ts";
+import { runDecisionDiffCli } from "./decision-diff-cli.ts";
+import { runCompareWeightsCli } from "./compare-weights-cli.ts";
+import { runTuneCli } from "./tune-cli.ts";
 import { runBatchCalibrationCli } from "./batch-cli.ts";
 import { runCalibrationCli } from "./cli.ts";
 

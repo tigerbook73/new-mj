@@ -1,5 +1,5 @@
 import type { JunkAction, JunkPlayerView, SeatId } from "@new-mj/core";
-import { playJunkMatch, type SeatPolicy } from "./arena.ts";
+import { playJunkMatch, type SeatPolicy } from "../match/arena.ts";
 
 export type Divergence = Readonly<{
   seed: number;
@@ -60,7 +60,7 @@ const runOneDirection = (
 /**
  * Compares two policies by *decision*, not by score — self-play win-rate is too
  * noisy to judge formula-level changes (see packages/ai/AGENTS.md's A/B rule;
- * confirmed by three seeds of tune:junk converging on noise). One policy actually
+ * confirmed by three seeds of weights tuning converging on noise). One policy actually
  * drives each match (all 4 seats), the other is only asked "what would you do
  * here" at every decision point without ever being applied — this sidesteps the
  * "two policies disagree, which state is now real" branching problem, at the

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_JUNK_WEIGHTS, JUNK_FAN_WEIGHTS } from "../src/junk/strategy.ts";
-import { MatchWorkerPool, type MatchTask } from "../src/junk/tune-pool.ts";
+import { MatchWorkerPool, type MatchTask } from "../src/junk/evaluation/match/tune-pool.ts";
 import {
   evaluateCandidate,
   evaluateTunedWeights,
   formatTuneReport,
   tuneJunkWeights,
-} from "../src/junk/tune.ts";
+} from "../src/junk/evaluation/match/tune.ts";
 
 // Tiny by design — this is a smoke test of the tuning *pipeline* (does it run
 // end-to-end, produce the right shape, stay reproducible), not a real tuning
@@ -139,7 +139,7 @@ describe("junk weight tuning", () => {
 
         pool = new MatchWorkerPool<MatchTask>(
           2,
-          new URL("../src/junk/tune-worker.ts", import.meta.url),
+          new URL("../src/junk/evaluation/match/tune-worker.ts", import.meta.url),
         );
         const parallel = await evaluateCandidate(seeds, DEFAULT_JUNK_WEIGHTS, candidate, pool);
 

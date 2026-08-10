@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
-import type { SeatPolicy } from "./arena.ts";
-import type { JunkStrengthConfig, JunkWeights } from "./strategy.ts";
+import type { SeatPolicy } from "../match/arena.ts";
+import type { JunkStrengthConfig, JunkWeights } from "../../strategy.ts";
 
 /**
  * Loads a `strategy.ts`-shaped module — either the current working tree's own
@@ -43,7 +43,7 @@ type StrategyModuleShape = Readonly<{
   DEFAULT_JUNK_WEIGHTS: JunkWeights;
 }>;
 
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const scratchRoot = path.join(packageRoot, ".compare-scratch");
 
 const repoRoot = (): string =>
@@ -53,8 +53,8 @@ const repoRoot = (): string =>
  * Pulls every non-test, non-CLI file directly inside packages/ai/src/junk/ at
  * `ref` into a fresh scratch directory — enough for strategy.ts's own dependency
  * closure (default-weights.json, tile-probability.ts if it existed yet at that
- * ref) without a real dependency resolver; a few unused sibling files (arena.ts,
- * tune.ts...) tag along harmlessly since nothing ever imports them.
+ * ref) without a real dependency resolver. The Junk source root is now restricted
+ * to this production closure, so offline evaluation modules never tag along.
  */
 const snapshotRefToScratch = (ref: string): string => {
   const root = repoRoot();
@@ -125,7 +125,7 @@ export const resolveModulePath = (source: PolicySource): string => {
   }
   if (source.ref) return snapshotRefToScratch(source.ref);
   if (source.modulePath) return path.resolve(source.modulePath);
-  return fileURLToPath(new URL("./strategy.ts", import.meta.url));
+  return fileURLToPath(new URL("../../strategy.ts", import.meta.url));
 };
 
 /**

@@ -7,9 +7,9 @@ import {
   assertTextEvaluationArtifactsAvailable,
   writeTextEvaluationArtifacts,
   type TextArtifactRuntime,
-} from "../evaluation/text-artifacts.ts";
-import { type ArenaTask, type ArenaTaskResult } from "./arena-worker.ts";
-import { MatchWorkerPool } from "./tune-pool.ts";
+} from "../../../evaluation/text-artifacts.ts";
+import { type ArenaTask, type ArenaTaskResult } from "../match/arena-worker.ts";
+import { MatchWorkerPool } from "../match/tune-pool.ts";
 
 type Arguments = {
   seed: number;
@@ -29,7 +29,7 @@ type ArenaCliRuntime = TextArtifactRuntime &
     createPool?: (concurrency: number) => ArenaPool;
   }>;
 
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 const defaultConcurrency = (): number => {
@@ -135,7 +135,7 @@ export const runArenaCli = async (
       ? runtime.createPool(args.concurrency)
       : new MatchWorkerPool<ArenaTask, ArenaTaskResult>(
           args.concurrency,
-          new URL("./arena-worker.ts", import.meta.url),
+          new URL("../match/arena-worker.ts", import.meta.url),
           (error) => ({ ok: false, seed: 0, error: String(error) }),
         );
     const results = await pool.runAll(tasks);

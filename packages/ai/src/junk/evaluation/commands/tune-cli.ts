@@ -7,7 +7,7 @@ import {
   assertTextEvaluationArtifactsAvailable,
   writeTextEvaluationArtifacts,
   type TextArtifactRuntime,
-} from "../evaluation/text-artifacts.ts";
+} from "../../../evaluation/text-artifacts.ts";
 import {
   evaluateTunedWeights,
   formatTuneReport,
@@ -16,13 +16,13 @@ import {
   type FinalEvaluation,
   type TuneReport,
   type TuneWriteStatus,
-} from "./tune.ts";
-import { MatchWorkerPool, type MatchTask } from "./tune-pool.ts";
-import type { JunkWeights } from "./strategy.ts";
+} from "../match/tune.ts";
+import { MatchWorkerPool, type MatchTask } from "../match/tune-pool.ts";
+import type { JunkWeights } from "../../strategy.ts";
 
 /** Same file strategy.ts's DEFAULT_JUNK_WEIGHTS loads from — this file lives
  * next to it in the same directory, so the relative URL always agrees. */
-const DEFAULT_WEIGHTS_PATH = new URL("./default-weights.json", import.meta.url);
+const DEFAULT_WEIGHTS_PATH = new URL("../../default-weights.json", import.meta.url);
 
 type Arguments = {
   seed: number;
@@ -44,7 +44,7 @@ type Arguments = {
   only?: (keyof JunkWeights)[];
 };
 
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 const defaultConcurrency = (): number => {
@@ -201,7 +201,7 @@ export const runTuneCli = async (
       ? runtime.createPool(args.concurrency)
       : new MatchWorkerPool<MatchTask>(
           args.concurrency,
-          new URL("./tune-worker.ts", import.meta.url),
+          new URL("../match/tune-worker.ts", import.meta.url),
         );
     const searchStartedAt = Date.now();
     const report = await (runtime.tune ?? tuneJunkWeights)(args.seed, {

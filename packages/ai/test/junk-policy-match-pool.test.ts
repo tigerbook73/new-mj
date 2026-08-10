@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_JUNK_WEIGHTS } from "../src/junk/strategy.ts";
-import { evaluateCandidatePolicies } from "../src/junk/tune.ts";
-import { MatchWorkerPool, type PolicyMatchTask } from "../src/junk/tune-pool.ts";
+import { evaluateCandidatePolicies } from "../src/junk/evaluation/match/tune.ts";
+import { MatchWorkerPool, type PolicyMatchTask } from "../src/junk/evaluation/match/tune-pool.ts";
 
 const currentStrategyPath = fileURLToPath(new URL("../src/junk/strategy.ts", import.meta.url));
 
@@ -37,7 +37,7 @@ describe("policy-based worker pool", () => {
 
     pool = new MatchWorkerPool<PolicyMatchTask>(
       2,
-      new URL("../src/junk/policy-match-worker.ts", import.meta.url),
+      new URL("../src/junk/evaluation/match/policy-match-worker.ts", import.meta.url),
     );
     const parallel = await evaluateCandidatePolicies(seeds, baseline, candidate, pool);
 

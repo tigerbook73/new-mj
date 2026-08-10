@@ -6,16 +6,16 @@ import { createPrng, nextUint32 } from "@new-mj/core";
 import {
   assertTextEvaluationArtifactsAvailable,
   writeTextEvaluationArtifacts,
-} from "../evaluation/text-artifacts.ts";
+} from "../../../evaluation/text-artifacts.ts";
 import {
   formatWeightDelta,
   evaluateCandidate,
   evaluateCandidatePolicies,
   WEIGHT_KEYS,
   type MatchupResult,
-} from "./tune.ts";
-import { MatchWorkerPool, type MatchTask, type PolicyMatchTask } from "./tune-pool.ts";
-import { loadWeightsFile, resolveModulePath, type PolicySource } from "./policy-loader.ts";
+} from "../match/tune.ts";
+import { MatchWorkerPool, type MatchTask, type PolicyMatchTask } from "../match/tune-pool.ts";
+import { loadWeightsFile, resolveModulePath, type PolicySource } from "../policy/policy-loader.ts";
 
 /**
  * General-purpose A/B primitive for any AI-quality change expressed as weights:
@@ -55,8 +55,8 @@ type Arguments = {
   runId?: string;
 };
 
-const DEFAULT_WEIGHTS_PATH = new URL("./default-weights.json", import.meta.url);
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const DEFAULT_WEIGHTS_PATH = new URL("../../default-weights.json", import.meta.url);
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 const defaultConcurrency = (): number => {
@@ -261,7 +261,7 @@ export const runCompareWeightsCli = async (
       log(`[compare] baseline=${baselinePath} candidate=${candidatePath} seeds=${args.seeds}\n`);
       weightPool = new MatchWorkerPool<MatchTask>(
         args.concurrency,
-        new URL("./tune-worker.ts", import.meta.url),
+        new URL("../match/tune-worker.ts", import.meta.url),
       );
       const result = await evaluateCandidate(seeds, baseline, candidate, weightPool);
       return complete(
@@ -287,7 +287,7 @@ export const runCompareWeightsCli = async (
     );
     policyPool = new MatchWorkerPool<PolicyMatchTask>(
       args.concurrency,
-      new URL("./policy-match-worker.ts", import.meta.url),
+      new URL("../match/policy-match-worker.ts", import.meta.url),
     );
     const result = await evaluateCandidatePolicies(
       seeds,

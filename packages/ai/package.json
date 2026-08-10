@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "evaluate": "node src/junk/evaluation/cli-entry.ts",
+    "evaluate": "node src/junk/evaluation/commands/cli-entry.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src test",
     "test": "vitest run --tags-filter '!slow'",

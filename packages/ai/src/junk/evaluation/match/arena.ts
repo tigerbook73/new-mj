@@ -15,7 +15,7 @@ import {
   createJunkAnalysisCache,
   type JunkStrengthConfig,
   type JunkWeights,
-} from "./strategy.ts";
+} from "../../strategy.ts";
 
 /** Per-seat decision function; a self-play arena plugs in one per seat so different
  * seats can play at different strength or with different tuned weights. */

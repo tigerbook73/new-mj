@@ -110,6 +110,8 @@ Junk adapter 负责：
 
 `policy capture` 已完成：无顶层副作用的 handler 接入 `evaluate policy capture`，仍只复制 `strategy.ts`、`default-weights.json`、`tile-probability.ts` 到 `.compare-scratch/<label>/junk/`，继续拒绝非法 label 和覆盖已有目标。filesystem 注入测试取代了删除整个共享 scratch root 的旧测试清理，避免误碰人工 capture；旧 root alias/entry 已删除。
 
+物理目录收口已完成：`src/junk/` 顶层非测试资产只剩生产 `strategy.ts`、`tile-probability.ts` 和 `default-weights.json`；离线入口、policy source、自对弈/worker 分别迁入 `evaluation/{commands,policy,match}`。结构测试锁定顶层资产集合并禁止生产模块反向 import evaluation；package 公共 barrel 改为显式导出 Junk 生产决策 API。统一 help、scenario list 和移动后的 arena worker smoke 均通过。
+
 ### 4. 收尾与恢复步骤 1
 
 - 更新 `packages/ai/AGENTS.md` 与 evaluation README 的统一入口和扩展方式；

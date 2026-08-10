@@ -5,17 +5,20 @@ import { fileURLToPath } from "node:url";
 import {
   CANONICAL_JUNK_SCENARIO_PROVIDER,
   JUNK_CALIBRATION_MANIFEST,
-} from "./canonical-fixtures.ts";
-import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
-import { evaluateProductionFixture } from "./production-evaluator.ts";
-import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
-import { runSingleCalibrationScenarioEvaluators } from "../../evaluation/runner.ts";
+} from "../canonical-fixtures.ts";
+import {
+  formatCalibrationSummary,
+  serializeCalibrationReport,
+} from "../../../evaluation/report.ts";
+import { evaluateProductionFixture } from "../production-evaluator.ts";
+import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../diagnostic-evaluators.ts";
+import { runSingleCalibrationScenarioEvaluators } from "../../../evaluation/runner.ts";
 import {
   compareCalibrationBaseline,
   type CalibrationBaseline,
-} from "../../evaluation/comparator.ts";
+} from "../../../evaluation/comparator.ts";
 
-const packageRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate scenario <command> [options]\n\n" +

@@ -1,17 +1,20 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { executeCalibrationTasksInWorkers } from "../../evaluation/executor.ts";
+import { executeCalibrationTasksInWorkers } from "../../../evaluation/executor.ts";
 import {
   runResumableCalibrationBatch,
   type CalibrationBatchCheckpoint,
-} from "../../evaluation/batch.ts";
-import { readCalibrationJsonl, type CalibrationJsonlRecord } from "../../evaluation/jsonl.ts";
-import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
-import type { CalibrationEvaluationTaskExecutor } from "../../evaluation/runner.ts";
-import type { CalibrationEvaluatorKind, CalibrationManifest } from "../../evaluation/types.ts";
-import { normalizeJunkSnapshot, type JunkProductionSnapshotData } from "./snapshot-provider.ts";
-import type { JunkEvaluationTaskInput } from "./evaluation-task.ts";
+} from "../../../evaluation/batch.ts";
+import { readCalibrationJsonl, type CalibrationJsonlRecord } from "../../../evaluation/jsonl.ts";
+import {
+  formatCalibrationSummary,
+  serializeCalibrationReport,
+} from "../../../evaluation/report.ts";
+import type { CalibrationEvaluationTaskExecutor } from "../../../evaluation/runner.ts";
+import type { CalibrationEvaluatorKind, CalibrationManifest } from "../../../evaluation/types.ts";
+import { normalizeJunkSnapshot, type JunkProductionSnapshotData } from "../snapshot-provider.ts";
+import type { JunkEvaluationTaskInput } from "../evaluation-task.ts";
 
 export const batchUsage =
   "Usage: pnpm --filter @new-mj/ai evaluate scenario batch <manifest.json> <scenarios.jsonl> [options]\n\n" +
@@ -98,8 +101,8 @@ export const runBatchCalibrationCli = async (
           tasks.map((task) => ({ ...task, input: { ...task.input, evaluator } })),
           {
             workerCount: workers,
-            workerUrl: new URL("../../evaluation/worker.ts", import.meta.url),
-            moduleUrl: new URL("./evaluation-task.ts", import.meta.url),
+            workerUrl: new URL("../../../evaluation/worker.ts", import.meta.url),
+            moduleUrl: new URL("../evaluation-task.ts", import.meta.url),
             exportName: "evaluateJunkTask",
           },
         ));

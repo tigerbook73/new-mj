@@ -69,9 +69,13 @@
 
 统一命令面收尾完成：scenario 旧 `evaluate list/run/batch` 短 alias 已删除，README 和测试只使用 `evaluate scenario ...`；root help 可发现 scenario、policy、weights、arena 全部离线工具。
 
+evaluation 工具物理目录收口完成：`src/junk/` 顶层非测试资产只保留 `strategy.ts`、`tile-probability.ts`、`default-weights.json`；commands、policy source、match/worker 分别迁入 `evaluation/{commands,policy,match}`。新增结构测试锁定顶层生产资产并禁止其反向 import evaluation，公共 barrel 只显式导出 Junk 生产决策 API。统一 help、scenario list 和移动后的 arena worker `1 match × 1 round` smoke 均通过。
+
+目录收口检查点 AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），server typecheck 通过。移动后的定向 slow 验证通过：同代码顺序/worker 等价 1 test（21.16s）、跨 policy worker pool 1 test（21.82s）、decision diff 2 tests（31.36s）。全量 `verify:full` 未重复启动；此前已确认长时间无输出并人工中止，仍不能记为通过。
+
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
 
-下一步第一个具体动作：执行 evaluation 工具物理目录收口，先建立 `junk/evaluation/{commands,policy,match}` 边界并机械迁移对应文件/引用，再增加生产路径不得 import `junk/evaluation/**` 的依赖测试和显式公共 barrel。
+下一步第一个具体动作：审计目录收口后的旧路径/旧入口引用并提交该机械重构；随后评估剩余 slow tests 的可分段执行方式，补齐可在当前时限内完成的 `verify:full` 证据后做 0b 文档收尾。
 
 ## 专题路线图
 

@@ -4,8 +4,12 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tileIdOf, type JunkAction, type JunkPlayerView } from "@new-mj/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { chooseJunkAction, DEFAULT_JUNK_WEIGHTS, scoreHandShapeAfterDiscard } from "../src/junk/strategy.ts";
-import { loadPolicy, loadWeightsFile } from "../src/junk/policy-loader.ts";
+import {
+  chooseJunkAction,
+  DEFAULT_JUNK_WEIGHTS,
+  scoreHandShapeAfterDiscard,
+} from "../src/junk/strategy.ts";
+import { loadPolicy, loadWeightsFile } from "../src/junk/evaluation/policy/policy-loader.ts";
 
 const currentStrategyPath = fileURLToPath(new URL("../src/junk/strategy.ts", import.meta.url));
 
@@ -82,5 +86,4 @@ describe("loadPolicy", () => {
     expect(historicalModule.DEFAULT_JUNK_WEIGHTS).not.toHaveProperty("tenpaiProbabilityWeight");
     expect(policy(view, legalActions)).toBeDefined();
   }, 20_000);
-
 });

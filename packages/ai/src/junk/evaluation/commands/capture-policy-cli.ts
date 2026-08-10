@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 
 const usage = "Usage: pnpm --filter @new-mj/ai evaluate policy capture <label>\n";
 
-const junkSrcDir = fileURLToPath(new URL(".", import.meta.url));
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const junkSrcDir = fileURLToPath(new URL("../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const policyFiles = ["strategy.ts", "default-weights.json", "tile-probability.ts"] as const;
 
 const isValidLabel = (label: string): boolean =>
