@@ -10,7 +10,8 @@ architecture/                   系统原理、边界与长期设计
 contracts/                      跨 package 的当前契约
 variants/                       每个玩法自己的规则与私有契约
 testing-strategy.md             测试策略
-process/plan.md                 当前任务状态与待完成任务
+process/plan.md                 当前任务计划、步骤状态与关键完成结论
+process/backlog.md              用户待选择的候选专题
 process/workflow.md             工作流与 DoD
 ```
 
@@ -26,7 +27,8 @@ process/workflow.md             工作流与 DoD
 | 测试层次、文件位置、最低门槛            | `testing-strategy.md`              | 策略变化时更新             |
 | AI 不可违反规则与包级边界               | 根/包级 `AGENTS.md`                | 活文档，保持短小           |
 | DoD、依赖、Git、专题流程                | `process/workflow.md`              | 活文档                     |
-| 当前专题、其前序片段、遗留问题、Backlog | `process/plan.md`                  | 过程性，持续清理           |
+| 当前专题、步骤状态、关键完成结论与遗留问题 | `process/plan.md`                  | 当前任务文档，持续清理     |
+| 尚未选择的候选专题与选择规则              | `process/backlog.md`               | 用户选择后移入当前任务     |
 
 `CLAUDE.md` 仅为兼容性入口，指向同目录 `AGENTS.md`；规范的唯一内容主场是 `AGENTS.md`。
 
@@ -40,7 +42,7 @@ process/workflow.md             工作流与 DoD
 
 - 类型/schema 已有权威代码时，文档指向代码并保留叙事、理由、不变量与时序；未实现内容保留完整规格。
 - 跨端契约或长期解释价值 → `contracts/` 或 `architecture/`；玩法私有 → `variants/`；局部实现陷阱 → 代码注释或 package `AGENTS.md`。
-- 专题推演只留在 `plan.md`，或临时一页 `process/<topic>.md`。完成后删除专题状态；只有当前专题仍需依赖的前序片段才暂留，耐久结论分流，临时文档删除。
+- 专题推演只留在 `plan.md`，或当前步骤的临时一页 `process/<topic>.md`。步骤完成后将影响后续判断的价值内容归并到 `plan.md`，删除临时文档；整个专题完成后再按 workflow 将耐久结论分流，清除专题状态。
 - 文档按主题命名，不按阶段号/日期命名。想新增抽象或把玩法逻辑提到公共层时，先查 `variant-boundary.md`；不确定则保守地留在玩法内。
 
 ## `AGENTS.md` 与 workflow 的边界
