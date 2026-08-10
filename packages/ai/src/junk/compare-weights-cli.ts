@@ -57,7 +57,7 @@ const defaultConcurrency = (): number => {
 };
 
 const usage =
-  "Usage: junk/compare-weights-cli.ts\n" +
+  "Usage: pnpm --filter @new-mj/ai evaluate weights compare\n" +
   "  [--baseline <weights-path>] [--baseline-module <path> | --baseline-ref <git-ref>]\n" +
   "  [--candidate <weights-path>] [--candidate-module <path> | --candidate-ref <git-ref>]\n" +
   "  [--seed <int>] [--seeds <int>] [--concurrency <int>]\n" +
@@ -159,13 +159,14 @@ const formatCompareReport = (
 };
 
 export const runCompareWeightsCli = async (
-  argv: string[],
+  argv: readonly string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
 ): Promise<{ exitCode: number; output: string }> => {
+  if (argv.includes("--help")) return { exitCode: 0, output: usage };
   let weightPool: MatchWorkerPool<MatchTask> | undefined;
   let policyPool: MatchWorkerPool<PolicyMatchTask> | undefined;
   try {
-    const args = parseArguments(argv);
+    const args = parseArguments([...argv]);
     let prng = createPrng(args.seed);
     const seeds: number[] = [];
     for (let index = 0; index < args.seeds; index += 1) {
@@ -238,7 +239,3 @@ export const runCompareWeightsCli = async (
     await Promise.all([weightPool?.close(), policyPool?.close()]);
   }
 };
-
-const output = await runCompareWeightsCli(process.argv.slice(2));
-process.stdout.write(output.output);
-process.exitCode = output.exitCode;

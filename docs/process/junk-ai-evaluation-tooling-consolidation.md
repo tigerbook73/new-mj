@@ -100,7 +100,7 @@ Junk adapter 负责：
 
 每迁移一项，先加新入口等价测试，再删除对应旧 CLI/entry/root script；不同时重写算法。
 
-当前下一项：迁移 `weights compare`。先把现有顶层脚本拆为可注入 handler，复用刚建立的文本产物 envelope；保留 `MatchWorkerPool`、双向同牌序、参数语义和只读边界。
+当前正在迁移 `weights compare`：`evaluate weights compare` 已注册，原脚本已拆为无顶层副作用的 handler 与临时兼容 entry，专属 help 已通过且不会启动 worker。下一步把同代码权重 A/B 和跨版本 policy A/B 的共同 `MatchupResult` 接入文本产物 envelope；保留 `MatchWorkerPool`、双向同牌序、参数语义和只读边界，完成真实 smoke 后再删除 root alias。
 
 ### 4. 收尾与恢复步骤 1
 

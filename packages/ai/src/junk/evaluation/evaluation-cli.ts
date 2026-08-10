@@ -1,5 +1,6 @@
 import { createEvaluationCommandRegistry } from "../../evaluation/commands.ts";
 import { runDecisionDiffCli } from "../decision-diff-cli.ts";
+import { runCompareWeightsCli } from "../compare-weights-cli.ts";
 import { runBatchCalibrationCli } from "./batch-cli.ts";
 import { runCalibrationCli } from "./cli.ts";
 
@@ -23,6 +24,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["policy", "diff"],
     summary: "Compare policy decisions on paired self-play states",
     run: runDecisionDiffCli,
+  },
+  {
+    path: ["weights", "compare"],
+    summary: "Compare two weight or policy configurations",
+    run: runCompareWeightsCli,
   },
 ]);
 
