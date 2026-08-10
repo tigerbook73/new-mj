@@ -29,7 +29,9 @@ describe("policy-based worker pool", () => {
     scratchDir = mkdtempSync(path.join(os.tmpdir(), "policy-match-pool-test-"));
     const weightsPath = path.join(scratchDir, "candidate-weights.json");
     writeFileSync(weightsPath, JSON.stringify({ ...DEFAULT_JUNK_WEIGHTS, shantenWeight: 120 }));
-    const seeds = [11, 12, 13];
+    // One deterministic task is sufficient to catch worker wiring, ordering,
+    // serialization, and module-resolution differences.
+    const seeds = [11];
     const baseline = { modulePath: currentStrategyPath };
     const candidate = { modulePath: currentStrategyPath, weightsPath };
 

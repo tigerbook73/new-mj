@@ -54,6 +54,17 @@
 
 ## Core 与跨玩法结构
 
+### 暂停的 AI/Core 长跑测试恢复
+
+当前自动门禁只保留不可替代的正确性覆盖；以下长跑暂不执行，恢复时先把“测试管线正确性”和“有意义的统计/效果评估”分开：
+
+- `packages/ai/test/junk-weight-tuning.test.ts`：真实自对弈调参循环整体暂停；先为 tuner 注入便宜、确定性的 evaluator，用小样本覆盖不可变默认值、收敛、sigma 上限、复现性和 `weightKeys`，真实调参继续通过 `evaluate weights tune` 手工运行；
+- `packages/ai/test/junk-arena.test.ts`：30 局 zero-sum 与强弱席位统计比较暂停；前者已有 core 结算守恒与单局 arena 接线覆盖，后者属于质量评估而非正确性断言；
+- Junk/杭州各自独立的“1000 seeded games finish while preserving tile conservation”暂停，因为同文件的 replay + 1000 局 fuzz 已覆盖规则执行与守恒；若未来拆走 fuzz 中的守恒断言再恢复；
+- 血战自动门禁保留 1000 局 fuzz；专题收尾或玩法语义改动后的 10000 局全量接受测试改为人工运行，不常驻 `verify:full`。
+
+恢复这些用例前要求单条稳定低于自身 timeout 的一半，并且整套 `verify:full` 不依赖共享机器的瞬时负载才能通过；不得只靠提高 timeout 恢复。
+
 ### `immer` 与 ruleset 手写 `cloneState` 的取舍
 
 先做性能和 fuzz 对照，不预设替换结论；若修改 core，遵守 core 验证门槛。

@@ -6,8 +6,10 @@ const junkRoot = fileURLToPath(new URL("../src/junk/", import.meta.url));
 const productionFiles = [
   "analysis.ts",
   "default-weights.json",
+  "hand-quality.ts",
   "strategy.ts",
   "tile-probability.ts",
+  "two-ply.ts",
   "weights.ts",
 ] as const;
 

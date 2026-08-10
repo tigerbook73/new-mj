@@ -16,8 +16,10 @@ describe("runCaptureJunkPolicyCli", () => {
     expect(copies.map(({ destination }) => destination.split("/").at(-1)).sort()).toEqual([
       "analysis.ts",
       "default-weights.json",
+      "hand-quality.ts",
       "strategy.ts",
       "tile-probability.ts",
+      "two-ply.ts",
       "weights.ts",
     ]);
   });

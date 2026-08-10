@@ -22,7 +22,7 @@ const seededRandom = (seed: number): (() => number) => {
 };
 
 describe("junk self-play arena", () => {
-  it(
+  it.skip(
     "runs full sessions end-to-end and keeps every session's cumulative score zero-sum",
     { tags: ["slow"] },
     () => {
@@ -41,7 +41,7 @@ describe("junk self-play arena", () => {
     },
   );
 
-  it("ranking always covers exactly the four seats", () => {
+  it("ranking always covers exactly the four seats", { tags: ["slow"] }, () => {
     const policies = [
       strengthPolicy(),
       strengthPolicy(),
@@ -53,7 +53,7 @@ describe("junk self-play arena", () => {
     expect([...result.ranking].sort((a, b) => a - b)).toEqual([...SEAT_IDS]);
   });
 
-  it("keeps structural analysis context across a seat's decisions", () => {
+  it("keeps structural analysis context across a seat's decisions", { tags: ["slow"] }, () => {
     const caches = [0, 1, 2, 3].map(() => createJunkAnalysisCache(32));
     const policies = caches.map((cache) => strengthPolicy({ analysisCache: cache })) as [
       SeatPolicy,
@@ -68,7 +68,7 @@ describe("junk self-play arena", () => {
     expect(caches.every((cache) => cache.size > 0 && cache.size <= 32)).toBe(true);
   });
 
-  it(
+  it.skip(
     "a low-temperature (strong) seat outranks a high-temperature (weak) seat on average",
     { tags: ["slow"] },
     () => {

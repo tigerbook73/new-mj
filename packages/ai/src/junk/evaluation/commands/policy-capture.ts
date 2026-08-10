@@ -21,8 +21,10 @@ const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const policyFiles = [
   "analysis.ts",
   "default-weights.json",
+  "hand-quality.ts",
   "strategy.ts",
   "tile-probability.ts",
+  "two-ply.ts",
   "weights.ts",
 ] as const;
 
