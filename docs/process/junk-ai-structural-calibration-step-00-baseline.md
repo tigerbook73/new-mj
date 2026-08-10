@@ -142,4 +142,4 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 当前单场景 baseline 已登记在 `packages/ai/src/junk/calibration/fixtures/baselines/`；它固定输入哈希、evaluator 版本、期望动作和候选数，不把耗时作为硬门槛，也不允许运行结果覆盖该资产。
 
-下一动作：为 canonical manifest 定义 baseline 登记资产、元数据和不可覆盖的比较入口；先只登记当前单场景基线，不扩展批量 runner 或 worker pool。
+下一动作：设计不依赖逐个 import 的通用 fixture registry，并明确 JSONL reader 的记录 schema、分片和稳定聚合边界；先不实现大批量 worker pool。
