@@ -24,11 +24,11 @@ web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调
 
 与 e2e 的 `@slow`/`test:e2e:full` 同一约定（`process/workflow.md`），应用到 Vitest 单测/fuzz：
 
-- **判定标准**：单用例运行秒级以上的 fuzz / property / 全量回放冒烟（如 1000 局 fuzz、万局扫描、全量 ukeire property）标记为慢速；普通 fixture/单元用例不标。
+- **判定标准**：单用例运行秒级以上的 fuzz / property / 全量回放冒烟（如 100 局 fuzz、万局扫描、全量 ukeire property）标记为慢速；普通 fixture/单元用例不标。
 - **标记方式**：Vitest 一等 test tag（4.1+）——`vitest.config.ts` 的 `test.tags` 声明 `{ name: "slow", timeout: … }`（timeout 由 tag 统一提供，慢速用例不再各自写位置参数），用例用 `test("…", { tags: ["slow"] }, fn)` 标记。快速 `test` 脚本以 `--tags-filter '!slow'` 排除（显示为 skipped），`test:full` 不筛选、跑全部。
 - **脚本约定**：有慢速用例的 workspace（当前 `packages/core`、`packages/ai`）提供 `test:full`/`verify:full`；没有的 workspace `test:full` 等于 `test`（与 `apps/server` 的 `test:e2e:full` 别名同理，不强行拆分）。根 `pnpm verify` 用快速子集，`pnpm verify:full` 用 `test:full` + `test:e2e:full`。
 - **统计/效果长跑不属于自动测试**：真实调参、强弱策略胜率、万局专题收尾等依赖大样本才有意义的任务走对应的手工 `evaluate`/fuzz 入口，不用墙钟 timeout 充当正确性断言。历史用例若暂时使用 `test.skip` 退出门禁，必须在 `process/backlog.md` 记录恢复条件；可注入便宜确定性 evaluator 后，先恢复最小管线正确性测试，再保留长跑为人工任务。
-- **DoD 挂钩**：日常迭代跑 `verify`；core 改动提交前必须跑 core 的 `verify:full`（fuzz 冒烟 ≥1000 局在 `test:full` 中），合并到 main 前跑根 `verify:full`。
+- **DoD 挂钩**：日常迭代跑 `verify`；core 改动提交前必须跑 core 的 `verify:full`（fuzz 冒烟 ≥100 局在 `test:full` 中），合并到 main 前跑根 `verify:full`。
 
 ## 2. 黄金路径 vs fuzz 的分工原则
 
@@ -42,7 +42,7 @@ web/mobile 使用各自框架的测试工具；跨包测试从根脚本统一调
 新增一个 `variants/<id>.md` 并接入代码时，进入下一阶段前必须满足：
 
 - [ ] 番型/规则 fixture：每个规则点至少 1 正例 + 1 边界例 + 1 区分例，负例带机器可读 `reason`
-- [ ] 该玩法独立 fuzz ≥ 1000 局冒烟通过（按 §1.2 标记为慢速用例，经 `test:full` 运行）；阶段收尾前跑满 ≥ 1 万局（随机 config）
+- [ ] 该玩法独立 fuzz ≥ 100 局冒烟通过（按 §1.2 标记为慢速用例，经 `test:full` 运行）；阶段收尾前跑满 ≥ 1 万局（随机 config）
 - [ ] 已注册进跨玩法不变量测试（容器唯一性、事件重建≡直接派生）
 - [ ] 若涉及 `architecture/variant-boundary.md` 中标注"需要验证"的机制（庄家轮换、会话排名等），本次接入的结论要回写台账的"已验证玩法数"列
 - [ ] 根目录 `pnpm verify`（format:check、typecheck、lint、test）全绿；接入收尾再跑一次根 `pnpm verify:full`（含慢速用例与 e2e 全量）

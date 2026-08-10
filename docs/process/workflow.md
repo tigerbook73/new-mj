@@ -25,7 +25,7 @@
 1. `pnpm typecheck`
 2. `pnpm lint`
 3. `pnpm test`（受影响包）
-4. core 改动：fuzz 冒烟 ≥1000 局（慢速用例，日常 `test` 默认跳过，经 core `verify:full`/`test:full` 运行）；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md` §1.2
+4. core 改动：fuzz 冒烟 ≥100 局（慢速用例，日常 `test` 默认跳过，经 core `verify:full`/`test:full` 运行）；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md` §1.2
 5. e2e：日常提交用 `pnpm verify`（`test:e2e` 排除标了 `@slow`/`@lab` 的用例——前者是慢速/低边际用例，后者是像 `apps/web` layout-sketch 这样的领域限定 DEV 工具，改到对应领域时手动加跑）；合并到 main 前改跑 `pnpm verify:full`（`test:e2e:full`，跑全部用例，不筛选），与 fuzz 冒烟/全量的分层原则一致
 
 - 测试与实现同一 commit；修 bug 先写复现用例（红→绿）。

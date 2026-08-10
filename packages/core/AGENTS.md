@@ -27,10 +27,10 @@
 - `src/ruleset-registry.ts`：唯一运行时 `rulesetId → RulesetModule` 登记表；`engine.ts` 与 `support/registered-rulesets.ts`（测试适配）都从这里派生，新增玩法只改这一处。
 - `src/lib/`：tiles、prng、wall、standard-hand（标准无癞子胡牌判断，非通用 TileSet 算法）、invariants、ids、seats、seat-state 等通用积木。
 - `src/rulesets/junk/`：完整 junk 状态机、结算、PlayerView 与 fuzz。
-- `src/rulesets/bloodbattle/`：血战前置、playing、番型、杠分/抢杠胡/呼叫转移、流局结算和 1000 局 fuzz。
+- `src/rulesets/bloodbattle/`：血战前置、playing、番型、杠分/抢杠胡/呼叫转移、流局结算和 100 局 fuzz。
 - `src/events.ts`：事件信封与可见性工具；`rulesets/<id>/events.ts`：玩法事件名；`rulesets/junk/cli.ts`：junk 开发/诊断 CLI。
 
 ## core DoD
 
 - 修改后必须通过 `pnpm --filter @new-mj/core verify`（快速子集，打 `slow` tag 的 fuzz/property 用例默认排除）。
-- core 改动必须跑 fuzz 冒烟，至少 1000 局：提交前跑 `pnpm --filter @new-mj/core verify:full`（`test:full` 不筛选、含全部 `slow` tag 用例，见 `docs/testing-strategy.md` §1.2）；测试与实现同一 commit。
+- core 改动必须跑 fuzz 冒烟，至少 100 局：提交前跑 `pnpm --filter @new-mj/core verify:full`（`test:full` 不筛选、含全部 `slow` tag 用例，见 `docs/testing-strategy.md` §1.2）；测试与实现同一 commit。

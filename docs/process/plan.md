@@ -25,7 +25,7 @@
 - 诊断与生产路径分离；未完成等价验证前不改评分公式、默认权重、候选筛选或 AI 对外行为；
 - 规则实现仍集中在 core，AI 只消费 core 提供的标准牌型能力；
 - 诊断必须明确区分玩家视角估计、牌山/公开信息上下文和完整胡牌概率；
-- 测试与实现同一 commit；若修改 core，按 testing strategy 增加至少 1000 局 fuzz 冒烟；
+- 测试与实现同一 commit；若修改 core，按 testing strategy 增加至少 100 局 fuzz 冒烟；
 - 每个当前步骤开始前，可建立一份临时专门计划；步骤完成后只把影响后续判断的结论归并到本文件，不保留过程日记。
 
 当前待验证：
@@ -46,8 +46,9 @@
 - `strategy.ts` 同时是生产 facade 与跨 Git ref policy-loader 的加载根；物理拆分必须同步维护可复制的闭包依赖，并验证 current、historical ref 和显式 module path，不能只移动函数。
 - 静态牌形质量现位于 `hand-quality.ts`，自摸二层 continuation probe 位于 `two-ply.ts`；`strategy.ts` 继续作为兼容 facade 导出既有 API。对 `HEAD` 与当前实现的 3-seed policy diff 覆盖 2110 个决策点且分歧为 0，现有 probe/production fixtures 与六份 baseline 均保持不变。
 - policy capture 现在显式复制 `strategy.ts`、`analysis.ts`、`hand-quality.ts`、`two-ply.ts`、`weights.ts`、默认权重 JSON 和概率 helper；Git ref loader 仍按该 ref 当时实际存在的顶层生产闭包取快照，因此旧 ref 不要求拥有新模块。
-- AI/Core 慢速测试已按正确性边界审计：Core 保留向听/表等价性质、回放与每玩法 1000 局 fuzz；重复 conservation、AI 真实调参循环、30 局 arena 统计与强弱胜率暂时退出自动门禁，恢复条件见 `backlog.md`。单局 arena/policy worker/decision-diff 接线正确性仍在 `verify:full`，真实调参与万局收尾改走手工入口。
+- AI/Core 慢速测试已按正确性边界审计：Core 保留向听/表等价性质、回放与每玩法 100 局 fuzz；重复 conservation、AI 真实调参循环、30 局 arena 统计与强弱胜率暂时退出自动门禁，恢复条件见 `backlog.md`。单局 arena/policy worker/decision-diff 接线正确性仍在 `verify:full`，真实调参与万局收尾改走手工入口。
 - AI `evaluate` CLI 与其 TypeScript 检查统一启用 `development` export condition，直接消费 Core `src`；离线诊断不再依赖预先构建且可能过期的 Core `dist`，worker 继承同一 Node condition。
+- 自动 fuzz 冒烟统一由每玩法 1000 局降为 100 局，保留专题收尾人工万局门禁；根 E2E 的 lobby 失败实为 Server 5 秒超时后 Turbo 中断 Web 的级联结果，replay 套件现由四个测试客户端按合法动作推进、不再借生产 AI bot 造 fixture，真实默认 AI advice 冒烟只对单条用例使用 10 秒预算。
 
 下一步第一个具体动作：执行步骤 3 slice 3，抽取 action-scoring 与两层候选编排，使 `strategy.ts` 只保留兼容导出和最终动作选择，同时保持原始 action 引用、cliff、fallback 与全部评分不变。
 

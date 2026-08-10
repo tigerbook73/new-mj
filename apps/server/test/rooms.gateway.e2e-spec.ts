@@ -246,7 +246,7 @@ describe("RoomsGateway (e2e, socket.io-client)", () => {
     if (!rejected.ok) {
       expect(["ILLEGAL_ACTION", "NOT_YOUR_TURN"]).toContain(rejected.code);
     }
-  });
+  }, 10_000);
 
   it("rejects game:action from a socket that never joined a room", async () => {
     const lonely = await connectAs("user-lonely");

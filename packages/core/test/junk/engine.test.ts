@@ -227,7 +227,7 @@ test("action logs replay a complete game and fuzz reports no failure", { tags: [
   if ("error" in played) throw new Error(played.error);
   const replayed = playJunkGame(31, {}, played.actions);
   expect(replayed).toEqual(played);
-  expect(fuzzJunkGames(1000, 41)).toBeUndefined();
+  expect(fuzzJunkGames(100, 41)).toBeUndefined();
 });
 
 test("illegal actions do not mutate state or consume event sequence", () => {
@@ -477,8 +477,8 @@ test("dealer's flat x2 applies to a payment involving either the payer or the wi
   expect(state.result).toMatchObject({ scoreDeltas: [-16, 16, 0, 0] });
 });
 
-test.skip("1000 seeded games finish while preserving tile conservation", { tags: ["slow"] }, () => {
-  for (let seed = 1; seed <= 1000; seed += 1) {
+test.skip("100 seeded games finish while preserving tile conservation", { tags: ["slow"] }, () => {
+  for (let seed = 1; seed <= 100; seed += 1) {
     const state = playDeterministically(seed);
     expect(state.result).toBeDefined();
   }

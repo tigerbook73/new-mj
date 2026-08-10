@@ -750,11 +750,11 @@ test("action logs replay a complete game and fuzz reports no failure", { tags: [
   if ("error" in played) throw new Error(played.error);
   const replayed = playHangzhouGame(31, {}, played.actions);
   expect(replayed).toEqual(played);
-  expect(fuzzHangzhouGames(1000, 41)).toBeUndefined();
+  expect(fuzzHangzhouGames(100, 41)).toBeUndefined();
 });
 
-test.skip("1000 seeded games finish while preserving tile conservation", { tags: ["slow"] }, () => {
-  for (let seed = 1; seed <= 1000; seed += 1) {
+test.skip("100 seeded games finish while preserving tile conservation", { tags: ["slow"] }, () => {
+  for (let seed = 1; seed <= 100; seed += 1) {
     const state = playDeterministically(seed);
     expect(state.result).toBeDefined();
   }

@@ -30,6 +30,7 @@ describe("debug:replayOmniscientView (e2e, socket.io-client — phase 4.5 step 5
     gameService = app.get(GameService);
 
     const configService = app.get(ConfigService);
+    Object.defineProperty(configService, "drawRevealDelayMs", { value: 10_000 });
     const jwtService = app.get(JwtService);
     protocolVersion = configService.protocolVersion;
     makeToken = (userId: string) =>
@@ -64,8 +65,8 @@ describe("debug:replayOmniscientView (e2e, socket.io-client — phase 4.5 step 5
     });
   };
 
-  /** Same technique as replay-get.e2e-spec.ts: re-read legal actions from live
-   * server state each step (bots decide their own moves via @new-mj/ai). */
+  /** Four real test clients drive the first currently legal action so replay
+   * protocol coverage does not pay for production bot policy evaluation. */
   const playOneFinishedGame = async (
     hostUserId: string,
   ): Promise<{ roomId: string; host: ClientSocket }> => {
@@ -74,12 +75,17 @@ describe("debug:replayOmniscientView (e2e, socket.io-client — phase 4.5 step 5
     if (!created.ok) throw new Error(`room:create failed: ${created.code}`);
     const roomId = created.data.id;
 
-    for (let i = 0; i < 3; i++) {
-      const added = await ack<object>(host, "room:addBot", {});
-      if (!added.ok) throw new Error(`room:addBot failed: ${added.code}`);
+    const players = [host];
+    for (let i = 1; i < 4; i++) {
+      const player = await connectAs(`${hostUserId}-p${i + 1}`);
+      const joined = await ack<RoomInfo>(player, "room:join", { roomId });
+      if (!joined.ok) throw new Error(`room:join failed: ${joined.code}`);
+      players.push(player);
     }
-    const ready = await ack<object>(host, "room:ready", { ready: true });
-    if (!ready.ok) throw new Error(`room:ready failed: ${ready.code}`);
+    for (const player of players) {
+      const ready = await ack<object>(player, "room:ready", { ready: true });
+      if (!ready.ok) throw new Error(`room:ready failed: ${ready.code}`);
+    }
     const started = await ack<object>(host, "room:start", {});
     if (!started.ok) throw new Error(`room:start failed: ${started.code}`);
 
@@ -89,9 +95,12 @@ describe("debug:replayOmniscientView (e2e, socket.io-client — phase 4.5 step 5
       const room = roomService.get(roomId);
       if (!room) throw new Error("room disappeared mid-session");
       if (room.finishedGames.length >= 1 || room.phase !== "in-game") break;
-      const legalActions = gameService.getLegalActions(room.gameState, 0);
-      if (legalActions.length === 0) continue;
-      const result = await ack<object>(host, "game:action", { action: legalActions[0] });
+      const seat = ([0, 1, 2, 3] as const).find(
+        (candidate) => gameService.getLegalActions(room.gameState, candidate).length > 0,
+      );
+      if (seat === undefined) continue;
+      const action = gameService.getLegalActions(room.gameState, seat)[0];
+      const result = await ack<object>(players[seat]!, "game:action", { action });
       if (!result.ok) throw new Error(`game:action rejected: ${result.code}`);
     }
     const finalRoom = roomService.get(roomId);
