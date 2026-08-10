@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runCaptureJunkPolicyCli } from "./capture-policy-cli.ts";
+import { runCaptureJunkPolicyCli } from "./policy-capture.ts";
 
 describe("runCaptureJunkPolicyCli", () => {
   it("copies only the policy dependency closure into .compare-scratch/<label>/junk/", () => {

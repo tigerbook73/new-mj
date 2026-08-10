@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runArenaCli } from "./arena-cli.ts";
+import { runArenaCli } from "./arena.ts";
 
 describe("runArenaCli", () => {
   it("writes an aggregate arena report through an injected pool", async () => {

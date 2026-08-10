@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runCalibrationCli } from "./cli.ts";
+import { runCalibrationCli } from "./scenario.ts";
 
 describe("evaluation CLI", () => {
   it("prints help successfully", () => {

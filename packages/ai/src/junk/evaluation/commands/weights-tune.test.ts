@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_JUNK_WEIGHTS } from "../../strategy.ts";
-import { runTuneCli } from "./tune-cli.ts";
+import { runTuneCli } from "./weights-tune.ts";
 import type { TuneReport } from "../match/tune.ts";
 
 const REPORT: TuneReport = {

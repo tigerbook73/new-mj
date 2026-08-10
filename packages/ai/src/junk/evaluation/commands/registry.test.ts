@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runEvaluationCli } from "./evaluation-cli.ts";
+import { runEvaluationCli } from "./registry.ts";
 
 describe("Junk evaluation command suite", () => {
   it("discovers scenario commands from the root help", async () => {

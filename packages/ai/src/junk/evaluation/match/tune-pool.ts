@@ -2,7 +2,7 @@ import { Worker } from "node:worker_threads";
 import type { SeatId } from "@new-mj/core";
 import type { JunkWeights } from "../../strategy.ts";
 
-/** Weight-based match task (weights tune / compare-weights-cli.ts's same-code
+/** Weight-based match task (weights tune / weights-compare.ts's same-code
  * path, dispatched to tune-worker.ts). See policy-match-worker.ts's
  * PolicyMatchTask for the cross-version counterpart — both share the same
  * generic MatchWorkerPool<TTask> below; the pool never inspects task

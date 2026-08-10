@@ -11,7 +11,7 @@ import {
 // Tiny by design — this is a smoke test of the tuning *pipeline* (does it run
 // end-to-end, produce the right shape, stay reproducible), not a real tuning
 // session. Real runs use much larger --max-generations/--seeds-per-generation
-// via junk/tune-cli.ts and take proportionally longer. minGenerations defaults
+// via evaluation/commands/weights-tune.ts and take proportionally longer. minGenerations defaults
 // to 20 (> maxGenerations here), so early-stop convergence checks never fire —
 // these runs always use exactly maxGenerations generations, which is what makes
 // the "toHaveLength" assertion below meaningful rather than a coincidence.

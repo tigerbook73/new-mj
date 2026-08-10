@@ -67,7 +67,7 @@ export type JunkWeights = {
 };
 
 /** Loaded from default-weights.json rather than hardcoded here, so adopting a
- * tuned candidate (junk/tune-cli.ts --write) is a data-file edit, not a code
+ * tuned candidate (evaluation/commands/weights-tune.ts --write) is a data-file edit, not a code
  * change. Frozen so an accidental in-place mutation (e.g. a `mutate()` bug that
  * forgets to spread) throws immediately in strict mode instead of silently
  * corrupting the shared default for every future call. */
@@ -1089,8 +1089,7 @@ export const scoreDiscardActionsTwoPlyAll = (
   return discardActions.map((action) => ({
     action,
     score:
-      scores.get(kindOf(action.tile)) ??
-      scoreAction(view, action, weights, memo, analysisCache),
+      scores.get(kindOf(action.tile)) ?? scoreAction(view, action, weights, memo, analysisCache),
   }));
 };
 

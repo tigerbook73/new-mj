@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SeatPolicy } from "../match/arena.ts";
-import { runDecisionDiffCli } from "./decision-diff-cli.ts";
+import { runDecisionDiffCli } from "./policy-diff.ts";
 
 const policy: SeatPolicy = (_view, legalActions) => legalActions[0]!;
 

@@ -1,11 +1,11 @@
 import { createEvaluationCommandRegistry } from "../../../evaluation/commands.ts";
-import { runArenaCli } from "./arena-cli.ts";
-import { runCaptureJunkPolicyCli } from "./capture-policy-cli.ts";
-import { runDecisionDiffCli } from "./decision-diff-cli.ts";
-import { runCompareWeightsCli } from "./compare-weights-cli.ts";
-import { runTuneCli } from "./tune-cli.ts";
-import { runBatchCalibrationCli } from "./batch-cli.ts";
-import { runCalibrationCli } from "./cli.ts";
+import { runArenaCli } from "./arena.ts";
+import { runCaptureJunkPolicyCli } from "./policy-capture.ts";
+import { runDecisionDiffCli } from "./policy-diff.ts";
+import { runBatchCalibrationCli } from "./scenario-batch.ts";
+import { runCalibrationCli } from "./scenario.ts";
+import { runCompareWeightsCli } from "./weights-compare.ts";
+import { runTuneCli } from "./weights-tune.ts";
 
 const registry = createEvaluationCommandRegistry([
   {

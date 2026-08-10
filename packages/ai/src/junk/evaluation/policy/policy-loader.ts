@@ -11,7 +11,7 @@ import type { JunkStrengthConfig, JunkWeights } from "../../strategy.ts";
  * (default), an arbitrary file path (e.g. a hand-duplicated experimental copy
  * under packages/ai/.compare-scratch/, see AGENTS.md "两个都没提交的实验版本
  * 互相比"), or a committed git ref — as a SeatPolicy, so tools like
- * compare-weights-cli.ts and decision-diff-cli.ts can compare across code
+ * weights-compare.ts and policy-diff.ts can compare across code
  * versions, not just weight values, using the same in-process self-play
  * machinery (`SeatPolicy` doesn't care where the function came from — see
  * arena.ts).
@@ -91,7 +91,7 @@ const isStrategyModuleShape = (value: unknown): value is StrategyModuleShape =>
   typeof (value as Record<string, unknown>).chooseJunkAction === "function" &&
   typeof (value as Record<string, unknown>).DEFAULT_JUNK_WEIGHTS === "object";
 
-/** Shared by compare-weights-cli.ts and decision-diff-cli.ts: `expectedKeys` is
+/** Shared by weights-compare.ts and policy-diff.ts: `expectedKeys` is
  * the *loaded module's own* weight key set (not necessarily the current working
  * tree's), since a `ref`/`modulePath` source may be a different code version
  * with a different JunkWeights shape (e.g. pre-Phase-1's improvementWeight). */

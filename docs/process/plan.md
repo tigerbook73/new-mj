@@ -65,6 +65,8 @@
 
 evaluation 工具物理目录收口完成：`src/junk/` 顶层非测试资产只保留 `strategy.ts`、`tile-probability.ts`、`default-weights.json`；commands、policy source、match/worker 分别迁入 `evaluation/{commands,policy,match}`。新增结构测试锁定顶层生产资产并禁止其反向 import evaluation，公共 barrel 只显式导出 Junk 生产决策 API。统一 help、scenario list 和移动后的 arena worker `1 match × 1 round` smoke 均通过。
 
+命名纠偏完成：`evaluation/cli-entry.ts` 是唯一带顶层 `process.argv`/stdout 副作用的进程入口，`commands/registry.ts` 负责统一分发；其余 handler 按命令职责命名为 `scenario`、`scenario-batch`、`policy-capture`、`policy-diff`、`weights-compare`、`weights-tune`、`arena`，不再用含糊的 `cli.ts` 或重复 `*-cli.ts` 文件名。AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），root help、scenario list 与单 worker arena 最小 smoke 通过。
+
 目录收口检查点 AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），server typecheck 通过。移动后的定向 slow 验证通过：同代码顺序/worker 等价 1 test（21.16s）、跨 policy worker pool 1 test（21.82s）、decision diff 2 tests（31.36s）。按 2026-08-10 用户明确边界，arena 与 tuning slow 用例全部 skip；arena 分段运行约 90 秒无输出后已中止，不把 `verify:full` 记为通过。真实 `1 match × 1 round` arena smoke 和 `1 generation × 1 search seed × 1 held-out seed` tuning smoke 已分别覆盖两条工具链。
 
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。

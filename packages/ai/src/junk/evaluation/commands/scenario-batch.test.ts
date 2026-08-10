@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import snapshotData from "../fixtures/midgame-shape-001.snapshot.json" with { type: "json" };
-import { runBatchCalibrationCli } from "./batch-cli.ts";
+import { runBatchCalibrationCli } from "./scenario-batch.ts";
 import { JUNK_CALIBRATION_MANIFEST } from "../canonical-fixtures.ts";
 import { evaluateProductionFixture } from "../production-evaluator.ts";
 import type { JunkProductionSnapshotData } from "../snapshot-provider.ts";

@@ -10,7 +10,7 @@ import type { MatchTask, MatchTaskResult, MatchWorkerPool, PolicyMatchTask } fro
 type WeightMatchPool = MatchWorkerPool<MatchTask>;
 type PolicyMatchPool = MatchWorkerPool<PolicyMatchTask>;
 
-/** Exported so compare-weights-cli.ts can validate an arbitrary candidate JSON
+/** Exported so weights-compare.ts can validate an arbitrary candidate JSON
  * file has exactly this key set without duplicating the list. */
 export const WEIGHT_KEYS = Object.keys(DEFAULT_JUNK_WEIGHTS) as (keyof JunkWeights)[];
 
@@ -49,7 +49,7 @@ const gaussian = (random: () => number): number => {
  * scale — shantenWeight ~100 vs pairBonus ~2 — so a single additive step
  * wouldn't be comparable across dimensions), clamped to keep pathological drift
  * finite. `eligibleKeys` is normally all of WEIGHT_KEYS, but a caller can pass a
- * subset (see TuneOptions.weightKeys / tune-cli.ts's --only) to pin every other
+ * subset (see TuneOptions.weightKeys / weights-tune.ts's --only) to pin every other
  * weight and search along just one dimension — a plain 1D step-size-adaptive
  * line search falls out of this "coordinate descent over one key" mechanism for
  * free when the eligible set has exactly one key in it.
@@ -422,7 +422,7 @@ export const evaluateTunedWeights = async (
   };
 };
 
-/** Exported so compare-weights-cli.ts can render the same "baseline -> other"
+/** Exported so weights-compare.ts can render the same "baseline -> other"
  * delta table for an arbitrary hand-authored candidate, not just a search result. */
 export const formatWeightDelta = (baseline: JunkWeights, tuned: JunkWeights): string =>
   WEIGHT_KEYS.map((key) => {

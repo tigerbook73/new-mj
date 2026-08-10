@@ -19,18 +19,18 @@ import { loadWeightsFile, resolveModulePath, type PolicySource } from "../policy
 
 /**
  * General-purpose A/B primitive for any AI-quality change expressed as weights:
- * unlike tune-cli.ts (which only ever compares a *search-generated* candidate
+ * unlike weights-tune.ts (which only ever compares a *search-generated* candidate
  * against the incumbent), this compares two arbitrary, hand-specified weight
  * files by self-play — the baseline (A, defaults to the committed
  * default-weights.json) against a candidate (B, any JSON path — e.g. a scratch
  * file holding a hand-edited or externally-produced weight set under
  * evaluation, kept out of git until it clears this comparison). See
  * packages/ai/AGENTS.md "AI 质量调优的 A/B 流程" for when to use this vs.
- * fixture-based regression tests and decision-diff-cli.ts.
+ * fixture-based regression tests and policy-diff.ts.
  *
  * `--baseline-module`/`--baseline-ref` (and the candidate equivalents) let A/B
  * cross code versions too, not just weight values, via policy-loader.ts's
- * resolveModulePath — same mechanism decision-diff-cli.ts uses for loading, but
+ * resolveModulePath — same mechanism policy-diff.ts uses for loading, but
  * this path stays on module *paths* (not live SeatPolicy closures) all the way
  * through so it can dispatch through a worker pool too (policy-match-worker.ts),
  * same as the plain same-code weight comparison.
@@ -41,7 +41,7 @@ type Arguments = {
    * (current default-weights.json on the fast path, or the loaded module's own
    * DEFAULT_JUNK_WEIGHTS on the cross-version path — see loadPolicy). Named
    * --baseline/--candidate (not --baseline-weights) for backward compatibility:
-   * this predates decision-diff-cli.ts's --baseline-weights naming. */
+   * this predates policy-diff.ts's --baseline-weights naming. */
   baselineWeightsPath?: string;
   candidateWeightsPath?: string;
   baselineModule?: string;
@@ -78,7 +78,7 @@ const usage =
 const parseArguments = (argv: string[]): Arguments => {
   const result: Arguments = {
     seed: 1,
-    // Matches tune-cli.ts's --eval-seeds default: enough duplicate-deal pairs
+    // Matches weights-tune.ts's --eval-seeds default: enough duplicate-deal pairs
     // (seeds * 2 seat splits) that a real quality difference clears self-play
     // variance instead of being noise (see tune.ts's mutate() doc comment).
     seeds: 15,
