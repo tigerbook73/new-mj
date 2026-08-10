@@ -33,7 +33,7 @@ header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，
 pnpm --filter @new-mj/ai evaluate list
 pnpm --filter @new-mj/ai evaluate run discard-001
 pnpm --filter @new-mj/ai evaluate run discard-001 \
-  --baseline src/junk/evaluation/fixtures/baselines/discard-001-production-v1.baseline.json
+  --baseline src/junk/evaluation/fixtures/baselines/discard-001.production-weighted.v1.baseline.json
 pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
   --evaluator two-ply-all --workers 4 --chunk-size 64 \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
@@ -66,6 +66,10 @@ production-weighted/one-ply-all/two-ply-all。它们保存输入内容哈希、�
 动作、候选集合和分数变化；输入 hash/evaluator 不一致视为 incompatible。耗时只作信息记录。
 `run --baseline <file>` 是只读比较入口：matched 返回 0，质量变化返回 2，不兼容或运行错误
 返回 1；比较结果写入同一 JSON/Markdown report，命令不会创建或更新 baseline。
+
+文件名固定为 `<scenario-id>.<evaluator>.v<baseline-revision>.baseline.json`；点分段区分
+场景、评估器和 baseline 资产修订版。文件内 scenario version、`evaluatorVersion` 与这里的
+baseline revision 是三个独立版本维度。
 
 generated source 的 schema 已预留，但 generator/provider 按专题路线图第 5 步接入；step 0
 不提前定义生成牌型语义。批量失败保留在报告/checkpoint 中，通过 hash-safe resume 重跑；

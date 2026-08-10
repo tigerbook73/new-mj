@@ -43,7 +43,7 @@
 
 - 通用 `packages/ai/src/evaluation/` 拥有 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint 契约；玩法层只注入 provider、evaluator task 和输出命名。
 - Junk canonical fixture 与固定可见状态 snapshot 共用 manifest/runner/report 主链；production-weighted、one-ply-all、two-ply-all 在同一 content hash 下形成三路对照。
-- 两个场景 × 三路 evaluator 共六份版本化 baseline；决策和候选集合是回归字段，耗时仅供参考，baseline 不由命令自动创建或覆盖。
+- 两个场景 × 三路 evaluator 共六份版本化 baseline；文件名使用 `<scenario-id>.<evaluator>.v<baseline-revision>.baseline.json`，决策和候选集合是回归字段，耗时仅供参考，baseline 不由命令自动创建或覆盖。
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
