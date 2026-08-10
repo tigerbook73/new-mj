@@ -37,13 +37,13 @@
 
 ## 当前状态
 
-当前步骤：1. AI/Junk 测试盘点与职责重分类。
+当前纠偏步骤：0b. AI evaluation 工具统一收口。
 
-专门计划：[步骤 1：测试盘点与职责重分类](junk-ai-structural-calibration-step-01-test-inventory.md)。
+专门计划：[Junk AI evaluation 工具统一收口](junk-ai-evaluation-tooling-consolidation.md)。
 
-本步骤先建立全部测试的责任矩阵，再实施不损失覆盖的低风险重分类；存在语义取舍的移动、合并或删除会给出建议与备选，不自行决定。
+原因：步骤 0 只建立了新 evaluation 平台，没有把既有 arena/tune/compare/diff/capture 纳入统一命令、执行和报告生命周期，原平台收口目标未完整兑现。当前暂停步骤 1，先完成该使能能力纠偏。
 
-步骤 1 责任矩阵与重分类已完成：22 个测试文件均有唯一主要责任；通用 evaluation、Junk provider/CLI unit、策略 fixture、真实 evaluator/baseline/worker integration 和 self-play/tuning slow 边界清楚。`strategy.test.ts` 保留单文件并按 four responsibility groups 分区，后续 StructuralMetrics 使用独立文件。未删除历史回归或 A/B 证据。
+步骤 1 已保存的可复用进度：policy capture、decision-diff、tuning、policy-loader、runner 和 Junk evaluation adapter 测试已完成 unit/integration/slow 分层；`strategy.test.ts` 已按 two-ply、production fixtures、strength、weights 四组整理。AI verify 在检查点通过（21 files passed、3 skipped；105 tests passed、11 skipped；build 成功）。工具收口后只需恢复 full 验证与文档收尾。
 
 影响后续判断的结论：
 
@@ -53,14 +53,15 @@
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
-下一步第一个具体动作：运行 AI `verify` 与 `verify:full`，确认 fast/slow 两条测试链和 build 全绿；随后归并步骤 1 结论并删除临时计划，不自动开始步骤 2。
+下一步第一个具体动作：盘点 scenario、arena、decision-diff、compare-weights、tune、capture 六类 CLI 的参数、I/O、worker、报告和写权限，形成迁移矩阵并定义最小 typed command registry。
 
 ## 专题路线图
 
 每一步开始前，结合当时状态补充该步骤的专门计划；未开始的步骤不提前实现或标记完成。步骤完成后，只在本文件保留结果、证据、限制和对后续步骤有影响的判断。
 
 0. 已完成：可重复的基线 bench 与验证平台
-1. [当前：AI/Junk 测试盘点与职责重分类](junk-ai-structural-calibration-step-01-test-inventory.md)
+0b. [当前纠偏：AI evaluation 工具统一收口](junk-ai-evaluation-tooling-consolidation.md)
+1. 已暂停待收尾：AI/Junk 测试盘点与职责重分类
 2. 待开始：只读 StructuralMetrics 诊断契约
 3. 待开始：结构分析、2-ply 与动作评分模块边界
 4. 待开始：人工确认的 canonical fixtures
