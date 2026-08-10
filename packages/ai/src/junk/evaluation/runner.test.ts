@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import baseline from "./fixtures/baselines/discard-001-production-v1.baseline.json" with { type: "json" };
 import { CANONICAL_PRODUCTION_SELECTION } from "./canonical-fixtures.ts";
 import { createJunkFixtureProvider } from "./fixture-provider.ts";
-import { formatCalibrationSummary, serializeCalibrationReport } from "./report.ts";
+import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
-import { runSingleCalibrationScenario } from "./runner.ts";
-import { runCalibrationJsonlBatch } from "./runner.ts";
-import { parseCalibrationJsonl } from "./jsonl.ts";
-import { CALIBRATION_SCHEMA_VERSION, type CalibrationManifest, type CalibrationRun } from "./types.ts";
+import { runSingleCalibrationScenario, runCalibrationJsonlBatch } from "../../evaluation/runner.ts";
+import { parseCalibrationJsonl } from "../../evaluation/jsonl.ts";
+import { CALIBRATION_SCHEMA_VERSION, type CalibrationManifest, type CalibrationRun } from "../../evaluation/types.ts";
 
 const fixture = CANONICAL_PRODUCTION_SELECTION;
 

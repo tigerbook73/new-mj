@@ -1,5 +1,5 @@
 import { chooseJunkAction, type JunkStrengthConfig } from "../strategy.ts";
-import type { CalibrationEvaluationResult } from "./types.ts";
+import type { CalibrationEvaluationResult } from "../../evaluation/types.ts";
 import type { JunkProductionFixtureInput } from "./fixture-provider.ts";
 
 export type ProductionEvaluatorOptions = Readonly<{
@@ -8,7 +8,7 @@ export type ProductionEvaluatorOptions = Readonly<{
 }>;
 
 /**
- * First real adapter for the calibration platform. It deliberately evaluates
+ * First real adapter for the evaluation platform. It deliberately evaluates
  * the existing production decision boundary only; structural metrics belong to
  * the later StructuralMetrics step.
  */

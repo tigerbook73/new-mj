@@ -51,7 +51,7 @@
 - 测试现状：arena、tune、worker pool、decision-diff 和 snapshot 已有 slow/冒烟覆盖，能证明管线连通和部分确定性；尚未覆盖统一 manifest、场景级任务 ID、报告 schema、失败重跑、baseline 比较和批量性能分位数。
 - 性能现状：worker pool 已通过同一任务函数实现顺序/并行等价，但结果类型只表达成功/失败和分数，缺少任务 ID、耗时、重试、进度和可诊断错误；`runAll` 保持输入顺序聚合，但尚未形成通用批量报告。
 - 命名结论：现有文件名/函数名不作为兼容约束；后续可按“场景、评估器、任务执行、报告、baseline”职责重命名或拆分，外部命令只需提供迁移说明。
-- 最小契约验证已完成：新增 `packages/ai/src/junk/calibration/` 下的 manifest、统一 evaluation result、versioned report 类型，以及稳定排序的 JSON 和固定 Markdown 摘要；两个契约测试证明 worker 完成顺序不会改变报告顺序，摘要能直接显示场景、评估器、状态、选中候选和耗时。
+- 最小契约验证已完成：新增 `packages/ai/src/evaluation/` 通用框架和 `packages/ai/src/junk/evaluation/` Junk adapter，包含 manifest、统一 evaluation result、versioned report 类型，以及稳定排序的 JSON 和固定 Markdown 摘要；两个契约测试证明 worker 完成顺序不会改变报告顺序，摘要能直接显示场景、评估器、状态、选中候选和耗时。
 - 初始契约验证结果：calibration 定向测试 2/2 通过，AI typecheck 通过，AI lint 通过；当时尚未接入真实 fixture、现有 evaluator adapter、批量 runner 或 worker pool。
 - provider 边界已确定：场景来源使用 `ScenarioProvider`，评估逻辑使用 `EvaluatorProvider`，单线程/worker 使用统一 `Executor`；baseline/候选差异使用纯 `Comparator`，JSON/Markdown 使用 `ReportWriter`，性能采集是横切 wrapper，不单独复制一套测试类型。
 - 场景来源统一用带 `kind` 的 source 描述（fixture/snapshot/generated/replay），再解析为 `NormalizedScenario`；step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator，step 2 再决定更底层的结构诊断输入，不提前锁死 `StructuralMetrics`。
@@ -62,7 +62,7 @@
 - 上一轮验证结果：calibration 2 个测试文件、4/4 测试通过，AI typecheck 通过，AI lint 通过；当时仍未串接完整单场景 report runner，也未接入批量 runner/worker pool。
 - 单场景 runner 已落地：按 manifest 查找 scenario，调用 provider 和 evaluator，再生成统一 JSON/Markdown report；runner 不包含业务评分、并发、重试或文件 I/O。
 - 本轮验证结果：calibration 3 个测试文件、6/6 测试通过，AI typecheck 通过，AI lint 通过；报告链路已用真实 fixture 验证，仍未接入稳定 CLI、批量 runner、baseline 存储或 worker pool。
-- canonical fixture 已提取为 registry 和稳定 manifest；AI 包内 CLI 现支持 `list`、`run <scenario-id>`、`--output-dir <dir>`、`--run-id <id>`，同时写 JSON 原始报告和 Markdown 摘要，已有 run ID 不覆盖，默认临时产物目录为 `packages/ai/.calibration-runs/`。
+- canonical fixture 已提取为 registry 和稳定 manifest；AI 包内 CLI 现支持 `list`、`run <scenario-id>`、`--output-dir <dir>`、`--run-id <id>`，同时写 JSON 原始报告和 Markdown 摘要，已有 run ID 不覆盖，默认临时产物目录为 `packages/ai/.evaluation-runs/`。
 - 本轮验证结果：calibration 4 个测试文件、8/8 测试通过，AI typecheck/lint 通过；真实命令 `pnpm --filter @new-mj/ai evaluate list` 与单 scenario 输出冒烟均通过。CLI 仍是单线程，不负责 baseline 登记/比较、批量调度或 worker pool。
 - 命令归属结论：calibration 是 `@new-mj/ai` 的包内能力，canonical script 放在 `packages/ai/package.json`；root 不新增快捷命令，临时输出忽略规则也放在 `packages/ai/.gitignore`。
 - canonical scenario 设计结论：scenario 本身必须是纯数据，代码只负责 schema 校验、牌种到 TileId 的转换、`JunkPlayerView`/合法动作构造和 evaluator；当前 `canonical-fixtures.ts` 仅是临时原型，step 0 完成前必须迁移为版本化 manifest/fixture 数据文件，并补 `contentHash`。

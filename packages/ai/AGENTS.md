@@ -30,7 +30,7 @@
 
 ## Calibration bench 框架
 
-- `packages/ai/src/junk/calibration/` 是诊断/基线工具，不改变生产策略；`manifest`/`scenario` 是纯数据，执行逻辑由 provider、evaluator、runner 和 report 层承担。
+- `packages/ai/src/evaluation/` 是通用诊断/基线框架，`src/junk/evaluation/` 只放 Junk adapter、fixture、evaluator 和 CLI；两者都不改变生产策略。`manifest`/`scenario` 是纯数据，执行逻辑由 provider、evaluator、runner 和 report 层承担。
 - provider 负责来源数据的 schema/版本校验、TileKind→TileId 转换、`JunkPlayerView`/合法动作构造和 `contentHash`；evaluator 只负责评估已构造的输入；runner 只负责编排，不把领域评分、并发或文件 I/O 混入 evaluator。
 - 少量 canonical manifest/fixture 使用 JSON；大量 generated、snapshot、replay 输入使用 JSONL。JSONL 首个非空行为 header，后续是自包含 scenario record；记录必须带 `schemaVersion`/`scenarioId`，文件按 manifest 版本和 shard 编号命名。
 - JSONL reader 只做流式解析和基础字段校验，领域合法性仍由 provider 负责；批量聚合按 `scenarioId` 稳定排序，不能依赖输入或 worker 完成顺序。

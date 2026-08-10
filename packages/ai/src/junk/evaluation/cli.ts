@@ -4,12 +4,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CANONICAL_JUNK_FIXTURES, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
 import { createJunkFixtureProvider } from "./fixture-provider.ts";
-import { formatCalibrationSummary, serializeCalibrationReport } from "./report.ts";
+import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
-import { runSingleCalibrationScenario } from "./runner.ts";
+import { runSingleCalibrationScenario } from "../../evaluation/runner.ts";
 
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
-const defaultOutputDir = path.join(packageRoot, ".calibration-runs");
+const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate <command> [options]\n\n" +
   "Commands:\n" +
@@ -18,7 +18,7 @@ const usage =
   "  help                                        Show this help\n\n" +
   "Options:\n" +
   "  --output-dir <dir>                          Write JSON/Markdown reports here\n" +
-  "                                              (default: packages/ai/.calibration-runs)\n" +
+  "                                              (default: packages/ai/.evaluation-runs)\n" +
   "  --run-id <id>                               Stable report filename prefix\n" +
   "  --help                                      Show this help\n\n" +
   "Examples:\n" +

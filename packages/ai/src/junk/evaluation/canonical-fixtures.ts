@@ -5,7 +5,7 @@ import {
   type JunkProductionFixture,
 } from "./fixture-provider.ts";
 import type { JunkProductionFixtureData } from "./fixture-data.ts";
-import type { CalibrationManifest } from "./types.ts";
+import type { CalibrationManifest } from "../../evaluation/types.ts";
 
 export const JUNK_CALIBRATION_MANIFEST = manifestData as CalibrationManifest;
 

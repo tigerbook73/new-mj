@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runCalibrationCli } from "./cli.ts";
 
-describe("calibration CLI", () => {
+describe("evaluation CLI", () => {
   it("prints help successfully", () => {
     const result = runCalibrationCli(["--help"]);
     expect(result.exitCode).toBe(0);
@@ -29,7 +29,7 @@ describe("calibration CLI", () => {
       "run",
       "discard-001",
       "--output-dir",
-      "/tmp/calibration-cli-test",
+      "/tmp/evaluation-cli-test",
       "--run-id",
       "cli-test-001",
     ];
@@ -42,13 +42,13 @@ describe("calibration CLI", () => {
     };
     const result = runCalibrationCli(args, runtime);
     expect(result.exitCode).toBe(0);
-    expect(files.get("/tmp/calibration-cli-test/junk-cli-test-001.json")).toContain(
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"schemaVersion": 1',
     );
-    expect(files.get("/tmp/calibration-cli-test/junk-cli-test-001.md")).toContain(
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.md")).toContain(
       "discard-001",
     );
-    expect(directories).toEqual(["/tmp/calibration-cli-test"]);
+    expect(directories).toEqual(["/tmp/evaluation-cli-test"]);
 
     const second = runCalibrationCli(args, {
       ...runtime,

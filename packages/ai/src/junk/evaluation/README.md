@@ -1,4 +1,4 @@
-# Junk calibration scenarios
+# Junk evaluation scenarios
 
 这是 `@new-mj/ai` 内部的 Junk AI 评估入口。scenario 是纯数据，执行逻辑由
 provider、evaluator 和 runner 提供。

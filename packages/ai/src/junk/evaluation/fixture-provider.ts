@@ -2,10 +2,10 @@ import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import type {
   CalibrationScenario,
   NormalizedCalibrationScenario,
-} from "./types.ts";
+} from "../../evaluation/types.ts";
 import { contentHashOf } from "./hash.ts";
 import { createJunkProductionFixture, type JunkProductionFixtureData } from "./fixture-data.ts";
-import type { CalibrationManifest } from "./types.ts";
+import type { CalibrationManifest } from "../../evaluation/types.ts";
 
 export type JunkProductionFixtureInput = Readonly<{
   view: JunkPlayerView;
