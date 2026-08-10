@@ -19,6 +19,7 @@ const usage = "Usage: pnpm --filter @new-mj/ai evaluate policy capture <label>\n
 const junkSrcDir = fileURLToPath(new URL("../../", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const policyFiles = [
+  "action-scoring.ts",
   "analysis.ts",
   "default-weights.json",
   "hand-quality.ts",

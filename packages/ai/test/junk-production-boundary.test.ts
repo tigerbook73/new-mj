@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const junkRoot = fileURLToPath(new URL("../src/junk/", import.meta.url));
 const productionFiles = [
+  "action-scoring.ts",
   "analysis.ts",
   "default-weights.json",
   "hand-quality.ts",

@@ -14,6 +14,7 @@ describe("runCaptureJunkPolicyCli", () => {
     expect(directories).toHaveLength(1);
     expect(directories[0]).toContain(".compare-scratch/unit-test-label/junk");
     expect(copies.map(({ destination }) => destination.split("/").at(-1)).sort()).toEqual([
+      "action-scoring.ts",
       "analysis.ts",
       "default-weights.json",
       "hand-quality.ts",
