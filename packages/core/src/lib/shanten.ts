@@ -252,6 +252,11 @@ const evaluateUkeireInternal = (
   return { shanten: current, improvingKinds };
 };
 
+/**
+ * 兼容的仅进张查询封装。需要同时取得当前向听数时使用 `evaluateUkeire`；需要
+ * 对多组手牌去重分析时使用 `evaluateUkeireBatch`。`existingMelds` 与
+ * `shantenWithExposedMelds` 的副露数量语义一致。
+ */
 export const ukeire = (
   tiles: readonly TileId[],
   options: ShantenOptions,

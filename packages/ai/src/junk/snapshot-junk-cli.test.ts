@@ -23,6 +23,8 @@ describe("runSnapshotJunkCli", () => {
   it("rejects a missing or invalid label", () => {
     expect(runSnapshotJunkCli([]).exitCode).toBe(1);
     expect(runSnapshotJunkCli(["../escape"]).exitCode).toBe(1);
+    expect(runSnapshotJunkCli(["."]).exitCode).toBe(1);
+    expect(runSnapshotJunkCli([".."]).exitCode).toBe(1);
   });
 
   it("refuses to overwrite an existing destination", () => {

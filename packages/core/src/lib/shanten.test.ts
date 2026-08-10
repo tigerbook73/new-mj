@@ -160,6 +160,57 @@ test("evaluateUkeireAfterDiscardDraws matches independent two-change analysis", 
   }
 });
 
+test(
+  "evaluateUkeireAfterDiscardDraws matches independent leaves across random two-change shapes",
+  { tags: ["slow"] },
+  () => {
+    let prng = createPrng(20260810);
+    const allIds = allTileIds();
+    for (let trial = 0; trial < 1000; trial += 1) {
+      const shuffled = shuffle(allIds, prng);
+      prng = shuffled.prng;
+      const hand = shuffled.items.slice(0, 14);
+      const discardKinds = [
+        ...new Set(
+          hand.map((tile) => STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile))),
+        ),
+      ].slice(0, 3);
+      const drawKinds = [trial % TILE_KINDS.length, (trial * 7) % TILE_KINDS.length, 33].filter(
+        (kindIndex, index, all) => all.indexOf(kindIndex) === index,
+      );
+      const options = trial % 2 === 0 ? standardOnly : withSevenPairs;
+      const existingMelds = trial % 5;
+      const batch = evaluateUkeireAfterDiscardDraws(
+        hand,
+        discardKinds,
+        drawKinds,
+        options,
+        STANDARD_TILE_SET,
+        existingMelds,
+      );
+      for (const result of batch) {
+        const discardKind = STANDARD_TILE_SET.kinds[result.discardKindIndex]!;
+        const drawKind = STANDARD_TILE_SET.kinds[result.drawKindIndex]!;
+        const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
+        const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
+        const heldDraws = leaf.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === drawKind).length;
+        const direct = computeShanten(
+          [...leaf, tileIdOf(drawKind, heldDraws)],
+          options,
+          STANDARD_TILE_SET,
+          undefined,
+          existingMelds,
+        );
+        assert.equal(
+          result.shanten,
+          direct,
+          `mismatch trial ${trial} ${discardKind}/${drawKind} existingMelds=${existingMelds}`,
+        );
+      }
+    }
+  },
+);
+
 test("ukeire: existingMelds caps usable tatsu the same way shantenWithExposedMelds does", () => {
   // 2 副露 + 2s3s4s（面子）+ 5m7m（嵌张搭子，缺6m）+ 9m9m（雀头），7 张手牌 —
   // 2 副露 + 1 手牌内面子 = 3 面子，只差 5m7m 补 6m 就是 4 面子 + 雀头，向听 0。

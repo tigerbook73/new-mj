@@ -134,6 +134,49 @@ describe("junk strategy", () => {
     expect(result.winProbability).toBeCloseTo(4 / 123, 12);
   });
 
+  it("deducts publicly exposed opponent melds from self-draw candidates", () => {
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1s",
+      "2s",
+    ]);
+    const progress: GameProgress = { wallCount: 84, unseenPoolSize: 84 };
+    const withoutMeld = probeSelfDrawTwoPly(
+      { hand, melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+    );
+    const withOpponentPeng = probeSelfDrawTwoPly(
+      { hand, melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+      undefined,
+      undefined,
+      undefined,
+      [{ type: "peng", tiles: ids(["3s", "3s", "3s"]) }],
+    );
+    expect(withoutMeld.outcomes.find(({ kind }) => kind === "3s")?.probability).toBeCloseTo(
+      4 / 84,
+      12,
+    );
+    expect(withOpponentPeng.outcomes.find(({ kind }) => kind === "3s")?.probability).toBeCloseTo(
+      1 / 84,
+      12,
+    );
+  });
+
   it("always takes a legal win and preserves its original reference", () => {
     const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
     expect(recommendJunkAction(view(["1m"]), actions)).toBe(actions[1]);
@@ -165,6 +208,26 @@ describe("junk strategy", () => {
     expect(cache.hits).toBeGreaterThan(hitsAfterFirstCall);
     expect(cache.size).toBeLessThanOrEqual(32);
     expect(second).toEqual(first);
+  });
+
+  it("falls back to one-ply scores after the wall is exhausted", () => {
+    const player = {
+      ...view(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "1s", "2s", "1z"]),
+      wallCount: 0,
+    };
+    const actions = player.hand.map((tile) => ({ type: "discard" as const, tile }));
+    const scored = scoreLegalActions(player, actions, DEFAULT_JUNK_WEIGHTS);
+    const expected = actions.map(({ tile }) =>
+      scoreHandShapeAfterDiscard(
+        { hand: player.hand, melds: [] },
+        tile,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        undefined,
+        { wallCount: 0, unseenPoolSize: 39 },
+      ),
+    );
+    expect(scored.map(({ score }) => score)).toEqual(expected);
   });
 
   it("keeps a one-away hand instead of breaking it", () => {

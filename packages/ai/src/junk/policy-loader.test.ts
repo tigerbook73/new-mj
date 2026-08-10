@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { tileIdOf, type JunkAction, type JunkPlayerView } from "@new-mj/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { chooseJunkAction, DEFAULT_JUNK_WEIGHTS, scoreHandShapeAfterDiscard } from "./strategy.ts";
@@ -69,15 +69,17 @@ describe("loadPolicy", () => {
     expect(legalActions).toContainEqual(customPolicy(view, legalActions));
   });
 
-  it("loads a historical version via a git ref (HEAD, pre-Phase-1 improvementWeight)", async () => {
-    const { policy, label, modulePath } = await loadPolicy({ ref: "HEAD" }, "head");
-    expect(label).toBe("head");
+  it("loads a historical version with the pre-probability weight shape", async () => {
+    const { policy, label, modulePath } = await loadPolicy({ ref: "6f2a7d8" }, "historical");
+    expect(label).toBe("historical");
     expect(modulePath).not.toBe(currentStrategyPath);
     expect(modulePath.includes(".compare-scratch")).toBe(true);
     scratchFiles.push(path.dirname(modulePath));
-    // Confirms this genuinely loaded a different module, not silently the
-    // current working tree — the pre-Phase-1 weight file still has
-    // improvementWeight, which the current DEFAULT_JUNK_WEIGHTS doesn't.
+    const historicalModule = (await import(pathToFileURL(modulePath).href)) as {
+      DEFAULT_JUNK_WEIGHTS: Record<string, number>;
+    };
+    expect(historicalModule.DEFAULT_JUNK_WEIGHTS).toHaveProperty("improvementWeight");
+    expect(historicalModule.DEFAULT_JUNK_WEIGHTS).not.toHaveProperty("tenpaiProbabilityWeight");
     expect(policy(view, legalActions)).toBeDefined();
   }, 20_000);
 

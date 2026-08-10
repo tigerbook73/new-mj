@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import os from "node:os";
 import { createPrng, nextUint32 } from "@new-mj/core";
 import {
@@ -9,8 +8,7 @@ import {
   type MatchupResult,
 } from "./tune.ts";
 import { MatchWorkerPool, type MatchTask, type PolicyMatchTask } from "./tune-pool.ts";
-import { resolveModulePath, type PolicySource } from "./policy-loader.ts";
-import type { JunkWeights } from "./strategy.ts";
+import { loadWeightsFile, resolveModulePath, type PolicySource } from "./policy-loader.ts";
 
 /**
  * General-purpose A/B primitive for any AI-quality change expressed as weights:
@@ -104,17 +102,6 @@ const parseArguments = (argv: string[]): Arguments => {
   return result;
 };
 
-const loadWeights = (path: string): JunkWeights => {
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (typeof parsed !== "object" || parsed === null)
-    throw new Error(`INVALID_WEIGHTS_FILE: ${path}`);
-  const keys = Object.keys(parsed).sort();
-  if (keys.join(",") !== [...WEIGHT_KEYS].sort().join(",")) {
-    throw new Error(`INVALID_WEIGHTS_FILE: ${path} does not have exactly the JunkWeights key set`);
-  }
-  return parsed as JunkWeights;
-};
-
 const isCrossVersion = (args: Arguments): boolean =>
   Boolean(args.baselineModule || args.baselineRef || args.candidateModule || args.candidateRef);
 
@@ -195,8 +182,8 @@ export const runCompareWeightsCli = async (
       // non-null assertion.
       if (!args.candidateWeightsPath) throw new Error("MISSING_CANDIDATE");
       const candidatePath = args.candidateWeightsPath;
-      const baseline = loadWeights(baselinePath);
-      const candidate = loadWeights(candidatePath);
+      const baseline = loadWeightsFile(baselinePath, WEIGHT_KEYS);
+      const candidate = loadWeightsFile(candidatePath, WEIGHT_KEYS);
       log(`[compare] baseline=${baselinePath} candidate=${candidatePath} seeds=${args.seeds}\n`);
       weightPool = new MatchWorkerPool<MatchTask>(
         args.concurrency,

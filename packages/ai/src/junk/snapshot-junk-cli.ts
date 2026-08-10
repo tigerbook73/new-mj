@@ -19,7 +19,8 @@ const usage = "Usage: junk/snapshot-junk-cli.ts <label>\n";
 const junkSrcDir = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-const isValidLabel = (label: string): boolean => /^[a-zA-Z0-9._-]+$/.test(label);
+const isValidLabel = (label: string): boolean =>
+  label !== "." && label !== ".." && /^[a-zA-Z0-9._-]+$/.test(label);
 
 export const runSnapshotJunkCli = (
   argv: string[],
@@ -48,7 +49,3 @@ export const runSnapshotJunkCli = (
       `  pnpm decision-diff:junk --baseline-module ${destination}/strategy.ts\n`,
   };
 };
-
-const result = runSnapshotJunkCli(process.argv.slice(2));
-process.stdout.write(result.output);
-process.exitCode = result.exitCode;

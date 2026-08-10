@@ -6,6 +6,8 @@
 
 当前专题：关闭 Junk AI 决策质量优化分支，并准备人工合并到 `main`。
 
+当前收尾动作：处理两份 code review 的合并前问题，并完成受限环境外的最终 verify。
+
 当前实现目标：
 
 - 默认 Junk AI 使用两轮快速过滤的 2-ply；
@@ -42,7 +44,8 @@
 4. [x] 完成 AI/core 类型检查、lint、测试和构建；验证结果见下文。
 5. [x] 将保留内容、删除内容、限制和验证结果写回本文件。
 6. [x] 提交当前分支的最终整理提交（`10bc8c3`），确认工作区干净。
-7. [ ] 停在人工合并前：不切换 `main`、不执行 merge/squash merge、不推送、不删除当前分支。
+7. [x] 综合两份 review，修复合并前问题并补充回归测试。
+8. [ ] 在非受限环境执行最终 AI/core verify，随后停在人工合并前：不切换 `main`、不执行 merge/squash merge、不推送、不删除当前分支。
 
 ## 验收标准
 
@@ -64,11 +67,14 @@
 - AI 全量测试：业务测试通过；`policy-loader.test.ts` 的 2 个测试在受限环境中因 `spawnSync git EPERM` 失败，随后测试进程未正常退出，未将该环境问题伪装成全绿。
 - core `verify:full`：19 个测试文件、192 个测试通过，构建通过。
 - `git diff --check`：通过。
+- review follow-up 定向测试：AI 39/39、core shanten 15/15 通过；AI/core typecheck 与 lint 通过。
+- 受限环境下 policy loader 的 git ref 测试仍会报 `spawnSync git EPERM`，需在非受限环境完成最终 verify。
 
 ## 阻塞与遗留问题
 
 - 分支关闭后，基础权重和断崖参数需要另开独立计划；
 - 2-ply 仍是启发式评估，不是完整牌局价值证明。
+- 2-ply 终局收益模型、断崖窗口 batch 合并、strategy.ts 拆分和断崖参数调优留待独立 benchmark/计划。
 
 ## Backlog
 

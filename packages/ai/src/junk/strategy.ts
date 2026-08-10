@@ -312,6 +312,18 @@ const remainingLiveCopies = (
   return Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
 };
 
+const createLiveCopyContext = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[],
+  additionalMelds: readonly Meld[] = [],
+): LiveCopyContext => ({
+  meldCounts: countsOf([
+    ...input.melds.flatMap((meld) => meld.tiles),
+    ...additionalMelds.flatMap((meld) => meld.tiles),
+  ]),
+  discardCounts: countsOf(visibleDiscards),
+});
+
 /**
  * The two numbers `handQuality` needs to turn a live-copy count into a draw
  * probability: how many tiles are still unaccounted for from this seat's
@@ -522,7 +534,9 @@ type TwoChangeBatchSource = Readonly<{
  * ranking and cliff filter. Direct callers may still omit the batch source;
  * that compatibility path uses the general batch evaluator, while the formal
  * policy path supplies the discard/draw source so core can reuse its two-change
- * shanten table.
+ * shanten table. `additionalMelds` contains public melds from other seats; their
+ * tile ids only reduce live-copy estimates and are never exposed as a simulated
+ * hand.
  */
 export const probeSelfDrawTwoPly = (
   input: ShapeInput,
@@ -532,6 +546,7 @@ export const probeSelfDrawTwoPly = (
   analysisCache?: JunkAnalysisCache,
   secondDiscardKindsForDraw?: (drawnKind: TileKind) => ReadonlySet<TileKind>,
   twoChangeBatchSource?: TwoChangeBatchSource,
+  additionalMelds: readonly Meld[] = [],
 ): SelfDrawTwoPlyProbe => {
   if (gameProgress.unseenPoolSize <= 0 || gameProgress.wallCount <= 0)
     return {
@@ -544,10 +559,7 @@ export const probeSelfDrawTwoPly = (
 
   const memo = new Map<string, number>();
   const structuralCache = analysisCache ?? createJunkAnalysisCache();
-  const liveCopyContext: LiveCopyContext = {
-    meldCounts: countsOf(input.melds.flatMap((meld) => meld.tiles)),
-    discardCounts: countsOf(visibleDiscards),
-  };
+  const liveCopyContext = createLiveCopyContext(input, visibleDiscards, additionalMelds);
   let continuationProbability = 0;
   let continuationValue = 0;
   let winProbability = 0;
@@ -556,6 +568,7 @@ export const probeSelfDrawTwoPly = (
   const occupied = new Set([
     ...input.hand,
     ...input.melds.flatMap((meld) => meld.tiles),
+    ...additionalMelds.flatMap((meld) => meld.tiles),
     ...visibleDiscards,
   ]);
   const drawCandidates: {
@@ -708,6 +721,11 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
 const visibleDiscards = (view: JunkPlayerView): TileId[] =>
   view.seats.flatMap((seat) => seat.discards.map((discard) => discard.tile));
 
+const opponentMelds = (view: JunkPlayerView): Meld[] =>
+  view.seats.flatMap((seat, seatIndex) =>
+    seatIndex === view.seat ? [] : seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
+  );
+
 /** unseenPoolSize = wallCount + every *other* seat's concealed hand (own hand is
  * fully known, so it's excluded); see GameProgress's doc comment for why this
  * pool is treated as exchangeable for a draw-probability estimate. */
@@ -783,6 +801,7 @@ const rankTwoPlyDiscards = (
   gameProgress: GameProgress,
   memo: Map<string, number>,
   analysisCache: JunkAnalysisCache,
+  additionalMelds: readonly Meld[],
 ): RankedTwoPlyDiscard[] => {
   const uniqueDiscards = new Map<TileKind, TileId>();
   for (const tile of input.hand) {
@@ -801,7 +820,7 @@ const rankTwoPlyDiscards = (
           weights,
           memo,
           gameProgress,
-          undefined,
+          createLiveCopyContext(input, visibleDiscards, additionalMelds),
           analysisCache,
         ) + suitTrajectoryBonusAfterDiscard(input, discard, weights),
     }))
@@ -857,7 +876,16 @@ const scoreTwoPlyDiscards = (
   const input = { hand: view.hand, melds: view.seats[view.seat]!.melds };
   const discards = visibleDiscards(view);
   const progress = gameProgressOf(view);
-  const ranked = rankTwoPlyDiscards(input, discards, weights, progress, memo, analysisCache);
+  const publicMelds = opponentMelds(view);
+  const ranked = rankTwoPlyDiscards(
+    input,
+    discards,
+    weights,
+    progress,
+    memo,
+    analysisCache,
+    publicMelds,
+  );
   const upperLimit = upperTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.upper);
   const lowerLimit = lowerTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.lower);
   const secondWhitelist = new Set(ranked.slice(0, lowerLimit).map(({ kind }) => kind));
@@ -880,9 +908,13 @@ const scoreTwoPlyDiscards = (
         tiles: input.hand,
         discardKindIndex: STANDARD_TILE_SET.kindIndexOf(kind),
       },
+      publicMelds,
     );
+    // 没有可抽牌的分支，或包含立即自摸分支时，暂不把未建模的终局收益混入
+    // 生产评分；交给一轮评分作为稳定 fallback。
+    if (probe.outcomes.length === 0 || probe.winProbability > 0) continue;
     const discardSafety = discards.includes(discard) ? weights.safetyBonus : 0;
-    scores.set(kind, probe.continuationValue + probe.winProbability + discardSafety);
+    scores.set(kind, probe.continuationValue + discardSafety);
   }
   return scores;
 };
@@ -897,6 +929,7 @@ const scoreAction = (
   const discards = visibleDiscards(view);
   const currentMelds = view.seats[view.seat]!.melds;
   const gameProgress = gameProgressOf(view);
+  const publicMelds = opponentMelds(view);
   if (action.type === "discard") {
     return scoreHandShapeAfterDiscard(
       { hand: view.hand, melds: currentMelds },
@@ -905,7 +938,7 @@ const scoreAction = (
       weights,
       memo,
       gameProgress,
-      undefined,
+      createLiveCopyContext({ hand: view.hand, melds: currentMelds }, discards, publicMelds),
       analysisCache,
     );
   }
@@ -919,7 +952,7 @@ const scoreAction = (
       discards,
       undefined,
       gameProgress,
-      undefined,
+      createLiveCopyContext({ hand: view.hand, melds: currentMelds }, discards, publicMelds),
       analysisCache,
     );
   if (action.type === "anGang") {
@@ -932,7 +965,7 @@ const scoreAction = (
           discards,
           undefined,
           gameProgress,
-          undefined,
+          createLiveCopyContext(claim, discards, publicMelds),
           analysisCache,
         ) + weights.gangkai
       : -100;
@@ -947,7 +980,7 @@ const scoreAction = (
           discards,
           undefined,
           gameProgress,
-          undefined,
+          createLiveCopyContext(claim, discards, publicMelds),
           analysisCache,
         ) +
           (weights.gangkai - weights.buGangPenalty)
@@ -957,8 +990,15 @@ const scoreAction = (
   if (!claim) return -100;
   const hurdle = action.type === "chi" ? weights.chiHurdle : weights.pengHurdle;
   return (
-    bestDiscardScore(claim, discards, weights, memo, gameProgress, undefined, analysisCache) -
-    hurdle
+    bestDiscardScore(
+      claim,
+      discards,
+      weights,
+      memo,
+      gameProgress,
+      createLiveCopyContext(claim, discards, publicMelds),
+      analysisCache,
+    ) - hurdle
   );
 };
 
