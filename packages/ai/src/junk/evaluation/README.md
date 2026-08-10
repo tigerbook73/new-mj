@@ -71,5 +71,9 @@ executor 的 task 契约使用稳定 `taskId` 和纯 task function；顺序/有�
 task input 可结构化克隆、通过 module URL 和 export name 定位纯 task function；CLI
 默认仍使用顺序模式。
 
+worker batch 按 `chunkSize` 分块执行，不一次性保留全部 normalized tasks。调用方可用
+`onProgress` 显示进度，并通过 `onCheckpoint` 持久化每个新完成 chunk；恢复时传入
+`resumeEvaluations`，runner 会校验 scenario content hash，不接受过期结果。
+
 reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
 合法性仍由对应 provider 负责。

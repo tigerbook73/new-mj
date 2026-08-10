@@ -169,4 +169,91 @@ describe("JSONL batch runner", () => {
       sequential.evaluations[0]?.scenarioContentHash,
     );
   });
+
+  it("executes JSONL in chunks and safely resumes matching evaluations", async () => {
+    const scenarios = ["scenario-c", "scenario-a", "scenario-b"].map((id) => ({
+      ...fixture.scenario,
+      id,
+    }));
+    const batchManifest: CalibrationManifest = { ...manifest, scenarios };
+    const records = parseCalibrationJsonl<{ value: number }>(
+      '{"type":"header","schemaVersion":1,"manifestId":"m","manifestVersion":1,"shardId":"part-0000","shardIndex":0}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"scenario-c","data":{"value":3}}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"scenario-a","data":{"value":1}}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"scenario-b","data":{"value":2}}',
+    );
+    const chunkSizes: number[] = [];
+    const progress: Array<{ seen: number; executed: number; resumed: number }> = [];
+    const checkpoints: string[][] = [];
+    const report = await runCalibrationJsonlBatchWithExecutor(
+      batchManifest,
+      (async function* () { for (const record of records) yield record; })(),
+      (scenario, data) => ({ scenario, input: data, contentHash: `hash-${scenario.id}` }),
+      async (tasks) => {
+        chunkSizes.push(tasks.length);
+        return executeCalibrationTasks(tasks, (task) => ({
+          scenarioId: task.scenarioId,
+          evaluator: "standard-only",
+          evaluatorVersion: "v1",
+          selectedCandidateId: String(task.input.value),
+          candidates: [],
+          performance: { durationMs: 1, cacheHits: 0, cacheMisses: 0 },
+          status: "ok",
+        }));
+      },
+      run,
+      {
+        chunkSize: 1,
+        resumeEvaluations: [{
+          scenarioId: "scenario-b",
+          scenarioContentHash: "hash-scenario-b",
+          evaluator: "standard-only",
+          evaluatorVersion: "v1",
+          selectedCandidateId: "2",
+          candidates: [],
+          performance: { durationMs: 1, cacheHits: 0, cacheMisses: 0 },
+          status: "ok",
+        }],
+        onProgress: ({ seen, executed, resumed }) => {
+          progress.push({ seen, executed, resumed });
+        },
+        onCheckpoint: ({ evaluations }) => {
+          checkpoints.push(evaluations.map(({ scenarioId }) => scenarioId));
+        },
+      },
+    );
+    expect(chunkSizes).toEqual([1, 1]);
+    expect(checkpoints).toEqual([["scenario-c"], ["scenario-a"]]);
+    expect(report.evaluations.map(({ scenarioId }) => scenarioId)).toEqual([
+      "scenario-a",
+      "scenario-b",
+      "scenario-c",
+    ]);
+    expect(progress.at(-1)).toEqual({ seen: 3, executed: 2, resumed: 1 });
+  });
+
+  it("rejects stale resume data when the content hash changed", async () => {
+    const records = parseCalibrationJsonl<Record<string, never>>(
+      '{"type":"header","schemaVersion":1,"manifestId":"m","manifestVersion":1,"shardId":"part-0000","shardIndex":0}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"discard-001","data":{}}',
+    );
+    await expect(runCalibrationJsonlBatchWithExecutor(
+      manifest,
+      (async function* () { for (const record of records) yield record; })(),
+      (scenario) => ({ scenario, input: fixture.input, contentHash: "new-hash" }),
+      () => Promise.resolve([]),
+      run,
+      {
+        resumeEvaluations: [{
+          scenarioId: "discard-001",
+          scenarioContentHash: "old-hash",
+          evaluator: "production-weighted",
+          evaluatorVersion: "v1",
+          candidates: [],
+          performance: { durationMs: 0, cacheHits: 0, cacheMisses: 0 },
+          status: "ok",
+        }],
+      },
+    )).rejects.toThrow("RESUME_CONTENT_HASH_MISMATCH: discard-001");
+  });
 });

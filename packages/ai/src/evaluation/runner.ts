@@ -58,6 +58,26 @@ export type CalibrationEvaluationTaskExecutor<TInput> = (
   tasks: readonly CalibrationTask<CalibrationEvaluationTaskInput<TInput>>[],
 ) => Promise<readonly Readonly<{ taskId: string; result: CalibrationEvaluationResult }>[]>;
 
+export type CalibrationBatchProgress = Readonly<{
+  seen: number;
+  executed: number;
+  resumed: number;
+  failed: number;
+  lastScenarioId: string;
+}>;
+
+export type CalibrationBatchCheckpoint = Readonly<{
+  progress: CalibrationBatchProgress;
+  evaluations: readonly CalibrationEvaluationResult[];
+}>;
+
+export type CalibrationBatchExecutorOptions = Readonly<{
+  chunkSize?: number;
+  resumeEvaluations?: readonly CalibrationEvaluationResult[];
+  onProgress?: (progress: CalibrationBatchProgress) => void | Promise<void>;
+  onCheckpoint?: (checkpoint: CalibrationBatchCheckpoint) => void | Promise<void>;
+}>;
+
 export const runCalibrationEvaluationsWithExecutor = async <TInput>(
   manifest: CalibrationManifest,
   scenarios: readonly NormalizedCalibrationScenario<TInput>[],
@@ -74,8 +94,9 @@ export const runCalibrationEvaluationsWithExecutor = async <TInput>(
     },
   }));
   const results = await execute(tasks);
+  const taskById = new Map(tasks.map((task) => [task.taskId, task]));
   const evaluations = results.map(({ taskId, result }) => {
-    const task = tasks.find(({ taskId: id }) => id === taskId);
+    const task = taskById.get(taskId);
     if (!task) throw new Error(`TASK_RESULT_NOT_FOUND: ${taskId}`);
     return {
       ...result,
@@ -96,17 +117,81 @@ export const runCalibrationJsonlBatchWithExecutor = async <TRecordData, TInput>(
   resolveRecord: CalibrationJsonlRecordResolver<TRecordData, TInput>,
   execute: CalibrationEvaluationTaskExecutor<TInput>,
   run: CalibrationRun,
+  options: CalibrationBatchExecutorOptions = {},
 ): Promise<CalibrationReport> => {
-  const scenarios: NormalizedCalibrationScenario<TInput>[] = [];
+  const chunkSize = options.chunkSize ?? 64;
+  if (!Number.isSafeInteger(chunkSize) || chunkSize <= 0) {
+    throw new Error("INVALID_BATCH_CHUNK_SIZE");
+  }
+  const startedAt = performance.now();
+  const evaluations: CalibrationEvaluationResult[] = [];
+  const chunk: NormalizedCalibrationScenario<TInput>[] = [];
   const seen = new Set<string>();
+  const resumeById = new Map<string, CalibrationEvaluationResult>();
+  for (const evaluation of options.resumeEvaluations ?? []) {
+    if (resumeById.has(evaluation.scenarioId)) {
+      throw new Error(`DUPLICATE_RESUME_SCENARIO: ${evaluation.scenarioId}`);
+    }
+    resumeById.set(evaluation.scenarioId, evaluation);
+  }
+  let executed = 0;
+  let resumed = 0;
+  let failed = 0;
+  let lastScenarioId = "";
+  const currentProgress = (): CalibrationBatchProgress => ({
+    seen: seen.size,
+    executed,
+    resumed,
+    failed,
+    lastScenarioId,
+  });
+  const emitProgress = async (): Promise<void> => {
+    if (!options.onProgress || !lastScenarioId) return;
+    await options.onProgress(currentProgress());
+  };
+  const flush = async (): Promise<void> => {
+    if (chunk.length === 0) return;
+    const chunkReport = await runCalibrationEvaluationsWithExecutor(manifest, chunk, execute, run);
+    evaluations.push(...chunkReport.evaluations);
+    executed += chunkReport.evaluations.length;
+    failed += chunkReport.evaluations.filter(({ status }) => status === "failed").length;
+    chunk.length = 0;
+    await emitProgress();
+    await options.onCheckpoint?.({
+      progress: currentProgress(),
+      evaluations: chunkReport.evaluations,
+    });
+  };
   for await (const record of records) {
     if (seen.has(record.scenarioId)) throw new Error(`DUPLICATE_SCENARIO: ${record.scenarioId}`);
     seen.add(record.scenarioId);
+    lastScenarioId = record.scenarioId;
     const scenario = manifest.scenarios.find(({ id }) => id === record.scenarioId);
     if (!scenario) throw new Error(`SCENARIO_NOT_FOUND: ${record.scenarioId}`);
-    scenarios.push(resolveRecord(scenario, record.data));
+    const normalized = resolveRecord(scenario, record.data);
+    const resumedEvaluation = resumeById.get(record.scenarioId);
+    if (resumedEvaluation) {
+      if (!resumedEvaluation.scenarioContentHash) {
+        throw new Error(`RESUME_CONTENT_HASH_MISSING: ${record.scenarioId}`);
+      }
+      if (resumedEvaluation.scenarioContentHash !== normalized.contentHash) {
+        throw new Error(`RESUME_CONTENT_HASH_MISMATCH: ${record.scenarioId}`);
+      }
+      evaluations.push(resumedEvaluation);
+      resumed += 1;
+      failed += resumedEvaluation.status === "failed" ? 1 : 0;
+      await emitProgress();
+      continue;
+    }
+    chunk.push(normalized);
+    if (chunk.length >= chunkSize) await flush();
   }
-  return runCalibrationEvaluationsWithExecutor(manifest, scenarios, execute, run);
+  await flush();
+  const report = createCalibrationReport(run, manifest, evaluations);
+  return {
+    ...report,
+    batch: createCalibrationBatchSummary(evaluations, performance.now() - startedAt),
+  };
 };
 
 /**

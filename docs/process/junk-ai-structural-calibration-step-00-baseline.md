@@ -152,7 +152,9 @@ executor 边界已初步落地：task 带稳定 `taskId`，顺序与有界并发
 
 通用 `worker_threads` adapter 已落地并通过顺序/worker 等价性测试；worker 只接收可结构化克隆的输入，主线程负责稳定聚合和生命周期，CLI 默认仍使用顺序模式。
 
-evaluator task 已接入批量 runner：JSONL resolver 留在主线程，顺序/worker executor 调用同一个可序列化 production evaluator task，完整 report 的 scenario、选中动作和 content hash 等价；当前 worker batch 会先收集 normalized tasks，超大数据的分块调度仍待补充。
+evaluator task 已接入批量 runner：JSONL resolver 留在主线程，顺序/worker executor 调用同一个可序列化 production evaluator task，完整 report 的 scenario、选中动作和 content hash 等价。
+
+worker batch 分块与恢复边界已落地：`chunkSize` 限制 normalized tasks 内存，`onProgress` 暴露 seen/executed/resumed/failed，`onCheckpoint` 逐 chunk 交付可持久化 evaluation；恢复结果必须匹配 scenario content hash，过期或缺失 hash 快速失败。
 
 fixture 元数据已去重：fixture JSON 不再保存 `id/version/seed`；registry 的 `fixtureId` 管理输入资产身份，manifest scenario 管理版本，fixture source 不使用 seed。
 
@@ -160,4 +162,4 @@ ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 
 
 seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不保存无效 seed。
 
-下一动作：为 worker batch 增加分块调度和 progress/failure resume 边界，避免超大 JSONL 一次性收集 normalized tasks；先不切换 CLI 默认并发。
+下一动作：确定批量 CLI 命令与 checkpoint 文件 schema；推荐在现有 `evaluate` 下增加独立批量动词，并显式提供 workers/chunk-size/resume 参数，确认命名后再实现。
