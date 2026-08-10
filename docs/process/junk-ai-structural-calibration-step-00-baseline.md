@@ -138,7 +138,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 | --- | --- | --- |
 | 1. manifest、统一结果、报告、baseline 资产 | 基本完成 | scenario 是纯数据；输入用 `contentHash` 绑定 baseline；报告稳定排序且不覆盖既有资产 |
 | 2. canonical + snapshot + 三路 evaluator | 完成 | canonical fixture 和代表性可见状态 snapshot 共用主链；production-weighted、one-ply-all、two-ply-all 在同一 content hash 下输出统一结果 |
-| 3. 通用断言、decision diff、baseline comparator | 部分完成 | 已有 schema/hash/顺序/worker 等价断言；仍缺候选差异和 baseline 回归分类 |
+| 3. 通用断言、decision diff、baseline comparator | 完成 | comparator 忽略耗时与候选顺序，区分动作、候选集合和分数变化；hash/evaluator 不匹配归类为 incompatible |
 | 4. 有界 worker 与性能报告 | 基本完成 | worker 与顺序共享 task function；支持分块、吞吐、p50/p95、checkpoint 和 hash-safe resume |
 | 5. 人/AI 使用入口 | 部分完成 | 单场景 `evaluate list/run` 可用；批量 CLI、checkpoint 文件格式和 baseline compare 尚未开放 |
 
@@ -146,7 +146,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 ## 当前下一动作
 
-1. 增加最小 decision diff/baseline comparator，区分动作变化、候选集合变化和仅分数变化；
-2. comparator 闭环后，再回到批量 CLI 与 checkpoint 持久化入口。
+1. 将现有 JSONL batch、worker、checkpoint/resume 能力开放为稳定 CLI 参数和文件产物；
+2. 补齐最短成功路径、批量运行和失败恢复说明后，审计 step 0 验收条件。
 
-第一个具体动作：定义 baseline comparator 的最小输入、回归分类和稳定输出；不扩展性能阈值，也不引入 step 2 的 `StructuralMetrics`。
+第一个具体动作：定义 batch CLI 的最小参数、checkpoint 文件契约和恢复方式；不增加新的 executor 能力，也不引入 step 2 的 `StructuralMetrics`。

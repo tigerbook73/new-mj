@@ -44,8 +44,9 @@ pnpm --filter @new-mj/ai evaluate run discard-001
 步骤。当前命令还不是 baseline 比较工具。
 
 当前决策 baseline 位于 `fixtures/baselines/*.baseline.json`。它保存输入内容哈希、评估器版本、
-期望动作和候选数量；baseline 文件作为版本化资产，不由运行结果覆盖。当前只有
-决策和候选数量是可比较结果，耗时只作信息记录。
+期望动作、候选 ID，并可选择保存候选分数及容差；baseline 文件作为版本化资产，不由运行
+结果覆盖。通用 comparator 将结果分类为 matched、changed 或 incompatible，并分别报告
+动作、候选集合和分数变化；输入 hash/evaluator 不一致视为 incompatible。耗时只作信息记录。
 
 ## 来源类型
 

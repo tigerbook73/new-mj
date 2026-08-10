@@ -41,9 +41,9 @@
 
 专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
 
-本步骤完成条件与下一动作见专门计划文件。当前通用 evaluation/worker/JSONL/report 基础设施、代表性 snapshot 和 production/one-ply-all/two-ply-all 三路同输入报告已具备，功能闭环仍缺 baseline comparator。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+本步骤完成条件与下一动作见专门计划文件。当前通用 evaluation/worker/JSONL/report 基础设施、代表性 snapshot、三路同输入报告和 baseline comparator 已具备，功能闭环仍缺 batch/checkpoint CLI 入口与最终使用说明审计。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
 
-下一步第一个具体动作：定义 baseline comparator 的最小输入、回归分类和稳定输出；不扩展性能阈值，也不引入 step 2 的 `StructuralMetrics`。
+下一步第一个具体动作：定义 batch CLI 的最小参数、checkpoint 文件契约和恢复方式；不增加新的 executor 能力，也不引入 step 2 的 `StructuralMetrics`。
 
 ## 专题路线图
 

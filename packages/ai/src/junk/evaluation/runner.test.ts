@@ -13,6 +13,7 @@ import { executeCalibrationTasks, executeCalibrationTasksInWorkers } from "../..
 import { evaluateProductionTask } from "./production-evaluator-task.ts";
 import { parseCalibrationJsonl } from "../../evaluation/jsonl.ts";
 import { CALIBRATION_SCHEMA_VERSION, type CalibrationManifest, type CalibrationRun } from "../../evaluation/types.ts";
+import { compareCalibrationBaseline, type CalibrationBaseline } from "../../evaluation/comparator.ts";
 
 const fixture = CANONICAL_PRODUCTION_SELECTION;
 
@@ -49,11 +50,12 @@ describe("single calibration runner", () => {
     expect(report.evaluations[0]?.scenarioContentHash).toBeDefined();
     expect(report.evaluations[0]?.scenarioContentHash).toBe(baseline.scenarioContentHash);
     expect(report.evaluations[0]?.selectedCandidateId).toBe(
-      JSON.stringify(baseline.expected.selectedAction),
+      baseline.expected.selectedCandidateId,
     );
-    expect(report.evaluations[0]?.candidates[0]?.metrics.legalActionCount).toBe(
-      baseline.expected.legalActionCount,
-    );
+    expect(compareCalibrationBaseline(
+      baseline as CalibrationBaseline,
+      report.evaluations[0]!,
+    ).status).toBe("matched");
     expect(fixture.input.legalActions).toContainEqual(report.evaluations[0]?.candidates[0]?.action);
     expect(serializeCalibrationReport(report)).toContain('"schemaVersion": 1');
     expect(formatCalibrationSummary(report)).toContain("discard-001");
