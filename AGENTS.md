@@ -6,7 +6,7 @@
 ## 会话仪式
 
 - 开工：读 docs/process/plan.md 状态区
-- 收工：把进度与"下一步第一个具体动作"写回 docs/process/plan.md 并 commit
+- 收工：覆盖更新 docs/process/plan.md 的当前状态与"下一步第一个具体动作"并 commit；不追加会话、提交或验证过程记录
 
 ## Ground Truth（冲突以 docs 为准）
 

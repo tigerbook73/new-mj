@@ -10,25 +10,25 @@ architecture/                   系统原理、边界与长期设计
 contracts/                      跨 package 的当前契约
 variants/                       每个玩法自己的规则与私有契约
 testing-strategy.md             测试策略
-process/plan.md                 当前任务计划、步骤状态与关键完成结论
+process/plan.md                 当前任务计划、步骤状态与关键判断
 process/backlog.md              用户待选择的候选专题
 process/workflow.md             工作流与 DoD
 ```
 
 ## 内容归属
 
-| 内容                                       | 主场                               | 生命周期                   |
-| ------------------------------------------ | ---------------------------------- | -------------------------- |
-| 项目目的、当前能力、阅读路径               | `overview.md`                      | 活文档，里程碑更新         |
-| 系统原理、数据模型、长期设计取舍           | `architecture/*.md`                | 活文档，设计变化时更新     |
-| engine、协议、会话的行为与不变量           | `contracts/*.md`                   | 活文档，与代码同 commit    |
-| 玩法规则、私有状态/事件/配置               | `variants/<id>.md`                 | 活文档，与代码同 commit    |
-| 公共/玩法私有的判定与转正记录              | `architecture/variant-boundary.md` | 仅边界变化或新增玩法时更新 |
-| 测试层次、文件位置、最低门槛               | `testing-strategy.md`              | 策略变化时更新             |
-| AI 不可违反规则与包级边界                  | 根/包级 `AGENTS.md`                | 活文档，保持短小           |
-| DoD、依赖、Git、专题流程                   | `process/workflow.md`              | 活文档                     |
-| 当前专题、步骤状态、关键完成结论与遗留问题 | `process/plan.md`                  | 当前任务文档，持续清理     |
-| 尚未选择的候选专题与选择规则               | `process/backlog.md`               | 用户选择后移入当前任务     |
+| 内容                                   | 主场                               | 生命周期                   |
+| -------------------------------------- | ---------------------------------- | -------------------------- |
+| 项目目的、当前能力、阅读路径           | `overview.md`                      | 活文档，里程碑更新         |
+| 系统原理、数据模型、长期设计取舍       | `architecture/*.md`                | 活文档，设计变化时更新     |
+| engine、协议、会话的行为与不变量       | `contracts/*.md`                   | 活文档，与代码同 commit    |
+| 玩法规则、私有状态/事件/配置           | `variants/<id>.md`                 | 活文档，与代码同 commit    |
+| 公共/玩法私有的判定与转正记录          | `architecture/variant-boundary.md` | 仅边界变化或新增玩法时更新 |
+| 测试层次、文件位置、最低门槛           | `testing-strategy.md`              | 策略变化时更新             |
+| AI 不可违反规则与包级边界              | 根/包级 `AGENTS.md`                | 活文档，保持短小           |
+| DoD、依赖、Git、专题流程               | `process/workflow.md`              | 活文档                     |
+| 当前专题、步骤状态、关键判断与遗留问题 | `process/plan.md`                  | 当前任务文档，覆盖更新     |
+| 尚未选择的候选专题与选择规则           | `process/backlog.md`               | 用户选择后移入当前任务     |
 
 `CLAUDE.md` 仅为兼容性入口，指向同目录 `AGENTS.md`；规范的唯一内容主场是 `AGENTS.md`。
 
@@ -42,7 +42,7 @@ process/workflow.md             工作流与 DoD
 
 - 类型/schema 已有权威代码时，文档指向代码并保留叙事、理由、不变量与时序；未实现内容保留完整规格。
 - 跨端契约或长期解释价值 → `contracts/` 或 `architecture/`；玩法私有 → `variants/`；局部实现陷阱 → 代码注释或 package `AGENTS.md`。
-- 专题推演只留在 `plan.md`，或当前步骤的临时一页 `process/<topic>.md`。步骤完成后将影响后续判断的价值内容归并到 `plan.md`，删除临时文档；整个专题完成后再按 workflow 将耐久结论分流，清除专题状态。
+- 专题推演只留在当前步骤的临时一页 `process/<topic>.md`。步骤完成后只将影响后续判断的内容归并到 `plan.md`，覆盖旧状态并删除临时文档；不在 `plan.md` 累积会话、提交、验证检查点或实现日记。整个专题完成后再按 workflow 将耐久结论分流，清除专题状态。
 - 文档按主题命名，不按阶段号/日期命名。想新增抽象或把玩法逻辑提到公共层时，先查 `variant-boundary.md`；不确定则保守地留在玩法内。
 
 ## `AGENTS.md` 与 workflow 的边界

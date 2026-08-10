@@ -1,6 +1,6 @@
 # 待完成任务与当前状态
 
-> 本文件是当前专题的计划文档：记录目标、步骤、当前状态、影响后续判断的完成结论和遗留问题。候选专题统一见 `backlog.md`；专题完整结束后按 workflow 将仍有耐久价值的内容分流到架构、契约或测试文档。
+> 本文件只记录当前专题的目标、步骤、当前状态、影响后续判断的关键结论和遗留问题；覆盖更新，不累积过程记录。候选专题统一见 `backlog.md`；专题完整结束后按 workflow 将仍有耐久价值的内容分流到架构、契约或测试文档。
 
 ## 当前任务
 
@@ -10,7 +10,7 @@
 
 范围：第一阶段只研究 `standard-only` 普通标准牌型，不引入清一色、混一色、七对、碰碰胡或防守目标的联合调优。生产模式保持当前固定规则、默认权重和 `twoPly: true` 行为不变。
 
-### 首个 slice：可重复基线 bench 与验证平台
+### 专题验收
 
 验收标准：
 
@@ -28,52 +28,21 @@
 - 测试与实现同一 commit；若修改 core，按 testing strategy 增加至少 1000 局 fuzz 冒烟；
 - 每个当前步骤开始前，可建立一份临时专门计划；步骤完成后只把影响后续判断的结论归并到本文件，不保留过程日记。
 
-已知未知项及最早验证：
+当前待验证：
 
-- 现有策略测试混合了结构契约、策略回归和 2-ply 行为；首个 slice 先盘点并建立基线，不先删除或迁移覆盖；
-- `StructuralMetrics` 的字段和概率上下文尚未定稿；先以只读报告和 canonical fixture 验证字段是否足够解释候选差异；
 - 结构指标与生产权重可能产生冲突；先记录差异和非支配关系，不预设“向听差 1/2”或 `isolationPotential` 的权重结论；
-- 最早验证：完成一个手写 fixture、一个代表性 snapshot 和一个报告样例，证明三种候选路径能被重复运行并比较。
+- 当前 `StructuralMetrics` 足够解释首个 canonical 差异；只有后续样本出现无法解释的决策差异时，才增加面子、雀头或搭子分解字段。
 
 ## 当前状态
 
-步骤 0b AI evaluation 工具统一收口、步骤 1 测试职责重分类与步骤 2 只读 `StructuralMetrics` 诊断契约均已完成。下一阶段为步骤 3：结构分析、2-ply 与动作评分模块边界；开始前先建立对应临时专门计划，不提前改变生产模块或行为。
+步骤 0、0b、1、2 已完成；当前进入步骤 3：结构分析、2-ply 与动作评分模块边界。开始前先建立对应临时专门计划，不提前改变生产模块或行为。
 
 影响后续判断的结论：
 
-- 通用 `packages/ai/src/evaluation/` 拥有 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint 契约；玩法层只注入 provider、evaluator task 和输出命名。
-- Junk canonical fixture 与固定可见状态 snapshot 共用 manifest/runner/report 主链；production-weighted、one-ply-all、two-ply-all 在同一 content hash 下形成三路对照。
-- 两个场景 × 三路 evaluator 共六份版本化 baseline；文件名使用 `<scenario-id>.<evaluator>.v<baseline-revision>.baseline.json`，决策和候选集合是回归字段，耗时仅供参考，baseline 不由命令自动创建或覆盖。
-- 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
-- generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
+- 通用 `packages/ai/src/evaluation/` 已统一 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint；Junk 只注入 provider、evaluator task 和输出命名。离线 scenario、policy、weights、arena 工具统一位于 `src/junk/evaluation/`，生产路径不得反向依赖。
+- canonical fixture 与固定可见状态 snapshot 共用主链；production-weighted、one-ply-all、two-ply-all 有六份不可自动覆盖的版本化 baseline。generated provider 延后到步骤 5，不提前定义牌型生成语义。
 - `standard-only@v1` 已作为第四路只读 evaluator 接入 canonical single-scenario 报告；对每个合法弃牌记录普通标准型向听数、进张牌种/牌种数和按玩家可见信息估计的剩余进张张数，不加权、不选动作，也不包含七对或番型目标。
 - 首个 canonical 样例已证明最小字段能解释非单调候选：弃 `5p` 为 2 向听、15 种/50 张进张，弃 `3m` 虽为 16 种/53 张进张却退到 3 向听；当前无需提前加入面子/雀头/搭子分解。进张张数不是墙内真值、自摸概率、完整胡牌概率或终局 EV。
-
-工具收口检查点：六类 CLI 迁移矩阵和最小 typed command registry 已完成；`evaluate scenario list/run/batch` 已接入；`evaluate policy diff` 已接入无顶层副作用的 handler。最小真实运行同策略 1 seed 共评估 674 个决策点、0 分歧；AI verify 通过（23 files passed、3 skipped；112 tests passed、11 skipped；build 成功）。所有工具迁移完成后，scenario 旧短命令兼容 alias 已删除。
-
-`policy diff` 竖切已完成：通用文本产物层统一 run metadata、JSON 摘要、文本报告和计算前防覆盖；大体量全量记录预留 JSONL，不塞入单个 JSON。真实同策略 1 seed 仍为 674 个决策点、0 分歧；旧 `decision-diff:junk` 双入口已删除。
-
-`weights compare` 迁移完成：同代码权重与跨版本 policy 两条 A/B 路径共用统一产物收尾，`MatchWorkerPool` 和比赛算法未改；两条路径各以同策略 1 seed、单 worker 完成 2 场 smoke，均为 50%/平局并生成 JSON/文本报告。旧 `compare:junk-weights` 双入口已删除。
-
-`weights tune` 迁移完成：统一入口现会在计算前防覆盖，并写入带 run metadata 的 JSON/文本报告；搜索、worker、进度、held-out 门槛和显式 `--write` 权限未改变。注入式测试覆盖默认只读与预检；真实单 worker 最小搜索以 1 generation、1 search seed、1 held-out seed 跑通并生成两份产物。旧 `tune:junk` root alias/entry 已删除。
-
-本检查点 AI fast verify 全绿（26 files passed、3 skipped；119 tests passed、11 skipped；build 成功）。`verify:full` 已完成 typecheck/lint，但 slow test 长时间无输出后人工中止，不能记为通过；本 slice 的真实调参链由上述最小搜索 smoke 覆盖。
-
-`arena run` 迁移完成：统一命令通过结果类型泛型化的 `MatchWorkerPool` 和专用 worker 并行执行现有 `playJunkMatch`，输出每座累计分与名次次数的 JSON/文本报告；报告明确同生产策略自对弈只验证管线并观察座次/牌序偏差，不是策略强弱证据。注入式命令测试及单 worker `1 match × 1 round` 真实 smoke 均通过，默认策略未改变。AI fast verify 全绿（27 files passed、3 skipped；122 tests passed、11 skipped；build 成功）。
-
-`policy capture` 迁移完成：`evaluate policy capture` 保持只复制三项 policy 依赖到 `.compare-scratch/<label>/junk/`、非法 label 拒绝和目标防覆盖边界；filesystem 注入测试取代了会删除整个共享 scratch root 的旧测试清理，避免误碰人工 capture。旧 `capture:junk-policy` root alias/entry 已删除。AI fast verify 全绿（27 files passed、3 skipped；123 tests passed、11 skipped；build 成功）。
-
-统一命令面收尾完成：scenario 旧 `evaluate list/run/batch` 短 alias 已删除，README 和测试只使用 `evaluate scenario ...`；root help 可发现 scenario、policy、weights、arena 全部离线工具。
-
-evaluation 工具物理目录收口完成：`src/junk/` 顶层非测试资产只保留 `strategy.ts`、`tile-probability.ts`、`default-weights.json`；commands、policy source、match/worker 分别迁入 `evaluation/{commands,policy,match}`。新增结构测试锁定顶层生产资产并禁止其反向 import evaluation，公共 barrel 只显式导出 Junk 生产决策 API。统一 help、scenario list 和移动后的 arena worker `1 match × 1 round` smoke 均通过。
-
-命名纠偏完成：`evaluation/cli-entry.ts` 是唯一带顶层 `process.argv`/stdout 副作用的进程入口，`commands/registry.ts` 负责统一分发；其余 handler 按命令职责命名为 `scenario`、`scenario-batch`、`policy-capture`、`policy-diff`、`weights-compare`、`weights-tune`、`arena`，不再用含糊的 `cli.ts` 或重复 `*-cli.ts` 文件名。AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），root help、scenario list 与单 worker arena 最小 smoke 通过。
-
-目录收口检查点 AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），server typecheck 通过。移动后的定向 slow 验证通过：同代码顺序/worker 等价 1 test（21.16s）、跨 policy worker pool 1 test（21.82s）、decision diff 2 tests（31.36s）。按 2026-08-10 用户明确边界，arena 与 tuning slow 用例全部 skip；arena 分段运行约 90 秒无输出后已中止，不把 `verify:full` 记为通过。真实 `1 match × 1 round` arena smoke 和 `1 generation × 1 search seed × 1 held-out seed` tuning smoke 已分别覆盖两条工具链。
-
-工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
-
-步骤 2 验证：真实 `discard-001` CLI 报告四路 evaluator 均成功且共享 content hash；AI fast verify 全绿（29 files passed、3 skipped；127 tests passed、11 skipped；typecheck/lint/build 成功），根 `pnpm verify` 全绿（含 43 个 Web E2E）。首次 sandbox 内运行仅因历史 policy-loader 测试的 `spawnSync git EPERM` 失败，允许只读 git 子进程后同命令通过。本步骤未修改 core，不触发新增 fuzz 要求。
 
 下一步第一个具体动作：为步骤 3 建立临时专门计划，先画出现有 `strategy.ts` 中结构分析、2-ply 续行与动作评分的调用/数据边界，并用 import/导出清单确定最小可抽取模块；只做等价重构，不改变生产评分、默认权重、候选筛选或 AI 对外行为。
 
