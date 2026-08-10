@@ -23,7 +23,6 @@
     "tune:junk": "node packages/ai/src/junk/tune-cli.ts",
     "compare:junk-weights": "node packages/ai/src/junk/compare-weights-cli.ts",
     "decision-diff:junk": "node packages/ai/src/junk/decision-diff-cli.ts",
-    "calibrate:junk": "node packages/ai/src/junk/calibration/cli-entry.ts",
     "snapshot:junk-ai": "node packages/ai/src/junk/snapshot-junk-cli-entry.ts",
     "sb:start": "supabase start",
     "sb:stop": "supabase stop",

@@ -1,6 +1,6 @@
 # 普通胡牌基础牌形校准：step 0
 
-状态：当前步骤，平台设计完成；已完成工具边界盘点、source provider 契约、最小 report 契约、真实 fixture/生产 evaluator adapter、单场景 report runner 和稳定 CLI 入口，下一步是 canonical baseline 登记/比较。本文件只描述平台计划，不记录过程日记。
+状态：当前步骤，平台设计完成；已完成工具边界盘点、source provider 契约、最小 report 契约、真实 fixture/生产 evaluator adapter、单场景 report runner 和 AI 包内 CLI 入口，下一步是 canonical baseline 登记/比较。本文件只描述平台计划，不记录过程日记。
 
 ## 目标与非目标
 
@@ -94,7 +94,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 - 报告写在哪里，如何从报告定位失败场景并重跑；
 - 哪些任务是普通测试、slow bench、性能门禁或人工分析。
 
-命令参数采用稳定命名和配置文件优先，避免每次评估临时记忆参数组合。AI 使用时应能从 manifest、schema 和示例报告直接判断输入、输出和限制；人使用时应能从一条命令定位到可读摘要。
+命令参数采用稳定命名和配置文件优先，避免每次评估临时记忆参数组合。当前包内入口为 `pnpm --filter @new-mj/ai calibrate --list`；AI 使用时应能从 manifest、schema 和示例报告直接判断输入、输出和限制；人使用时应能从一条命令定位到可读摘要。
 
 ### 7. 增加可观测性和失败恢复
 
