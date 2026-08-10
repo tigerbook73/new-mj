@@ -45,3 +45,13 @@ schema 预留了 `fixture`、`snapshot`、`generated` 和 `replay`。目前只�
 
 当前 canonical loader 仍显式注册 JSON fixture。新增场景在完善通用 registry 前，
 需要同时更新 manifest 和 `canonical-fixtures.ts` 的数据注册；这属于当前实现限制。
+
+registry 已按 `source.fixtureId` 匹配数据，不会把一份 fixture 静默套到 manifest 的
+所有 scenario。JSONL reader 的最小记录格式为：
+
+```json
+{"schemaVersion":1,"scenarioId":"generated-001","data":{}}
+```
+
+reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
+合法性仍由对应 provider 负责。

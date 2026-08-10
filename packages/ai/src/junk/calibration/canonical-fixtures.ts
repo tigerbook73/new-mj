@@ -1,14 +1,17 @@
 import manifestData from "./fixtures/junk-structural-calibration-canonical.json" with { type: "json" };
 import fixtureData from "./fixtures/canonical-production-selection-001.json" with { type: "json" };
-import { createJunkFixtureProviderFromData, type JunkProductionFixture } from "./fixture-provider.ts";
+import {
+  createJunkFixtureProviderFromRegistry,
+  type JunkProductionFixture,
+} from "./fixture-provider.ts";
 import type { JunkProductionFixtureData } from "./fixture-data.ts";
 import type { CalibrationManifest } from "./types.ts";
 
 export const JUNK_CALIBRATION_MANIFEST = manifestData as CalibrationManifest;
 
-export const CANONICAL_JUNK_FIXTURE_PROVIDER = createJunkFixtureProviderFromData(
+export const CANONICAL_JUNK_FIXTURE_PROVIDER = createJunkFixtureProviderFromRegistry(
   JUNK_CALIBRATION_MANIFEST,
-  fixtureData as unknown as JunkProductionFixtureData,
+  { [fixtureData.id]: fixtureData as unknown as JunkProductionFixtureData },
 );
 
 export const CANONICAL_JUNK_FIXTURES: readonly JunkProductionFixture[] =

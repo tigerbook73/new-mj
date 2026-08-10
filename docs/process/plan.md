@@ -71,6 +71,7 @@
 - manifest 说明已补齐：manifest 增加 `purpose`/`description`，scenario 增加可读 `description`/`tags`，并新增 calibration README 解释当前 canonical-baseline 的用途、字段和已实现/未实现的 source 类型；README 同时明确当前 loader 仍需显式注册 fixture。
 - 大数据格式边界已记录：manifest 和少量 canonical fixture 使用 JSON；大量 generated/snapshot/replay 场景使用一条记录一行的 JSONL，以支持流式读取、按行校验、分片分发和失败场景重跑。JSONL 记录必须自包含且报告按稳定 scenario ID 聚合排序；`.jsonl.gz` reader 留给批量 runner，不在当前单场景入口临时实现。
 - 当前单场景 baseline 已登记为版本化资产：保存 manifest/scenario 版本、`scenarioContentHash`、evaluator 版本、期望动作和合法动作数；决策与候选数量作为可比较结果，耗时仅作信息指标，baseline 文件不由运行结果覆盖。
+- registry/JSONL 最小边界已落地：fixture registry 按 `source.fixtureId` 精确匹配，避免多 scenario 静默复用错误数据；JSONL reader 逐行解析、跳过空行并报告行号错误，记录包含 `schemaVersion`、`scenarioId` 和自包含 `data`，领域 provider 继续负责具体校验和转换。
 
 下一步第一个具体动作：设计不依赖逐个 import 的通用 fixture registry，并明确 JSONL reader 的记录 schema、分片和稳定聚合边界；先不实现大批量 worker pool。
 

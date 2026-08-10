@@ -24,6 +24,10 @@ export type JunkFixtureProvider = Readonly<{
   ) => NormalizedCalibrationScenario<JunkProductionFixtureInput>;
 }>;
 
+export type JunkProductionFixtureDataRegistry = Readonly<
+  Record<string, JunkProductionFixtureData>
+>;
+
 export const createJunkFixtureProvider = (
   fixtures: readonly JunkProductionFixture[],
 ): JunkFixtureProvider => {
@@ -51,6 +55,20 @@ export const createJunkFixtureProviderFromData = (
   manifest: CalibrationManifest,
   data: JunkProductionFixtureData,
 ): JunkFixtureProvider =>
+  createJunkFixtureProviderFromRegistry(manifest, { [data.id]: data });
+
+/** Builds fixtures by source fixtureId, so multiple scenarios cannot silently reuse one input. */
+export const createJunkFixtureProviderFromRegistry = (
+  manifest: CalibrationManifest,
+  registry: JunkProductionFixtureDataRegistry,
+): JunkFixtureProvider =>
   createJunkFixtureProvider(
-    manifest.scenarios.map((scenario) => createJunkProductionFixture(data, scenario)),
+    manifest.scenarios.map((scenario) => {
+      if (scenario.source.kind !== "fixture") {
+        throw new Error(`UNSUPPORTED_SCENARIO_SOURCE: ${scenario.source.kind}`);
+      }
+      const data = registry[scenario.source.fixtureId];
+      if (!data) throw new Error(`FIXTURE_DATA_NOT_FOUND: ${scenario.source.fixtureId}`);
+      return createJunkProductionFixture(data, scenario);
+    }),
   );
