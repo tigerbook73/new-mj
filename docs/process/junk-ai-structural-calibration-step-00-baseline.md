@@ -150,10 +150,12 @@ registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹
 
 executor 边界已初步落地：task 带稳定 `taskId`，顺序与有界并发模式共享纯 task function 并保持输入顺序；当前只是 async executor seam，CPU 密集任务仍需后续 worker_threads adapter 才能获得多核收益。
 
+通用 `worker_threads` adapter 已落地并通过顺序/worker 等价性测试；worker 只接收可结构化克隆的输入，主线程负责稳定聚合和生命周期，CLI 默认仍使用顺序模式。
+
 fixture 元数据已去重：fixture JSON 不再保存 `id/version/seed`；registry 的 `fixtureId` 管理输入资产身份，manifest scenario 管理版本，fixture source 不使用 seed。
 
 ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case；CLI 输出文件使用 `junk-` 前缀，避免跨玩法汇总时重名。
 
 seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不保存无效 seed。
 
-下一动作：为 executor 增加 `worker_threads` adapter，并用同一 task function 对比顺序/worker 结果；先不切换 CLI 默认并发。
+下一动作：把可序列化的 evaluator task 接入批量 runner，比较顺序/worker 的完整 evaluation report；先不切换 CLI 默认并发。

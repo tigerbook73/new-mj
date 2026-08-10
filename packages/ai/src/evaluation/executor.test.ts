@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { executeCalibrationTasks } from "./executor.ts";
+import { executeCalibrationTasks, executeCalibrationTasksInWorkers } from "./executor.ts";
 
 describe("calibration executor", () => {
   const tasks = [
@@ -27,5 +27,16 @@ describe("calibration executor", () => {
     await expect(executeCalibrationTasks(tasks, runTask, { concurrency: 0 })).rejects.toThrow(
       "INVALID_EXECUTOR_CONCURRENCY",
     );
+  });
+
+  it("matches sequential results in worker_threads mode", async () => {
+    const sequential = await executeCalibrationTasks(tasks, runTask);
+    const workers = await executeCalibrationTasksInWorkers(tasks, {
+      workerCount: 2,
+      workerUrl: new URL("./worker.ts", import.meta.url),
+      moduleUrl: new URL("./executor-worker-test-target.ts", import.meta.url),
+      exportName: "multiplyTask",
+    });
+    expect(workers).toEqual(sequential);
   });
 });

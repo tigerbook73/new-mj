@@ -67,7 +67,9 @@ scenario 会失败。报告额外记录场景数、成功/失败/跳过数量、
 
 executor 的 task 契约使用稳定 `taskId` 和纯 task function；顺序/有界并发模式共用
 同一函数，并按输入顺序返回结果。当前有界并发只是 executor seam，CPU 密集任务要
-接入 `worker_threads` 后才会获得真正的多核收益。
+接入 `worker_threads` 后才会获得真正的多核收益。通用 worker adapter 已提供，要求
+task input 可结构化克隆、通过 module URL 和 export name 定位纯 task function；CLI
+默认仍使用顺序模式。
 
 reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
 合法性仍由对应 provider 负责。
