@@ -32,6 +32,9 @@ header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，
 ```bash
 pnpm --filter @new-mj/ai evaluate list
 pnpm --filter @new-mj/ai evaluate run discard-001
+pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
+  --evaluator two-ply-all --workers 4 --chunk-size 64 \
+  --checkpoint checkpoint.json --run-id snapshot-batch-001
 ```
 
 `run` 对同一个规范化输入执行三路 evaluator，并写入同一份 JSON/Markdown 报告：
@@ -42,6 +45,13 @@ pnpm --filter @new-mj/ai evaluate run discard-001
 
 这三路仍使用当前生产权重，不代表无权重结构指标；后者属于后续 `StructuralMetrics`
 步骤。当前命令还不是 baseline 比较工具。
+
+`batch` 当前消费外部 manifest 和自包含 snapshot JSONL。一次 batch 只运行一个 evaluator，
+使 checkpoint 明确绑定一种计算语义；需要三路结果时用相同输入分别运行三次。`--workers`
+使用已有 worker_threads executor，`--chunk-size` 决定每次交付 checkpoint 的场景数。
+`--checkpoint` 在每个 chunk 后写入包含 manifest 版本、evaluator 和已完成 evaluations 的完整
+JSON 快照；中断后用 `--resume <checkpoint.json>` 恢复。恢复时 manifest/evaluator/content hash
+任一不匹配都会失败，不会静默复用旧结果。generated/replay batch 要等对应 provider 落地。
 
 当前决策 baseline 位于 `fixtures/baselines/*.baseline.json`。它保存输入内容哈希、评估器版本、
 期望动作、候选 ID，并可选择保存候选分数及容差；baseline 文件作为版本化资产，不由运行

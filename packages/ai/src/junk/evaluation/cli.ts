@@ -15,6 +15,7 @@ const usage =
   "Commands:\n" +
   "  list                                        List available evaluation scenarios\n" +
   "  run <scenario-id>                           Run one scenario\n" +
+  "  batch <manifest.json> <scenarios.jsonl>      Run a snapshot batch\n" +
   "  help                                        Show this help\n\n" +
   "Options:\n" +
   "  --output-dir <dir>                          Write JSON/Markdown reports here\n" +
