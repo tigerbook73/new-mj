@@ -36,8 +36,7 @@ export const runCaptureJunkPolicyCli = (
     return { exitCode: 1, output: `DESTINATION_ALREADY_EXISTS: ${destination}\n${usage}` };
   }
   mkdirSync(destination, { recursive: true });
-  for (const file of policyFiles)
-    cpSync(path.join(junkSrcDir, file), path.join(destination, file));
+  for (const file of policyFiles) cpSync(path.join(junkSrcDir, file), path.join(destination, file));
   log(`[capture] copied Junk policy dependencies to ${destination}\n`);
   return {
     exitCode: 0,
@@ -45,6 +44,6 @@ export const runCaptureJunkPolicyCli = (
       `Policy capture written to ${destination}\n` +
       "Compare against it later with, e.g.:\n" +
       `  pnpm compare:junk-weights --candidate-module ${destination}/strategy.ts --candidate x\n` +
-      `  pnpm decision-diff:junk --baseline-module ${destination}/strategy.ts\n`,
+      `  pnpm --filter @new-mj/ai evaluate policy diff --baseline-module ${destination}/strategy.ts\n`,
   };
 };

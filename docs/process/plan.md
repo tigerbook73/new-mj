@@ -55,7 +55,9 @@
 
 工具收口检查点：六类 CLI 迁移矩阵和最小 typed command registry 已完成；`evaluate scenario list/run/batch` 已接入，旧短命令暂作隐藏兼容别名；`evaluate policy diff` 已接入无顶层副作用的 handler。最小真实运行同策略 1 seed 共评估 674 个决策点、0 分歧；AI verify 通过（23 files passed、3 skipped；112 tests passed、11 skipped；build 成功）。
 
-下一步第一个具体动作：为只读文本评估定义最小 run metadata/产物 envelope，并接入 `policy diff`；完成参数、结果和失败行为等价测试后删除 `decision-diff:junk` 兼容入口。
+`policy diff` 竖切已完成：通用文本产物层统一 run metadata、JSON 摘要、文本报告和计算前防覆盖；大体量全量记录预留 JSONL，不塞入单个 JSON。真实同策略 1 seed 仍为 674 个决策点、0 分歧；旧 `decision-diff:junk` 双入口已删除。
+
+下一步第一个具体动作：迁移 `weights compare`，保留现有 `MatchWorkerPool`、双向同牌序、参数语义和只读边界，复用统一命令与文本产物 envelope。
 
 ## 专题路线图
 

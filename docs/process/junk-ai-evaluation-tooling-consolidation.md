@@ -86,7 +86,7 @@ Junk adapter 负责：
 - 使用统一 run/output envelope，但保留 decision-diff 专属报告字段；
 - 与现有 `decision-diff:junk` 做参数、结果和失败行为等价测试；通过后删除旧 entry/root script。
 
-进行中：`evaluate policy diff` 已注册，原 CLI 已拆为无顶层副作用的 handler 与临时兼容 entry；命令专属 help 和最小真实 self-play 已通过（同策略、1 seed：674 个决策点、0 分歧）。下一步先定义可复用的 run metadata/文本产物 envelope，再接入该 handler；完成等价测试后删除兼容 root script。
+已完成：`evaluate policy diff` 已注册为无顶层副作用的 handler；通用文本产物层统一 run ID、command、Git SHA、开始时间、JSON 摘要、文本报告和防覆盖，并在昂贵计算前预检输出。JSON 只保留策略来源、seed、决策点和分歧计数；限定样例留在文本中，未来全量分歧使用 JSONL。命令专属 help、注入式等价测试和真实 self-play 均通过（同策略、1 seed：674 个决策点、0 分歧）；旧 `decision-diff:junk` entry/root script 已删除。
 
 这个竖切同时覆盖 policy source、完整引擎、slow 工具和只读报告，是验证统一结构是否足够的最小代表。
 
@@ -99,6 +99,8 @@ Junk adapter 负责：
 5. scenario `list/run/batch`：完成兼容 alias 清理，固定最终 help。
 
 每迁移一项，先加新入口等价测试，再删除对应旧 CLI/entry/root script；不同时重写算法。
+
+当前下一项：迁移 `weights compare`。先把现有顶层脚本拆为可注入 handler，复用刚建立的文本产物 envelope；保留 `MatchWorkerPool`、双向同牌序、参数语义和只读边界。
 
 ### 4. 收尾与恢复步骤 1
 

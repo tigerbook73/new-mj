@@ -5,8 +5,19 @@ import {
   type JunkAction,
   type TileId,
 } from "@new-mj/core";
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  assertTextEvaluationArtifactsAvailable,
+  writeTextEvaluationArtifacts,
+  type TextArtifactRuntime,
+} from "../evaluation/text-artifacts.ts";
 import { loadPolicy, type PolicySource } from "./policy-loader.ts";
-import { runDecisionDiff, type Divergence } from "./decision-diff.ts";
+import { runDecisionDiff, type DecisionDiffReport, type Divergence } from "./decision-diff.ts";
+
+const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 /** exactOptionalPropertyTypes rejects `{ ref: undefined }` — build the source
  * object with only the keys the caller actually provided. */
@@ -26,16 +37,19 @@ type Arguments = {
   seed: number;
   seeds: number;
   sampleSize: number;
+  outputDir: string;
+  runId?: string;
 };
 
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate policy diff\n" +
   "  [--baseline-ref <git-ref> | --baseline-module <path>] [--baseline-weights <path>]\n" +
   "  [--candidate-ref <git-ref> | --candidate-module <path>] [--candidate-weights <path>]\n" +
-  "  [--seed <int>] [--seeds <int>] [--sample-size <int>]\n";
+  "  [--seed <int>] [--seeds <int>] [--sample-size <int>]\n" +
+  "  [--output-dir <dir>] [--run-id <id>]\n";
 
 const parseArguments = (argv: string[]): Arguments => {
-  const result: Arguments = { seed: 1, seeds: 20, sampleSize: 20 };
+  const result: Arguments = { seed: 1, seeds: 20, sampleSize: 20, outputDir: defaultOutputDir };
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
@@ -49,6 +63,8 @@ const parseArguments = (argv: string[]): Arguments => {
     else if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--seeds") result.seeds = Number(value);
     else if (flag === "--sample-size") result.sampleSize = Number(value);
+    else if (flag === "--output-dir") result.outputDir = value;
+    else if (flag === "--run-id") result.runId = value;
     else throw new Error("UNKNOWN_ARGUMENT");
   }
   if (
@@ -60,6 +76,8 @@ const parseArguments = (argv: string[]): Arguments => {
   ) {
     throw new Error("INVALID_NUMERIC_ARGUMENT");
   }
+  if (result.runId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(result.runId))
+    throw new Error("INVALID_RUN_ID");
   return result;
 };
 
@@ -120,25 +138,48 @@ const formatReport = (
     "",
     `--- sample divergences (up to ${args.sampleSize} of ${divergences.length}) ---`,
     ...sample.flatMap((divergence, index) => formatDivergence(divergence, index)),
-    "This tool never writes any file — it only reports. Adopting the candidate is",
-    "a manual decision made after reading this report, never automatic.",
+    "This tool only writes evaluation reports. Adopting the candidate remains a",
+    "manual decision made after reading this report, never automatic.",
   ].join("\n");
+};
+
+type Runtime = TextArtifactRuntime &
+  Readonly<{
+    now?: () => Date;
+    gitSha?: string;
+    load?: typeof loadPolicy;
+    evaluate?: (
+      seeds: readonly number[],
+      baseline: Parameters<typeof runDecisionDiff>[1],
+      candidate: Parameters<typeof runDecisionDiff>[2],
+    ) => DecisionDiffReport;
+  }>;
+
+const currentGitSha = (): string => {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
 };
 
 export const runDecisionDiffCli = async (
   argv: readonly string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
+  runtime: Runtime = {},
 ): Promise<{ exitCode: number; output: string }> => {
   if (argv.includes("--help")) return { exitCode: 0, output: usage };
   try {
     const args = parseArguments([...argv]);
+    const startedAt = (runtime.now ?? (() => new Date()))();
+    const runId = args.runId ?? `run-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
+    const fileStem = `junk-policy-diff-${runId}`;
+    assertTextEvaluationArtifactsAvailable(args.outputDir, fileStem, runtime);
     log(`[decision-diff] loading baseline/candidate policies (seeds=${args.seeds})...\n`);
+    const load = runtime.load ?? loadPolicy;
     const [baseline, candidate] = await Promise.all([
-      loadPolicy(
-        policySource(args.baselineRef, args.baselineModule, args.baselineWeights),
-        "baseline",
-      ),
-      loadPolicy(
+      load(policySource(args.baselineRef, args.baselineModule, args.baselineWeights), "baseline"),
+      load(
         policySource(args.candidateRef, args.candidateModule, args.candidateWeights),
         "candidate",
       ),
@@ -151,14 +192,39 @@ export const runDecisionDiffCli = async (
       seeds.push(step.value);
     }
     log("[decision-diff] running self-play (both directions driving)...\n");
-    const { decisionPoints, divergences } = runDecisionDiff(
+    const { decisionPoints, divergences } = (runtime.evaluate ?? runDecisionDiff)(
       seeds,
       baseline.policy,
       candidate.policy,
     );
+    const report = `${formatReport(args, baseline, candidate, seeds, decisionPoints, divergences)}\n`;
+    const paths = writeTextEvaluationArtifacts(
+      args.outputDir,
+      fileStem,
+      {
+        run: {
+          schemaVersion: 1,
+          runId,
+          command: `pnpm --filter @new-mj/ai evaluate policy diff ${argv.join(" ")}`.trim(),
+          gitSha: runtime.gitSha ?? currentGitSha(),
+          startedAt: startedAt.toISOString(),
+        },
+        data: {
+          baseline: { label: baseline.label, modulePath: baseline.modulePath },
+          candidate: { label: candidate.label, modulePath: candidate.modulePath },
+          seed: args.seed,
+          seeds,
+          sampleSize: args.sampleSize,
+          decisionPoints,
+          divergenceCount: divergences.length,
+        },
+      },
+      report,
+      runtime,
+    );
     return {
       exitCode: 0,
-      output: `${formatReport(args, baseline, candidate, seeds, decisionPoints, divergences)}\n`,
+      output: `${report}json: ${paths.jsonPath}\ntext: ${paths.textPath}\n`,
     };
   } catch (error) {
     return {

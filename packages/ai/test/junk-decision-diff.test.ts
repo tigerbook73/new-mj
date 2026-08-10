@@ -4,7 +4,7 @@ import { runDecisionDiff } from "../src/junk/decision-diff.ts";
 import { DEFAULT_JUNK_WEIGHTS } from "../src/junk/strategy.ts";
 
 // 这是工具级冒烟，不承担多 seed 的统计覆盖；大规模比较通过
-// `pnpm decision-diff:junk` 手动执行。
+// `pnpm --filter @new-mj/ai evaluate policy diff` 手动执行。
 const SEEDS = [1];
 
 describe("runDecisionDiff", () => {
