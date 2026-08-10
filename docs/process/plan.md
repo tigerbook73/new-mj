@@ -39,19 +39,25 @@
 
 当前步骤：0. 建立可重复的基线 bench 与验证平台。
 
-实施边界：先复用现有 Junk arena、decision-diff、snapshot 和 core batch 能力，必要时只抽取无副作用的诊断适配层；不进入默认策略调用链，不改变现有生产结果。
+专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
 
-计划动作：
+本步骤完成条件与下一动作见专门计划文件；本轮只完成计划整理，不开始盘点或实现。
 
-1. 盘点现有 AI/Junk 测试、fixture、snapshot、arena、decision-diff 和 2-ply 入口，标出可复用项与职责混杂项；
-2. 选定少量 canonical fixtures、固定种子和代表性 snapshot，定义最小输入/输出报告；
-3. 实现三种候选路径的统一采集与比较接口，记录候选数、决策、耗时、缓存命中和报告版本；
-4. 为指标计算、候选比较、决策差异和报告格式补最小测试；
-5. 运行最小验证，记录结果和下一步骤的第一个具体动作，再决定是否需要新增专题 brief。
+## 专题路线图
 
-本步骤完成条件：基线报告可重复生成，三种路径的差异可解释，普通验证入口不执行大样本/全量 2-ply，且生产策略无行为变化。
+每一步开始前，先打开对应专门计划，结合当时状态补充范围、验收和最早验证；未开始的步骤不提前实现或标记完成。
 
-下一步第一个具体动作：先盘点 `packages/ai/src/junk` 与相关 `test/` 中现有 arena、snapshot、decision-diff、fixture 和策略测试的入口及职责。
+0. [可重复的基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)
+1. AI/Junk 测试盘点与职责重分类
+2. 只读 StructuralMetrics 诊断契约
+3. 结构分析、2-ply 与动作评分模块边界
+4. 人工确认的 canonical fixtures
+5. 自动牌型生成器与样本报告
+6. 保守 Pareto 支配诊断/过滤
+7. 无权重全量 2-ply 三路诊断对照
+8. isolationPotential 影响边界校准
+9. 普通路线的 paired-seed 与 held-out 验证
+10. 番型路线收益模型可行性（另专题）
 
 ## 阻塞与遗留问题
 
@@ -59,16 +65,7 @@
 
 ## Backlog
 
-- 盘点并重分类现有 AI/Junk 测试：结构契约、策略回归、2-ply 正确性、arena/worker、policy loader 和调参平台；新诊断覆盖前不删除重复用例。
-- 定义只读 `StructuralMetrics` 契约：按不同弃牌种类记录 `standard-only` 向听数、进张种类、有效牌数、改善概率、`wallCount`、`unseenPoolSize`、公开牌河、公开副露和摸牌 horizon，并标注生产权重预筛选与支配分类。
-- 在不改变行为和导出的前提下拆分结构分析、2-ply 和动作评分模块，保留 `strategy.ts` façade，并验证缓存生命周期与决策等价。
-- 增加约 20–40 个人工确认的 canonical fixtures，覆盖孤张/字牌、两面/嵌张/边张、对子/刻子拆解、低向听窄牌与高向听宽牌、早中晚牌山。
-- 增加合法 14 张牌的自动牌型生成器，枚举弃牌并对 1,000–10,000 个样本生成诊断报告；非支配冲突不强行标成唯一正确答案。
-- 实现保守 Pareto 支配诊断/过滤：只有向听、进张种类、有效牌数、改善概率均不差且至少一项严格更好时才删除候选。
-- 建立无权重全量 2-ply 与生产版“权重筛选 + 2-ply”的三路诊断对照，记录漏选、决策差异、指标和耗时；诊断先不改变生产行为。
-- 用 canonical fixtures 验证 `isolationPotential` 不能跨越明确结构优势，只能解决基础指标并列；是否降为 tie-break 另行决策。
-- 结构校准通过后，再用 paired-seed、held-out seeds 和 `decision-diff` 验证普通路线；先限制调参范围，不自动写入默认配置。
-- 若后续接入番型路线，另开专题设计收益模型；不把无法可靠计算的真实胡牌概率伪装成当前校准器标签。
+- 本专题的步骤路线见上方“专题路线图”，步骤状态只在当前工作推进后更新。
 - Mobile 横屏/竖屏布局与 Expo 路线。
 - Junk Table UX：Replay、慢网络反馈、声明超时行为及 E2E。
 - 评估 `immer` 替代 ruleset 手写 `cloneState`，先验证 fuzz 性能。
