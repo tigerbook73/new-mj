@@ -15,18 +15,22 @@ describe("runDecisionDiff", () => {
     expect(report.divergences).toEqual([]);
   });
 
-  it("finds divergences when the candidate's weights are drastically different", { tags: ["slow"] }, () => {
-    const baseline = strengthPolicy({}, DEFAULT_JUNK_WEIGHTS);
-    // An inverted shantenWeight makes the candidate actively prefer *worsening*
-    // its own shanten — almost the exact opposite of the baseline's preference
-    // whenever there's more than one legal option, unlike a narrow single-fan
-    // weight that only matters in specific hand shapes.
-    const candidate = strengthPolicy({}, { ...DEFAULT_JUNK_WEIGHTS, shantenWeight: -1000 });
-    const report = runDecisionDiff(SEEDS, baseline, candidate);
-    expect(report.divergences.length).toBeGreaterThan(0);
-    for (const divergence of report.divergences) {
-      expect(divergence.driverAction).not.toEqual(divergence.otherAction);
-      expect(["baseline", "candidate"]).toContain(divergence.driver);
-    }
-  });
+  it(
+    "finds divergences when the candidate's weights are drastically different",
+    { tags: ["slow"] },
+    () => {
+      const baseline = strengthPolicy({}, DEFAULT_JUNK_WEIGHTS);
+      // An inverted shantenWeight makes the candidate actively prefer *worsening*
+      // its own shanten — almost the exact opposite of the baseline's preference
+      // whenever there's more than one legal option, unlike a narrow single-fan
+      // weight that only matters in specific hand shapes.
+      const candidate = strengthPolicy({}, { ...DEFAULT_JUNK_WEIGHTS, shantenWeight: -1000 });
+      const report = runDecisionDiff(SEEDS, baseline, candidate);
+      expect(report.divergences.length).toBeGreaterThan(0);
+      for (const divergence of report.divergences) {
+        expect(divergence.driverAction).not.toEqual(divergence.otherAction);
+        expect(["baseline", "candidate"]).toContain(divergence.driver);
+      }
+    },
+  );
 });
