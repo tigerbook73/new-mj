@@ -59,9 +59,11 @@
 - 正式 AI play 的 player 上下文与缓存观测不属于当前 bench step，已作为独立 backlog 记录；当前平台只保留评估运行所需的 cache/performance 摘要。
 - source provider 已落地为判别联合并支持 `NormalizedCalibrationScenario`；当前 fixture provider 只解析 `fixture` source，其他来源会显式失败，不会静默当作 fixture。
 - 已接入第一个真实 canonical fixture 和生产 evaluator adapter：复用现有 `chooseJunkAction(JunkPlayerView, legalActions)`，默认确定性 argmax，只验证合法且可重复的生产决策，不提前定义结构指标。
-- 本轮验证结果：calibration 2 个测试文件、4/4 测试通过，AI typecheck 通过，AI lint 通过；仍未串接完整单场景 report runner，也未接入批量 runner/worker pool。
+- 上一轮验证结果：calibration 2 个测试文件、4/4 测试通过，AI typecheck 通过，AI lint 通过；当时仍未串接完整单场景 report runner，也未接入批量 runner/worker pool。
+- 单场景 runner 已落地：按 manifest 查找 scenario，调用 provider 和 evaluator，再生成统一 JSON/Markdown report；runner 不包含业务评分、并发、重试或文件 I/O。
+- 本轮验证结果：calibration 3 个测试文件、6/6 测试通过，AI typecheck 通过，AI lint 通过；报告链路已用真实 fixture 验证，仍未接入稳定 CLI、批量 runner、baseline 存储或 worker pool。
 
-下一步第一个具体动作：把 fixture provider 和生产 evaluator 串入单场景 runner，调用 `createCalibrationReport` 生成第一份真实 JSON/Markdown report；继续保持单线程和只读路径。
+下一步第一个具体动作：为单场景 runner 设计稳定的 manifest/CLI 入口和输出目录约定，先支持列出 scenario、运行一个 scenario、打印 Markdown 摘要并保存 JSON；继续保持单线程和只读路径。
 
 ## 专题路线图
 
