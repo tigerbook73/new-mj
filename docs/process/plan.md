@@ -4,79 +4,26 @@
 
 ## 当前任务
 
-当前专题：关闭 Junk AI 决策质量优化分支，并准备人工合并到 `main`。
+当前专题：Windows + WSL + VS Code 新成员 onboarding。
 
-当前收尾动作：处理两份 code review 的合并前问题，并完成受限环境外的最终 verify。
+当前状态：等待用户 review `docs/onboarding/windows-wsl-vscode.md` 及 bootstrap/doctor 脚本。
 
-当前实现目标：
+已完成：
 
-- 默认 Junk AI 使用两轮快速过滤的 2-ply；
-- 首轮上断崖：`minN=2`、`maxN=4`、阈值 20%；
-- 第二轮下断崖：`minN=1`、`maxN=all`、阈值 20%；
-- 2-ply 结构计算统一使用 core `evaluateUkeireAfterDiscardDraws`；
-- 当前基础权重保持不变；后续参数调优另开分支处理。
+- 增加从 Windows 准备、WSL clone、VS Code Remote 到首次启动的分步指南；
+- 明确 public repo 的 clone 权限、直接 collaborator 和 fork PR 两种协作方式；
+- 增加非破坏性的 bootstrap：保留已有本机配置，否则生成无数据库昵称登录配置，再安装和构建；
+- 增加 doctor：检查 WSL、Git、Node 24、pnpm 10.33.3、依赖、构建产物、Docker及可选运行中服务/Supabase；
+- 增加完整本地 Supabase、Prisma migration、OAuth callback 和 secret 边界说明；
+- README 与 doc map 已加入 onboarding 入口。
 
-## 已完成并保留
+验证：bash 语法、doctor help、当前 WSL doctor、bootstrap 安装与全仓 build、Prettier、typecheck、lint、unit tests 和 `git diff --check` 已通过。根 `pnpm verify` 到 E2E 前均通过；E2E 的既有 server 对局/回放用例在 5 秒超时，允许端口后定向复跑仍为 6 个 timeout，未标全绿。当前环境 Docker daemon 不可用，未执行 `--supabase` 运行态验证。
 
-- 概率评分、墙牌比例模型、既有副露 ukeire 修复和结构分析缓存；
-- core suit table / shanten prober 优化及完整测试；
-- core 两变化结构 batch API；完整 2-ply 端到端约减少 11% 耗时，决策结果与旧路径一致；
-- 两轮断崖 2-ply 候选方案，固定上下阈值 20%；
-- 通用 arena、权重 A/B、调参和代码版本对比工具；
-- 正式策略所需的回归 fixture 和测试。
-
-## 本轮清理范围
-
-删除未采用路线的过程实现和专用材料：
-
-- 固定 Top-N、结构 Top-4、最低向听黑名单等实验代码；
-- 共享缓存、摸牌状态重叠、full-result batch 等实验代码；
-- two-ply benchmark、baseline、对抗性搜索、结构化 runner 及其 CLI、worker、测试和数据；
-- 对应 package/root 脚本和失效文档引用。
-
-保留后续参数和代码 A/B 所需的 arena、tune、compare-weights、decision-diff、policy-loader、snapshot 及其测试。
-
-## 收尾步骤
-
-1. [x] 完成正式 2-ply + core batch 的生产路径重构。
-2. [x] 完成未采用实验代码、数据、CLI 和文档引用清理。
-3. [x] 既有正式路径回归测试通过：非弃牌动作、胜牌、声明、缓存和温度采样均有覆盖。
-4. [x] 完成 AI/core 类型检查、lint、测试和构建；验证结果见下文。
-5. [x] 将保留内容、删除内容、限制和验证结果写回本文件。
-6. [x] 提交当前分支的最终整理提交（`10bc8c3`），确认工作区干净。
-7. [x] 综合两份 review，修复合并前问题并补充回归测试。
-8. [ ] 在非受限环境执行最终 AI/core verify，随后停在人工合并前：不切换 `main`、不执行 merge/squash merge、不推送、不删除当前分支。
-
-## 验收标准
-
-- 默认 Junk AI 确实走两轮 2-ply；
-- 默认 2-ply 路径使用 core batch；直接 probe 调用保留兼容性 fallback；
-- 未采用实验材料已清理；
-- 后续参数 A/B 工具仍可运行；
-- `pnpm --filter @new-mj/ai verify:full` 通过；
-- `pnpm --filter @new-mj/core verify:full` 通过；
-- `git diff --check` 通过且工作区干净；
-- 输出人工合并命令和注意事项，但不执行最终合并。
-
-## 本轮验证记录
-
-- AI typecheck：通过。
-- AI lint：通过。
-- AI strategy 定向测试：32/32 通过。
-- AI build：通过。
-- AI 全量测试：业务测试通过；`policy-loader.test.ts` 的 2 个测试在受限环境中因 `spawnSync git EPERM` 失败，随后测试进程未正常退出，未将该环境问题伪装成全绿。
-- `policy-loader.test.ts` 历史版本 fixture 曾错误指向已完成概率改造的 `6f2a7d8`，改为其父提交 `6f2a7d8^` 后，非受限环境定向测试 6/6 通过。
-- core `verify:full`：19 个测试文件、192 个测试通过，构建通过。
-- `git diff --check`：通过。
-- review follow-up 定向测试：AI 39/39、core shanten 15/15 通过；AI/core typecheck 与 lint 通过。
-- 受限环境下 policy loader 的 git ref 测试仍会报 `spawnSync git EPERM`，需在非受限环境完成最终 verify。
-- 下一步第一个具体动作：在非受限环境执行 `pnpm --filter @new-mj/ai verify:full`，确认最终收尾验证。
+下一步第一个具体动作：用户 review onboarding 的操作顺序和协作权限说明，确认是否需要调整。
 
 ## 阻塞与遗留问题
 
-- 分支关闭后，基础权重和断崖参数需要另开独立计划；
-- 2-ply 仍是启发式评估，不是完整牌局价值证明。
-- 2-ply 终局收益模型、断崖窗口 batch 合并、strategy.ts 拆分和断崖参数调优留待独立 benchmark/计划。
+- 完整 Supabase doctor 需要在 Docker Desktop WSL Integration 可用的机器上验收。
 
 ## Backlog
 

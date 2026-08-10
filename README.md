@@ -6,6 +6,8 @@
 
 ## Quickstart
 
+Windows + WSL + VS Code 新成员请先阅读 [`docs/onboarding/windows-wsl-vscode.md`](docs/onboarding/windows-wsl-vscode.md)，并使用其中的 bootstrap/doctor 脚本完成首次安装和自检。
+
 ```bash
 pnpm install
 pnpm typecheck
