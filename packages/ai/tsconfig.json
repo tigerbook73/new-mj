@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "customConditions": ["development"],
     "ignoreDeprecations": "6.0",
     "resolveJsonModule": true
   },
