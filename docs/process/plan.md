@@ -37,13 +37,7 @@
 
 ## 当前状态
 
-当前纠偏步骤：0b. AI evaluation 工具统一收口。
-
-专门计划：[Junk AI evaluation 工具统一收口](junk-ai-evaluation-tooling-consolidation.md)。
-
-原因：步骤 0 只建立了新 evaluation 平台，没有把既有 arena/tune/compare/diff/capture 纳入统一命令、执行和报告生命周期，原平台收口目标未完整兑现。当前暂停步骤 1，先完成该使能能力纠偏。
-
-步骤 1 已保存的可复用进度：policy capture、decision-diff、tuning、policy-loader、runner 和 Junk evaluation adapter 测试已完成 unit/integration/slow 分层；`strategy.test.ts` 已按 two-ply、production fixtures、strength、weights 四组整理。AI verify 在检查点通过（21 files passed、3 skipped；105 tests passed、11 skipped；build 成功）。工具收口后只需恢复 full 验证与文档收尾。
+步骤 0b AI evaluation 工具统一收口与步骤 1 测试职责重分类均已完成。下一阶段为步骤 2：只读 `StructuralMetrics` 诊断契约；开始前先建立对应临时专门计划，不在工具收口提交中提前实现。
 
 影响后续判断的结论：
 
@@ -61,7 +55,7 @@
 
 `weights tune` 迁移完成：统一入口现会在计算前防覆盖，并写入带 run metadata 的 JSON/文本报告；搜索、worker、进度、held-out 门槛和显式 `--write` 权限未改变。注入式测试覆盖默认只读与预检；真实单 worker 最小搜索以 1 generation、1 search seed、1 held-out seed 跑通并生成两份产物。旧 `tune:junk` root alias/entry 已删除。
 
-本检查点 AI fast verify 全绿（26 files passed、3 skipped；119 tests passed、11 skipped；build 成功）。`verify:full` 已完成 typecheck/lint，但 slow test 长时间无输出后人工中止，不能记为通过；本 slice 的真实调参链由上述最小搜索 smoke 覆盖，完整 slow 门禁留到 0b 收尾再次执行。
+本检查点 AI fast verify 全绿（26 files passed、3 skipped；119 tests passed、11 skipped；build 成功）。`verify:full` 已完成 typecheck/lint，但 slow test 长时间无输出后人工中止，不能记为通过；本 slice 的真实调参链由上述最小搜索 smoke 覆盖。
 
 `arena run` 迁移完成：统一命令通过结果类型泛型化的 `MatchWorkerPool` 和专用 worker 并行执行现有 `playJunkMatch`，输出每座累计分与名次次数的 JSON/文本报告；报告明确同生产策略自对弈只验证管线并观察座次/牌序偏差，不是策略强弱证据。注入式命令测试及单 worker `1 match × 1 round` 真实 smoke 均通过，默认策略未改变。AI fast verify 全绿（27 files passed、3 skipped；122 tests passed、11 skipped；build 成功）。
 
@@ -71,20 +65,20 @@
 
 evaluation 工具物理目录收口完成：`src/junk/` 顶层非测试资产只保留 `strategy.ts`、`tile-probability.ts`、`default-weights.json`；commands、policy source、match/worker 分别迁入 `evaluation/{commands,policy,match}`。新增结构测试锁定顶层生产资产并禁止其反向 import evaluation，公共 barrel 只显式导出 Junk 生产决策 API。统一 help、scenario list 和移动后的 arena worker `1 match × 1 round` smoke 均通过。
 
-目录收口检查点 AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），server typecheck 通过。移动后的定向 slow 验证通过：同代码顺序/worker 等价 1 test（21.16s）、跨 policy worker pool 1 test（21.82s）、decision diff 2 tests（31.36s）。全量 `verify:full` 未重复启动；此前已确认长时间无输出并人工中止，仍不能记为通过。
+目录收口检查点 AI fast verify 全绿（28 files passed、3 skipped；125 tests passed、11 skipped；build 成功），server typecheck 通过。移动后的定向 slow 验证通过：同代码顺序/worker 等价 1 test（21.16s）、跨 policy worker pool 1 test（21.82s）、decision diff 2 tests（31.36s）。按 2026-08-10 用户明确边界，arena 与 tuning slow 用例全部 skip；arena 分段运行约 90 秒无输出后已中止，不把 `verify:full` 记为通过。真实 `1 match × 1 round` arena smoke 和 `1 generation × 1 search seed × 1 held-out seed` tuning smoke 已分别覆盖两条工具链。
 
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
 
-下一步第一个具体动作：审计目录收口后的旧路径/旧入口引用并提交该机械重构；随后评估剩余 slow tests 的可分段执行方式，补齐可在当前时限内完成的 `verify:full` 证据后做 0b 文档收尾。
+下一步第一个具体动作：为步骤 2 建立临时专门计划，先从现有 canonical fixture 抽取一个只读 `StructuralMetrics` 报告样例，验证字段能否解释候选差异；不修改生产评分、默认权重、候选筛选或 AI 对外行为。
 
 ## 专题路线图
 
 每一步开始前，结合当时状态补充该步骤的专门计划；未开始的步骤不提前实现或标记完成。步骤完成后，只在本文件保留结果、证据、限制和对后续步骤有影响的判断。
 
 - 0 已完成：可重复的基线 bench 与验证平台
-- 0b [当前纠偏：AI evaluation 工具统一收口](junk-ai-evaluation-tooling-consolidation.md)
-- 1 已暂停待收尾：AI/Junk 测试盘点与职责重分类
-- 2 待开始：只读 StructuralMetrics 诊断契约
+- 0b 已完成：AI evaluation 工具统一收口
+- 1 已完成：AI/Junk 测试盘点与职责重分类
+- 2 下一步：只读 StructuralMetrics 诊断契约
 - 3 待开始：结构分析、2-ply 与动作评分模块边界
 - 4 待开始：人工确认的 canonical fixtures
 - 5 待开始：自动牌型生成器与样本报告
