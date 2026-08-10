@@ -57,9 +57,9 @@
 
 `policy diff` 竖切已完成：通用文本产物层统一 run metadata、JSON 摘要、文本报告和计算前防覆盖；大体量全量记录预留 JSONL，不塞入单个 JSON。真实同策略 1 seed 仍为 674 个决策点、0 分歧；旧 `decision-diff:junk` 双入口已删除。
 
-`weights compare` 迁移进行中：`evaluate weights compare` 已注册为无顶层副作用的 handler，旧 root alias 暂留；尚未改动 `MatchWorkerPool` 或比赛算法。
+`weights compare` 迁移完成：同代码权重与跨版本 policy 两条 A/B 路径共用统一产物收尾，`MatchWorkerPool` 和比赛算法未改；两条路径各以同策略 1 seed、单 worker 完成 2 场 smoke，均为 50%/平局并生成 JSON/文本报告。旧 `compare:junk-weights` 双入口已删除。
 
-下一步第一个具体动作：把同代码权重 A/B 和跨版本 policy A/B 的共同 `MatchupResult` 接入文本产物 envelope，完成真实 smoke 后删除 `compare:junk-weights` 兼容入口。
+下一步第一个具体动作：迁移 `weights tune` 的命令入口和只读报告产物；保留搜索、worker、进度、held-out 门槛及显式 `--write` 权限，写默认权重的能力不下沉到通用层。
 
 ## 专题路线图
 

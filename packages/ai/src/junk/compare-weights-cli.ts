@@ -1,5 +1,12 @@
 import os from "node:os";
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createPrng, nextUint32 } from "@new-mj/core";
+import {
+  assertTextEvaluationArtifactsAvailable,
+  writeTextEvaluationArtifacts,
+} from "../evaluation/text-artifacts.ts";
 import {
   formatWeightDelta,
   evaluateCandidate,
@@ -44,9 +51,13 @@ type Arguments = {
   seed: number;
   seeds: number;
   concurrency: number;
+  outputDir: string;
+  runId?: string;
 };
 
 const DEFAULT_WEIGHTS_PATH = new URL("./default-weights.json", import.meta.url);
+const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 const defaultConcurrency = (): number => {
   try {
@@ -61,6 +72,7 @@ const usage =
   "  [--baseline <weights-path>] [--baseline-module <path> | --baseline-ref <git-ref>]\n" +
   "  [--candidate <weights-path>] [--candidate-module <path> | --candidate-ref <git-ref>]\n" +
   "  [--seed <int>] [--seeds <int>] [--concurrency <int>]\n" +
+  "  [--output-dir <dir>] [--run-id <id>]\n" +
   "  (--candidate, --candidate-module or --candidate-ref is required)\n";
 
 const parseArguments = (argv: string[]): Arguments => {
@@ -71,6 +83,7 @@ const parseArguments = (argv: string[]): Arguments => {
     // variance instead of being noise (see tune.ts's mutate() doc comment).
     seeds: 15,
     concurrency: defaultConcurrency(),
+    outputDir: defaultOutputDir,
   };
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
@@ -85,6 +98,8 @@ const parseArguments = (argv: string[]): Arguments => {
     else if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--seeds") result.seeds = Number(value);
     else if (flag === "--concurrency") result.concurrency = Number(value);
+    else if (flag === "--output-dir") result.outputDir = value;
+    else if (flag === "--run-id") result.runId = value;
     else throw new Error("UNKNOWN_ARGUMENT");
   }
   if (!result.candidateWeightsPath && !result.candidateModule && !result.candidateRef) {
@@ -99,6 +114,8 @@ const parseArguments = (argv: string[]): Arguments => {
   ) {
     throw new Error("INVALID_NUMERIC_ARGUMENT");
   }
+  if (result.runId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(result.runId))
+    throw new Error("INVALID_RUN_ID");
   return result;
 };
 
@@ -153,9 +170,17 @@ const formatCompareReport = (
     `verdict: ${verdict}`,
     "",
     ...(weightDelta !== undefined ? ["Weight changes (A -> B):", weightDelta, ""] : []),
-    "This tool never writes any file — it only reports. Adopt B by hand-copying",
-    "it over default-weights.json once the numbers above hold up.",
+    "This tool only writes evaluation reports. Adopt B by hand-copying it over",
+    "default-weights.json once the numbers above hold up.",
   ].join("\n");
+};
+
+const currentGitSha = (): string => {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
 };
 
 export const runCompareWeightsCli = async (
@@ -167,6 +192,10 @@ export const runCompareWeightsCli = async (
   let policyPool: MatchWorkerPool<PolicyMatchTask> | undefined;
   try {
     const args = parseArguments([...argv]);
+    const startedAt = new Date();
+    const runId = args.runId ?? `run-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
+    const fileStem = `junk-weights-compare-${runId}`;
+    assertTextEvaluationArtifactsAvailable(args.outputDir, fileStem);
     let prng = createPrng(args.seed);
     const seeds: number[] = [];
     for (let index = 0; index < args.seeds; index += 1) {
@@ -174,6 +203,50 @@ export const runCompareWeightsCli = async (
       prng = step.prng;
       seeds.push(step.value);
     }
+
+    const complete = (
+      mode: "weights" | "policy",
+      baselineLabel: string,
+      candidateLabel: string,
+      result: MatchupResult,
+      weightDelta?: string,
+    ): { exitCode: number; output: string } => {
+      const report = `${formatCompareReport(
+        args,
+        baselineLabel,
+        candidateLabel,
+        seeds,
+        result,
+        weightDelta,
+      )}\n`;
+      const paths = writeTextEvaluationArtifacts(
+        args.outputDir,
+        fileStem,
+        {
+          run: {
+            schemaVersion: 1,
+            runId,
+            command: `pnpm --filter @new-mj/ai evaluate weights compare ${argv.join(" ")}`.trim(),
+            gitSha: currentGitSha(),
+            startedAt: startedAt.toISOString(),
+          },
+          data: {
+            mode,
+            baseline: baselineLabel,
+            candidate: candidateLabel,
+            seed: args.seed,
+            seeds,
+            concurrency: args.concurrency,
+            ...result,
+          },
+        },
+        report,
+      );
+      return {
+        exitCode: 0,
+        output: `${report}json: ${paths.jsonPath}\ntext: ${paths.textPath}\n`,
+      };
+    };
 
     if (!isCrossVersion(args)) {
       const baselinePath = args.baselineWeightsPath ?? DEFAULT_WEIGHTS_PATH.pathname;
@@ -191,17 +264,13 @@ export const runCompareWeightsCli = async (
         new URL("./tune-worker.ts", import.meta.url),
       );
       const result = await evaluateCandidate(seeds, baseline, candidate, weightPool);
-      return {
-        exitCode: 0,
-        output: `${formatCompareReport(
-          args,
-          baselinePath,
-          candidatePath,
-          seeds,
-          result,
-          formatWeightDelta(baseline, candidate),
-        )}\n`,
-      };
+      return complete(
+        "weights",
+        baselinePath,
+        candidatePath,
+        result,
+        formatWeightDelta(baseline, candidate),
+      );
     }
 
     log(
@@ -226,10 +295,7 @@ export const runCompareWeightsCli = async (
       resolvedSource(candidateModulePath, args.candidateWeightsPath),
       policyPool,
     );
-    return {
-      exitCode: 0,
-      output: `${formatCompareReport(args, baselineModulePath, candidateModulePath, seeds, result)}\n`,
-    };
+    return complete("policy", baselineModulePath, candidateModulePath, result);
   } catch (error) {
     return {
       exitCode: 1,
