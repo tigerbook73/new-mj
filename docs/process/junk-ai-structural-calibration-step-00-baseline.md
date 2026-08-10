@@ -142,6 +142,6 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 当前单场景 baseline 已登记为 `packages/ai/src/junk/calibration/fixtures/baselines/*.baseline.json`；它固定输入哈希、evaluator 版本、期望动作和候选数，不把耗时作为硬门槛，也不允许运行结果覆盖该资产。
 
-registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹配；JSONL reader 只做逐行解析和基础字段校验，记录为 `schemaVersion`、`scenarioId`、自包含 `data`，具体领域校验继续由 provider 负责。
+registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹配；JSONL reader 首行校验 manifest/schema/shard header，后续逐行校验相同 schema version，具体领域校验继续由 provider 负责。推荐文件名为 `<manifest-id>.v<manifest-version>.part-<index>.jsonl`。
 
-下一动作：为 JSONL 增加文件级 schema/version 校验、分片命名和稳定 scenario 排序约定，再接入批量 runner；先不实现大批量 worker pool。
+下一动作：在批量 runner 中接入 JSONL reader，并在聚合层按 scenario ID 稳定排序；先不实现大批量 worker pool。

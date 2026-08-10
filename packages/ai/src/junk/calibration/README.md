@@ -19,8 +19,8 @@ provider 会把牌种转换为 TileId，并生成 `contentHash`。
 
 JSON 只用于 manifest 和少量 canonical fixture。大规模 generated、snapshot 或
 replay 数据不直接拼成一个巨大的 JSON 数组；批量 runner 应使用一条记录一行的
-JSONL，以便流式读取、按行校验、分片分发和失败场景重跑。JSONL 每行必须是一个
-带 `scenario` 元数据和数据版本的独立记录，不能依赖跨行状态；文件顺序不作为
+JSONL，以便流式读取、按行校验、分片分发和失败场景重跑。JSONL 第一条非空行是
+header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，不能依赖跨行状态；文件顺序不作为
 决策输入，报告仍按稳定 scenario ID 排序。后续可在不改变 evaluator 契约的前提下
 增加 `.jsonl`/`.jsonl.gz` reader。
 
@@ -47,11 +47,17 @@ schema 预留了 `fixture`、`snapshot`、`generated` 和 `replay`。目前只�
 需要同时更新 manifest 和 `canonical-fixtures.ts` 的数据注册；这属于当前实现限制。
 
 registry 已按 `source.fixtureId` 匹配数据，不会把一份 fixture 静默套到 manifest 的
-所有 scenario。JSONL reader 的最小记录格式为：
+所有 scenario。JSONL reader 的最小格式为：
 
 ```json
-{"schemaVersion":1,"scenarioId":"generated-001","data":{}}
+{"type":"header","schemaVersion":1,"manifestId":"generated","manifestVersion":1,"shardId":"part-0000","shardIndex":0,"shardCount":1}
+{"type":"scenario","schemaVersion":1,"scenarioId":"generated-001","data":{}}
 ```
+
+reader 只负责 header、逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和
+场景合法性仍由对应 provider 负责。建议文件名为
+`<manifest-id>.v<manifest-version>.part-<zero-padded-index>.jsonl`，例如
+`junk-generated.v1.part-0000.jsonl`。
 
 reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
 合法性仍由对应 provider 负责。
