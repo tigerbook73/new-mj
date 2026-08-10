@@ -1,6 +1,6 @@
 # 普通胡牌基础牌形校准：step 0
 
-状态：当前步骤，平台设计完成；已完成工具边界盘点、source provider 契约、最小 report 契约、真实 fixture/生产 evaluator adapter 和单场景 report runner，下一步是稳定 manifest/CLI 入口。本文件只描述平台计划，不记录过程日记。
+状态：当前步骤，平台设计完成；已完成工具边界盘点、source provider 契约、最小 report 契约、真实 fixture/生产 evaluator adapter、单场景 report runner 和稳定 CLI 入口，下一步是 canonical baseline 登记/比较。本文件只描述平台计划，不记录过程日记。
 
 ## 目标与非目标
 
