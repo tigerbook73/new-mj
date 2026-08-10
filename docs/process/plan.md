@@ -37,7 +37,11 @@
 
 ## 当前状态
 
-步骤 0“可重复的基线 bench 与验证平台”已完成。
+当前步骤：1. AI/Junk 测试盘点与职责重分类。
+
+专门计划：[步骤 1：测试盘点与职责重分类](junk-ai-structural-calibration-step-01-test-inventory.md)。
+
+本步骤先建立全部测试的责任矩阵，再实施不损失覆盖的低风险重分类；存在语义取舍的移动、合并或删除会给出建议与备选，不自行决定。
 
 影响后续判断的结论：
 
@@ -47,14 +51,14 @@
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
-下一步第一个具体动作：等待用户确认是否开始步骤 1；确认后只为步骤 1 建立当前步骤专门计划，不提前实现。
+下一步第一个具体动作：生成 20 个现有 AI 测试文件的责任矩阵，优先审计 `strategy.test.ts`、`junk-weight-tuning.test.ts`、`junk/evaluation/runner.test.ts` 与 `policy-loader.test.ts` 的混合边界。
 
 ## 专题路线图
 
 每一步开始前，结合当时状态补充该步骤的专门计划；未开始的步骤不提前实现或标记完成。步骤完成后，只在本文件保留结果、证据、限制和对后续步骤有影响的判断。
 
 0. 已完成：可重复的基线 bench 与验证平台
-1. 待开始：AI/Junk 测试盘点与职责重分类
+1. [当前：AI/Junk 测试盘点与职责重分类](junk-ai-structural-calibration-step-01-test-inventory.md)
 2. 待开始：只读 StructuralMetrics 诊断契约
 3. 待开始：结构分析、2-ply 与动作评分模块边界
 4. 待开始：人工确认的 canonical fixtures
