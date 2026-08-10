@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import baseline from "./fixtures/baselines/canonical-production-selection-001.json" with { type: "json" };
+import baseline from "./fixtures/baselines/canonical-production-selection-001.baseline.json" with { type: "json" };
 import { CANONICAL_PRODUCTION_SELECTION } from "./canonical-fixtures.ts";
 import { createJunkFixtureProvider } from "./fixture-provider.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "./report.ts";

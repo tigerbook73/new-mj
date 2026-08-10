@@ -34,7 +34,7 @@ pnpm --filter @new-mj/ai evaluate run canonical-production-selection-001
 `run` 当前只执行生产权重 evaluator，输出选中的动作和统一 JSON/Markdown 报告；
 它还不是完整的结构指标或 baseline 比较工具。
 
-当前决策 baseline 位于 `fixtures/baselines/`。它保存输入内容哈希、评估器版本、
+当前决策 baseline 位于 `fixtures/baselines/*.baseline.json`。它保存输入内容哈希、评估器版本、
 期望动作和候选数量；baseline 文件作为版本化资产，不由运行结果覆盖。当前只有
 决策和候选数量是可比较结果，耗时只作信息记录。
 

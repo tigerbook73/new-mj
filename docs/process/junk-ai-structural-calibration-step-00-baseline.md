@@ -140,7 +140,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 补充完成：manifest/scene 增加用途、描述和 tags 元数据，calibration README 说明当前 manifest、字段、命令和 source 支持边界；已明确当前 loader 仍有显式 fixture 注册限制。
 
-当前单场景 baseline 已登记在 `packages/ai/src/junk/calibration/fixtures/baselines/`；它固定输入哈希、evaluator 版本、期望动作和候选数，不把耗时作为硬门槛，也不允许运行结果覆盖该资产。
+当前单场景 baseline 已登记为 `packages/ai/src/junk/calibration/fixtures/baselines/*.baseline.json`；它固定输入哈希、evaluator 版本、期望动作和候选数，不把耗时作为硬门槛，也不允许运行结果覆盖该资产。
 
 registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹配；JSONL reader 只做逐行解析和基础字段校验，记录为 `schemaVersion`、`scenarioId`、自包含 `data`，具体领域校验继续由 provider 负责。
 
