@@ -20,6 +20,11 @@ provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snap
 `*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
 副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
 
+`fixtures/canonical-structural-expectations.json` 独立记录人工确认的候选关系、精确结构
+指标和理由；它不进入生产 fixture schema，也不让 `standard-only` 选择动作。加载时会
+校验 schema、scenario、比较牌种和重复 ID，`structural-metrics.test.ts` 对真实 evaluator
+结果执行这些关系断言。
+
 JSON 只用于 manifest 和少量 canonical fixture。大规模 generated、snapshot 或
 replay 数据不直接拼成一个巨大的 JSON 数组；批量 runner 应使用一条记录一行的
 JSONL，以便流式读取、按行校验、分片分发和失败场景重跑。JSONL 第一条非空行是

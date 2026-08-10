@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "expectations": [
+    {
+      "id": "lower-shanten-vs-wider-ukeire",
+      "scenarioId": "discard-001",
+      "relation": "lower-shanten-vs-wider-ukeire",
+      "leftDiscard": "5p",
+      "rightDiscard": "3m",
+      "leftMetrics": {
+        "standardShanten": 2,
+        "improvingKindCount": 15,
+        "liveImprovingTileCount": 50
+      },
+      "rightMetrics": {
+        "standardShanten": 3,
+        "improvingKindCount": 16,
+        "liveImprovingTileCount": 53
+      },
+      "rationale": "弃 5p 少一向听，但弃 3m 的进张更宽；这是应保留的结构冲突，不能只按进张宽度决定。"
+    },
+    {
+      "id": "same-shanten-strictly-wider-ukeire",
+      "scenarioId": "discard-snapshot-001",
+      "relation": "same-shanten-strictly-wider-ukeire",
+      "leftDiscard": "1z",
+      "rightDiscard": "3s",
+      "leftMetrics": {
+        "standardShanten": 1,
+        "improvingKindCount": 8,
+        "liveImprovingTileCount": 25
+      },
+      "rightMetrics": {
+        "standardShanten": 1,
+        "improvingKindCount": 4,
+        "liveImprovingTileCount": 13
+      },
+      "rationale": "两者向听相同，弃 1z 的进张种类和玩家可见信息下剩余张数都严格更多。"
+    }
+  ]
+}

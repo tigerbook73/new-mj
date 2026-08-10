@@ -35,12 +35,12 @@
 
 ## 当前状态
 
-步骤 0、0b、1、2、3 已完成；下一步进入步骤 4：人工确认的 canonical fixtures。生产策略现已按 weights、无权重 analysis/cache、hand-quality、2-ply continuation、action-scoring 和兼容 facade 单向拆分。
+步骤 0、0b、1、2、3、4 已完成；下一步进入步骤 5：自动牌型生成器与样本报告。生产策略保持 weights、无权重 analysis/cache、hand-quality、2-ply continuation、action-scoring 和兼容 facade 的单向边界。
 
 影响后续判断的结论：
 
 - 通用 `packages/ai/src/evaluation/` 已统一 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint；Junk 只注入 provider、evaluator task 和输出命名。离线 scenario、policy、weights、arena 工具统一位于 `src/junk/evaluation/`，生产路径不得反向依赖。
-- canonical fixture 与固定可见状态 snapshot 共用主链；production-weighted、one-ply-all、two-ply-all 有六份不可自动覆盖的版本化 baseline。generated provider 延后到步骤 5，不提前定义牌型生成语义。
+- canonical fixture 与固定可见状态 snapshot 共用主链；最小人工确认集合固定为两类关系：`discard-001` 的“较低向听 vs 更宽进张”冲突，以及 `discard-snapshot-001` 同向听下的严格进张宽度优势。关系、精确指标和理由位于独立版本化 expectation，不让 `standard-only` 选择动作；production-weighted、one-ply-all、two-ply-all 的六份 baseline 保持不变。
 - `standard-only@v1` 已作为第四路只读 evaluator 接入 canonical single-scenario 报告；对每个合法弃牌记录普通标准型向听数、进张牌种/牌种数和按玩家可见信息估计的剩余进张张数，不加权、不选动作，也不包含七对或番型目标。
 - 首个 canonical 样例已证明最小字段能解释非单调候选：弃 `5p` 为 2 向听、15 种/50 张进张，弃 `3m` 虽为 16 种/53 张进张却退到 3 向听；当前无需提前加入面子/雀头/搭子分解。进张张数不是墙内真值、自摸概率、完整胡牌概率或终局 EV。
 - `strategy.ts` 同时是生产 facade 与跨 Git ref policy-loader 的加载根；动作模拟、单层评分、cliff/fallback 和两层候选编排现集中在 `action-scoring.ts`，facade 只保留兼容导出、胜利动作优先、argmax/softmax 与最终动作选择；生产边界与 evaluation 框架的耐久约束以 `packages/ai/AGENTS.md` 为准，具体命令和当前来源支持以 evaluation README 为准。
@@ -50,7 +50,7 @@
 - AI `evaluate` CLI 与其 TypeScript 检查统一启用 `development` export condition，直接消费 Core `src`；离线诊断不再依赖预先构建且可能过期的 Core `dist`，worker 继承同一 Node condition。
 - 自动 fuzz 冒烟统一由每玩法 1000 局降为 100 局，保留专题收尾人工万局门禁；根 E2E 的 lobby 失败实为 Server 5 秒超时后 Turbo 中断 Web 的级联结果，replay 套件现由四个测试客户端按合法动作推进、不再借生产 AI bot 造 fixture，真实默认 AI advice 冒烟只对单条用例使用 10 秒预算。
 
-下一步第一个具体动作：开始步骤 4 前先补充该步骤的专门计划，盘点现有 canonical fixtures 覆盖的结构冲突与人工判定依据，明确需要新增的最小样例集合；此动作只定义验收边界，不提前实现步骤 5 的生成器。
+下一步第一个具体动作：开始步骤 5 前先补充生成器专门计划，定义确定性 seed、普通标准型输入合法性、去重/分片边界与样本报告验收；不得从当前两份 canonical expectation 反推或硬编码生成分布。
 
 ## 专题路线图
 
@@ -61,8 +61,8 @@
 - 1 已完成：AI/Junk 测试盘点与职责重分类
 - 2 已完成：只读 StructuralMetrics 诊断契约
 - 3 已完成：结构分析、2-ply 与动作评分模块边界
-- 4 下一步：人工确认的 canonical fixtures
-- 5 待开始：自动牌型生成器与样本报告
+- 4 已完成：人工确认的 canonical fixtures
+- 5 下一步：自动牌型生成器与样本报告
 - 6 待开始：保守 Pareto 支配诊断/过滤
 - 7 待开始：无权重全量 2-ply 三路诊断对照
 - 8 待开始：isolationPotential 影响边界校准
