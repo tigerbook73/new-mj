@@ -1,4 +1,5 @@
 import { createCalibrationReport } from "./report.ts";
+import type { CalibrationJsonlRecord } from "./jsonl.ts";
 import type {
   CalibrationEvaluationResult,
   CalibrationManifest,
@@ -38,4 +39,37 @@ export const runSingleCalibrationScenario = <TInput>(
     scenarioContentHash: normalized.contentHash,
   };
   return createCalibrationReport(run, manifest, [evaluationWithHash]);
+};
+
+export type CalibrationJsonlRecordResolver<TRecordData, TInput> = (
+  scenario: CalibrationManifest["scenarios"][number],
+  data: TRecordData,
+) => NormalizedCalibrationScenario<TInput>;
+
+/**
+ * Sequential streaming runner. It consumes JSONL records without materializing
+ * the input set; concurrency, retry and progress reporting belong to the later
+ * executor layer.
+ */
+export const runCalibrationJsonlBatch = async <TRecordData, TInput>(
+  manifest: CalibrationManifest,
+  records: AsyncIterable<CalibrationJsonlRecord<TRecordData>>,
+  resolveRecord: CalibrationJsonlRecordResolver<TRecordData, TInput>,
+  evaluator: CalibrationEvaluator<TInput>,
+  run: CalibrationRun,
+): Promise<CalibrationReport> => {
+  const evaluations: CalibrationEvaluationResult[] = [];
+  const seen = new Set<string>();
+  for await (const record of records) {
+    if (seen.has(record.scenarioId)) {
+      throw new Error(`DUPLICATE_SCENARIO: ${record.scenarioId}`);
+    }
+    seen.add(record.scenarioId);
+    const scenario = manifest.scenarios.find(({ id }) => id === record.scenarioId);
+    if (!scenario) throw new Error(`SCENARIO_NOT_FOUND: ${record.scenarioId}`);
+    const normalized = resolveRecord(scenario, record.data);
+    const evaluation = evaluator(normalized);
+    evaluations.push({ ...evaluation, scenarioContentHash: normalized.contentHash });
+  }
+  return createCalibrationReport(run, manifest, evaluations);
 };

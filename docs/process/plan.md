@@ -73,6 +73,7 @@
 - 当前单场景 baseline 已登记为版本化资产：保存 manifest/scenario 版本、`scenarioContentHash`、evaluator 版本、期望动作和合法动作数；决策与候选数量作为可比较结果，耗时仅作信息指标，baseline 文件不由运行结果覆盖。
 - registry/JSONL 最小边界已落地：fixture registry 按 `source.fixtureId` 精确匹配，避免多 scenario 静默复用错误数据；JSONL reader 逐行解析、跳过空行并报告行号错误，记录包含 `schemaVersion`、`scenarioId` 和自包含 `data`，领域 provider 继续负责具体校验和转换。
 - JSONL 文件级契约已确定并落地：首个非空行为 header，包含 manifest/schema/shard 元数据，后续 scenario record 必须使用相同 schema version；推荐文件名为 `<manifest-id>.v<manifest-version>.part-<index>.jsonl`，空行可跳过，报告按 scenario ID 稳定排序。
+- 顺序批量 runner 已接入 JSONL record：流式消费、不整体加载，按 `scenarioId` 查找 manifest，经 resolver 构造 normalized scenario 后复用统一 evaluator；重复或不存在的 scenario 显式失败，报告沿用稳定排序，worker/重试/断点恢复仍未实现。
 
 下一步第一个具体动作：在批量 runner 中接入 JSONL reader，并在聚合层按 scenario ID 稳定排序；先不实现大批量 worker pool。
 

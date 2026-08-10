@@ -5,6 +5,8 @@ import { createJunkFixtureProvider } from "./fixture-provider.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "./report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { runSingleCalibrationScenario } from "./runner.ts";
+import { runCalibrationJsonlBatch } from "./runner.ts";
+import { parseCalibrationJsonl } from "./jsonl.ts";
 import { CALIBRATION_SCHEMA_VERSION, type CalibrationManifest, type CalibrationRun } from "./types.ts";
 
 const fixture = CANONICAL_PRODUCTION_SELECTION;
@@ -59,5 +61,46 @@ describe("single calibration runner", () => {
         throw new Error("must not run");
       }, run),
     ).toThrow("SCENARIO_NOT_FOUND: missing");
+  });
+});
+
+describe("JSONL batch runner", () => {
+  it("streams records and returns stable scenario order", async () => {
+    const scenarios = [
+      { ...fixture.scenario, id: "scenario-b" },
+      { ...fixture.scenario, id: "scenario-a" },
+    ];
+    const batchManifest: CalibrationManifest = { ...manifest, scenarios };
+    const records = parseCalibrationJsonl<{ value: number }>(
+      '{"type":"header","schemaVersion":1,"manifestId":"m","manifestVersion":1,"shardId":"part-0000","shardIndex":0}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"scenario-b","data":{"value":2}}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"scenario-a","data":{"value":1}}',
+    );
+    const asyncRecords = (async function* () {
+      for (const record of records) yield record;
+    })();
+    const report = await runCalibrationJsonlBatch(
+      batchManifest,
+      asyncRecords,
+      (scenario, data) => ({ scenario, input: data, contentHash: `hash-${scenario.id}` }),
+      (normalized) => ({
+        scenarioId: normalized.scenario.id,
+        evaluator: "standard-only",
+        evaluatorVersion: "test",
+        selectedCandidateId: String(normalized.input.value),
+        candidates: [],
+        performance: { durationMs: 0, cacheHits: 0, cacheMisses: 0 },
+        status: "ok",
+      }),
+      run,
+    );
+    expect(report.evaluations.map(({ scenarioId }) => scenarioId)).toEqual([
+      "scenario-a",
+      "scenario-b",
+    ]);
+    expect(report.evaluations.map(({ scenarioContentHash }) => scenarioContentHash)).toEqual([
+      "hash-scenario-a",
+      "hash-scenario-b",
+    ]);
   });
 });

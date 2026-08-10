@@ -144,4 +144,6 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹配；JSONL reader 首行校验 manifest/schema/shard header，后续逐行校验相同 schema version，具体领域校验继续由 provider 负责。推荐文件名为 `<manifest-id>.v<manifest-version>.part-<index>.jsonl`。
 
-下一动作：在批量 runner 中接入 JSONL reader，并在聚合层按 scenario ID 稳定排序；先不实现大批量 worker pool。
+顺序批量 runner 已接入 JSONL record：按 scenario ID 查 manifest、经 resolver 构造 normalized scenario 并复用 evaluator，输入不整体加载，重复/未知 scenario 显式失败，结果交给现有稳定排序报告；worker、重试和断点恢复留待 executor 阶段。
+
+下一动作：为顺序批量 runner 增加报告级吞吐/分位耗时和失败摘要，再设计 executor 的 worker 等价性测试；先不改变生产 evaluator。
