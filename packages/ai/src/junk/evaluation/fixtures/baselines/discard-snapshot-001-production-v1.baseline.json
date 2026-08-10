@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "discard-snapshot-001-production-v1",
+  "scenarioId": "discard-snapshot-001",
+  "scenarioContentHash": "sha256:0c58d8d046e1d39d4916b56576c60be13d7a9059b50eee254a65d1278335c849",
+  "evaluator": "production-weighted",
+  "evaluatorVersion": "v1",
+  "manifest": { "id": "canonical-baseline", "version": 1 },
+  "config": { "strategy": "production-default", "twoPly": true },
+  "environment": { "runtime": "Node.js", "portability": "decision-only; performance informational" },
+  "expected": { "selectedCandidateId": "{\"type\":\"discard\",\"tile\":108}", "candidateIds": ["{\"type\":\"discard\",\"tile\":108}"] },
+  "limits": { "performance": "informational" },
+  "notes": "固定中盘可见状态 snapshot 的生产决策基线；耗时不作为硬门槛。"
+}

@@ -35,21 +35,25 @@
 - 结构指标与生产权重可能产生冲突；先记录差异和非支配关系，不预设“向听差 1/2”或 `isolationPotential` 的权重结论；
 - 最早验证：完成一个手写 fixture、一个代表性 snapshot 和一个报告样例，证明三种候选路径能被重复运行并比较。
 
-## 当前 slice 专门计划
+## 当前状态
 
-当前步骤：0. 建立可重复的基线 bench 与验证平台。
+步骤 0“可重复的基线 bench 与验证平台”已完成。
 
-专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
+影响后续判断的结论：
 
-本步骤完成条件与下一动作见专门计划文件。当前基础设施、代表性 snapshot、三路报告、通用 resumable batch、checkpoint/resume 和只读 baseline compare CLI 已具备；正在进行最终验收审计。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+- 通用 `packages/ai/src/evaluation/` 拥有 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint 契约；玩法层只注入 provider、evaluator task 和输出命名。
+- Junk canonical fixture 与固定可见状态 snapshot 共用 manifest/runner/report 主链；production-weighted、one-ply-all、two-ply-all 在同一 content hash 下形成三路对照。
+- 两个场景 × 三路 evaluator 共六份版本化 baseline；决策和候选集合是回归字段，耗时仅供参考，baseline 不由命令自动创建或覆盖。
+- 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
+- generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
-下一步第一个具体动作：逐条审计 step 0 交付边界与验收标准，列出未满足项及建议归属；不自动宣告完成。
+下一步第一个具体动作：等待用户确认是否开始步骤 1；确认后只为步骤 1 建立当前步骤专门计划，不提前实现。
 
 ## 专题路线图
 
 每一步开始前，结合当时状态补充该步骤的专门计划；未开始的步骤不提前实现或标记完成。步骤完成后，只在本文件保留结果、证据、限制和对后续步骤有影响的判断。
 
-0. [当前：可重复的基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)
+0. 已完成：可重复的基线 bench 与验证平台
 1. 待开始：AI/Junk 测试盘点与职责重分类
 2. 待开始：只读 StructuralMetrics 诊断契约
 3. 待开始：结构分析、2-ply 与动作评分模块边界

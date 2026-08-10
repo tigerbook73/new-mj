@@ -46,7 +46,7 @@ pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
 - `two-ply-all`：全部合法弃牌的现有 2-ply 续行计算，不执行 cliff，属于较慢的诊断路径。
 
 这三路仍使用当前生产权重，不代表无权重结构指标；后者属于后续 `StructuralMetrics`
-步骤。当前命令还不是 baseline 比较工具。
+步骤。
 
 `batch` 当前消费外部 manifest 和自包含 snapshot JSONL。一次 batch 只运行一个 evaluator，
 使 checkpoint 明确绑定一种计算语义；需要三路结果时用相同输入分别运行三次。`--workers`
@@ -59,12 +59,17 @@ batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
 只是薄 adapter，绑定 snapshot resolver、Junk evaluator worker 和 `junk-` 输出前缀。
 
-当前决策 baseline 位于 `fixtures/baselines/*.baseline.json`。它保存输入内容哈希、评估器版本、
+当前六份决策 baseline 位于 `fixtures/baselines/*.baseline.json`，覆盖 canonical/snapshot ×
+production-weighted/one-ply-all/two-ply-all。它们保存输入内容哈希、评估器版本、
 期望动作、候选 ID，并可选择保存候选分数及容差；baseline 文件作为版本化资产，不由运行
 结果覆盖。通用 comparator 将结果分类为 matched、changed 或 incompatible，并分别报告
 动作、候选集合和分数变化；输入 hash/evaluator 不一致视为 incompatible。耗时只作信息记录。
 `run --baseline <file>` 是只读比较入口：matched 返回 0，质量变化返回 2，不兼容或运行错误
 返回 1；比较结果写入同一 JSON/Markdown report，命令不会创建或更新 baseline。
+
+generated source 的 schema 已预留，但 generator/provider 按专题路线图第 5 步接入；step 0
+不提前定义生成牌型语义。批量失败保留在报告/checkpoint 中，通过 hash-safe resume 重跑；
+不自动 retry 确定性错误，也不采集容易误导的跨 worker CPU/resource 汇总。
 
 ## 来源类型
 

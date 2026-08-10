@@ -10,12 +10,16 @@ export type CalibrationBaseline = Readonly<{
   scenarioContentHash: string;
   evaluator: CalibrationEvaluatorKind;
   evaluatorVersion: string;
+  manifest?: Readonly<{ id: string; version: number }>;
+  config?: Readonly<Record<string, string | number | boolean>>;
+  environment?: Readonly<Record<string, string>>;
   expected: Readonly<{
     selectedCandidateId?: string;
     candidateIds?: readonly string[];
     scores?: Readonly<Record<string, number>>;
   }>;
   limits?: Readonly<{ scoreTolerance?: number; performance?: "informational" }>;
+  notes?: string;
 }>;
 
 export type CalibrationBaselineChangeKind =

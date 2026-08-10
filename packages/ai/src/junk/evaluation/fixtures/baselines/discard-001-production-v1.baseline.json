@@ -5,6 +5,9 @@
   "scenarioContentHash": "sha256:fd10b00c285fc0f6521a373c9a967afd1d61eb25e4665ebd65a6b1da3fc3c4d8",
   "evaluator": "production-weighted",
   "evaluatorVersion": "v1",
+  "manifest": { "id": "canonical-baseline", "version": 1 },
+  "config": { "strategy": "production-default", "twoPly": true },
+  "environment": { "runtime": "Node.js", "portability": "decision-only; performance informational" },
   "expected": {
     "selectedCandidateId": "{\"type\":\"discard\",\"tile\":52}",
     "candidateIds": ["{\"type\":\"discard\",\"tile\":52}"]
