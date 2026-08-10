@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 /**
  * Convenience for the "two uncommitted experimental versions side by side"
- * workflow policy-loader.ts's doc comment describes: `pnpm capture:junk-policy
+ * workflow policy-loader.ts's doc comment describes: `evaluate policy capture
  * before` copies the current strategy module and its local dependencies into
  * packages/ai/.compare-scratch/before/junk/ *once*, then you keep editing
  * src/junk/ normally — no copy-then-restore dance, and no risk of putting the
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
  * — this script is only for versions that aren't commits yet.
  */
 
-const usage = "Usage: junk/capture-policy-cli.ts <label>\n";
+const usage = "Usage: pnpm --filter @new-mj/ai evaluate policy capture <label>\n";
 
 const junkSrcDir = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -24,19 +24,28 @@ const isValidLabel = (label: string): boolean =>
   label !== "." && label !== ".." && /^[a-zA-Z0-9._-]+$/.test(label);
 
 export const runCaptureJunkPolicyCli = (
-  argv: string[],
+  argv: readonly string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
+  runtime: Readonly<{
+    exists?: (filePath: string) => boolean;
+    makeDirectory?: (directory: string) => void;
+    copy?: (source: string, destination: string) => void;
+  }> = {},
 ): { exitCode: number; output: string } => {
+  if (argv.includes("--help")) return { exitCode: 0, output: usage };
   const label = argv[0];
-  if (!label || !isValidLabel(label)) {
+  if (!label || argv.length !== 1 || !isValidLabel(label)) {
     return { exitCode: 1, output: `INVALID_LABEL\n${usage}` };
   }
   const destination = path.join(packageRoot, ".compare-scratch", label, "junk");
-  if (existsSync(destination)) {
+  if ((runtime.exists ?? existsSync)(destination)) {
     return { exitCode: 1, output: `DESTINATION_ALREADY_EXISTS: ${destination}\n${usage}` };
   }
-  mkdirSync(destination, { recursive: true });
-  for (const file of policyFiles) cpSync(path.join(junkSrcDir, file), path.join(destination, file));
+  (runtime.makeDirectory ?? ((directory) => mkdirSync(directory, { recursive: true })))(
+    destination,
+  );
+  const copy = runtime.copy ?? cpSync;
+  for (const file of policyFiles) copy(path.join(junkSrcDir, file), path.join(destination, file));
   log(`[capture] copied Junk policy dependencies to ${destination}\n`);
   return {
     exitCode: 0,

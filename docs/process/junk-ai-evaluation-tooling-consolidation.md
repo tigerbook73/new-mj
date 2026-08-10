@@ -108,6 +108,8 @@ Junk adapter 负责：
 
 `arena run` 已完成：`MatchWorkerPool` 将结果类型泛型化但保留现有 A/B 默认结果，arena adapter 复用 `playJunkMatch` 并通过专用 worker 并行独立 session；报告汇总每座总分与四档名次，并明确同策略 arena 只验证管线/观察座次牌序偏差，不作为策略强弱证据。注入式测试与单 worker `1 match × 1 round` 真实 smoke 均通过，生成 JSON/文本产物。
 
+`policy capture` 已完成：无顶层副作用的 handler 接入 `evaluate policy capture`，仍只复制 `strategy.ts`、`default-weights.json`、`tile-probability.ts` 到 `.compare-scratch/<label>/junk/`，继续拒绝非法 label 和覆盖已有目标。filesystem 注入测试取代了删除整个共享 scratch root 的旧测试清理，避免误碰人工 capture；旧 root alias/entry 已删除。
+
 ### 4. 收尾与恢复步骤 1
 
 - 更新 `packages/ai/AGENTS.md` 与 evaluation README 的统一入口和扩展方式；
@@ -129,5 +131,5 @@ Junk adapter 负责：
 
 - 统一的是生命周期和扩展接口，不是把不同业务报告扁平化；若 run envelope 无法无损承载某工具，扩展 typed payload，不复制第二套框架。
 - policy-loader 目前只支持 AI-only 跨版本比较，不支持 core 同时跨版本；本步骤保持限制。
-- `capture:junk-policy`、tune `--write` 会写本地文件，但权限边界不扩大；其余命令保持只读。
+- `evaluate policy capture`、tune `--write` 会写本地文件，但权限边界不扩大；其余命令保持只读。
 - 若迁移需要改变策略算法、RuleSet/协议或默认权重，停止并另提决策，不借工具重构实施。

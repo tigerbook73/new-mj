@@ -65,9 +65,11 @@
 
 `arena run` 迁移完成：统一命令通过结果类型泛型化的 `MatchWorkerPool` 和专用 worker 并行执行现有 `playJunkMatch`，输出每座累计分与名次次数的 JSON/文本报告；报告明确同生产策略自对弈只验证管线并观察座次/牌序偏差，不是策略强弱证据。注入式命令测试及单 worker `1 match × 1 round` 真实 smoke 均通过，默认策略未改变。AI fast verify 全绿（27 files passed、3 skipped；122 tests passed、11 skipped；build 成功）。
 
+`policy capture` 迁移完成：`evaluate policy capture` 保持只复制三项 policy 依赖到 `.compare-scratch/<label>/junk/`、非法 label 拒绝和目标防覆盖边界；filesystem 注入测试取代了会删除整个共享 scratch root 的旧测试清理，避免误碰人工 capture。旧 `capture:junk-policy` root alias/entry 已删除。AI fast verify 全绿（27 files passed、3 skipped；123 tests passed、11 skipped；build 成功）。
+
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
 
-下一步第一个具体动作：迁移 `policy capture` 到 `evaluate policy capture`，保持只写 `.compare-scratch` 的有界权限，先接无顶层副作用 handler 和目标路径/防覆盖测试，再删除旧 root alias/entry。
+下一步第一个具体动作：清理 scenario `list/run/batch` 的旧短命令兼容 alias，更新 evaluation README 和最终 `evaluate --help` 契约，确认所有离线工具只从统一命令族发现。
 
 ## 专题路线图
 

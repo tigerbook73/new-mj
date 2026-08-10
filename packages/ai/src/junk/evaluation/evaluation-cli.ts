@@ -1,5 +1,6 @@
 import { createEvaluationCommandRegistry } from "../../evaluation/commands.ts";
 import { runArenaCli } from "../arena-cli.ts";
+import { runCaptureJunkPolicyCli } from "../capture-policy-cli.ts";
 import { runDecisionDiffCli } from "../decision-diff-cli.ts";
 import { runCompareWeightsCli } from "../compare-weights-cli.ts";
 import { runTuneCli } from "../tune-cli.ts";
@@ -21,6 +22,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["scenario", "batch"],
     summary: "Evaluate a JSONL scenario batch",
     run: runBatchCalibrationCli,
+  },
+  {
+    path: ["policy", "capture"],
+    summary: "Capture the current policy into compare scratch",
+    run: (argv) => runCaptureJunkPolicyCli(argv),
   },
   {
     path: ["policy", "diff"],
