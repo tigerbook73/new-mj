@@ -6,9 +6,6 @@ import type { JunkProductionFixture } from "./fixture-provider.ts";
 type FixtureActionData = Readonly<{ type: "discard"; kind: TileKind; copy: number }>;
 
 export type JunkProductionFixtureData = Readonly<{
-  id: string;
-  version: number;
-  seed: number;
   input: Readonly<{
     seat: 0 | 1 | 2 | 3;
     hand: readonly TileKind[];
@@ -37,9 +34,6 @@ export const createJunkProductionFixture = (
   if (scenario.source.kind !== "fixture") {
     throw new Error(`INVALID_FIXTURE_DATA: scenario source must be fixture`);
   }
-  assert(scenario.source.fixtureId === data.id, "fixture id does not match scenario source");
-  assert(data.version === scenario.version, "fixture version does not match scenario");
-  assert(data.seed === scenario.seed, "fixture seed does not match scenario");
   assert(data.input.seats.length === 4, "exactly four seat snapshots are required");
 
   const copies = new Map<TileKind, number>();

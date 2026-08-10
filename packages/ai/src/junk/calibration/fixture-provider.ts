@@ -50,13 +50,6 @@ export const createJunkFixtureProvider = (
   };
 };
 
-/** Loads pure JSON fixture data and exposes the same provider contract as other sources. */
-export const createJunkFixtureProviderFromData = (
-  manifest: CalibrationManifest,
-  data: JunkProductionFixtureData,
-): JunkFixtureProvider =>
-  createJunkFixtureProviderFromRegistry(manifest, { [data.id]: data });
-
 /** Builds fixtures by source fixtureId, so multiple scenarios cannot silently reuse one input. */
 export const createJunkFixtureProviderFromRegistry = (
   manifest: CalibrationManifest,

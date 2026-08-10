@@ -14,7 +14,8 @@ manifest：
 - `seed`：场景来源的稳定标识。fixture 当前不通过随机生成使用它；
 - `description`/`tags`：帮助人和 AI 快速理解场景用途，不参与执行逻辑。
 
-具体输入位于同目录的 `fixtures/*.json`，包括牌种、牌副本、玩家视角和合法动作。
+具体输入位于同目录的 `fixtures/*.json`，只包括牌种、牌副本、玩家视角和合法动作；
+fixture 身份由 registry 的 `fixtureId` 提供，版本由 manifest 中的 scenario 提供。
 provider 会把牌种转换为 TileId，并生成 `contentHash`。
 
 JSON 只用于 manifest 和少量 canonical fixture。大规模 generated、snapshot 或

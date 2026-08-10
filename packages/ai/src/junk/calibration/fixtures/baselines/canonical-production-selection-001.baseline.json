@@ -6,7 +6,7 @@
     "version": 1
   },
   "scenarioId": "canonical-production-selection-001",
-  "scenarioContentHash": "sha256:0a6f174993a52c445a9de4f33432fdc929dec89266cc0e31ab4524591b789537",
+  "scenarioContentHash": "sha256:fd10b00c285fc0f6521a373c9a967afd1d61eb25e4665ebd65a6b1da3fc3c4d8",
   "evaluator": "production-weighted",
   "evaluatorVersion": "current",
   "expected": {

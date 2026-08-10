@@ -148,4 +148,6 @@ registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹
 
 批量报告已增加场景数、状态计数、总耗时、吞吐、p50/p95 evaluator 延迟和失败摘要；evaluator 异常转为 failed evaluation 保留在报告中，未知/重复 scenario 仍快速失败。
 
+fixture 元数据已去重：fixture JSON 不再保存 `id/version/seed`；registry 的 `fixtureId` 管理输入资产身份，manifest scenario 管理版本，fixture source 不使用 seed。
+
 下一动作：设计 executor 的 worker 等价性测试，确保顺序与 worker 模式共享任务函数并产生相同决策和稳定报告；先不改变生产 evaluator。

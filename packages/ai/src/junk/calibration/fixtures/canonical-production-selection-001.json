@@ -1,7 +1,4 @@
 {
-  "id": "canonical-production-selection-001",
-  "version": 1,
-  "seed": 1,
   "input": {
     "seat": 0,
     "hand": ["1m", "2m", "3m", "4m", "5m", "7m", "8m", "9m", "2p", "3p", "5p", "7s", "8s", "1z"],

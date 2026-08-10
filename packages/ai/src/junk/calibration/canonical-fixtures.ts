@@ -11,7 +11,7 @@ export const JUNK_CALIBRATION_MANIFEST = manifestData as CalibrationManifest;
 
 export const CANONICAL_JUNK_FIXTURE_PROVIDER = createJunkFixtureProviderFromRegistry(
   JUNK_CALIBRATION_MANIFEST,
-  { [fixtureData.id]: fixtureData as unknown as JunkProductionFixtureData },
+  { "canonical-production-selection-001": fixtureData as unknown as JunkProductionFixtureData },
 );
 
 export const CANONICAL_JUNK_FIXTURES: readonly JunkProductionFixture[] =
