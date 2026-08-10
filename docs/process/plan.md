@@ -66,8 +66,10 @@
 - 本轮验证结果：calibration 4 个测试文件、8/8 测试通过，AI typecheck/lint 通过；真实命令 `pnpm --filter @new-mj/ai evaluate list` 与单 scenario 输出冒烟均通过。CLI 仍是单线程，不负责 baseline 登记/比较、批量调度或 worker pool。
 - 命令归属结论：calibration 是 `@new-mj/ai` 的包内能力，canonical script 放在 `packages/ai/package.json`；root 不新增快捷命令，临时输出忽略规则也放在 `packages/ai/.gitignore`。
 - canonical scenario 设计结论：scenario 本身必须是纯数据，代码只负责 schema 校验、牌种到 TileId 的转换、`JunkPlayerView`/合法动作构造和 evaluator；当前 `canonical-fixtures.ts` 仅是临时原型，step 0 完成前必须迁移为版本化 manifest/fixture 数据文件，并补 `contentHash`。
+- canonical 数据迁移已完成：manifest 与 fixture 使用版本化 JSON，fixture 数据只表达牌种、动作副本和玩家视角字段；provider 负责通用校验、TileId 构造和稳定 `sha256:<hex>` 内容哈希，报告 evaluation 记录 `scenarioContentHash`，Markdown 摘要也显示该哈希。
+- 迁移验证结果：calibration 4 个测试文件、10/10 测试通过，AI typecheck 与 lint 通过；现有 canonical 生产 evaluator 仍返回同一类合法、确定性决策。数据文件新增场景时不需要修改 provider 或 runner 代码。
 
-下一步第一个具体动作：先把当前 `canonical-fixtures.ts` 迁移为纯数据 manifest/fixture 文件，由 provider 完成校验、TileId/合法动作构造并生成 `contentHash`；迁移完成后再定义 canonical baseline 的登记、元数据和比较入口。
+下一步第一个具体动作：为 canonical manifest 定义 baseline 登记资产、元数据和不可覆盖的比较入口；先只登记当前单场景基线，不扩展批量 runner 或 worker pool。
 
 ## 专题路线图
 

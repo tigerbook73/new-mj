@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "junk-structural-calibration-canonical",
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "canonical-production-selection-001",
+      "version": 1,
+      "source": {
+        "kind": "fixture",
+        "fixtureId": "canonical-production-selection-001"
+      },
+      "seed": 1
+    }
+  ]
+}

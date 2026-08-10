@@ -15,6 +15,7 @@ describe("Junk fixture provider and production evaluator", () => {
     expect(first.status).toBe("ok");
     expect(first.scenarioId).toBe(fixture.scenario.id);
     expect(normalized.input.legalActions).toContainEqual(first.candidates[0]?.action);
+    expect(normalized.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(second.selectedCandidateId).toBe(first.selectedCandidateId);
   });
 

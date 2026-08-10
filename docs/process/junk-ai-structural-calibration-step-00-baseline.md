@@ -134,4 +134,6 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 最早验证不是跑大样本，而是写出一个最小 manifest、一个统一报告样例和一条单场景复现命令，确认三种现有评估路径能在不改 bench 框架的情况下产出同构结果。
 
-下一动作：将当前 `canonical-fixtures.ts` 迁移为纯数据 manifest/fixture，验证 provider 能从数据重建同一真实 fixture，并记录 `contentHash`；完成前不登记 baseline，也不扩展批量 runner。
+已完成：canonical manifest 与 fixture 已迁移为版本化 JSON；provider 从数据重建真实 `JunkPlayerView` 与合法动作，执行通用校验、TileId 转换并生成稳定 `contentHash`。报告 evaluation 已记录该哈希，新增数据场景无需修改 provider/runner。
+
+下一动作：为 canonical manifest 定义 baseline 登记资产、元数据和不可覆盖的比较入口；先只登记当前单场景基线，不扩展批量 runner 或 worker pool。

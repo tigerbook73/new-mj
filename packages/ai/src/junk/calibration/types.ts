@@ -35,6 +35,7 @@ export type CalibrationScenario = Readonly<{
 export type NormalizedCalibrationScenario<TInput = CalibrationScenarioInput> = Readonly<{
   scenario: CalibrationScenario;
   input: TInput;
+  contentHash: string;
 }>;
 
 export type CalibrationManifest = Readonly<{
@@ -54,6 +55,7 @@ export type CalibrationCandidateResult = Readonly<{
 
 export type CalibrationEvaluationResult = Readonly<{
   scenarioId: string;
+  scenarioContentHash?: string;
   evaluator: CalibrationEvaluatorKind;
   evaluatorVersion: string;
   selectedCandidateId?: string;

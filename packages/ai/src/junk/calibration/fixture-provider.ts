@@ -3,6 +3,9 @@ import type {
   CalibrationScenario,
   NormalizedCalibrationScenario,
 } from "./types.ts";
+import { contentHashOf } from "./hash.ts";
+import { createJunkProductionFixture, type JunkProductionFixtureData } from "./fixture-data.ts";
+import type { CalibrationManifest } from "./types.ts";
 
 export type JunkProductionFixtureInput = Readonly<{
   view: JunkPlayerView;
@@ -12,6 +15,7 @@ export type JunkProductionFixtureInput = Readonly<{
 export type JunkProductionFixture = Readonly<{
   scenario: CalibrationScenario;
   input: JunkProductionFixtureInput;
+  contentHash?: string;
 }>;
 
 export type JunkFixtureProvider = Readonly<{
@@ -33,7 +37,20 @@ export const createJunkFixtureProvider = (
       }
       const fixture = byId.get(scenario.source.fixtureId);
       if (!fixture) throw new Error(`FIXTURE_NOT_FOUND: ${scenario.source.fixtureId}`);
-      return { scenario, input: fixture.input };
+      return {
+        scenario,
+        input: fixture.input,
+        contentHash: fixture.contentHash ?? contentHashOf(fixture.input),
+      };
     },
   };
 };
+
+/** Loads pure JSON fixture data and exposes the same provider contract as other sources. */
+export const createJunkFixtureProviderFromData = (
+  manifest: CalibrationManifest,
+  data: JunkProductionFixtureData,
+): JunkFixtureProvider =>
+  createJunkFixtureProvider(
+    manifest.scenarios.map((scenario) => createJunkProductionFixture(data, scenario)),
+  );

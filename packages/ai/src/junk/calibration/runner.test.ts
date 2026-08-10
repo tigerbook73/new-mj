@@ -38,6 +38,7 @@ describe("single calibration runner", () => {
     expect(report.evaluations).toHaveLength(1);
     expect(report.evaluations[0]?.scenarioId).toBe(fixture.scenario.id);
     expect(report.evaluations[0]?.status).toBe("ok");
+    expect(report.evaluations[0]?.scenarioContentHash).toBeDefined();
     expect(fixture.input.legalActions).toContainEqual(report.evaluations[0]?.candidates[0]?.action);
     expect(serializeCalibrationReport(report)).toContain('"schemaVersion": 1');
     expect(formatCalibrationSummary(report)).toContain("canonical-production-selection-001");

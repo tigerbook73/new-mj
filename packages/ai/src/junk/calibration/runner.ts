@@ -33,5 +33,9 @@ export const runSingleCalibrationScenario = <TInput>(
   if (!scenario) throw new Error(`SCENARIO_NOT_FOUND: ${scenarioId}`);
   const normalized = provider.resolve(scenario);
   const evaluation = evaluator(normalized);
-  return createCalibrationReport(run, manifest, [evaluation]);
+  const evaluationWithHash = {
+    ...evaluation,
+    scenarioContentHash: normalized.contentHash,
+  };
+  return createCalibrationReport(run, manifest, [evaluationWithHash]);
 };

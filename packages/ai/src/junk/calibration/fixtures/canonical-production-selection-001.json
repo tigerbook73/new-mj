@@ -1,0 +1,35 @@
+{
+  "id": "canonical-production-selection-001",
+  "version": 1,
+  "seed": 1,
+  "input": {
+    "seat": 0,
+    "hand": ["1m", "2m", "3m", "4m", "5m", "7m", "8m", "9m", "2p", "3p", "5p", "7s", "8s", "1z"],
+    "wallCount": 50,
+    "currentSeat": 0,
+    "dealer": 0,
+    "phase": "playing",
+    "seats": [
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false },
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false },
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false },
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false }
+    ],
+    "legalActions": [
+      { "type": "discard", "kind": "1m", "copy": 0 },
+      { "type": "discard", "kind": "2m", "copy": 0 },
+      { "type": "discard", "kind": "3m", "copy": 0 },
+      { "type": "discard", "kind": "4m", "copy": 0 },
+      { "type": "discard", "kind": "5m", "copy": 0 },
+      { "type": "discard", "kind": "7m", "copy": 0 },
+      { "type": "discard", "kind": "8m", "copy": 0 },
+      { "type": "discard", "kind": "9m", "copy": 0 },
+      { "type": "discard", "kind": "2p", "copy": 0 },
+      { "type": "discard", "kind": "3p", "copy": 0 },
+      { "type": "discard", "kind": "5p", "copy": 0 },
+      { "type": "discard", "kind": "7s", "copy": 0 },
+      { "type": "discard", "kind": "8s", "copy": 0 },
+      { "type": "discard", "kind": "1z", "copy": 0 }
+    ]
+  }
+}
