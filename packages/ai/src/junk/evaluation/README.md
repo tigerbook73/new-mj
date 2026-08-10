@@ -24,8 +24,7 @@ JSON 只用于 manifest 和少量 canonical fixture。大规模 generated、snap
 replay 数据不直接拼成一个巨大的 JSON 数组；批量 runner 应使用一条记录一行的
 JSONL，以便流式读取、按行校验、分片分发和失败场景重跑。JSONL 第一条非空行是
 header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，不能依赖跨行状态；文件顺序不作为
-决策输入，报告仍按稳定 scenario ID 排序。后续可在不改变 evaluator 契约的前提下
-增加 `.jsonl`/`.jsonl.gz` reader。
+决策输入，报告仍按稳定 scenario ID 排序。现有 reader 支持 `.jsonl`；压缩输入尚未接入。
 
 ## 使用
 
@@ -103,21 +102,3 @@ reader 只负责 header、逐行解析和基础字段校验；具体 `data` 的 
 场景合法性仍由对应 provider 负责。建议文件名为
 `<manifest-id>.v<manifest-version>.part-<zero-padded-index>.jsonl`，例如
 `junk-generated.v1.part-0000.jsonl`。
-
-顺序批量 runner 会流式消费这些 records，按 `scenarioId` 查找 manifest，交给 resolver
-构造 normalized scenario，再交给统一 evaluator；输入不会整体加载，重复或不存在的
-scenario 会失败。报告额外记录场景数、成功/失败/跳过数量、总耗时、吞吐、p50/p95
-延迟和失败摘要。runner 当前只保证顺序消费和稳定报告排序，尚未接入 worker、重试或进度恢复。
-
-executor 的 task 契约使用稳定 `taskId` 和纯 task function；顺序/有界并发模式共用
-同一函数，并按输入顺序返回结果。当前有界并发只是 executor seam，CPU 密集任务要
-接入 `worker_threads` 后才会获得真正的多核收益。通用 worker adapter 已提供，要求
-task input 可结构化克隆、通过 module URL 和 export name 定位纯 task function；CLI
-默认仍使用顺序模式。
-
-worker batch 按 `chunkSize` 分块执行，不一次性保留全部 normalized tasks。调用方可用
-`onProgress` 显示进度，并通过 `onCheckpoint` 持久化每个新完成 chunk；恢复时传入
-`resumeEvaluations`，runner 会校验 scenario content hash，不接受过期结果。
-
-reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
-合法性仍由对应 provider 负责。
