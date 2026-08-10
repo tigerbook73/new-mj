@@ -48,7 +48,7 @@ type PendingResolve<TResult> = (result: TResult) => void;
  * Generic over the task shape (`TTask`) so multiple task kinds that all reduce
  * to the same MatchTaskResult can share this implementation instead of each
  * hand-rolling their own pool. Matches are pure, independent, and CPU-bound
- * (the real cost is shanten computation inside strategy.ts, not I/O), which
+ * (the real cost is shanten computation in the production scoring closure, not I/O), which
  * makes them embarrassingly parallel across cores. The pool is meant to be
  * created once and reused for an entire run — not spawned per generation/task
  * — so thread-startup cost is amortized across many matches instead of paid

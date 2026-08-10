@@ -20,8 +20,7 @@ import {
 import { MatchWorkerPool, type MatchTask } from "../match/tune-pool.ts";
 import type { JunkWeights } from "../../strategy.ts";
 
-/** Same file strategy.ts's DEFAULT_JUNK_WEIGHTS loads from — this file lives
- * next to it in the same directory, so the relative URL always agrees. */
+/** Same JSON asset weights.ts loads as DEFAULT_JUNK_WEIGHTS. */
 const DEFAULT_WEIGHTS_PATH = new URL("../../default-weights.json", import.meta.url);
 
 type Arguments = {

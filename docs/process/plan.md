@@ -43,7 +43,7 @@
 - canonical fixture 与固定可见状态 snapshot 共用主链；production-weighted、one-ply-all、two-ply-all 有六份不可自动覆盖的版本化 baseline。generated provider 延后到步骤 5，不提前定义牌型生成语义。
 - `standard-only@v1` 已作为第四路只读 evaluator 接入 canonical single-scenario 报告；对每个合法弃牌记录普通标准型向听数、进张牌种/牌种数和按玩家可见信息估计的剩余进张张数，不加权、不选动作，也不包含七对或番型目标。
 - 首个 canonical 样例已证明最小字段能解释非单调候选：弃 `5p` 为 2 向听、15 种/50 张进张，弃 `3m` 虽为 16 种/53 张进张却退到 3 向听；当前无需提前加入面子/雀头/搭子分解。进张张数不是墙内真值、自摸概率、完整胡牌概率或终局 EV。
-- `strategy.ts` 同时是生产 facade 与跨 Git ref policy-loader 的加载根；动作模拟、单层评分、cliff/fallback 和两层候选编排现集中在 `action-scoring.ts`，facade 只保留兼容导出、胜利动作优先、argmax/softmax 与最终动作选择。
+- `strategy.ts` 同时是生产 facade 与跨 Git ref policy-loader 的加载根；动作模拟、单层评分、cliff/fallback 和两层候选编排现集中在 `action-scoring.ts`，facade 只保留兼容导出、胜利动作优先、argmax/softmax 与最终动作选择；这条耐久依赖边界已下沉到 `packages/ai/AGENTS.md`。
 - 静态牌形质量位于 `hand-quality.ts`，自摸二层 continuation probe 位于 `two-ply.ts`；`strategy.ts` 继续按原路径导出既有 API。最终一次对 `HEAD` 与当前实现的 3-seed policy diff 覆盖 2110 个决策点且分歧为 0，原始 action 引用、cliff、fallback、全部评分、现有 probe/production fixtures 与六份 baseline 均保持不变。
 - policy capture 现在显式复制 `strategy.ts`、`action-scoring.ts`、`analysis.ts`、`hand-quality.ts`、`two-ply.ts`、`weights.ts`、默认权重 JSON 和概率 helper；Git ref loader 仍按该 ref 当时实际存在的顶层生产闭包取快照，因此旧 ref 不要求拥有新模块。
 - AI/Core 慢速测试已按正确性边界审计：Core 保留向听/表等价性质、回放与每玩法 100 局 fuzz；重复 conservation、AI 真实调参循环、30 局 arena 统计与强弱胜率暂时退出自动门禁，恢复条件见 `backlog.md`。单局 arena/policy worker/decision-diff 接线正确性仍在 `verify:full`，真实调参与万局收尾改走手工入口。

@@ -446,8 +446,8 @@ const formatWriteStatus = (status: TuneWriteStatus): string[] => {
   if (!status.attempted) {
     return [
       "This is a candidate only — it does not change any file. Review the numbers",
-      "above, then manually update JUNK_FAN_WEIGHTS/DEFAULT_JUNK_WEIGHTS in",
-      "strategy.ts (or rerun with --write) if you want to adopt it.",
+      "above, then manually update default-weights.json (or rerun with --write)",
+      "if you want to adopt it.",
     ];
   }
   if (status.written) {
