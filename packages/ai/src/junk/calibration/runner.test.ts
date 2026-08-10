@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import baseline from "./fixtures/baselines/canonical-production-selection-001.json" with { type: "json" };
 import { CANONICAL_PRODUCTION_SELECTION } from "./canonical-fixtures.ts";
 import { createJunkFixtureProvider } from "./fixture-provider.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "./report.ts";
@@ -39,6 +40,13 @@ describe("single calibration runner", () => {
     expect(report.evaluations[0]?.scenarioId).toBe(fixture.scenario.id);
     expect(report.evaluations[0]?.status).toBe("ok");
     expect(report.evaluations[0]?.scenarioContentHash).toBeDefined();
+    expect(report.evaluations[0]?.scenarioContentHash).toBe(baseline.scenarioContentHash);
+    expect(report.evaluations[0]?.selectedCandidateId).toBe(
+      JSON.stringify(baseline.expected.selectedAction),
+    );
+    expect(report.evaluations[0]?.candidates[0]?.metrics.legalActionCount).toBe(
+      baseline.expected.legalActionCount,
+    );
     expect(fixture.input.legalActions).toContainEqual(report.evaluations[0]?.candidates[0]?.action);
     expect(serializeCalibrationReport(report)).toContain('"schemaVersion": 1');
     expect(formatCalibrationSummary(report)).toContain("canonical-production-selection-001");

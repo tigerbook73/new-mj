@@ -68,6 +68,9 @@
 - canonical scenario 设计结论：scenario 本身必须是纯数据，代码只负责 schema 校验、牌种到 TileId 的转换、`JunkPlayerView`/合法动作构造和 evaluator；当前 `canonical-fixtures.ts` 仅是临时原型，step 0 完成前必须迁移为版本化 manifest/fixture 数据文件，并补 `contentHash`。
 - canonical 数据迁移已完成：manifest 与 fixture 使用版本化 JSON，fixture 数据只表达牌种、动作副本和玩家视角字段；provider 负责通用校验、TileId 构造和稳定 `sha256:<hex>` 内容哈希，报告 evaluation 记录 `scenarioContentHash`，Markdown 摘要也显示该哈希。
 - 迁移验证结果：calibration 4 个测试文件、10/10 测试通过，AI typecheck 与 lint 通过；现有 canonical 生产 evaluator 仍返回同一类合法、确定性决策。数据文件新增场景时不需要修改 provider 或 runner 代码。
+- manifest 说明已补齐：manifest 增加 `purpose`/`description`，scenario 增加可读 `description`/`tags`，并新增 calibration README 解释当前 canonical-baseline 的用途、字段和已实现/未实现的 source 类型；README 同时明确当前 loader 仍需显式注册 fixture。
+- 大数据格式边界已记录：manifest 和少量 canonical fixture 使用 JSON；大量 generated/snapshot/replay 场景使用一条记录一行的 JSONL，以支持流式读取、按行校验、分片分发和失败场景重跑。JSONL 记录必须自包含且报告按稳定 scenario ID 聚合排序；`.jsonl.gz` reader 留给批量 runner，不在当前单场景入口临时实现。
+- 当前单场景 baseline 已登记为版本化资产：保存 manifest/scenario 版本、`scenarioContentHash`、evaluator 版本、期望动作和合法动作数；决策与候选数量作为可比较结果，耗时仅作信息指标，baseline 文件不由运行结果覆盖。
 
 下一步第一个具体动作：为 canonical manifest 定义 baseline 登记资产、元数据和不可覆盖的比较入口；先只登记当前单场景基线，不扩展批量 runner 或 worker pool。
 

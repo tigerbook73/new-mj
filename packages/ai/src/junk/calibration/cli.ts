@@ -81,6 +81,9 @@ const commandFor = (argv: readonly string[]): string =>
 const listScenarios = (): string =>
   [
     `manifest: ${JUNK_CALIBRATION_MANIFEST.id}@${JUNK_CALIBRATION_MANIFEST.version}`,
+    ...(JUNK_CALIBRATION_MANIFEST.description
+      ? [`description: ${JUNK_CALIBRATION_MANIFEST.description}`]
+      : []),
     ...JUNK_CALIBRATION_MANIFEST.scenarios.map(
       (scenario) => `- ${scenario.id} (${scenario.source.kind}, seed=${scenario.seed})`,
     ),

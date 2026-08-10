@@ -30,6 +30,8 @@ export type CalibrationScenario = Readonly<{
   version: number;
   source: CalibrationScenarioSource;
   seed: number;
+  description?: string;
+  tags?: readonly string[];
 }>;
 
 export type NormalizedCalibrationScenario<TInput = CalibrationScenarioInput> = Readonly<{
@@ -42,6 +44,8 @@ export type CalibrationManifest = Readonly<{
   schemaVersion: typeof CALIBRATION_SCHEMA_VERSION;
   id: string;
   version: number;
+  purpose?: "canonical-baseline" | "snapshot-regression" | "generated-scan" | "replay-analysis";
+  description?: string;
   scenarios: readonly CalibrationScenario[];
 }>;
 

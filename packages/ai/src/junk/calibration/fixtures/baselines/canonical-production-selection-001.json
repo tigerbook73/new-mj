@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "junk-structural-calibration-canonical-baseline-001",
+  "manifest": {
+    "id": "junk-structural-calibration-canonical",
+    "version": 1
+  },
+  "scenarioId": "canonical-production-selection-001",
+  "scenarioContentHash": "sha256:0a6f174993a52c445a9de4f33432fdc929dec89266cc0e31ab4524591b789537",
+  "evaluator": "production-weighted",
+  "evaluatorVersion": "current",
+  "expected": {
+    "selectedAction": { "type": "discard", "tile": 52 },
+    "legalActionCount": 14
+  },
+  "limits": {
+    "decision": "exact",
+    "performance": "informational"
+  },
+  "notes": "当前生产策略在固定 canonical 输入上的决策基线；耗时不作为硬门槛。"
+}

@@ -39,6 +39,7 @@ step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator；ste
 
 - canonical fixture、snapshot、批量种子和报告配置使用统一 manifest；
 - canonical scenario 本身只保存可读、可版本化的纯数据；当前 TypeScript fixture registry 只是 bootstrap，step 0 完成前必须迁移为 manifest/fixture 数据文件；
+- manifest/少量 canonical fixture 使用 JSON；大规模 generated、snapshot、replay 数据使用 JSONL 流式记录，避免单个 JSON 数组的内存和解析成本；JSONL 记录必须自包含，支持分片、失败重跑和稳定聚合，后续可增加 gzip reader；
 - 测试只选择 manifest、评估器和断言级别，不修改平台代码；
 - 断言分层为：结构字段/不变量、候选集合、决策差异、性能阈值和报告 schema；
 - 新增评估器只需实现稳定 adapter，并复用通用 runner、比较器、序列化器和 reporter；
@@ -125,6 +126,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 - 单个 fixture、固定 snapshot、批量 seeds 和三种现有评估路径共享同一 manifest/结果模型；
 - 单线程和多 worker 结果等价，任务顺序不会影响决策或报告；
 - 批量运行有有界并发、稳定聚合、失败重试/重跑和性能分位数据；
+- 大数据输入不要求一次性加载到内存，JSONL reader 能按记录流式校验并交给统一 provider/executor；
 - 人读摘要与机器报告字段固定，报告能直接定位失败场景和复现命令；
 - baseline 具备版本、环境、配置、哈希、结论和限制，不覆盖历史数据；
 - 普通测试、slow bench、性能门禁和人工报告有明确入口与边界；
@@ -135,5 +137,9 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 最早验证不是跑大样本，而是写出一个最小 manifest、一个统一报告样例和一条单场景复现命令，确认三种现有评估路径能在不改 bench 框架的情况下产出同构结果。
 
 已完成：canonical manifest 与 fixture 已迁移为版本化 JSON；provider 从数据重建真实 `JunkPlayerView` 与合法动作，执行通用校验、TileId 转换并生成稳定 `contentHash`。报告 evaluation 已记录该哈希，新增数据场景无需修改 provider/runner。
+
+补充完成：manifest/scene 增加用途、描述和 tags 元数据，calibration README 说明当前 manifest、字段、命令和 source 支持边界；已明确当前 loader 仍有显式 fixture 注册限制。
+
+当前单场景 baseline 已登记在 `packages/ai/src/junk/calibration/fixtures/baselines/`；它固定输入哈希、evaluator 版本、期望动作和候选数，不把耗时作为硬门槛，也不允许运行结果覆盖该资产。
 
 下一动作：为 canonical manifest 定义 baseline 登记资产、元数据和不可覆盖的比较入口；先只登记当前单场景基线，不扩展批量 runner 或 worker pool。
