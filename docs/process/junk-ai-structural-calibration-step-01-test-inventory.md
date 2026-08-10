@@ -46,8 +46,8 @@
 | `src/junk/tile-probability.test.ts` | 概率纯函数 unit | keep / fast |
 | `src/junk/strategy.test.ts` | 2-ply、生产 fixture、strength、weights 混合 | split-by-responsibility；先保留全部断言 |
 | `test/junk-decision-diff.test.ts` | 完整引擎 decision-diff smoke | 已移入 `test/` / slow |
-| `src/junk/policy-loader.test.ts` | 权重校验 unit + 模块/Git/fs integration | split；纯校验留 `src/`，Git/import 路径进 `test/` |
-| `src/junk/capture-policy-cli.test.ts` | 未提交 policy 捕获 CLI unit/fs | 已完成 capture-policy 改名；fast，仍待收窄复制范围 |
+| `src/junk/policy-loader.test.ts` + `test/junk-policy-loader.test.ts` | 权重/来源校验 unit + 模块/Git/fs integration | 已拆分；纯校验 fast，真实 import/Git 路径归 integration |
+| `src/junk/capture-policy-cli.test.ts` | 未提交 policy 捕获 CLI unit/fs | 已完成改名并收窄为三个实际 policy 依赖；fast |
 | `src/junk/evaluation/{cli,batch-cli}.test.ts` | 注入 runtime 的 Junk CLI contract | keep / fast |
 | `src/junk/evaluation/{fixture-provider,snapshot-provider}.test.ts` | provider unit + 真实 runner/evaluator 接线 | split provider unit 与 adapter integration |
 | `src/junk/evaluation/diagnostic-evaluators.test.ts` | 三路真实 evaluator contract | move 到 `test/` / fast integration |
@@ -78,9 +78,9 @@
 - evaluation baseline 测试与旧 strategy fixture 的职责是否重叠。
 
 已确认的工具结论：原 snapshot CLI 保存的是未提交 policy 代码，不是 evaluation 局面
-snapshot，现已重命名为 `capture:junk-policy`/`capture-policy-cli.ts`。能力继续保留，并将复制
-范围收窄到 policy 实际依赖。它仍是 compare-weights/decision-diff 的开发辅助入口，不并入
-通用 evaluation provider。
+snapshot，现已重命名为 `capture:junk-policy`/`capture-policy-cli.ts`，且只复制
+`strategy.ts`、`default-weights.json`、`tile-probability.ts`。它仍是
+compare-weights/decision-diff 的开发辅助入口，不并入通用 evaluation provider。
 
 ### 3. 分批实施低风险重分类
 

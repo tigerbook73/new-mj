@@ -11,13 +11,16 @@ afterEach(() => {
 });
 
 describe("runCaptureJunkPolicyCli", () => {
-  it("copies every non-test file into .compare-scratch/<label>/junk/", () => {
+  it("copies only the policy dependency closure into .compare-scratch/<label>/junk/", () => {
     const result = runCaptureJunkPolicyCli(["unit-test-label"], () => {});
     expect(result.exitCode).toBe(0);
     const destination = path.join(scratchRoot, "unit-test-label", "junk");
     const copied = readdirSync(destination);
-    expect(copied).toContain("strategy.ts");
-    expect(copied.some((name) => name.endsWith(".test.ts"))).toBe(false);
+    expect(copied.sort()).toEqual([
+      "default-weights.json",
+      "strategy.ts",
+      "tile-probability.ts",
+    ]);
   });
 
   it("rejects a missing or invalid label", () => {
