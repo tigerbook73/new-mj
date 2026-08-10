@@ -6,7 +6,7 @@
 
 当前专题：Windows + WSL + VS Code 新成员 onboarding。
 
-当前状态：等待用户 review `docs/onboarding/windows-wsl-vscode.md` 及 bootstrap/doctor 脚本。
+当前状态：等待用户 review `docs/onboarding/windows-wsl-vscode.md` 及 bootstrap/doctor 脚本；期间完成 shanten 表布局与循环展开的独立性能评估。
 
 已完成：
 
@@ -16,8 +16,9 @@
 - 增加 doctor：检查 WSL、Git、Node 24、pnpm 10.33.3、依赖、构建产物、Docker及可选运行中服务/Supabase；
 - 增加完整本地 Supabase、Prisma migration、OAuth callback 和 secret 边界说明；
 - README 与 doc map 已加入 onboarding 入口。
+- 独立验证 shanten 热路径的两项优化：16-slot stride 在固定热基准中使完整查询约快 5%、two-change batch 约快 2%，以约 20 行改动保留；完全展开 `applyTransition` 虽使其本体约快 10%、batch 约快 4%–6%，但需要增加约 300 行重复转移代码，且与 stride 叠加后总 batch 收益仍约 5%，已撤回；四 block 单独展开约慢 11%，也已撤回。
 
-验证：bash 语法、doctor help、当前 WSL doctor、bootstrap 安装与全仓 build、Prettier、typecheck、lint、unit tests 和 `git diff --check` 已通过。根 `pnpm verify` 到 E2E 前均通过；E2E 的既有 server 对局/回放用例在 5 秒超时，允许端口后定向复跑仍为 6 个 timeout，未标全绿。当前环境 Docker daemon 不可用，未执行 `--supabase` 运行态验证。
+验证：bash 语法、doctor help、当前 WSL doctor、bootstrap 安装与全仓 build、Prettier、typecheck、lint、unit tests 和 `git diff --check` 已通过。shanten 改动的 `pnpm --filter @new-mj/core verify:full` 通过（19 个测试文件、194 个测试，含 slow/fuzz、lint、typecheck、build）。根 `pnpm verify` 到 E2E 前均通过；E2E 的既有 server 对局/回放用例在 5 秒超时，允许端口后定向复跑仍为 6 个 timeout，未标全绿。当前环境 Docker daemon 不可用，未执行 `--supabase` 运行态验证。
 
 下一步第一个具体动作：用户 review onboarding 的操作顺序和协作权限说明，确认是否需要调整。
 

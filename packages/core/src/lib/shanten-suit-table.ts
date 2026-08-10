@@ -257,7 +257,10 @@ export const solveSuitVectorStandalone = (
   return flat.slice(base, base + 10);
 };
 
-export const SLOTS_PER_VECTOR = 15;
+/** 每条转移记录有 15 个有效槽位，物理步长补齐到 16，令热路径的 contentId
+ * 寻址可以使用左移。第 16 个槽位只是 padding，不参与内容 key 或转移语义。 */
+const CONTENT_SLOTS_PER_VECTOR = 15;
+export const SLOTS_PER_VECTOR = 16;
 
 export type SuitTable = {
   suitLength: number;
@@ -269,13 +272,13 @@ export type SuitTable = {
    * `buildSuitTable` 文档），会共享同一个 contentId，所以上限远小于向量数
    * （数牌表实测上限仅 1,118），`Int16Array` 足够存下。-1 表示这个槽位从未
    * 建过（总张数 >14，被剪掉；真实手牌的查询路径不会用到）——`contentId=-1`
-   * 时下游 `base = -1 * SLOTS_PER_VECTOR` 是负数，读 `data[base+...]` 会越界
+   * 时下游 `base = -1 << 4` 是负数，读 `data[base+...]` 会越界
    * 返回 `undefined`，`computeShantenViaTable` 里的 `>= 0` 判断天然把
    * `undefined` 当"不可达"处理，不需要在查询路径里额外判空。 */
   indexMap: Int16Array;
   /** 紧凑数据：只存"至少有一个 vectorIndex 需要"的**不同内容**，数量远小于
    * `5^suitLength`，也远小于剪枝+镜像去重后的 vectorIndex 数量（数牌表实测
-   * 仅 1,119 条，见 `buildSuitTable` 文档）。每份 15 个 Int8：
+   * 仅 1,119 条，见 `buildSuitTable` 文档）。每份物理步长 16 个 Int8：
    * `[0..4]`=withEntryPair1，`[5..9]`=entryPair0ExitPair0，
    * `[10..14]`=entryPair0ExitPair1。 */
   data: Int8Array;
@@ -296,7 +299,7 @@ export const MAX_REAL_HAND_TILES = 14;
  */
 const contentKeyOf = (data: Int8Array, base: number): number => {
   let key = 0;
-  for (let i = 0; i < SLOTS_PER_VECTOR; i += 1) key = key * 6 + (data[base + i]! + 1);
+  for (let i = 0; i < CONTENT_SLOTS_PER_VECTOR; i += 1) key = key * 6 + (data[base + i]! + 1);
   return key;
 };
 
@@ -319,7 +322,7 @@ const contentKeyOf = (data: Int8Array, base: number): number => {
  * `data` 小容量起步、写满时倍增扩容（内容去重后最终只有几十 KB，不值得按
  * 稠密上界预分配），建完后 slice 成精确大小（slice 是拷贝，不是 subarray
  * 那种仍拴着原 buffer 的视图）。每个候选内容先写进
- * `contentCount * SLOTS_PER_VECTOR` 这个尚未确认的槽位再算 key——如果判定
+ * `contentCount << 4` 这个尚未确认的槽位再算 key——如果判定
  * 是重复内容，contentCount 不递增，槽位被下一次迭代的候选内容原地覆盖，
  * 不需要额外的 scratch buffer。
  */
@@ -347,7 +350,7 @@ export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTa
     const base0 = solveSuitVector(flat, counts, 0, hasRunLogic);
     const base1 = solveSuitVector(flat, counts, 1, hasRunLogic);
 
-    const candidateBase = contentCount * SLOTS_PER_VECTOR;
+    const candidateBase = contentCount << 4;
     if (candidateBase + SLOTS_PER_VECTOR > data.length) {
       const grown = new Int8Array(data.length * 2);
       grown.set(data);
@@ -373,7 +376,7 @@ export const buildSuitTable = (suitLength: number, hasRunLogic: boolean): SuitTa
     suitLength,
     hasRunLogic,
     indexMap,
-    data: data.slice(0, contentCount * SLOTS_PER_VECTOR),
+    data: data.slice(0, contentCount << 4),
   };
 };
 
@@ -432,7 +435,7 @@ export const getBlocks = (): readonly SuitBlock[] => {
 let countsScratch: number[] | undefined;
 
 /**
- * 把一条 15-slot 转移记录（表里的单花色结果，或 `composeTransitions` 合成
+ * 把一条转移记录的 15 个有效槽位（表里的单花色结果，或 `composeTransitions` 合成
  * 的多花色转移）应用到 DP 状态上：`dp`（`(tm*2+pairFlag)` → 累计最大
  * tatsu，`DP_UNREACHED`=不可达）经 `rec[base..base+14]` 转移写进 `next`。
  * `base` 为负（花色总张数 >14 被剪，真实手牌不会出现）时越界读返回
@@ -512,7 +515,7 @@ export const computeShantenFromCounts = (
   dp[0] = 0; // tm=0, pairFlag=0 -> 累计 tatsu=0
   for (const block of blocks) {
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     applyTransition(dp, next, block.table.data, base);
     [dp, next] = [next, dp];
   }
@@ -544,7 +547,7 @@ export const computeShantenViaTable = (
 };
 
 /**
- * 把两条 15-slot 转移记录（`a` 先、`b` 后）合成一条等价的复合转移，写进
+ * 把两条各含 15 个有效槽位的转移记录（`a` 先、`b` 后）合成一条等价记录，写进
  * `out`。转移在 (Δmelds, pair) 上构成 max-plus 半环，天然可结合：
  *   - withEntryPair1 链：两段都在"雀头已认领"轨道上。
  *   - entryPair0ExitPair0 链：两段都不认雀头。
