@@ -27,7 +27,7 @@ describe("calibration report contract", () => {
     const report = createCalibrationReport(run, manifest, [
       {
         scenarioId: "scenario-b",
-        evaluator: "two-ply",
+        evaluator: "two-ply-all",
         evaluatorVersion: "v1",
         candidates: [],
         performance: { durationMs: 3, cacheHits: 0, cacheMisses: 0 },

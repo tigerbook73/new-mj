@@ -46,6 +46,12 @@ describe("evaluation CLI", () => {
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"schemaVersion": 1',
     );
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
+      '"evaluator": "one-ply-all"',
+    );
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
+      '"evaluator": "two-ply-all"',
+    );
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.md")).toContain(
       "discard-001",
     );

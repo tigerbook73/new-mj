@@ -34,8 +34,14 @@ pnpm --filter @new-mj/ai evaluate list
 pnpm --filter @new-mj/ai evaluate run discard-001
 ```
 
-`run` 当前只执行生产权重 evaluator，输出选中的动作和统一 JSON/Markdown 报告；
-它还不是完整的结构指标或 baseline 比较工具。
+`run` 对同一个规范化输入执行三路 evaluator，并写入同一份 JSON/Markdown 报告：
+
+- `production-weighted`：当前生产混合路径，作为行为基线；
+- `one-ply-all`：全部合法动作的一轮生产加权评分，不执行 2-ply/cliff；
+- `two-ply-all`：全部合法弃牌的现有 2-ply 续行计算，不执行 cliff，属于较慢的诊断路径。
+
+这三路仍使用当前生产权重，不代表无权重结构指标；后者属于后续 `StructuralMetrics`
+步骤。当前命令还不是 baseline 比较工具。
 
 当前决策 baseline 位于 `fixtures/baselines/*.baseline.json`。它保存输入内容哈希、评估器版本、
 期望动作和候选数量；baseline 文件作为版本化资产，不由运行结果覆盖。当前只有

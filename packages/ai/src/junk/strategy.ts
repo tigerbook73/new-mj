@@ -868,6 +868,7 @@ const scoreTwoPlyDiscards = (
   weights: JunkWeights,
   memo: Map<string, number>,
   analysisCache: JunkAnalysisCache,
+  allCandidates = false,
 ): Map<TileKind, number> => {
   // The first round is intentionally cheap and bounded. The second round keeps
   // the exact branch result, but only for the upper candidates; the lower cliff
@@ -886,8 +887,12 @@ const scoreTwoPlyDiscards = (
     analysisCache,
     publicMelds,
   );
-  const upperLimit = upperTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.upper);
-  const lowerLimit = lowerTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.lower);
+  const upperLimit = allCandidates
+    ? ranked.length
+    : upperTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.upper);
+  const lowerLimit = allCandidates
+    ? ranked.length
+    : lowerTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.lower);
   const secondWhitelist = new Set(ranked.slice(0, lowerLimit).map(({ kind }) => kind));
   const scores = new Map<TileKind, number>();
   const actionKinds = new Set(discardActions.map(({ tile }) => kindOf(tile)));
@@ -1052,6 +1057,40 @@ export const scoreLegalActions = (
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
           })()),
+  }));
+};
+
+/** Diagnostic one-ply view over every legal action; production behavior is unchanged. */
+export const scoreLegalActionsOnePlyAll = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  analysisCache: JunkAnalysisCache = createJunkAnalysisCache(),
+): ScoredAction[] => {
+  const memo = new Map<string, number>();
+  return legalActions.map((action) => ({
+    action,
+    score: scoreAction(view, action, weights, memo, analysisCache),
+  }));
+};
+
+/** Slow diagnostic path: run the existing two-ply continuation over every discard kind. */
+export const scoreDiscardActionsTwoPlyAll = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  analysisCache: JunkAnalysisCache = createJunkAnalysisCache(),
+): ScoredAction[] => {
+  const discardActions = legalActions.filter(
+    (action): action is Extract<JunkAction, { type: "discard" }> => action.type === "discard",
+  );
+  const memo = new Map<string, number>();
+  const scores = scoreTwoPlyDiscards(view, discardActions, weights, memo, analysisCache, true);
+  return discardActions.map((action) => ({
+    action,
+    score:
+      scores.get(kindOf(action.tile)) ??
+      scoreAction(view, action, weights, memo, analysisCache),
   }));
 };
 

@@ -5,9 +5,9 @@ export type CalibrationHorizon = "early" | "mid" | "late";
 
 export type CalibrationEvaluatorKind =
   | "production-weighted"
-  | "full-candidate"
+  | "one-ply-all"
   | "standard-only"
-  | "two-ply";
+  | "two-ply-all";
 
 export type CalibrationScenarioSource =
   | Readonly<{ kind: "fixture"; fixtureId: string }>

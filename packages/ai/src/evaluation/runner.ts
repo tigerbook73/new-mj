@@ -32,15 +32,25 @@ export const runSingleCalibrationScenario = <TInput>(
   evaluator: CalibrationEvaluator<TInput>,
   run: CalibrationRun,
 ): CalibrationReport => {
+  return runSingleCalibrationScenarioEvaluators(manifest, scenarioId, provider, [evaluator], run);
+};
+
+/** Runs multiple evaluator adapters against one resolved, hash-stable input. */
+export const runSingleCalibrationScenarioEvaluators = <TInput>(
+  manifest: CalibrationManifest,
+  scenarioId: string,
+  provider: CalibrationScenarioProvider<TInput>,
+  evaluators: readonly CalibrationEvaluator<TInput>[],
+  run: CalibrationRun,
+): CalibrationReport => {
   const scenario = manifest.scenarios.find(({ id }) => id === scenarioId);
   if (!scenario) throw new Error(`SCENARIO_NOT_FOUND: ${scenarioId}`);
   const normalized = provider.resolve(scenario);
-  const evaluation = evaluator(normalized);
-  const evaluationWithHash = {
-    ...evaluation,
+  const evaluations = evaluators.map((evaluate) => ({
+    ...evaluate(normalized),
     scenarioContentHash: normalized.contentHash,
-  };
-  return createCalibrationReport(run, manifest, [evaluationWithHash]);
+  }));
+  return createCalibrationReport(run, manifest, evaluations);
 };
 
 export type CalibrationJsonlRecordResolver<TRecordData, TInput> = (

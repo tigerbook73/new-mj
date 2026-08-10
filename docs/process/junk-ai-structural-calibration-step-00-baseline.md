@@ -33,7 +33,7 @@
 
 Provider 分层固定为：`ScenarioProvider`（fixture/snapshot/generated/replay）、`EvaluatorProvider`（生产权重/`standard-only`/2-ply/decision diff）和统一 `Executor`（单线程/有界 worker）；baseline/候选差异使用纯 `Comparator`，JSON/Markdown 使用 `ReportWriter`。性能采集作为横切 wrapper，不为每类测试复制 runner。
 
-step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator；step 2 再决定是否引入更底层的结构诊断输入，避免基线平台提前锁死 `StructuralMetrics` 契约。
+step 0 先适配现有 `JunkPlayerView + legalActions` 的三路 evaluator：`production` 原样执行当前混合生产路径，`one-ply-all` 对全部合法动作执行当前一轮加权评分但不做 2-ply/cliff，`two-ply-all` 对全部合法弃牌执行现有 2-ply 续行计算且不做 cliff。step 2 再决定是否引入更底层、无权重的结构诊断输入，避免基线平台提前锁死 `StructuralMetrics` 契约；若三路边界需要随结构契约调整，在后续步骤计划中重新评审，不回改 step 0 的历史基线语义。
 
 ### 2. 用数据驱动测试，保证复用和开发效率
 
@@ -137,17 +137,16 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 | 交付项 | 状态 | 对后续判断有价值的结论 |
 | --- | --- | --- |
 | 1. manifest、统一结果、报告、baseline 资产 | 基本完成 | scenario 是纯数据；输入用 `contentHash` 绑定 baseline；报告稳定排序且不覆盖既有资产 |
-| 2. canonical + snapshot + 三路 evaluator | 部分完成 | canonical fixture 和代表性可见状态 snapshot 已进入同一主链；production-weighted 可运行，仍缺 full-candidate/现有 2-ply 的明确语义和同构输出 |
+| 2. canonical + snapshot + 三路 evaluator | 完成 | canonical fixture 和代表性可见状态 snapshot 共用主链；production-weighted、one-ply-all、two-ply-all 在同一 content hash 下输出统一结果 |
 | 3. 通用断言、decision diff、baseline comparator | 部分完成 | 已有 schema/hash/顺序/worker 等价断言；仍缺候选差异和 baseline 回归分类 |
 | 4. 有界 worker 与性能报告 | 基本完成 | worker 与顺序共享 task function；支持分块、吞吐、p50/p95、checkpoint 和 hash-safe resume |
 | 5. 人/AI 使用入口 | 部分完成 | 单场景 `evaluate list/run` 可用；批量 CLI、checkpoint 文件格式和 baseline compare 尚未开放 |
 
-基础设施已经覆盖 Top-down §1、§3、§4 和 §7 的主要边界，但不能代替本步骤要求的功能闭环。`standard-only` 的新结构契约属于 step 2；step 0 的三路现有评价固定为 production-weighted、full-candidate 和现有 2-ply，不提前实现 `StructuralMetrics`。
+基础设施已经覆盖 Top-down §1、§3、§4 和 §7 的主要边界，但不能代替本步骤要求的功能闭环。`standard-only` 的新结构契约属于 step 2；step 0 的三路现有评价固定为 production、one-ply-all 和 two-ply-all，不提前实现“无权重”评价或 `StructuralMetrics`。
 
 ## 当前下一动作
 
-1. 明确 full-candidate 与现有 2-ply evaluator 的边界：当前生产路径已混合一轮加权评分和 cliff 筛选后的 2-ply，不能仅靠改名伪造两条独立语义；
-2. 按确认后的边界，在同一 canonical/snapshot 输入上接入两路 evaluator，与 production-weighted 形成三路同构结果；
-3. 增加最小 decision diff/baseline comparator 后，再回到批量 CLI 与 checkpoint 持久化入口。
+1. 增加最小 decision diff/baseline comparator，区分动作变化、候选集合变化和仅分数变化；
+2. comparator 闭环后，再回到批量 CLI 与 checkpoint 持久化入口。
 
-第一个具体动作：确认 full-candidate 是“全部弃牌候选的一轮生产加权评分”还是“全部弃牌候选都执行现有 2-ply”，以及独立 two-ply evaluator 应输出筛选前排名、cliff 后集合还是最终续行价值；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
+第一个具体动作：定义 baseline comparator 的最小输入、回归分类和稳定输出；不扩展性能阈值，也不引入 step 2 的 `StructuralMetrics`。

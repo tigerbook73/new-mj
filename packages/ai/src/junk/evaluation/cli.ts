@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { CANONICAL_JUNK_SCENARIO_PROVIDER, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
-import { runSingleCalibrationScenario } from "../../evaluation/runner.ts";
+import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
+import { runSingleCalibrationScenarioEvaluators } from "../../evaluation/runner.ts";
 
 const packageRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
@@ -100,11 +101,15 @@ export const runCalibrationCli = (
     const now = runtime.now ?? (() => new Date());
     const startedAt = now();
     const runId = args.runId ?? `run-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
-    const report = runSingleCalibrationScenario(
+    const report = runSingleCalibrationScenarioEvaluators(
       JUNK_CALIBRATION_MANIFEST,
       args.scenarioId!,
       CANONICAL_JUNK_SCENARIO_PROVIDER,
-      (normalized) => evaluateProductionFixture(normalized.scenario.id, normalized.input),
+      [
+        (normalized) => evaluateProductionFixture(normalized.scenario.id, normalized.input),
+        (normalized) => evaluateOnePlyAll(normalized.scenario.id, normalized.input),
+        (normalized) => evaluateTwoPlyAll(normalized.scenario.id, normalized.input),
+      ],
       {
         runId,
         gitSha: runtime.gitSha ?? currentGitSha(),
