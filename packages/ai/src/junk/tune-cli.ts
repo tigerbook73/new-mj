@@ -43,7 +43,7 @@ const defaultConcurrency = (): number => {
 };
 
 const usage =
-  "Usage: junk/tune-cli.ts [--seed <int>] [--max-generations <int>] [--min-generations <int>] " +
+  "Usage: pnpm --filter @new-mj/ai evaluate weights tune [--seed <int>] [--max-generations <int>] [--min-generations <int>] " +
   "[--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] [--max-sigma <float>] " +
   "[--sigma-convergence-ratio <float>] [--stagnation-patience <int>] [--concurrency <int>] " +
   `[--only <comma-separated JunkWeights keys, e.g. tenpaiProbabilityWeight — one of: ${WEIGHT_KEYS.join(",")}>] ` +
@@ -144,12 +144,13 @@ const writeTunedWeights = (
 /** Progress goes to stderr (never stdout) so `pnpm tune:junk > report.txt` still
  * captures only the final report; `log` is injectable so this stays testable. */
 export const runTuneCli = async (
-  argv: string[],
+  argv: readonly string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
 ): Promise<{ exitCode: number; output: string }> => {
+  if (argv.includes("--help")) return { exitCode: 0, output: usage };
   let pool: MatchWorkerPool<MatchTask> | undefined;
   try {
-    const args = parseArguments(argv);
+    const args = parseArguments([...argv]);
     const worstCaseMatches = args.maxGenerations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
     log(
       `[tune] max-generations=${args.maxGenerations} (min ${args.minGenerations}, stops early on ` +
@@ -213,7 +214,3 @@ export const runTuneCli = async (
     await pool?.close();
   }
 };
-
-const output = await runTuneCli(process.argv.slice(2));
-process.stdout.write(output.output);
-process.exitCode = output.exitCode;

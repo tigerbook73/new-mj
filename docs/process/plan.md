@@ -59,7 +59,9 @@
 
 `weights compare` 迁移完成：同代码权重与跨版本 policy 两条 A/B 路径共用统一产物收尾，`MatchWorkerPool` 和比赛算法未改；两条路径各以同策略 1 seed、单 worker 完成 2 场 smoke，均为 50%/平局并生成 JSON/文本报告。旧 `compare:junk-weights` 双入口已删除。
 
-下一步第一个具体动作：迁移 `weights tune` 的命令入口和只读报告产物；保留搜索、worker、进度、held-out 门槛及显式 `--write` 权限，写默认权重的能力不下沉到通用层。
+`weights tune` 迁移进行中：`evaluate weights tune` 已注册为无顶层副作用的 handler，旧 root alias 暂留；help 不启动搜索，尚未改变调参和写权重逻辑。
+
+下一步第一个具体动作：给 `weights tune` 接入只读报告产物并完成最小搜索 smoke；保留搜索、worker、进度、held-out 门槛及显式 `--write` 权限，写默认权重的能力不下沉到通用层。
 
 ## 专题路线图
 

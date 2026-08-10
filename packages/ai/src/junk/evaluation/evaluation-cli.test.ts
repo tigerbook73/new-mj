@@ -10,6 +10,14 @@ describe("Junk evaluation command suite", () => {
     expect(result.output).toContain("scenario batch");
     expect(result.output).toContain("policy diff");
     expect(result.output).toContain("weights compare");
+    expect(result.output).toContain("weights tune");
+  });
+
+  it("routes weights tune help without starting a search", async () => {
+    const result = await runEvaluationCli(["weights", "tune", "--help"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("evaluate weights tune");
+    expect(result.output).toContain("--write");
   });
 
   it("routes weights compare help without starting workers", async () => {

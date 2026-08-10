@@ -102,7 +102,7 @@ Junk adapter 负责：
 
 `weights compare` 已完成：`evaluate weights compare` 注册为无顶层副作用的 handler；同代码权重 A/B 和跨版本 policy A/B 共用 `MatchupResult` 产物收尾，保留 `MatchWorkerPool`、双向同牌序、参数语义和只读边界。两条路径各以同策略 1 seed、单 worker 完成 smoke，均为 2 场、50%/平局并生成 JSON/文本报告；旧 `compare:junk-weights` entry/root script 已删除。
 
-当前下一项：迁移 `weights tune`。调参搜索、worker pool、进度输出、held-out 门槛与 `--write` 权限保持不变；统一命令发现和只读报告产物，显式写默认权重仍由 Junk handler 单独负责，不下沉到通用产物层。
+当前正在迁移 `weights tune`：`evaluate weights tune` 已注册，原脚本拆为无顶层副作用的 handler 与临时兼容 entry，help 不启动搜索。下一步接入只读报告产物；调参搜索、worker pool、进度输出、held-out 门槛与 `--write` 权限保持不变，显式写默认权重仍由 Junk handler 单独负责，不下沉到通用产物层。
 
 ### 4. 收尾与恢复步骤 1
 

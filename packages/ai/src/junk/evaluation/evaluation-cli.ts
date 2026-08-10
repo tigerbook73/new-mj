@@ -1,6 +1,7 @@
 import { createEvaluationCommandRegistry } from "../../evaluation/commands.ts";
 import { runDecisionDiffCli } from "../decision-diff-cli.ts";
 import { runCompareWeightsCli } from "../compare-weights-cli.ts";
+import { runTuneCli } from "../tune-cli.ts";
 import { runBatchCalibrationCli } from "./batch-cli.ts";
 import { runCalibrationCli } from "./cli.ts";
 
@@ -29,6 +30,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["weights", "compare"],
     summary: "Compare two weight or policy configurations",
     run: runCompareWeightsCli,
+  },
+  {
+    path: ["weights", "tune"],
+    summary: "Search and evaluate candidate Junk weights",
+    run: runTuneCli,
   },
 ]);
 
