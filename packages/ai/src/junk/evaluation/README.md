@@ -5,8 +5,8 @@ provider、evaluator 和 runner 提供。
 
 ## 当前 manifest
 
-`fixtures/canonical-baseline.json` 是当前唯一已接入的
-manifest：
+`fixtures/canonical-baseline.json` 是当前唯一已接入的 manifest，同时登记手写 fixture
+和固定生产 snapshot：
 
 - `purpose: canonical-baseline`：固定普通牌型输入，用于记录生产 AI 的可重复决策；
 - `source.kind: fixture`：输入来自版本化 JSON fixture；
@@ -16,7 +16,9 @@ manifest：
 
 具体输入位于同目录的 `fixtures/*.json`，只包括牌种、牌副本、玩家视角和合法动作；
 fixture 身份由 registry 的 `fixtureId` 提供，版本由 manifest 中的 scenario 提供。
-provider 会把牌种转换为 TileId，并生成 `contentHash`。
+provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snapshot 使用
+`*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
+副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
 
 JSON 只用于 manifest 和少量 canonical fixture。大规模 generated、snapshot 或
 replay 数据不直接拼成一个巨大的 JSON 数组；批量 runner 应使用一条记录一行的
@@ -41,8 +43,8 @@ pnpm --filter @new-mj/ai evaluate run discard-001
 
 ## 来源类型
 
-schema 预留了 `fixture`、`snapshot`、`generated` 和 `replay`。目前只有
-`fixture` provider 已实现，其他类型会明确报告不支持，不会静默当作 fixture。
+schema 预留了 `fixture`、`snapshot`、`generated` 和 `replay`。目前已实现
+`fixture` 和 `snapshot` provider；generated/replay 会明确报告不支持，不会静默转换。
 
 当前 canonical loader 仍显式注册 JSON fixture。新增场景在完善通用 registry 前，
 需要同时更新 manifest 和 `canonical-fixtures.ts` 的数据注册；这属于当前实现限制。

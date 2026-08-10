@@ -2,8 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CANONICAL_JUNK_FIXTURES, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
-import { createJunkFixtureProvider } from "./fixture-provider.ts";
+import { CANONICAL_JUNK_SCENARIO_PROVIDER, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { runSingleCalibrationScenario } from "../../evaluation/runner.ts";
@@ -101,11 +100,10 @@ export const runCalibrationCli = (
     const now = runtime.now ?? (() => new Date());
     const startedAt = now();
     const runId = args.runId ?? `run-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
-    const provider = createJunkFixtureProvider(CANONICAL_JUNK_FIXTURES);
     const report = runSingleCalibrationScenario(
       JUNK_CALIBRATION_MANIFEST,
       args.scenarioId!,
-      provider,
+      CANONICAL_JUNK_SCENARIO_PROVIDER,
       (normalized) => evaluateProductionFixture(normalized.scenario.id, normalized.input),
       {
         runId,

@@ -20,6 +20,7 @@ describe("evaluation CLI", () => {
     const result = runCalibrationCli(["list"]);
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("discard-001");
+    expect(result.output).toContain("discard-snapshot-001");
   });
 
   it("writes JSON and Markdown reports without overwriting a run", () => {

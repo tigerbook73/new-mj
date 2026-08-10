@@ -41,9 +41,9 @@
 
 专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
 
-本步骤完成条件与下一动作见专门计划文件。当前通用 evaluation/worker/JSONL/report 基础设施已具备，但功能闭环仍缺代表性 snapshot、full-candidate/现有 2-ply evaluator 同输入对照和 baseline comparator。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+本步骤完成条件与下一动作见专门计划文件。当前通用 evaluation/worker/JSONL/report 基础设施和代表性可见状态 snapshot 主链已具备，但功能闭环仍缺 full-candidate/现有 2-ply evaluator 的明确语义、同输入对照和 baseline comparator。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
 
-下一步第一个具体动作：定义代表性 snapshot 的纯数据 schema 和 provider adapter，使其进入与 canonical 相同的 manifest/runner/report 主链；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
+下一步第一个具体动作：先确认 full-candidate 与独立 two-ply evaluator 的输出边界，再在 canonical/snapshot 同一输入上接入；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
 
 ## 专题路线图
 

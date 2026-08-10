@@ -137,7 +137,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 | 交付项 | 状态 | 对后续判断有价值的结论 |
 | --- | --- | --- |
 | 1. manifest、统一结果、报告、baseline 资产 | 基本完成 | scenario 是纯数据；输入用 `contentHash` 绑定 baseline；报告稳定排序且不覆盖既有资产 |
-| 2. canonical + snapshot + 三路 evaluator | 未完成 | 已有 canonical fixture 和 production-weighted；仍缺代表性 snapshot、full-candidate、现有 2-ply 同输入输出 |
+| 2. canonical + snapshot + 三路 evaluator | 部分完成 | canonical fixture 和代表性可见状态 snapshot 已进入同一主链；production-weighted 可运行，仍缺 full-candidate/现有 2-ply 的明确语义和同构输出 |
 | 3. 通用断言、decision diff、baseline comparator | 部分完成 | 已有 schema/hash/顺序/worker 等价断言；仍缺候选差异和 baseline 回归分类 |
 | 4. 有界 worker 与性能报告 | 基本完成 | worker 与顺序共享 task function；支持分块、吞吐、p50/p95、checkpoint 和 hash-safe resume |
 | 5. 人/AI 使用入口 | 部分完成 | 单场景 `evaluate list/run` 可用；批量 CLI、checkpoint 文件格式和 baseline compare 尚未开放 |
@@ -146,8 +146,8 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 ## 当前下一动作
 
-1. 增加一个代表性 snapshot source/provider，并让它进入与 canonical 相同的 manifest/runner/report 主链；
-2. 在同一 canonical/snapshot 输入上接入 full-candidate 和现有 2-ply evaluator，与 production-weighted 形成三路同构结果；
+1. 明确 full-candidate 与现有 2-ply evaluator 的边界：当前生产路径已混合一轮加权评分和 cliff 筛选后的 2-ply，不能仅靠改名伪造两条独立语义；
+2. 按确认后的边界，在同一 canonical/snapshot 输入上接入两路 evaluator，与 production-weighted 形成三路同构结果；
 3. 增加最小 decision diff/baseline comparator 后，再回到批量 CLI 与 checkpoint 持久化入口。
 
-第一个具体动作：定义代表性 snapshot 的纯数据 schema 和 provider adapter；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
+第一个具体动作：确认 full-candidate 是“全部弃牌候选的一轮生产加权评分”还是“全部弃牌候选都执行现有 2-ply”，以及独立 two-ply evaluator 应输出筛选前排名、cliff 后集合还是最终续行价值；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
