@@ -65,5 +65,9 @@ reader 只负责 header、逐行解析和基础字段校验；具体 `data` 的 
 scenario 会失败。报告额外记录场景数、成功/失败/跳过数量、总耗时、吞吐、p50/p95
 延迟和失败摘要。runner 当前只保证顺序消费和稳定报告排序，尚未接入 worker、重试或进度恢复。
 
+executor 的 task 契约使用稳定 `taskId` 和纯 task function；顺序/有界并发模式共用
+同一函数，并按输入顺序返回结果。当前有界并发只是 executor seam，CPU 密集任务要
+接入 `worker_threads` 后才会获得真正的多核收益。
+
 reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
 合法性仍由对应 provider 负责。
