@@ -41,7 +41,20 @@
 
 专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
 
-本步骤完成条件与下一动作见专门计划文件；本轮只完成计划整理，不开始盘点或实现。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+本步骤完成条件与下一动作见专门计划文件。当前已完成现有工具的只读输入/输出边界盘点，尚未写新的 bench runner。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+
+### 已完成的关键盘点（step 0）
+
+- 可复用：`playJunkMatch`/`strengthPolicy` 的确定性自对弈驱动、`runMatchTask`/`runPolicyMatchTask` 的纯任务单元、`MatchWorkerPool` 的有界 `worker_threads` 调度、`policy-loader` 的代码版本/权重加载，以及现有顺序与并行结果等价测试。
+- 可复用但需 adapter：`arena` 目前只返回累计分数和排名；`decision-diff` 只面向两策略自对弈决策分歧；`tune` 的报告和任务围绕权重搜索；它们可提供执行/比较积木，但不能直接作为结构校准平台契约。
+- 不直接复用：`snapshot-junk-cli` 是未提交代码的 scratch 复制工具，不是 baseline 资产库；现有各 CLI 的参数解析和文本报告是一次性入口，不能让每个新场景继续复制格式逻辑。
+- 测试现状：arena、tune、worker pool、decision-diff 和 snapshot 已有 slow/冒烟覆盖，能证明管线连通和部分确定性；尚未覆盖统一 manifest、场景级任务 ID、报告 schema、失败重跑、baseline 比较和批量性能分位数。
+- 性能现状：worker pool 已通过同一任务函数实现顺序/并行等价，但结果类型只表达成功/失败和分数，缺少任务 ID、耗时、重试、进度和可诊断错误；`runAll` 保持输入顺序聚合，但尚未形成通用批量报告。
+- 命名结论：现有文件名/函数名不作为兼容约束；后续可按“场景、评估器、任务执行、报告、baseline”职责重命名或拆分，外部命令只需提供迁移说明。
+- 最小契约验证已完成：新增 `packages/ai/src/junk/calibration/` 下的 manifest、统一 evaluation result、versioned report 类型，以及稳定排序的 JSON 和固定 Markdown 摘要；两个契约测试证明 worker 完成顺序不会改变报告顺序，摘要能直接显示场景、评估器、状态、选中候选和耗时。
+- 本次验证结果：calibration 定向测试 2/2 通过，AI typecheck 通过，AI lint 通过；尚未接入真实 fixture、现有 evaluator adapter、批量 runner 或 worker pool。
+
+下一步第一个具体动作：用一个真实 canonical fixture 接入一个现有 evaluator adapter，生成第一份真实 calibration report；先保持单线程和只读路径，不接入批量 runner 或 worker pool。
 
 ## 专题路线图
 
