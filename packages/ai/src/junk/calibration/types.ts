@@ -9,6 +9,12 @@ export type CalibrationEvaluatorKind =
   | "standard-only"
   | "two-ply";
 
+export type CalibrationScenarioSource =
+  | Readonly<{ kind: "fixture"; fixtureId: string }>
+  | Readonly<{ kind: "snapshot"; snapshotId: string }>
+  | Readonly<{ kind: "generated"; seed: number; generatorVersion: string }>
+  | Readonly<{ kind: "replay"; replayId: string }>;
+
 /** JSON-safe context shared by fixtures, snapshots and batch scenarios. */
 export type CalibrationScenarioInput = Readonly<{
   hand: readonly number[];
@@ -22,9 +28,13 @@ export type CalibrationScenarioInput = Readonly<{
 export type CalibrationScenario = Readonly<{
   id: string;
   version: number;
-  source: "canonical" | "snapshot" | "generated";
+  source: CalibrationScenarioSource;
   seed: number;
-  input: CalibrationScenarioInput;
+}>;
+
+export type NormalizedCalibrationScenario<TInput = CalibrationScenarioInput> = Readonly<{
+  scenario: CalibrationScenario;
+  input: TInput;
 }>;
 
 export type CalibrationManifest = Readonly<{
