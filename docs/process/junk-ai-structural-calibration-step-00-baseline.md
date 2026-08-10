@@ -38,6 +38,7 @@ step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator；ste
 ### 2. 用数据驱动测试，保证复用和开发效率
 
 - canonical fixture、snapshot、批量种子和报告配置使用统一 manifest；
+- canonical scenario 本身只保存可读、可版本化的纯数据；当前 TypeScript fixture registry 只是 bootstrap，step 0 完成前必须迁移为 manifest/fixture 数据文件；
 - 测试只选择 manifest、评估器和断言级别，不修改平台代码；
 - 断言分层为：结构字段/不变量、候选集合、决策差异、性能阈值和报告 schema；
 - 新增评估器只需实现稳定 adapter，并复用通用 runner、比较器、序列化器和 reporter；
@@ -119,6 +120,7 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 ## 验收标准
 
 - 新增一个场景或评估器不需要修改通用 runner、worker 调度和报告 schema；
+- canonical scenario 不包含执行逻辑；新增数据场景不需要修改 provider 代码，provider 只负责通用校验、TileId 转换、视图/合法动作构造和 content hash；
 - 平台重构后的命名和目录能反映职责；旧名称没有因为历史包袱继续承载混合职责，外部入口的迁移路径清楚；
 - 单个 fixture、固定 snapshot、批量 seeds 和三种现有评估路径共享同一 manifest/结果模型；
 - 单线程和多 worker 结果等价，任务顺序不会影响决策或报告；
@@ -132,4 +134,4 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 
 最早验证不是跑大样本，而是写出一个最小 manifest、一个统一报告样例和一条单场景复现命令，确认三种现有评估路径能在不改 bench 框架的情况下产出同构结果。
 
-下一动作：先盘点现有 `arena`、`decision-diff`、`snapshot`、`tune` 和 worker 的输入/输出边界，形成“可复用 / 需 adapter / 不应复用”的清单；清单完成前不写新的 bench runner。
+下一动作：将当前 `canonical-fixtures.ts` 迁移为纯数据 manifest/fixture，验证 provider 能从数据重建同一真实 fixture，并记录 `contentHash`；完成前不登记 baseline，也不扩展批量 runner。

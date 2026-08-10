@@ -65,8 +65,9 @@
 - canonical fixture 已提取为 registry 和稳定 manifest；AI 包内 CLI 现支持 `list`、`run <scenario-id>`、`--output-dir <dir>`、`--run-id <id>`，同时写 JSON 原始报告和 Markdown 摘要，已有 run ID 不覆盖，默认临时产物目录为 `packages/ai/.calibration-runs/`。
 - 本轮验证结果：calibration 4 个测试文件、8/8 测试通过，AI typecheck/lint 通过；真实命令 `pnpm --filter @new-mj/ai evaluate list` 与单 scenario 输出冒烟均通过。CLI 仍是单线程，不负责 baseline 登记/比较、批量调度或 worker pool。
 - 命令归属结论：calibration 是 `@new-mj/ai` 的包内能力，canonical script 放在 `packages/ai/package.json`；root 不新增快捷命令，临时输出忽略规则也放在 `packages/ai/.gitignore`。
+- canonical scenario 设计结论：scenario 本身必须是纯数据，代码只负责 schema 校验、牌种到 TileId 的转换、`JunkPlayerView`/合法动作构造和 evaluator；当前 `canonical-fixtures.ts` 仅是临时原型，step 0 完成前必须迁移为版本化 manifest/fixture 数据文件，并补 `contentHash`。
 
-下一步第一个具体动作：定义小规模 canonical baseline 的登记、元数据和比较入口，先禁止覆盖历史 baseline，再考虑批量 runner 和 worker pool。
+下一步第一个具体动作：先把当前 `canonical-fixtures.ts` 迁移为纯数据 manifest/fixture 文件，由 provider 完成校验、TileId/合法动作构造并生成 `contentHash`；迁移完成后再定义 canonical baseline 的登记、元数据和比较入口。
 
 ## 专题路线图
 
