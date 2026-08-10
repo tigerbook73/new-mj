@@ -65,10 +65,12 @@
 - AI strategy 定向测试：32/32 通过。
 - AI build：通过。
 - AI 全量测试：业务测试通过；`policy-loader.test.ts` 的 2 个测试在受限环境中因 `spawnSync git EPERM` 失败，随后测试进程未正常退出，未将该环境问题伪装成全绿。
+- `policy-loader.test.ts` 历史版本 fixture 曾错误指向已完成概率改造的 `6f2a7d8`，改为其父提交 `6f2a7d8^` 后，非受限环境定向测试 6/6 通过。
 - core `verify:full`：19 个测试文件、192 个测试通过，构建通过。
 - `git diff --check`：通过。
 - review follow-up 定向测试：AI 39/39、core shanten 15/15 通过；AI/core typecheck 与 lint 通过。
 - 受限环境下 policy loader 的 git ref 测试仍会报 `spawnSync git EPERM`，需在非受限环境完成最终 verify。
+- 下一步第一个具体动作：在非受限环境执行 `pnpm --filter @new-mj/ai verify:full`，确认最终收尾验证。
 
 ## 阻塞与遗留问题
 

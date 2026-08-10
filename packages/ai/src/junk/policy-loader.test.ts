@@ -70,7 +70,7 @@ describe("loadPolicy", () => {
   });
 
   it("loads a historical version with the pre-probability weight shape", async () => {
-    const { policy, label, modulePath } = await loadPolicy({ ref: "6f2a7d8" }, "historical");
+    const { policy, label, modulePath } = await loadPolicy({ ref: "6f2a7d8^" }, "historical");
     expect(label).toBe("historical");
     expect(modulePath).not.toBe(currentStrategyPath);
     expect(modulePath.includes(".compare-scratch")).toBe(true);
