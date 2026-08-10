@@ -90,5 +90,13 @@ export const formatCalibrationSummary = (report: CalibrationReport): string => {
         (evaluation.scenarioContentHash ? `, content=${evaluation.scenarioContentHash}` : ""),
     );
   }
+  if (report.baselineComparisons) {
+    lines.push("", "Baseline comparisons:");
+    for (const comparison of report.baselineComparisons) {
+      lines.push(`- ${comparison.baselineId}: ${comparison.status}`);
+      for (const change of comparison.changes)
+        lines.push(`  - ${change.kind}: ${change.message}`);
+    }
+  }
   return `${lines.join("\n")}\n`;
 };

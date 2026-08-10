@@ -41,9 +41,9 @@
 
 专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
 
-本步骤完成条件与下一动作见专门计划文件。当前基础设施、代表性 snapshot、三路报告、baseline comparator 以及 batch/checkpoint/resume CLI 已具备，功能闭环仍缺只读 baseline compare CLI 和最终验收审计。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+本步骤完成条件与下一动作见专门计划文件。当前基础设施、代表性 snapshot、三路报告、通用 resumable batch、checkpoint/resume 和只读 baseline compare CLI 已具备；正在进行最终验收审计。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
 
-下一步第一个具体动作：为单场景报告增加显式 `--baseline <file>` 比较入口和退出码语义；不自动更新 baseline。
+下一步第一个具体动作：逐条审计 step 0 交付边界与验收标准，列出未满足项及建议归属；不自动宣告完成。
 
 ## 专题路线图
 

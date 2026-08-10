@@ -87,6 +87,7 @@ export type CalibrationReport = Readonly<{
   manifest: Pick<CalibrationManifest, "id" | "version">;
   evaluations: readonly CalibrationEvaluationResult[];
   batch?: CalibrationBatchSummary;
+  baselineComparisons?: readonly import("./comparator.ts").CalibrationBaselineComparison[];
 }>;
 
 export type CalibrationBatchSummary = Readonly<{

@@ -32,6 +32,8 @@ header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，
 ```bash
 pnpm --filter @new-mj/ai evaluate list
 pnpm --filter @new-mj/ai evaluate run discard-001
+pnpm --filter @new-mj/ai evaluate run discard-001 \
+  --baseline src/junk/evaluation/fixtures/baselines/discard-001-production-v1.baseline.json
 pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
   --evaluator two-ply-all --workers 4 --chunk-size 64 \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
@@ -61,6 +63,8 @@ manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编�
 期望动作、候选 ID，并可选择保存候选分数及容差；baseline 文件作为版本化资产，不由运行
 结果覆盖。通用 comparator 将结果分类为 matched、changed 或 incompatible，并分别报告
 动作、候选集合和分数变化；输入 hash/evaluator 不一致视为 incompatible。耗时只作信息记录。
+`run --baseline <file>` 是只读比较入口：matched 返回 0，质量变化返回 2，不兼容或运行错误
+返回 1；比较结果写入同一 JSON/Markdown report，命令不会创建或更新 baseline。
 
 ## 来源类型
 

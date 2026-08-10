@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CANONICAL_JUNK_SCENARIO_PROVIDER, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
@@ -7,6 +7,7 @@ import { formatCalibrationSummary, serializeCalibrationReport } from "../../eval
 import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../../evaluation/runner.ts";
+import { compareCalibrationBaseline, type CalibrationBaseline } from "../../evaluation/comparator.ts";
 
 const packageRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
@@ -21,6 +22,7 @@ const usage =
   "  --output-dir <dir>                          Write JSON/Markdown reports here\n" +
   "                                              (default: packages/ai/.evaluation-runs)\n" +
   "  --run-id <id>                               Stable report filename prefix\n" +
+  "  --baseline <file>                           Compare without modifying baseline\n" +
   "  --help                                      Show this help\n\n" +
   "Examples:\n" +
   "  pnpm --filter @new-mj/ai evaluate list\n" +
@@ -31,6 +33,7 @@ type Arguments = Readonly<{
   scenarioId?: string;
   outputDir: string;
   runId?: string;
+  baselinePath?: string;
 }>;
 
 type Runtime = Readonly<{
@@ -38,6 +41,7 @@ type Runtime = Readonly<{
   gitSha?: string;
   exists?: (filePath: string) => boolean;
   write?: (filePath: string, content: string) => void;
+  read?: (filePath: string) => string;
   makeDirectory?: (directory: string) => void;
 }>;
 
@@ -51,11 +55,13 @@ const parseArguments = (argv: readonly string[]): Arguments => {
   const scenarioId: string | undefined = command === "run" ? argv[1] : undefined;
   let outputDir = defaultOutputDir;
   let runId: string | undefined;
+  let baselinePath: string | undefined;
   const options = command === "run" ? argv.slice(2) : argv.slice(1);
   for (let index = 0; index < options.length; index += 1) {
     const flag = options[index];
     if (flag === "--output-dir") outputDir = options[++index] ?? "";
     else if (flag === "--run-id") runId = options[++index];
+    else if (flag === "--baseline") baselinePath = options[++index];
     else if (flag === "--help") throw new Error(usage);
     else throw new Error(`UNKNOWN_ARGUMENT: ${flag}`);
   }
@@ -65,7 +71,13 @@ const parseArguments = (argv: readonly string[]): Arguments => {
   if (runId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(runId)) {
     throw new Error("INVALID_RUN_ID");
   }
-  return { list, ...(scenarioId ? { scenarioId } : {}), outputDir, ...(runId ? { runId } : {}) };
+  return {
+    list,
+    ...(scenarioId ? { scenarioId } : {}),
+    outputDir,
+    ...(runId ? { runId } : {}),
+    ...(baselinePath ? { baselinePath } : {}),
+  };
 };
 
 const currentGitSha = (): string => {
@@ -102,7 +114,7 @@ export const runCalibrationCli = (
     const now = runtime.now ?? (() => new Date());
     const startedAt = now();
     const runId = args.runId ?? `run-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
-    const report = runSingleCalibrationScenarioEvaluators(
+    const rawReport = runSingleCalibrationScenarioEvaluators(
       JUNK_CALIBRATION_MANIFEST,
       args.scenarioId!,
       CANONICAL_JUNK_SCENARIO_PROVIDER,
@@ -120,6 +132,19 @@ export const runCalibrationCli = (
         workerCount: 1,
       },
     );
+    const baseline = args.baselinePath
+      ? JSON.parse((runtime.read ?? ((filePath) => readFileSync(filePath, "utf8")))(args.baselinePath)) as CalibrationBaseline
+      : undefined;
+    const comparison = baseline
+      ? compareCalibrationBaseline(
+        baseline,
+        rawReport.evaluations.find(({ evaluator }) => evaluator === baseline.evaluator) ??
+          (() => { throw new Error(`EVALUATOR_RESULT_NOT_FOUND: ${baseline.evaluator}`); })(),
+      )
+      : undefined;
+    const report = comparison
+      ? { ...rawReport, baselineComparisons: [comparison] }
+      : rawReport;
     const outputDir = path.resolve(args.outputDir);
     const jsonPath = path.join(outputDir, `junk-${runId}.json`);
     const markdownPath = path.join(outputDir, `junk-${runId}.md`);
@@ -132,7 +157,7 @@ export const runCalibrationCli = (
     write(jsonPath, serializeCalibrationReport(report));
     write(markdownPath, formatCalibrationSummary(report));
     return {
-      exitCode: 0,
+      exitCode: comparison?.status === "changed" ? 2 : comparison?.status === "incompatible" ? 1 : 0,
       output: `${formatCalibrationSummary(report)}json: ${jsonPath}\nmarkdown: ${markdownPath}\n`,
     };
   } catch (error) {

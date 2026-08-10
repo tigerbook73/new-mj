@@ -8,6 +8,37 @@ describe("evaluation CLI", () => {
     expect(result.output).toContain("run <scenario-id>");
     expect(result.output).toContain("--output-dir <dir>");
     expect(result.output).toContain("--run-id <id>");
+    expect(result.output).toContain("--baseline <file>");
+  });
+
+  it("compares a baseline without modifying it and uses exit code 2 for a quality change", () => {
+    const files = new Map<string, string>();
+    const baseline = {
+      schemaVersion: 1,
+      baselineId: "changed-baseline",
+      scenarioId: "discard-001",
+      scenarioContentHash: "sha256:fd10b00c285fc0f6521a373c9a967afd1d61eb25e4665ebd65a6b1da3fc3c4d8",
+      evaluator: "production-weighted",
+      evaluatorVersion: "v1",
+      expected: { selectedCandidateId: "different" },
+    };
+    const result = runCalibrationCli([
+      "run", "discard-001", "--baseline", "baseline.json",
+      "--output-dir", "/tmp/evaluation-cli-baseline", "--run-id", "compare-001",
+    ], {
+      now: () => new Date("2026-08-10T00:00:00.000Z"),
+      gitSha: "abc1234",
+      read: () => JSON.stringify(baseline),
+      exists: () => false,
+      makeDirectory: () => undefined,
+      write: (filePath, content) => files.set(filePath, content),
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.output).toContain("changed-baseline: changed");
+    expect(files.get("/tmp/evaluation-cli-baseline/junk-compare-001.json")).toContain(
+      '"kind": "selection-changed"',
+    );
+    expect(files.has("baseline.json")).toBe(false);
   });
 
   it("accepts help as a subcommand", () => {
