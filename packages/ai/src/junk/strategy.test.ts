@@ -5,15 +5,22 @@ import {
   tileIdOf,
   type JunkAction,
   type JunkPlayerView,
+  type TileId,
   type TileKind,
 } from "@new-mj/core";
 import { describe, expect, it, vi } from "vitest";
 import {
   chooseJunkAction,
+  createJunkAnalysisCache,
   DEFAULT_JUNK_WEIGHTS,
+  probeSelfDrawTwoPly,
   recommendJunkAction,
+  scoreLegalActions,
   scoreHandShapeAfterDiscard,
+  type GameProgress,
+  type JunkWeights,
 } from "./strategy.ts";
+import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
 
 /** Deterministic [0, 1) generator over @new-mj/core's xorshift32 PRNG — same
  * reproducibility primitive core's own fuzz driver uses, so a fixed seed always
@@ -46,9 +53,181 @@ const view = (hand: TileKind[]): JunkPlayerView => ({
   seats: [0, 1, 2, 3].map(() => ({ handCount: 13, melds: [], discards: [], justDrawn: false })),
 });
 describe("junk strategy", () => {
+  it("two-ply probe recognizes a live bridge through its post-draw leaf, without giving close ranks a flat bonus", () => {
+    // Three complete runs plus a pair leave one block to build. Both candidates
+    // have the same surrounding hand; the target keeps 3m6m, while the control
+    // keeps the more spread-out 2m7m. The target's 4m draw makes 3m4m6m, whose
+    // best follow-up discard has genuinely better shape than the control's 4m
+    // draw. This intentionally does *not* assert that the target's total EV is
+    // larger: the control has a wider first-step catchment, exactly the point
+    // that a conditional leaf score must remain separate from raw breadth.
+    const shared: TileKind[] = ["1p", "2p", "3p", "4p", "5p", "6p", "7s", "8s", "9s", "1z", "1z"];
+    const progress: GameProgress = { wallCount: 84, unseenPoolSize: 123 };
+    const bridge = probeSelfDrawTwoPly(
+      { hand: ids([...shared, "3m", "6m"]), melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+    );
+    const control = probeSelfDrawTwoPly(
+      { hand: ids([...shared, "2m", "7m"]), melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+    );
+    const bridge4m = bridge.outcomes.find(({ kind }) => kind === "4m");
+    const control4m = control.outcomes.find(({ kind }) => kind === "4m");
+    expect(bridge.continuationProbability).toBeCloseTo(1, 12);
+    expect(bridge4m?.leafScore).toBeGreaterThan(control4m?.leafScore ?? Number.POSITIVE_INFINITY);
+  });
+
+  it("two-ply probe does not reward a bridge whose every copy is already visible", () => {
+    const hand = ids([
+      "1p",
+      "2p",
+      "3p",
+      "4p",
+      "5p",
+      "6p",
+      "7s",
+      "8s",
+      "9s",
+      "1z",
+      "1z",
+      "3m",
+      "6m",
+    ]);
+    // All four copies of both bridge ranks have left the unseen pool. The
+    // corresponding wall/unseen counts remain physically consistent with 13
+    // own tiles, 39 opponent concealed tiles, and 8 visible discards.
+    const deadBridgeTiles = ids(["4m", "4m", "4m", "4m", "5m", "5m", "5m", "5m"]);
+    const result = probeSelfDrawTwoPly({ hand, melds: [] }, deadBridgeTiles, DEFAULT_JUNK_WEIGHTS, {
+      wallCount: 76,
+      unseenPoolSize: 115,
+    });
+    expect(result.outcomes.some(({ kind }) => kind === "4m" || kind === "5m")).toBe(false);
+    expect(result.continuationProbability).toBeCloseTo(1, 12);
+  });
+
+  it("two-ply probe reports an immediate self-draw win separately from continuation leaves", () => {
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1s",
+      "2s",
+    ]);
+    const result = probeSelfDrawTwoPly({ hand, melds: [] }, [], DEFAULT_JUNK_WEIGHTS, {
+      wallCount: 84,
+      unseenPoolSize: 123,
+    });
+    const win = result.outcomes.find(({ kind }) => kind === "3s");
+    expect(win).toEqual({ kind: "3s", probability: 4 / 123 });
+    expect(result.winProbability).toBeCloseTo(4 / 123, 12);
+  });
+
+  it("deducts publicly exposed opponent melds from self-draw candidates", () => {
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1s",
+      "2s",
+    ]);
+    const progress: GameProgress = { wallCount: 84, unseenPoolSize: 84 };
+    const withoutMeld = probeSelfDrawTwoPly(
+      { hand, melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+    );
+    const withOpponentPeng = probeSelfDrawTwoPly(
+      { hand, melds: [] },
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      progress,
+      undefined,
+      undefined,
+      undefined,
+      [{ type: "peng", tiles: ids(["3s", "3s", "3s"]) }],
+    );
+    expect(withoutMeld.outcomes.find(({ kind }) => kind === "3s")?.probability).toBeCloseTo(
+      4 / 84,
+      12,
+    );
+    expect(withOpponentPeng.outcomes.find(({ kind }) => kind === "3s")?.probability).toBeCloseTo(
+      1 / 84,
+      12,
+    );
+  });
+
   it("always takes a legal win and preserves its original reference", () => {
     const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
     expect(recommendJunkAction(view(["1m"]), actions)).toBe(actions[1]);
+  });
+
+  it("reuses bounded structural analysis across calls without reusing live-state scores", () => {
+    const player = view([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1z",
+      "2z",
+    ]);
+    const actions: JunkAction[] = player.hand.map((tile) => ({ type: "discard", tile }));
+    const cache = createJunkAnalysisCache(32);
+    const first = scoreLegalActions(player, actions, DEFAULT_JUNK_WEIGHTS, cache);
+    const hitsAfterFirstCall = cache.hits;
+    const second = scoreLegalActions(player, actions, DEFAULT_JUNK_WEIGHTS, cache);
+
+    expect(hitsAfterFirstCall).toBeGreaterThan(0);
+    expect(cache.hits).toBeGreaterThan(hitsAfterFirstCall);
+    expect(cache.size).toBeLessThanOrEqual(32);
+    expect(second).toEqual(first);
+  });
+
+  it("falls back to one-ply scores after the wall is exhausted", () => {
+    const player = {
+      ...view(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "1s", "2s", "1z"]),
+      wallCount: 0,
+    };
+    const actions = player.hand.map((tile) => ({ type: "discard" as const, tile }));
+    const scored = scoreLegalActions(player, actions, DEFAULT_JUNK_WEIGHTS);
+    const expected = actions.map(({ tile }) =>
+      scoreHandShapeAfterDiscard(
+        { hand: player.hand, melds: [] },
+        tile,
+        [],
+        DEFAULT_JUNK_WEIGHTS,
+        undefined,
+        { wallCount: 0, unseenPoolSize: 39 },
+      ),
+    );
+    expect(scored.map(({ score }) => score)).toEqual(expected);
   });
 
   it("keeps a one-away hand instead of breaking it", () => {
@@ -97,6 +276,175 @@ describe("junk strategy", () => {
       { type: "pass" },
     ];
     expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+  });
+
+  it("still pengs when doing so reaches tenpai (regression guard: tenpaiProbabilityWeight's endgame-awareness must not make claiming too conservative)", () => {
+    // Phase 1 (improvementWeight -> tenpaiProbabilityWeight, plan.md 2026-08-08)
+    // made the AI decline plenty of marginal chi/peng opportunities it used to
+    // take, because the probability term saturates while menqing's fixed cost
+    // doesn't — an accepted, direction-sound side effect (see plan.md), but one
+    // that needs a lower bound: a claim that's *substantially* good (not
+    // marginal) must still win. Here two complete runs (2m3m4m, 5m6m7m) + a
+    // pair (8p8p) + a pengable pair (3s3s) + a ryanmen (6s7s) + one dead honor
+    // (1z) is 1-shanten; pengging the discarded 3s and discarding the useless
+    // 1z reaches tenpai (shanten 0) — a full shanten-level jump that must
+    // dominate menqing's loss regardless of how conservative the probability
+    // term has become.
+    const player: JunkPlayerView = {
+      ...view(["2m", "3m", "4m", "5m", "6m", "7m", "8p", "8p", "3s", "3s", "6s", "7s", "1z"]),
+      lastDiscard: { seat: 1, tile: tileIdOf("3s", 2) },
+    };
+    const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
+    expect(recommendJunkAction(player, actions)).toBe(actions[0]);
+  });
+
+  it("declines a chi that only trades one tanki wait for an equally-wide one (chiHurdle regression)", () => {
+    // 1 declared meld (1s2s3s) + concealed 4s5s6s + 7s8s9s + 1p2p3p (three
+    // complete runs) + a lone 4m: already tenpai, waiting tanki on 4m (4 melds
+    // + isolated single). Seat 1 discards a second 9s; chi-ing it with hand's
+    // 7s+8s forms a *new* declared run, leaving hand's own 9s as the new
+    // isolated tile — a straight swap of one tanki wait for another, same
+    // width, no shanten change. Since both branches share the exact same
+    // shanten/fanPotential/isolationPotential and (here) the same live-tile
+    // count for their respective tanki target, the *raw* pre-hurdle scores are
+    // exactly equal (verified to 10 decimal places) — a genuine tie, not just
+    // a thin margin. Declining a tied claim is exactly what a hurdle is for:
+    // opening the hand should require a *real* edge, not a coin flip. Without
+    // chiHurdle, argmaxAction's first-wins tie-break would still pick the
+    // claim purely because it's listed first in `actions` — an arbitrary
+    // reason to give up menqing, which chiHurdle correctly overrides.
+    const hand = ids(["4s", "5s", "6s", "7s", "8s", "9s", "1p", "2p", "3p", "4m"]);
+    const player: JunkPlayerView = {
+      seat: 0,
+      hand,
+      wallCount: 60,
+      currentSeat: 0,
+      dealer: 0,
+      phase: "playing",
+      lastDiscard: { seat: 1, tile: tileIdOf("9s", 1) },
+      seats: [
+        {
+          handCount: 10,
+          melds: [{ type: "chi", tiles: ids(["1s", "2s", "3s"]), from: 3 }],
+          discards: [],
+          justDrawn: false,
+        },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+        { handCount: 13, melds: [], discards: [], justDrawn: false },
+      ],
+    };
+    const chi: JunkAction = { type: "chi", tiles: [hand[3]!, hand[4]!] }; // 7s, 8s
+    const actions: JunkAction[] = [chi, { type: "pass" }];
+    expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+    const noHurdle: JunkWeights = { ...DEFAULT_JUNK_WEIGHTS, chiHurdle: 0 };
+    expect(recommendJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
+  });
+
+  it("declines a thin-margin peng that only trades a wide wait for a narrower one (pengHurdle regression, mined from self-play seed=5 step=75)", () => {
+    // Real position from arena self-play, reconstructed from the exact raw
+    // TileIds the arena produced (not re-derived by kind — this hand has
+    // several tombstoned claimed-discard entries shared with declared melds,
+    // e.g. seat 3's tile 81 is both a discard-pile tombstone and one of this
+    // seat's own chi-meld tiles; re-deriving fresh TileIds per kind broke that
+    // sharing and silently drifted the score by colliding two *different*
+    // physical tiles onto the same id instead — see plan.md/session notes on
+    // this fixture's construction for the debugging story). Decoded: this
+    // seat holds 1m2m6m8m3s3s6s concealed with a declared 1z1z1z peng and
+    // 1s2s3s chi; seat 3 discards a second 3s, peng-able against the existing
+    // pair. Pre-fix (buggy ukeire ignoring exposed melds) this claim looked
+    // meaningfully positive; post-fix the raw margin is only +2.6 — comfortably
+    // under pengHurdle's default (4), so the hurdle correctly falls back to
+    // pass; zeroing it recovers the pre-hurdle pick.
+    const player: JunkPlayerView = {
+      seat: 0,
+      hand: [2, 6, 20, 28, 80, 82, 93],
+      dealer: 1,
+      seats: [
+        {
+          melds: [
+            { type: "peng", tiles: [108, 111, 110], from: 2 },
+            { type: "chi", tiles: [73, 76, 81], from: 3 },
+          ],
+          discards: [
+            { tile: 123 },
+            { tile: 114, claimedBy: 2 },
+            { tile: 21, claimedBy: 1 },
+            { tile: 33 },
+            { tile: 127 },
+            { tile: 54, claimedBy: 2 },
+            { tile: 130 },
+            { tile: 37 },
+            { tile: 95, claimedBy: 1 },
+          ],
+          handCount: 7,
+          justDrawn: false,
+        },
+        {
+          melds: [
+            { type: "chi", tiles: [16, 25, 21], from: 0 },
+            { type: "chi", tiles: [89, 98, 95], from: 0 },
+          ],
+          discards: [
+            { tile: 120 },
+            { tile: 128 },
+            { tile: 116 },
+            { tile: 78 },
+            { tile: 47 },
+            { tile: 1 },
+            { tile: 97 },
+            { tile: 12, claimedBy: 2 },
+          ],
+          handCount: 7,
+          justDrawn: false,
+        },
+        {
+          melds: [
+            { type: "peng", tiles: [115, 113, 114], from: 0 },
+            { type: "peng", tiles: [53, 55, 54], from: 0 },
+            { type: "peng", tiles: [14, 13, 12], from: 1 },
+          ],
+          discards: [
+            { tile: 110, claimedBy: 0 },
+            { tile: 102 },
+            { tile: 68 },
+            { tile: 105 },
+            { tile: 103 },
+            { tile: 65 },
+            { tile: 45 },
+            { tile: 48 },
+            { tile: 63 },
+            { tile: 18 },
+          ],
+          handCount: 4,
+          justDrawn: false,
+        },
+        {
+          melds: [],
+          discards: [
+            { tile: 122 },
+            { tile: 112 },
+            { tile: 135 },
+            { tile: 77 },
+            { tile: 81, claimedBy: 0 },
+            { tile: 46 },
+            { tile: 66 },
+            { tile: 61 },
+            { tile: 83 },
+          ],
+          handCount: 13,
+          justDrawn: false,
+        },
+      ],
+      wallCount: 55,
+      currentSeat: 3,
+      phase: "awaiting-claims",
+      lastDiscard: { seat: 3, tile: 83 },
+    };
+    const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
+    expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+    const noHurdle: JunkWeights = { ...DEFAULT_JUNK_WEIGHTS, pengHurdle: 0 };
+    expect(recommendJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
   });
 
   it("uses visible discards as a safety tie-break", () => {
@@ -196,16 +544,62 @@ describe("junk strategy", () => {
     expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
   });
 
+  it("scores a lone honor above breaking a live number-tile cluster in the base scorer", () => {
+    // Turn 2 of a real self-played game (round 0, step 2, wallCount=82) — many
+    // shanten away from tenpai. `handQuality` used to only compute ukeire when
+    // shanten<=1 ("2 层穷举" was considered too expensive to run every turn);
+    // now that shanten/ukeire are microsecond-fast, the gate was removed so
+    // this signal reaches the mid-game too. Before removing it, discarding 7s
+    // (which sits between live neighbors 6s/8s) and discarding 5z (a lone
+    // honor connected to nothing) tied on every other term this far from
+    // tenpai, so argmax picked whichever came first in hand order — an
+    // arbitrary tie, not a real judgment. With ukeire ungated, keeping the
+    // 6s/8s-connected tile and discarding the honor is now a deliberate,
+    // reasoned pick.
+    const player = view([
+      "1m",
+      "2s",
+      "2s",
+      "2z",
+      "3s",
+      "4z",
+      "5z",
+      "6p",
+      "6s",
+      "7s",
+      "7z",
+      "7z",
+      "8s",
+      "9p",
+    ]);
+    const discardSequenceTile: JunkAction = { type: "discard", tile: player.hand[9]! }; // 7s
+    const discardHonor: JunkAction = { type: "discard", tile: player.hand[6]! }; // 5z
+    const sequenceScore = scoreHandShapeAfterDiscard(
+      { hand: player.hand, melds: [] },
+      discardSequenceTile.tile,
+    );
+    const honorScore = scoreHandShapeAfterDiscard(
+      { hand: player.hand, melds: [] },
+      discardHonor.tile,
+    );
+    expect(honorScore).toBeGreaterThan(sequenceScore);
+  });
+
   it("does not reward breaking a genuinely redundant tatsu to manufacture a new isolated tile", () => {
     // 2 complete runs + 3 *symmetric* ryanmen tatsu (5p6p, 3s4s, 7s8s) + 2 lone
     // honors. standardShanten's usableTatsu is capped at (4 - melds) = 2 here,
-    // so only 2 of the 3 tatsu ever count — any one of them, including 5p6p,
-    // is exactly as redundant as either honor: discarding half of it changes
-    // shanten no more than discarding a honor does. Regression found in real
-    // play: pre-fix, isolationPotential scored the *post-discard* hand, so
-    // breaking 5p6p left a "newly isolated" 5p that collected the isolation
-    // bonus — making the AI prefer discarding 6p (breaking a useful shape)
-    // over discarding a genuinely useless lone honor.
+    // so only 2 of the 3 tatsu ever count on shanten alone — any one of them,
+    // including 5p6p, is exactly as redundant as either honor there.
+    // Historical regression: pre-fix, isolationPotential scored the
+    // *post-discard* hand, so breaking 5p6p left a "newly isolated" 5p that
+    // collected the isolation bonus — making the AI prefer discarding 6p
+    // (breaking a useful shape) over discarding a genuinely useless lone
+    // honor. Originally this hand's two candidates scored *exactly* tied
+    // (shanten=2, so ukeire was gated off before plan.md's 2026-08-08
+    // mid-game ukeire change) and the test could only probe list-order
+    // behavior; now ukeire is ungated and genuinely tells them apart (keeping
+    // the tatsu scores higher), so this asserts the correct discard wins
+    // outright, independent of list order.
     const player = view([
       "1m",
       "2m",
@@ -224,12 +618,8 @@ describe("junk strategy", () => {
     ]);
     const discardTatsuTile: JunkAction = { type: "discard", tile: player.hand[7]! }; // 6p
     const discardHonor: JunkAction = { type: "discard", tile: player.hand[12]! }; // 1z
-    expect(
-      scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardTatsuTile.tile),
-    ).toBe(scoreHandShapeAfterDiscard({ hand: player.hand, melds: [] }, discardHonor.tile));
-    // With scores genuinely tied, listing the tatsu-breaking discard first
-    // pins down that it no longer wins outright (which is what the bug did).
-    expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardTatsuTile);
+    expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardHonor);
+    expect(recommendJunkAction(player, [discardHonor, discardTatsuTile])).toBe(discardHonor);
   });
 
   it("prefers keeping a live wait over a dead one (theoretical -> practical ukeire)", () => {
@@ -269,6 +659,147 @@ describe("junk strategy", () => {
     const keepLive9p: JunkAction = { type: "discard", tile: hand[11]! }; // discards 9s
     const keepDead9s: JunkAction = { type: "discard", tile: hand[12]! }; // discards 9p
     expect(recommendJunkAction(player, [keepDead9s, keepLive9p])).toBe(keepLive9p);
+  });
+
+  it("values the same live wait less as the wall runs low (tenpaiProbabilityWeight reads GameProgress, not just the raw live-tile count)", () => {
+    // Same hand/discard as the previous test (keeping the 3-live-copy 9p wait);
+    // only wallCount changes. A flat per-live-copy weight (the pre-Phase-1
+    // formula) would score this identically regardless of how many draws are
+    // left — this is the behavior that was structurally impossible before
+    // GameProgress existed, so it's the one fact this test needs to pin down.
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "1p",
+      "2p",
+      "3p",
+      "1s",
+      "1s",
+      "9s",
+      "9p",
+    ]);
+    const shapeInput = { hand, melds: [] };
+    const discard = hand[11]!; // discards 9s, keeps the live 9p wait
+    const othersHandCount = 39; // 3 opponents x 13, matching this file's `view` helper convention
+    const earlyGame: GameProgress = {
+      wallCount: 60,
+      unseenPoolSize: 60 + othersHandCount,
+    };
+    const lateGame: GameProgress = {
+      wallCount: 4,
+      unseenPoolSize: 4 + othersHandCount,
+    };
+    const earlyScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      earlyGame,
+    );
+    const lateScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      lateGame,
+    );
+    expect(earlyScore).toBeGreaterThan(lateScore);
+  });
+
+  it("estimates self-draw probability from the wall alone, not a merged wall+opponents pool (plan.md ③: tenpaiProbability's zimo channel)", () => {
+    // A clean single-kind tenpai wait (123456789m run of 3 + 11p pair + 12s
+    // kanchan, waiting only on 3s) padded with a dead 14th tile (1z) so
+    // scoreHandShapeAfterDiscard has something to discard; after discarding 1z
+    // the hand is back to the same tenpai shape, so `improvements` is the live
+    // copy count of 3s alone (4, none seen yet) — one unambiguous number to
+    // hand-verify against, unlike a multi-kind ukeire wait.
+    const hand = ids([
+      "1m",
+      "2m",
+      "3m",
+      "4m",
+      "5m",
+      "6m",
+      "7m",
+      "8m",
+      "9m",
+      "1p",
+      "1p",
+      "1s",
+      "2s",
+      "1z",
+    ]);
+    const shapeInput = { hand, melds: [] };
+    const discard = hand[13]!; // discards 1z
+    const liveCopies = 4;
+
+    const wallCount = 8;
+    const othersHandCount = 39;
+    const remainingDraws = Math.ceil(wallCount / 4);
+
+    // Baseline where wallCount === unseenPoolSize (no opponents to distinguish):
+    // the merged-pool (pre-fix) and wall-only (fixed) formulas coincide here, so
+    // this isolates the score's non-probability terms (shanten/fanPotential/
+    // isolationPotential/safety), none of which read GameProgress.
+    const noOthersProgress: GameProgress = { wallCount, unseenPoolSize: wallCount };
+    const baselineScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      noOthersProgress,
+    );
+    const nonProbabilityTerms =
+      baselineScore -
+      DEFAULT_JUNK_WEIGHTS.tenpaiProbabilityWeight *
+        probabilityAtLeastOneDraw(wallCount, liveCopies, remainingDraws);
+
+    const realisticProgress: GameProgress = {
+      wallCount,
+      unseenPoolSize: wallCount + othersHandCount,
+    };
+    const actualScore = scoreHandShapeAfterDiscard(
+      shapeInput,
+      discard,
+      [],
+      DEFAULT_JUNK_WEIGHTS,
+      undefined,
+      realisticProgress,
+    );
+
+    // Fixed formula: a self-draw only ever pulls from the wall, so the draw
+    // simulation samples `wallCount` tiles, not the wall+opponents pool — but
+    // successCount must shrink to this seat's expected *wall share* of the live
+    // copies (exchangeability, see GameProgress's doc comment), since
+    // liveUkeireCount can't tell which unseen copies sit in the wall vs in an
+    // opponent's hand.
+    const expectedFixedProbability = probabilityAtLeastOneDraw(
+      wallCount,
+      (liveCopies * wallCount) / (wallCount + othersHandCount),
+      remainingDraws,
+    );
+    expect(actualScore).toBeCloseTo(
+      nonProbabilityTerms + DEFAULT_JUNK_WEIGHTS.tenpaiProbabilityWeight * expectedFixedProbability,
+      6,
+    );
+
+    // The bug this replaces: sampling `remainingDraws` from the *merged* pool
+    // with the raw (unscaled) live-copy count as successCount — same draws
+    // count but a bigger population, so it systematically understated the true
+    // self-draw odds.
+    const buggyMergedPoolProbability = probabilityAtLeastOneDraw(
+      wallCount + othersHandCount,
+      liveCopies,
+      remainingDraws,
+    );
+    expect(expectedFixedProbability).toBeGreaterThan(buggyMergedPoolProbability);
   });
 
   it("throws only when there is no legal action", () => {
@@ -332,7 +863,7 @@ describe("junk strategy", () => {
     it("low temperature converges to the higher-scoring action", () => {
       const random = seededRandom(1);
       const results = Array.from({ length: 200 }, () =>
-        recommendJunkAction(gapView, gapActions, { temperature: 0.5, random }),
+        recommendJunkAction(gapView, gapActions, { temperature: 0.01, random }),
       );
       expect(results.every((result) => result === discardA)).toBe(true);
     });

@@ -3,6 +3,10 @@ import { test } from "vitest";
 import { createPrng, nextInt, shuffle } from "./prng.ts";
 import {
   computeShanten,
+  evaluateUkeireAfterDiscards,
+  evaluateUkeireAfterDiscardDraws,
+  evaluateUkeire,
+  evaluateUkeireBatch,
   isTingpai,
   sevenPairsShanten,
   shantenWithExposedMelds,
@@ -67,6 +71,166 @@ test("isTingpai and ukeire report only tiles that can immediately win", () => {
   const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "1s", "1s"]);
   assert.equal(isTingpai(hand, standardOnly), true);
   assert.deepEqual(ukeire(hand, standardOnly), ["1p", "1s"]);
+});
+
+test("evaluateUkeire combines shanten and ukeire, and batch evaluation deduplicates hands", () => {
+  const hand = ids(["1m", "2m", "3m", "4m", "5m", "6m", "7m", "8m", "9m", "1p", "1p", "1s", "1s"]);
+  const single = evaluateUkeire(hand, standardOnly);
+  const batch = evaluateUkeireBatch([
+    { tiles: hand, options: standardOnly },
+    { tiles: [...hand].reverse(), options: standardOnly },
+  ]);
+  assert.deepEqual(single, {
+    shanten: 0,
+    improvingKinds: ["1p", "1s"],
+  });
+  assert.deepEqual(batch[0], single);
+  assert.strictEqual(batch[1], batch[0]);
+});
+
+test("evaluateUkeireAfterDiscards matches independent leaf analysis", () => {
+  const hand = ids([
+    "1m",
+    "2m",
+    "3m",
+    "4m",
+    "5m",
+    "6m",
+    "7s",
+    "8s",
+    "9s",
+    "1z",
+    "1z",
+    "3m",
+    "6m",
+    "6m",
+  ]);
+  const discardKinds = [
+    ...new Set(hand.map((tile) => STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile)))),
+  ];
+  const batch = evaluateUkeireAfterDiscards(hand, discardKinds, standardOnly);
+  for (const result of batch) {
+    const discardKind = STANDARD_TILE_SET.kinds[result.discardKindIndex]!;
+    const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
+    const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
+    const direct = evaluateUkeire(leaf, standardOnly);
+    assert.deepEqual(result.shanten, direct.shanten, discardKind);
+    assert.deepEqual(result.improvingKinds, direct.improvingKinds, discardKind);
+  }
+});
+
+test("evaluateUkeireAfterDiscardDraws matches independent two-change analysis", () => {
+  const hand = ids([
+    "1m",
+    "2m",
+    "3m",
+    "4m",
+    "5m",
+    "6m",
+    "7s",
+    "8s",
+    "9s",
+    "1z",
+    "1z",
+    "3m",
+    "6m",
+    "6m",
+  ]);
+  const discardKinds = [
+    STANDARD_TILE_SET.kindIndexOf("1m"),
+    STANDARD_TILE_SET.kindIndexOf("6m"),
+    STANDARD_TILE_SET.kindIndexOf("1z"),
+  ];
+  const drawKinds = [
+    STANDARD_TILE_SET.kindIndexOf("1m"),
+    STANDARD_TILE_SET.kindIndexOf("4m"),
+    STANDARD_TILE_SET.kindIndexOf("1z"),
+    STANDARD_TILE_SET.kindIndexOf("7z"),
+  ];
+  const batch = evaluateUkeireAfterDiscardDraws(hand, discardKinds, drawKinds, standardOnly);
+  assert.equal(batch.length, 12);
+  for (const result of batch) {
+    const discardKind = STANDARD_TILE_SET.kinds[result.discardKindIndex]!;
+    const drawKind = STANDARD_TILE_SET.kinds[result.drawKindIndex]!;
+    const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
+    const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
+    const heldDraws = leaf.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === drawKind).length;
+    const direct = evaluateUkeire([...leaf, tileIdOf(drawKind, heldDraws)], standardOnly);
+    assert.equal(result.shanten, direct.shanten, `${discardKind}/${drawKind}`);
+  }
+});
+
+test(
+  "evaluateUkeireAfterDiscardDraws matches independent leaves across random two-change shapes",
+  { tags: ["slow"] },
+  () => {
+    let prng = createPrng(20260810);
+    const allIds = allTileIds();
+    for (let trial = 0; trial < 1000; trial += 1) {
+      const shuffled = shuffle(allIds, prng);
+      prng = shuffled.prng;
+      const hand = shuffled.items.slice(0, 14);
+      const discardKinds = [
+        ...new Set(
+          hand.map((tile) => STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile))),
+        ),
+      ].slice(0, 3);
+      const drawKinds = [trial % TILE_KINDS.length, (trial * 7) % TILE_KINDS.length, 33].filter(
+        (kindIndex, index, all) => all.indexOf(kindIndex) === index,
+      );
+      const options = trial % 2 === 0 ? standardOnly : withSevenPairs;
+      const existingMelds = trial % 5;
+      const batch = evaluateUkeireAfterDiscardDraws(
+        hand,
+        discardKinds,
+        drawKinds,
+        options,
+        STANDARD_TILE_SET,
+        existingMelds,
+      );
+      for (const result of batch) {
+        const discardKind = STANDARD_TILE_SET.kinds[result.discardKindIndex]!;
+        const drawKind = STANDARD_TILE_SET.kinds[result.drawKindIndex]!;
+        const tileIndex = hand.findIndex((tile) => STANDARD_TILE_SET.kindOf(tile) === discardKind);
+        const leaf = [...hand.slice(0, tileIndex), ...hand.slice(tileIndex + 1)];
+        const heldDraws = leaf.filter((tile) => STANDARD_TILE_SET.kindOf(tile) === drawKind).length;
+        const direct = computeShanten(
+          [...leaf, tileIdOf(drawKind, heldDraws)],
+          options,
+          STANDARD_TILE_SET,
+          undefined,
+          existingMelds,
+        );
+        assert.equal(
+          result.shanten,
+          direct,
+          `mismatch trial ${trial} ${discardKind}/${drawKind} existingMelds=${existingMelds}`,
+        );
+      }
+    }
+  },
+);
+
+test("ukeire: existingMelds caps usable tatsu the same way shantenWithExposedMelds does", () => {
+  // 2 副露 + 2s3s4s（面子）+ 5m7m（嵌张搭子，缺6m）+ 9m9m（雀头），7 张手牌 —
+  // 2 副露 + 1 手牌内面子 = 3 面子，只差 5m7m 补 6m 就是 4 面子 + 雀头，向听 0。
+  // 2026-08-08 修复前：ukeire 内部硬编码 existingMelds=0 去算候选，把手牌当成
+  // 独立的 0 副露 7 张牌评估，摸 9m（凑成 9m9m9m 刻子）在这个错误基准下被判定
+  // "降向听"，但按真实的 2 副露基准复算，摸 9m 后向听仍是 0（见下方精确验证），
+  // 不该出现在 ukeire 里——只有 6m 才是真正的听牌。
+  const concealed = ids(["2s", "3s", "4s", "5m", "7m", "9m", "9m"]);
+  assert.equal(shantenWithExposedMelds(concealed, 2), 0);
+  assert.equal(
+    shantenWithExposedMelds([...concealed, id("9m", 2)], 2),
+    0,
+    "drawing a third 9m must NOT reduce shanten below 0 with 2 exposed melds",
+  );
+  assert.equal(shantenWithExposedMelds([...concealed, id("6m")], 2), -1);
+  assert.deepEqual(ukeire(concealed, standardOnly, STANDARD_TILE_SET, 2), ["6m"]);
+  // existingMelds defaults to 0 — matches the (buggy but now-explicit) behavior
+  // for callers that genuinely have no exposed melds, and is what makes this a
+  // non-breaking default for every pre-existing call site in this file.
+  assert.deepEqual(ukeire(concealed, standardOnly), ["6m", "9m"]);
 });
 
 test("shantenWithExposedMelds: usable tatsu is capped by exposed melds, not just concealed melds", () => {

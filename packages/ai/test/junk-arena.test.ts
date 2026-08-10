@@ -1,6 +1,7 @@
 import { createPrng, nextUint32, SEAT_IDS } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
-import { playJunkMatch, strengthPolicy } from "../src/junk/arena.ts";
+import { playJunkMatch, strengthPolicy, type SeatPolicy } from "../src/junk/arena.ts";
+import { createJunkAnalysisCache } from "../src/junk/strategy.ts";
 
 const GAMES = 30;
 
@@ -46,6 +47,21 @@ describe("junk self-play arena", () => {
     const result = playJunkMatch(1, policies);
     if ("error" in result) throw new Error(result.error);
     expect([...result.ranking].sort((a, b) => a - b)).toEqual([...SEAT_IDS]);
+  });
+
+  it("keeps structural analysis context across a seat's decisions", () => {
+    const caches = [0, 1, 2, 3].map(() => createJunkAnalysisCache(32));
+    const policies = caches.map((cache) => strengthPolicy({ analysisCache: cache })) as [
+      SeatPolicy,
+      SeatPolicy,
+      SeatPolicy,
+      SeatPolicy,
+    ];
+    const result = playJunkMatch(1, policies);
+    if ("error" in result) throw new Error(result.error);
+
+    expect(caches.some((cache) => cache.hits > 0)).toBe(true);
+    expect(caches.every((cache) => cache.size > 0 && cache.size <= 32)).toBe(true);
   });
 
   it(

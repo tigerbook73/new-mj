@@ -1,14 +1,20 @@
 import {
   STANDARD_TILE_SET,
+  evaluateUkeireBatch,
+  evaluateUkeireAfterDiscardDraws,
+  evaluateUkeire,
   shantenWithExposedMelds,
+  tileIdOf,
   ukeire,
   type JunkAction,
   type JunkPlayerView,
   type Meld,
   type TileId,
   type TileKind,
+  type UkeireEvaluation,
 } from "@new-mj/core";
 import defaultWeightsData from "./default-weights.json" with { type: "json" };
+import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
 
 /** Every magic number that shapes handQuality/fanPotential/scoreAction, made
  * overridable so an offline tuner (see junk/tune.ts) can search this space
@@ -30,10 +36,13 @@ export type JunkWeights = {
   qiduiPotential: number;
   /** handQuality: shanten weight (-shanten * shantenWeight). */
   shantenWeight: number;
-  /** handQuality: ukeire-improvement weight, applied per live tile still available
-   * (4 - copies in own hand/melds - copies visible in any seat's discards), not
-   * per improving *kind* — a wait with 3 live copies outscores one with 1. */
-  improvementWeight: number;
+  /** handQuality: weight on the *probability* of drawing an improving tile within
+   * the seat's estimated remaining draws this game (see tile-probability.ts and
+   * GameProgress) — not a raw live-copy count. A wait backed by more live copies
+   * still scores higher (probability rises with successCount), but the same live
+   * count is worth less late in the wall than early, which a flat per-copy weight
+   * could never express. */
+  tenpaiProbabilityWeight: number;
   /** scoreHandShapeAfterDiscard: bonus for discarding an already-visible tile. */
   safetyBonus: number;
   /** handQuality: flat bonus for a concealed, unpaired suited tile that has no
@@ -42,6 +51,19 @@ export type JunkWeights = {
    * ever pair, never form a run — so this is what makes discarding an isolated
    * honor outscore discarding an isolated number tile even while shanten ties. */
   isolationPotential: number;
+  /** scoreAction: flat penalty subtracted from a chi claim's score before it's
+   * compared against pass — a margin the claim must clear, not just beat pass
+   * by any amount. handQuality already prices in chi's certain costs (loses
+   * menqing, forecloses pengpenghu), but that point estimate carries real
+   * uncertainty (known gaps: no opponent-behavior model, no zimo/peng/chi
+   * channel split — see docs/process/plan.md); requiring a
+   * clear margin guards against committing to an irreversible open hand over a
+   * claim that only *looks* better because of the formula's own noise. */
+  chiHurdle: number;
+  /** Same idea as chiHurdle, for peng/minGang — smaller by default since those
+   * only cost menqing, not pengpenghu too (see the same doc's note correcting
+   * an earlier claim that chi also costs qingyise — it doesn't). */
+  pengHurdle: number;
 };
 
 /** Loaded from default-weights.json rather than hardcoded here, so adopting a
@@ -65,7 +87,98 @@ export const JUNK_FAN_WEIGHTS = {
 
 type ShapeInput = Readonly<{ hand: readonly TileId[]; melds: readonly Meld[] }>;
 
+type LiveCopyContext = Readonly<{
+  meldCounts: Uint8Array;
+  discardCounts: Uint8Array;
+}>;
+
+export type JunkAnalysisCache = Readonly<{
+  get: (key: string) => UkeireEvaluation | undefined;
+  set: (key: string, value: UkeireEvaluation) => void;
+  clear: () => void;
+  readonly hits: number;
+  readonly misses: number;
+  readonly size: number;
+}>;
+
+/** 创建一个有上限的结构分析 LRU；只缓存纯 hand-shape 结果，不持有局面状态。 */
+export const createJunkAnalysisCache = (maxEntries = 32): JunkAnalysisCache => {
+  if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0)
+    throw new Error("maxEntries must be a positive safe integer");
+  const entries = new Map<string, UkeireEvaluation>();
+  let hits = 0;
+  let misses = 0;
+  return {
+    get(key) {
+      const value = entries.get(key);
+      if (!value) {
+        misses += 1;
+        return undefined;
+      }
+      hits += 1;
+      entries.delete(key);
+      entries.set(key, value);
+      return value;
+    },
+    set(key, value) {
+      entries.delete(key);
+      entries.set(key, value);
+      while (entries.size > maxEntries) entries.delete(entries.keys().next().value!);
+    },
+    clear() {
+      entries.clear();
+      hits = 0;
+      misses = 0;
+    },
+    get hits() {
+      return hits;
+    },
+    get misses() {
+      return misses;
+    },
+    get size() {
+      return entries.size;
+    },
+  };
+};
+
+type HandAnalysisCache = JunkAnalysisCache;
+
 const kindOf = (tile: TileId): TileKind => STANDARD_TILE_SET.kindOf(tile);
+const kindIndexOf = (kind: TileKind): number => STANDARD_TILE_SET.kindIndexOf(kind);
+
+const countsOf = (tiles: readonly TileId[]): Uint8Array => {
+  const counts = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+  for (const tile of tiles) counts[kindIndexOf(kindOf(tile))]! += 1;
+  return counts;
+};
+
+const handAnalysisKey = (input: ShapeInput): string => {
+  const counts = countsOf(input.hand);
+  return `${input.melds.length}/${input.melds.length === 0 ? 1 : 0}/${counts.join("")}`;
+};
+
+const handAnalysisOf = (input: ShapeInput, cache?: HandAnalysisCache): UkeireEvaluation => {
+  if (!cache) {
+    return evaluateUkeire(
+      input.hand,
+      { sevenPairs: input.melds.length === 0 },
+      STANDARD_TILE_SET,
+      input.melds.length,
+    );
+  }
+  const key = handAnalysisKey(input);
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const analysis = evaluateUkeire(
+    input.hand,
+    { sevenPairs: input.melds.length === 0 },
+    STANDARD_TILE_SET,
+    input.melds.length,
+  );
+  cache.set(key, analysis);
+  return analysis;
+};
 const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[] | undefined => {
   const remaining = [...hand];
   for (const tile of tiles) {
@@ -171,16 +284,76 @@ const liveUkeireCount = (
   input: ShapeInput,
   kinds: readonly TileKind[],
   visibleDiscards: readonly TileId[],
+  context?: LiveCopyContext,
 ): number => {
+  const handCounts = countsOf(input.hand);
   let total = 0;
   for (const kind of kinds) {
-    const known =
-      input.hand.filter((tile) => kindOf(tile) === kind).length +
-      input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
-      visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
-    total += Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
+    total += remainingLiveCopies(input, kind, visibleDiscards, context, handCounts);
   }
   return total;
+};
+
+const remainingLiveCopies = (
+  input: ShapeInput,
+  kind: TileKind,
+  visibleDiscards: readonly TileId[],
+  context?: LiveCopyContext,
+  handCounts?: Uint8Array,
+): number => {
+  const index = kindIndexOf(kind);
+  const known = context
+    ? (handCounts ?? countsOf(input.hand))[index]! +
+      context.meldCounts[index]! +
+      context.discardCounts[index]!
+    : input.hand.filter((tile) => kindOf(tile) === kind).length +
+      input.melds.flatMap((meld) => meld.tiles).filter((tile) => kindOf(tile) === kind).length +
+      visibleDiscards.filter((tile) => kindOf(tile) === kind).length;
+  return Math.max(0, STANDARD_TILE_SET.copiesPerKind - known);
+};
+
+const createLiveCopyContext = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[],
+  additionalMelds: readonly Meld[] = [],
+): LiveCopyContext => ({
+  meldCounts: countsOf([
+    ...input.melds.flatMap((meld) => meld.tiles),
+    ...additionalMelds.flatMap((meld) => meld.tiles),
+  ]),
+  discardCounts: countsOf(visibleDiscards),
+});
+
+/**
+ * The two numbers `handQuality` needs to turn a live-copy count into a draw
+ * probability: how many tiles are still unaccounted for from this seat's
+ * point of view, and how many more times this seat is expected to draw this
+ * game. `remainingDraws` is estimated as `ceil(wallCount / 4)` — the four
+ * seats draw in strict rotation, so this is exact when no one calls a tile
+ * out of turn; claims (chi/peng/gang) skip other seats' draws and shift the
+ * rotation, which this estimate doesn't model. Known simplification, same
+ * spirit as liveUkeireCount's anGang/buGang gap above.
+ */
+export type GameProgress = Readonly<{
+  wallCount: number;
+  /** wallCount plus every other seat's concealed hand — tiles whose identity
+   * is unknown to this seat, so from this seat's subjective epistemic state
+   * a given live copy is exchangeably likely to be sitting in the wall or in
+   * an opponent's hand (deal was uniform random). handQuality uses this only
+   * to estimate what *share* of a kind's live copies are expected to be in
+   * the wall right now (see wallShare below) — the actual draw simulation
+   * samples from `wallCount` alone, since a self-draw physically only pulls
+   * from the wall, never from an opponent's concealed hand. */
+  unseenPoolSize: number;
+}>;
+
+/** Default for callers that don't track game progress (most direct unit-test
+ * calls into scoreHandShapeAfterDiscard) — a full, untouched wall, so the
+ * probability term behaves as "plenty of time left" rather than being
+ * silently zeroed out. */
+const AMPLE_GAME_PROGRESS: GameProgress = {
+  wallCount: STANDARD_TILE_SET.kinds.length * STANDARD_TILE_SET.copiesPerKind,
+  unseenPoolSize: STANDARD_TILE_SET.kinds.length * STANDARD_TILE_SET.copiesPerKind,
 };
 
 /**
@@ -194,19 +367,54 @@ const handQuality = (
   memo?: Map<string, number>,
   visibleDiscards: readonly TileId[] = [],
   isolationReferenceHand: readonly TileId[] = input.hand,
+  gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+  liveCopyContext?: LiveCopyContext,
+  analysisCache?: HandAnalysisCache,
 ): number => {
-  const shanten = shantenOf(input, memo);
-  // 进张枚举会再求 34 次向听数；离听牌尚远时，先以向听数本身做筛选即可，
-  // 避免自动对局在每一次出牌都做无收益的二层穷举。ukeire 内部的向听差值不
-  // 受副露数量的常数偏移影响，因此这里不需要把偏移传进去。ukeire 自己内部
-  // 已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的 memo
-  // 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
-  const improvingKinds =
-    shanten <= 1 ? ukeire(input.hand, { sevenPairs: input.melds.length === 0 }) : [];
-  const improvements = liveUkeireCount(input, improvingKinds, visibleDiscards);
+  const analysis = handAnalysisOf(input, analysisCache);
+  const shanten = analysis.shanten;
+  // 曾经只在 shanten<=1 时才算 ukeire（避免中局无收益穷举），实测这个门槛让
+  // 中局"留一手换未来更多可能性"这类判断完全看不到进张信号——shanten/ukeire
+  // 性能提升后，无条件计算的开销经基准测试确认可接受（1000 场自对弈从 10.5s
+  // 涨到 16.4s，约 1.56x，不是数量级级别的暴涨），于是把门槛去掉。ukeire 自己
+  // 内部已经在 34 种候选进张之间共享 memo（见 core 的 shanten.ts），这里的
+  // memo 是另一层——同一回合不同候选弃牌之间共享，两者互补、互不冲突。
+  //
+  // existingMelds 必须传 input.melds.length：ukeire 内部按"搭子数上限
+  // min(tatsu, 4-已有面子数)"给候选封顶，遗漏这个偏移会让有副露的手牌把不
+  // 真正降向听的牌种也报成进张（2026-08-08 修复，见 shanten.ts ukeire 的
+  // 文档注释与 shanten.test.ts 的回归用例）。
+  const improvements = liveUkeireCount(
+    input,
+    analysis.improvingKinds,
+    visibleDiscards,
+    liveCopyContext,
+  );
+  const remainingDraws = Math.ceil(gameProgress.wallCount / 4);
+  // Self-draws physically only pull from the wall — never from an opponent's
+  // concealed hand — so the draw simulation must sample from `wallCount`, not
+  // `unseenPoolSize` (wallCount + opponents' hands). But `improvements` counts
+  // live copies across *both* locations (liveUkeireCount can't see into hidden
+  // opponent hands), so it overstates what's actually drawable this way. Since
+  // this seat can't tell which unseen copies sit where, the two locations are
+  // exchangeable from its point of view (see GameProgress) — the expected
+  // number actually in the wall is `improvements` scaled by the wall's share
+  // of the whole unseen pool. This only fixes the self-draw channel; claiming
+  // an improving tile via a future peng/chi off an opponent's discard is a
+  // separate, harder-to-model channel (needs opponent-behavior assumptions)
+  // and stays untouched here — see plan.md's backlog note on this gap.
+  const wallShare =
+    gameProgress.unseenPoolSize > 0
+      ? (improvements * gameProgress.wallCount) / gameProgress.unseenPoolSize
+      : 0;
+  const tenpaiProbability = probabilityAtLeastOneDraw(
+    gameProgress.wallCount,
+    wallShare,
+    remainingDraws,
+  );
   return (
     -shanten * weights.shantenWeight +
-    improvements * weights.improvementWeight +
+    tenpaiProbability * weights.tenpaiProbabilityWeight +
     fanPotential(input, weights) +
     isolationPotential(input.hand, weights, isolationReferenceHand)
   );
@@ -219,12 +427,24 @@ export const scoreHandShapeAfterDiscard = (
   visibleDiscards: readonly TileId[] = [],
   weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
   memo?: Map<string, number>,
+  gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+  liveCopyContext?: LiveCopyContext,
+  analysisCache?: HandAnalysisCache,
 ): number => {
   const hand = removeTiles(input.hand, [discard]);
   if (!hand) return Number.NEGATIVE_INFINITY;
   const safety = visibleDiscards.includes(discard) ? weights.safetyBonus : 0;
   return (
-    handQuality({ hand, melds: input.melds }, weights, memo, visibleDiscards, input.hand) + safety
+    handQuality(
+      { hand, melds: input.melds },
+      weights,
+      memo,
+      visibleDiscards,
+      input.hand,
+      gameProgress,
+      liveCopyContext,
+      analysisCache,
+    ) + safety
   );
 };
 
@@ -235,22 +455,207 @@ const bestDiscardScore = (
   input: ShapeInput,
   visibleDiscards: readonly TileId[],
   weights: JunkWeights,
-  memo?: Map<string, number>,
+  memo: Map<string, number> | undefined,
+  gameProgress: GameProgress,
+  liveCopyContext?: LiveCopyContext,
+  analysisCache?: HandAnalysisCache,
+  allowedKinds?: ReadonlySet<TileKind>,
 ): number => {
   const scores = new Map<TileKind, number>();
   let best = Number.NEGATIVE_INFINITY;
   for (const tile of input.hand) {
     const kind = kindOf(tile);
+    if (allowedKinds && !allowedKinds.has(kind)) continue;
     const score =
       scores.get(kind) ??
       (() => {
-        const calculated = scoreHandShapeAfterDiscard(input, tile, visibleDiscards, weights, memo);
+        const calculated = scoreHandShapeAfterDiscard(
+          input,
+          tile,
+          visibleDiscards,
+          weights,
+          memo,
+          gameProgress,
+          liveCopyContext,
+          analysisCache,
+        );
         scores.set(kind, calculated);
         return calculated;
       })();
     if (score > best) best = score;
   }
   return best;
+};
+
+export type SelfDrawTwoPlyOutcome = Readonly<{
+  kind: TileKind;
+  probability: number;
+  /** Undefined for an immediate win: this probe deliberately does not invent
+   * a terminal payout model and therefore never asks the bot to discard a
+   * winning 14-tile hand. */
+  leafScore?: number;
+}>;
+
+export type SelfDrawTwoPlyProbe = Readonly<{
+  /** Sum of probabilities represented by non-winning outcomes. */
+  continuationProbability: number;
+  /** Sum of probability × leaf score for non-winning outcomes. This is not a
+   * complete action score until a future terminal-win payout is added. */
+  continuationValue: number;
+  /** Probability that the next self-draw immediately wins. */
+  winProbability: number;
+  /** Number of second-discard candidates actually scored across non-winning draws. */
+  secondDiscardCandidateCount: number;
+  outcomes: readonly SelfDrawTwoPlyOutcome[];
+}>;
+
+type TwoChangeBatchSource = Readonly<{
+  tiles: readonly TileId[];
+  discardKindIndex: number;
+}>;
+
+/**
+ * A deliberately narrow 2-ply probe for Phase 2 exploration:
+ *
+ *   post-discard hand -> next *self* draw -> best subsequent discard -> leaf quality
+ *
+ * Every hidden copy is assigned its visible-information probability: under the
+ * same exchangeability assumption as handQuality, kind k has probability
+ * `remainingCopies(k) / unseenPoolSize` of being our next wall draw. The wall
+ * share cancels out here because E[wall copies] / wallCount = live copies /
+ * unseenPoolSize. Opponent discards, chi/peng opportunities, and terminal win
+ * payouts are intentionally outside this probe; immediate wins are reported
+ * separately rather than incorrectly forcing a discard from the winning hand.
+ * `visibleDiscards` must include the discard that produced `input`; callers
+ * evaluating a candidate discard must append that tile before calling this
+ * probe, otherwise the just-discarded physical copy would be counted as drawable.
+ *
+ * The default discard policy uses this probe after the first-round weighted
+ * ranking and cliff filter. Direct callers may still omit the batch source;
+ * that compatibility path uses the general batch evaluator, while the formal
+ * policy path supplies the discard/draw source so core can reuse its two-change
+ * shanten table. `additionalMelds` contains public melds from other seats; their
+ * tile ids only reduce live-copy estimates and are never exposed as a simulated
+ * hand.
+ */
+export const probeSelfDrawTwoPly = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[] = [],
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+  gameProgress: GameProgress = AMPLE_GAME_PROGRESS,
+  analysisCache?: JunkAnalysisCache,
+  secondDiscardKindsForDraw?: (drawnKind: TileKind) => ReadonlySet<TileKind>,
+  twoChangeBatchSource?: TwoChangeBatchSource,
+  additionalMelds: readonly Meld[] = [],
+): SelfDrawTwoPlyProbe => {
+  if (gameProgress.unseenPoolSize <= 0 || gameProgress.wallCount <= 0)
+    return {
+      continuationProbability: 0,
+      continuationValue: 0,
+      winProbability: 0,
+      secondDiscardCandidateCount: 0,
+      outcomes: [],
+    };
+
+  const memo = new Map<string, number>();
+  const structuralCache = analysisCache ?? createJunkAnalysisCache();
+  const liveCopyContext = createLiveCopyContext(input, visibleDiscards, additionalMelds);
+  let continuationProbability = 0;
+  let continuationValue = 0;
+  let winProbability = 0;
+  let secondDiscardCandidateCount = 0;
+  const outcomes: SelfDrawTwoPlyOutcome[] = [];
+  const occupied = new Set([
+    ...input.hand,
+    ...input.melds.flatMap((meld) => meld.tiles),
+    ...additionalMelds.flatMap((meld) => meld.tiles),
+    ...visibleDiscards,
+  ]);
+  const drawCandidates: {
+    kind: TileKind;
+    probability: number;
+    afterDraw: ShapeInput;
+  }[] = [];
+  for (const kind of STANDARD_TILE_SET.kinds) {
+    const remaining = remainingLiveCopies(input, kind, visibleDiscards, liveCopyContext);
+    if (remaining === 0) continue;
+    const probability = remaining / gameProgress.unseenPoolSize;
+    const drawnTile = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
+      tileIdOf(kind, copy),
+    ).find((tile) => !occupied.has(tile));
+    if (drawnTile === undefined) continue;
+    drawCandidates.push({
+      kind,
+      probability,
+      afterDraw: { hand: [...input.hand, drawnTile], melds: input.melds },
+    });
+  }
+  const drawAnalyses = twoChangeBatchSource
+    ? new Map(
+        evaluateUkeireAfterDiscardDraws(
+          twoChangeBatchSource.tiles,
+          [twoChangeBatchSource.discardKindIndex],
+          drawCandidates.map(({ kind }) => STANDARD_TILE_SET.kindIndexOf(kind)),
+          { sevenPairs: input.melds.length === 0 },
+          STANDARD_TILE_SET,
+          input.melds.length,
+        ).map((analysis) => [analysis.drawKindIndex, analysis] as const),
+      )
+    : undefined;
+  const directDrawAnalyses = !twoChangeBatchSource
+    ? evaluateUkeireBatch(
+        drawCandidates.map(({ afterDraw }) => ({
+          tiles: afterDraw.hand,
+          options: { sevenPairs: afterDraw.melds.length === 0 },
+          existingMelds: afterDraw.melds.length,
+        })),
+      )
+    : undefined;
+  for (const [index, { kind, probability, afterDraw }] of drawCandidates.entries()) {
+    const analysis = twoChangeBatchSource
+      ? drawAnalyses?.get(STANDARD_TILE_SET.kindIndexOf(kind))
+      : directDrawAnalyses?.[index];
+    if (!analysis) throw new Error("MISSING_TWO_CHANGE_ANALYSIS");
+    if (!twoChangeBatchSource) {
+      structuralCache.set(handAnalysisKey(afterDraw), directDrawAnalyses![index]!);
+    }
+    if (analysis.shanten < 0) {
+      winProbability += probability;
+      outcomes.push({ kind, probability });
+      continue;
+    }
+
+    const allowedSecondDiscardKinds = secondDiscardKindsForDraw?.(kind);
+    if (allowedSecondDiscardKinds) {
+      secondDiscardCandidateCount += new Set(
+        afterDraw.hand
+          .filter((tile) => allowedSecondDiscardKinds.has(kindOf(tile)))
+          .map((tile) => kindOf(tile)),
+      ).size;
+    } else {
+      secondDiscardCandidateCount += new Set(afterDraw.hand.map((tile) => kindOf(tile))).size;
+    }
+    const leafScore = bestDiscardScore(
+      afterDraw,
+      visibleDiscards,
+      weights,
+      memo,
+      gameProgress,
+      liveCopyContext,
+      structuralCache,
+      allowedSecondDiscardKinds,
+    );
+    continuationProbability += probability;
+    continuationValue += probability * leafScore;
+    outcomes.push({ kind, probability, leafScore });
+  }
+  return {
+    continuationProbability,
+    continuationValue,
+    winProbability,
+    secondDiscardCandidateCount,
+    outcomes,
+  };
 };
 
 const simulatedClaim = (view: JunkPlayerView, action: JunkAction): ShapeInput | undefined => {
@@ -316,14 +721,215 @@ const simulatedBuGang = (view: JunkPlayerView, tile: TileId): ShapeInput | undef
 const visibleDiscards = (view: JunkPlayerView): TileId[] =>
   view.seats.flatMap((seat) => seat.discards.map((discard) => discard.tile));
 
+const opponentMelds = (view: JunkPlayerView): Meld[] =>
+  view.seats.flatMap((seat, seatIndex) =>
+    seatIndex === view.seat ? [] : seat.melds.map((meld) => ({ ...meld, tiles: [...meld.tiles] })),
+  );
+
+/** unseenPoolSize = wallCount + every *other* seat's concealed hand (own hand is
+ * fully known, so it's excluded); see GameProgress's doc comment for why this
+ * pool is treated as exchangeable for a draw-probability estimate. */
+const gameProgressOf = (view: JunkPlayerView): GameProgress => {
+  const othersHandCount = view.seats.reduce(
+    (sum, seat, seatIndex) => (seatIndex === view.seat ? sum : sum + seat.handCount),
+    0,
+  );
+  return { wallCount: view.wallCount, unseenPoolSize: view.wallCount + othersHandCount };
+};
+
+type RankedTwoPlyDiscard = Readonly<{
+  kind: TileKind;
+  discard: TileId;
+  rankScore: number;
+}>;
+
+type TwoPlyCliffConfig = Readonly<{
+  upper: Readonly<{ minN: number; maxN: number; relativeGap: number }>;
+  lower: Readonly<{ minN: number; maxN: number | "all"; relativeGap: number }>;
+}>;
+
+const DEFAULT_TWO_PLY_CLIFF_CONFIG: TwoPlyCliffConfig = {
+  upper: { minN: 2, maxN: 4, relativeGap: 0.2 },
+  lower: { minN: 1, maxN: "all", relativeGap: 0.2 },
+};
+
+const suitTrajectoryBonusAfterDiscard = (
+  input: ShapeInput,
+  discard: TileId,
+  weights: JunkWeights,
+): number => {
+  const hand = input.hand.filter((tile) => tile !== discard);
+  const suitCounts = [0, 0, 0];
+  let honorCount = 0;
+  for (const tile of [...hand, ...input.melds.flatMap((meld) => meld.tiles)]) {
+    const kind = kindOf(tile);
+    if (kind.endsWith("z")) honorCount += 1;
+    else suitCounts[kind[1] === "m" ? 0 : kind[1] === "p" ? 1 : 2]! += 1;
+  }
+  const suitedCount = suitCounts.reduce((sum, count) => sum + count, 0);
+  if (suitedCount === 0) return 0;
+  const dominantSuitCount = Math.max(...suitCounts);
+  const offSuitCount = suitedCount - dominantSuitCount;
+  if (dominantSuitCount < 8 || dominantSuitCount <= offSuitCount) return 0;
+  const routeSignal = Math.max(
+    0,
+    (honorCount > 0 ? dominantSuitCount + honorCount : dominantSuitCount) - offSuitCount - 1,
+  );
+  return (routeSignal * (honorCount > 0 ? weights.hunyise : weights.qingyise)) / 8;
+};
+
+const validateTwoPlyCliffConfig = (config: TwoPlyCliffConfig): void => {
+  if (
+    !Number.isSafeInteger(config.upper.minN) ||
+    !Number.isSafeInteger(config.upper.maxN) ||
+    config.upper.minN <= 0 ||
+    config.upper.maxN < config.upper.minN ||
+    config.upper.relativeGap < 0 ||
+    !Number.isSafeInteger(config.lower.minN) ||
+    config.lower.minN <= 0 ||
+    (config.lower.maxN !== "all" &&
+      (!Number.isSafeInteger(config.lower.maxN) || config.lower.maxN < config.lower.minN)) ||
+    config.lower.relativeGap < 0
+  )
+    throw new Error("invalid two-ply cliff config");
+};
+
+const rankTwoPlyDiscards = (
+  input: ShapeInput,
+  visibleDiscards: readonly TileId[],
+  weights: JunkWeights,
+  gameProgress: GameProgress,
+  memo: Map<string, number>,
+  analysisCache: JunkAnalysisCache,
+  additionalMelds: readonly Meld[],
+): RankedTwoPlyDiscard[] => {
+  const uniqueDiscards = new Map<TileKind, TileId>();
+  for (const tile of input.hand) {
+    const kind = kindOf(tile);
+    if (!uniqueDiscards.has(kind)) uniqueDiscards.set(kind, tile);
+  }
+  return [...uniqueDiscards.entries()]
+    .map(([kind, discard]) => ({
+      kind,
+      discard,
+      rankScore:
+        scoreHandShapeAfterDiscard(
+          input,
+          discard,
+          visibleDiscards,
+          weights,
+          memo,
+          gameProgress,
+          createLiveCopyContext(input, visibleDiscards, additionalMelds),
+          analysisCache,
+        ) + suitTrajectoryBonusAfterDiscard(input, discard, weights),
+    }))
+    .sort((left, right) => right.rankScore - left.rankScore);
+};
+
+const relativeScoreRange = (ranked: readonly RankedTwoPlyDiscard[]): number =>
+  ranked.length < 2 ? 0 : ranked[0]!.rankScore - ranked[ranked.length - 1]!.rankScore;
+
+const upperTwoPlyLimit = (
+  ranked: readonly RankedTwoPlyDiscard[],
+  config: TwoPlyCliffConfig["upper"],
+): number => {
+  const minimum = Math.min(config.minN, ranked.length);
+  const maximum = Math.min(config.maxN, ranked.length);
+  if (minimum === 0) return 0;
+  const range = relativeScoreRange(ranked);
+  if (range <= 0) return maximum;
+  for (let index = minimum; index < maximum; index += 1) {
+    if ((ranked[index - 1]!.rankScore - ranked[index]!.rankScore) / range >= config.relativeGap)
+      return index;
+  }
+  return maximum;
+};
+
+const lowerTwoPlyLimit = (
+  ranked: readonly RankedTwoPlyDiscard[],
+  config: TwoPlyCliffConfig["lower"],
+): number => {
+  const minimum = Math.min(config.minN, ranked.length);
+  const maximum = config.maxN === "all" ? ranked.length : Math.min(config.maxN, ranked.length);
+  if (ranked.length === 0) return 0;
+  const range = relativeScoreRange(ranked);
+  if (range <= 0) return maximum;
+  for (let index = ranked.length - 1; index >= minimum; index -= 1) {
+    if ((ranked[index - 1]!.rankScore - ranked[index]!.rankScore) / range >= config.relativeGap)
+      return Math.min(Math.max(index, minimum), maximum);
+  }
+  return maximum;
+};
+
+const scoreTwoPlyDiscards = (
+  view: JunkPlayerView,
+  discardActions: readonly Extract<JunkAction, { type: "discard" }>[],
+  weights: JunkWeights,
+  memo: Map<string, number>,
+  analysisCache: JunkAnalysisCache,
+): Map<TileKind, number> => {
+  // The first round is intentionally cheap and bounded. The second round keeps
+  // the exact branch result, but only for the upper candidates; the lower cliff
+  // supplies a whitelist for the best subsequent discard after each draw.
+  validateTwoPlyCliffConfig(DEFAULT_TWO_PLY_CLIFF_CONFIG);
+  const input = { hand: view.hand, melds: view.seats[view.seat]!.melds };
+  const discards = visibleDiscards(view);
+  const progress = gameProgressOf(view);
+  const publicMelds = opponentMelds(view);
+  const ranked = rankTwoPlyDiscards(
+    input,
+    discards,
+    weights,
+    progress,
+    memo,
+    analysisCache,
+    publicMelds,
+  );
+  const upperLimit = upperTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.upper);
+  const lowerLimit = lowerTwoPlyLimit(ranked, DEFAULT_TWO_PLY_CLIFF_CONFIG.lower);
+  const secondWhitelist = new Set(ranked.slice(0, lowerLimit).map(({ kind }) => kind));
+  const scores = new Map<TileKind, number>();
+  const actionKinds = new Set(discardActions.map(({ tile }) => kindOf(tile)));
+  for (const { kind, discard } of ranked.slice(0, upperLimit)) {
+    if (!actionKinds.has(kind)) continue;
+    const afterDiscard = {
+      hand: input.hand.filter((tile) => tile !== discard),
+      melds: input.melds,
+    };
+    const probe = probeSelfDrawTwoPly(
+      afterDiscard,
+      [...discards, discard],
+      weights,
+      progress,
+      analysisCache,
+      (drawnKind) => new Set([...secondWhitelist, drawnKind]),
+      {
+        tiles: input.hand,
+        discardKindIndex: STANDARD_TILE_SET.kindIndexOf(kind),
+      },
+      publicMelds,
+    );
+    // 没有可抽牌的分支，或包含立即自摸分支时，暂不把未建模的终局收益混入
+    // 生产评分；交给一轮评分作为稳定 fallback。
+    if (probe.outcomes.length === 0 || probe.winProbability > 0) continue;
+    const discardSafety = discards.includes(discard) ? weights.safetyBonus : 0;
+    scores.set(kind, probe.continuationValue + discardSafety);
+  }
+  return scores;
+};
+
 const scoreAction = (
   view: JunkPlayerView,
   action: JunkAction,
   weights: JunkWeights,
   memo: Map<string, number>,
+  analysisCache?: HandAnalysisCache,
 ): number => {
   const discards = visibleDiscards(view);
   const currentMelds = view.seats[view.seat]!.melds;
+  const gameProgress = gameProgressOf(view);
+  const publicMelds = opponentMelds(view);
   if (action.type === "discard") {
     return scoreHandShapeAfterDiscard(
       { hand: view.hand, melds: currentMelds },
@@ -331,25 +937,69 @@ const scoreAction = (
       discards,
       weights,
       memo,
+      gameProgress,
+      createLiveCopyContext({ hand: view.hand, melds: currentMelds }, discards, publicMelds),
+      analysisCache,
     );
   }
   // pass 的基线是"手牌原样不动"的当前质量，而不是任意常数——这样才能和
   // 吃/碰/杠模拟出的结果分数放在同一把尺子上比较，AI 才可能真的选择不动。
   if (action.type === "pass")
-    return handQuality({ hand: view.hand, melds: currentMelds }, weights, memo, discards);
+    return handQuality(
+      { hand: view.hand, melds: currentMelds },
+      weights,
+      memo,
+      discards,
+      undefined,
+      gameProgress,
+      createLiveCopyContext({ hand: view.hand, melds: currentMelds }, discards, publicMelds),
+      analysisCache,
+    );
   if (action.type === "anGang") {
     const claim = simulatedAnGang(view, action.kind);
-    return claim ? handQuality(claim, weights, memo, discards) + weights.gangkai : -100;
+    return claim
+      ? handQuality(
+          claim,
+          weights,
+          memo,
+          discards,
+          undefined,
+          gameProgress,
+          createLiveCopyContext(claim, discards, publicMelds),
+          analysisCache,
+        ) + weights.gangkai
+      : -100;
   }
   if (action.type === "buGang") {
     const claim = simulatedBuGang(view, action.tile);
     return claim
-      ? handQuality(claim, weights, memo, discards) + (weights.gangkai - weights.buGangPenalty)
+      ? handQuality(
+          claim,
+          weights,
+          memo,
+          discards,
+          undefined,
+          gameProgress,
+          createLiveCopyContext(claim, discards, publicMelds),
+          analysisCache,
+        ) +
+          (weights.gangkai - weights.buGangPenalty)
       : -100;
   }
   const claim = simulatedClaim(view, action);
-  if (claim) return bestDiscardScore(claim, discards, weights, memo);
-  return -100;
+  if (!claim) return -100;
+  const hurdle = action.type === "chi" ? weights.chiHurdle : weights.pengHurdle;
+  return (
+    bestDiscardScore(
+      claim,
+      discards,
+      weights,
+      memo,
+      gameProgress,
+      createLiveCopyContext(claim, discards, publicMelds),
+      analysisCache,
+    ) - hurdle
+  );
 };
 
 /**
@@ -362,28 +1012,43 @@ const scoreAction = (
 export type JunkStrengthConfig = {
   temperature?: number;
   random?: () => number;
+  analysisCache?: JunkAnalysisCache;
 };
 
-type ScoredAction = { action: JunkAction; score: number };
+export type ScoredAction = { action: JunkAction; score: number };
 
-const scoreLegalActions = (
+/** Exposed (beyond recommendJunkAction's own use) so diagnostic/tuning scripts can
+ * inspect per-action scores directly — e.g. measuring how large a margin a claim
+ * beats pass by, which recommendJunkAction's return value alone can't answer. */
+export const scoreLegalActions = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
   weights: JunkWeights,
+  analysisCache?: JunkAnalysisCache,
 ): ScoredAction[] => {
   // One memo shared across every candidate this turn evaluates — see shantenOf's
   // doc comment for why that turns overlapping recursive sub-searches into cache
   // hits instead of each candidate re-deriving them from scratch.
   const memo = new Map<string, number>();
+  const structuralCache = analysisCache ?? createJunkAnalysisCache();
   const discardScores = new Map<TileKind, number>();
+  const discardActions = legalActions.filter(
+    (action): action is Extract<JunkAction, { type: "discard" }> => action.type === "discard",
+  );
+  const twoPlyScores =
+    discardActions.length > 0
+      ? scoreTwoPlyDiscards(view, discardActions, weights, memo, structuralCache)
+      : new Map<TileKind, number>();
   return legalActions.map((action) => ({
     action,
     score:
       action.type !== "discard"
-        ? scoreAction(view, action, weights, memo)
+        ? scoreAction(view, action, weights, memo, structuralCache)
         : (discardScores.get(kindOf(action.tile)) ??
           (() => {
-            const calculated = scoreAction(view, action, weights, memo);
+            const calculated =
+              twoPlyScores.get(kindOf(action.tile)) ??
+              scoreAction(view, action, weights, memo, structuralCache);
             discardScores.set(kindOf(action.tile), calculated);
             return calculated;
           })()),
@@ -433,7 +1098,7 @@ export const recommendJunkAction = (
 ): JunkAction | undefined => {
   const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
   if (winning) return winning;
-  const scored = scoreLegalActions(view, legalActions, weights);
+  const scored = scoreLegalActions(view, legalActions, weights, strength.analysisCache);
   const temperature = strength.temperature ?? 0;
   if (temperature <= 0) return argmaxAction(scored);
   return sampleSoftmax(scored, temperature, strength.random ?? Math.random);

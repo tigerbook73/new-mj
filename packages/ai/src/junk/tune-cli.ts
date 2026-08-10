@@ -4,11 +4,13 @@ import {
   evaluateTunedWeights,
   formatTuneReport,
   tuneJunkWeights,
+  WEIGHT_KEYS,
   type FinalEvaluation,
   type TuneReport,
   type TuneWriteStatus,
 } from "./tune.ts";
-import { MatchWorkerPool } from "./tune-pool.ts";
+import { MatchWorkerPool, type MatchTask } from "./tune-pool.ts";
+import type { JunkWeights } from "./strategy.ts";
 
 /** Same file strategy.ts's DEFAULT_JUNK_WEIGHTS loads from — this file lives
  * next to it in the same directory, so the relative URL always agrees. */
@@ -26,6 +28,10 @@ type Arguments = {
   maxSigma: number;
   concurrency: number;
   write: boolean;
+  /** Restricts the search to this subset of JunkWeights keys (see tune.ts's
+   * mutate/TuneOptions.weightKeys); undefined means "search all of them",
+   * same as before this flag existed. */
+  only?: (keyof JunkWeights)[];
 };
 
 const defaultConcurrency = (): number => {
@@ -39,7 +45,9 @@ const defaultConcurrency = (): number => {
 const usage =
   "Usage: junk/tune-cli.ts [--seed <int>] [--max-generations <int>] [--min-generations <int>] " +
   "[--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] [--max-sigma <float>] " +
-  "[--sigma-convergence-ratio <float>] [--stagnation-patience <int>] [--concurrency <int>] [--write]\n";
+  "[--sigma-convergence-ratio <float>] [--stagnation-patience <int>] [--concurrency <int>] " +
+  `[--only <comma-separated JunkWeights keys, e.g. tenpaiProbabilityWeight — one of: ${WEIGHT_KEYS.join(",")}>] ` +
+  "[--write]\n";
 
 const parseArguments = (argv: string[]): Arguments => {
   const write = argv.includes("--write");
@@ -75,7 +83,14 @@ const parseArguments = (argv: string[]): Arguments => {
     else if (flag === "--sigma-convergence-ratio") result.sigmaConvergenceRatio = Number(value);
     else if (flag === "--stagnation-patience") result.stagnationPatience = Number(value);
     else if (flag === "--concurrency") result.concurrency = Number(value);
-    else throw new Error("UNKNOWN_ARGUMENT");
+    else if (flag === "--only") {
+      const requested = value.split(",").map((key) => key.trim());
+      const invalid = requested.filter((key) => !(WEIGHT_KEYS as string[]).includes(key));
+      if (requested.length === 0 || invalid.length > 0) {
+        throw new Error(`INVALID_ONLY_KEYS: ${invalid.join(",") || "(empty)"}`);
+      }
+      result.only = requested as (keyof JunkWeights)[];
+    } else throw new Error("UNKNOWN_ARGUMENT");
   }
   if (
     !Number.isInteger(result.seed) ||
@@ -132,7 +147,7 @@ export const runTuneCli = async (
   argv: string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
 ): Promise<{ exitCode: number; output: string }> => {
-  let pool: MatchWorkerPool | undefined;
+  let pool: MatchWorkerPool<MatchTask> | undefined;
   try {
     const args = parseArguments(argv);
     const worstCaseMatches = args.maxGenerations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
@@ -141,7 +156,10 @@ export const runTuneCli = async (
         `convergence) seeds/generation=${args.seedsPerGeneration} eval-seeds=${args.evalSeeds} ` +
         `concurrency=${args.concurrency}  worst case ~${worstCaseMatches} matches\n`,
     );
-    pool = new MatchWorkerPool(args.concurrency);
+    pool = new MatchWorkerPool<MatchTask>(
+      args.concurrency,
+      new URL("./tune-worker.ts", import.meta.url),
+    );
     const startedAt = Date.now();
     const report = await tuneJunkWeights(args.seed, {
       maxGenerations: args.maxGenerations,
@@ -152,6 +170,7 @@ export const runTuneCli = async (
       stagnationPatience: args.stagnationPatience,
       maxSigma: args.maxSigma,
       pool,
+      ...(args.only ? { weightKeys: args.only } : {}),
       onGeneration: (generationLog) => {
         const elapsedSec = (Date.now() - startedAt) / 1000;
         // "eta" here is time-to-cap, an upper bound — early stopping usually means
@@ -176,7 +195,15 @@ export const runTuneCli = async (
     const writeStatus: TuneWriteStatus = args.write
       ? writeTunedWeights(finalEval, report, log)
       : { attempted: false };
-    return { exitCode: 0, output: `${formatTuneReport(report, finalEval, args, writeStatus)}\n` };
+    // args is passed as TuneOptions for its shared numeric fields (maxGenerations,
+    // seedsPerGeneration, ...) — it doesn't actually have a weightKeys field
+    // (it has `only`, the CLI-facing name), so that has to be added explicitly
+    // or formatTuneReport always falls back to "search all of them".
+    const reportOptions = { ...args, ...(args.only ? { weightKeys: args.only } : {}) };
+    return {
+      exitCode: 0,
+      output: `${formatTuneReport(report, finalEval, reportOptions, writeStatus)}\n`,
+    };
   } catch (error) {
     return {
       exitCode: 1,

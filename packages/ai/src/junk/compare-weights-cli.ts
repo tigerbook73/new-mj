@@ -1,9 +1,14 @@
-import { readFileSync } from "node:fs";
 import os from "node:os";
 import { createPrng, nextUint32 } from "@new-mj/core";
-import { formatWeightDelta, evaluateCandidate, WEIGHT_KEYS, type MatchupResult } from "./tune.ts";
-import { MatchWorkerPool } from "./tune-pool.ts";
-import type { JunkWeights } from "./strategy.ts";
+import {
+  formatWeightDelta,
+  evaluateCandidate,
+  evaluateCandidatePolicies,
+  WEIGHT_KEYS,
+  type MatchupResult,
+} from "./tune.ts";
+import { MatchWorkerPool, type MatchTask, type PolicyMatchTask } from "./tune-pool.ts";
+import { loadWeightsFile, resolveModulePath, type PolicySource } from "./policy-loader.ts";
 
 /**
  * General-purpose A/B primitive for any AI-quality change expressed as weights:
@@ -14,12 +19,28 @@ import type { JunkWeights } from "./strategy.ts";
  * file holding a hand-edited or externally-produced weight set under
  * evaluation, kept out of git until it clears this comparison). See
  * packages/ai/AGENTS.md "AI 质量调优的 A/B 流程" for when to use this vs.
- * fixture-based regression tests.
+ * fixture-based regression tests and decision-diff-cli.ts.
+ *
+ * `--baseline-module`/`--baseline-ref` (and the candidate equivalents) let A/B
+ * cross code versions too, not just weight values, via policy-loader.ts's
+ * resolveModulePath — same mechanism decision-diff-cli.ts uses for loading, but
+ * this path stays on module *paths* (not live SeatPolicy closures) all the way
+ * through so it can dispatch through a worker pool too (policy-match-worker.ts),
+ * same as the plain same-code weight comparison.
  */
 
 type Arguments = {
-  baselinePath: string;
-  candidatePath: string;
+  /** Weight file path override; unset means "use that side's own defaults"
+   * (current default-weights.json on the fast path, or the loaded module's own
+   * DEFAULT_JUNK_WEIGHTS on the cross-version path — see loadPolicy). Named
+   * --baseline/--candidate (not --baseline-weights) for backward compatibility:
+   * this predates decision-diff-cli.ts's --baseline-weights naming. */
+  baselineWeightsPath?: string;
+  candidateWeightsPath?: string;
+  baselineModule?: string;
+  baselineRef?: string;
+  candidateModule?: string;
+  candidateRef?: string;
   seed: number;
   seeds: number;
   concurrency: number;
@@ -36,13 +57,14 @@ const defaultConcurrency = (): number => {
 };
 
 const usage =
-  "Usage: junk/compare-weights-cli.ts --candidate <path> [--baseline <path>] " +
-  "[--seed <int>] [--seeds <int>] [--concurrency <int>]\n";
+  "Usage: junk/compare-weights-cli.ts\n" +
+  "  [--baseline <weights-path>] [--baseline-module <path> | --baseline-ref <git-ref>]\n" +
+  "  [--candidate <weights-path>] [--candidate-module <path> | --candidate-ref <git-ref>]\n" +
+  "  [--seed <int>] [--seeds <int>] [--concurrency <int>]\n" +
+  "  (--candidate, --candidate-module or --candidate-ref is required)\n";
 
 const parseArguments = (argv: string[]): Arguments => {
   const result: Arguments = {
-    baselinePath: DEFAULT_WEIGHTS_PATH.pathname,
-    candidatePath: "",
     seed: 1,
     // Matches tune-cli.ts's --eval-seeds default: enough duplicate-deal pairs
     // (seeds * 2 seat splits) that a real quality difference clears self-play
@@ -54,14 +76,20 @@ const parseArguments = (argv: string[]): Arguments => {
     const flag = argv[index];
     const value = argv[index + 1];
     if (!flag || value === undefined) throw new Error("MISSING_ARGUMENT_VALUE");
-    if (flag === "--baseline") result.baselinePath = value;
-    else if (flag === "--candidate") result.candidatePath = value;
+    if (flag === "--baseline") result.baselineWeightsPath = value;
+    else if (flag === "--candidate") result.candidateWeightsPath = value;
+    else if (flag === "--baseline-module") result.baselineModule = value;
+    else if (flag === "--baseline-ref") result.baselineRef = value;
+    else if (flag === "--candidate-module") result.candidateModule = value;
+    else if (flag === "--candidate-ref") result.candidateRef = value;
     else if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--seeds") result.seeds = Number(value);
     else if (flag === "--concurrency") result.concurrency = Number(value);
     else throw new Error("UNKNOWN_ARGUMENT");
   }
-  if (!result.candidatePath) throw new Error("MISSING_CANDIDATE_PATH");
+  if (!result.candidateWeightsPath && !result.candidateModule && !result.candidateRef) {
+    throw new Error("MISSING_CANDIDATE");
+  }
   if (
     !Number.isInteger(result.seed) ||
     !Number.isInteger(result.seeds) ||
@@ -74,23 +102,33 @@ const parseArguments = (argv: string[]): Arguments => {
   return result;
 };
 
-const loadWeights = (path: string): JunkWeights => {
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (typeof parsed !== "object" || parsed === null)
-    throw new Error(`INVALID_WEIGHTS_FILE: ${path}`);
-  const keys = Object.keys(parsed).sort();
-  if (keys.join(",") !== [...WEIGHT_KEYS].sort().join(",")) {
-    throw new Error(`INVALID_WEIGHTS_FILE: ${path} does not have exactly the JunkWeights key set`);
-  }
-  return parsed as JunkWeights;
-};
+const isCrossVersion = (args: Arguments): boolean =>
+  Boolean(args.baselineModule || args.baselineRef || args.candidateModule || args.candidateRef);
+
+/** exactOptionalPropertyTypes rejects `{ ref: undefined }`. */
+const policySource = (ref?: string, modulePath?: string): PolicySource => ({
+  ...(ref !== undefined ? { ref } : {}),
+  ...(modulePath !== undefined ? { modulePath } : {}),
+});
+
+const resolvedSource = (
+  modulePath: string,
+  weightsPath?: string,
+): { modulePath: string; weightsPath?: string } => ({
+  modulePath,
+  ...(weightsPath !== undefined ? { weightsPath } : {}),
+});
 
 const formatCompareReport = (
   args: Arguments,
-  baseline: JunkWeights,
-  candidate: JunkWeights,
+  baselineLabel: string,
+  candidateLabel: string,
   seeds: readonly number[],
   result: MatchupResult,
+  /** Omitted on the cross-version path — two different code versions may not
+   * share a JunkWeights shape (e.g. a renamed field), so there's no meaningful
+   * single delta table to print. */
+  weightDelta?: string,
 ): string => {
   const winRate =
     result.totalMatches === 0
@@ -106,17 +144,15 @@ const formatCompareReport = (
           : "tied — inconclusive";
   return [
     "=== Junk AI weight A/B comparison ===",
-    `A (baseline):  ${args.baselinePath}`,
-    `B (candidate): ${args.candidatePath}`,
+    `A (baseline):  ${baselineLabel}`,
+    `B (candidate): ${candidateLabel}`,
     `seed: ${args.seed}  matches: ${result.totalMatches} (${seeds.length} seeds x 2 seat splits)`,
     "",
     `A total score: ${result.baselineScore}   B total score: ${result.candidateScore}`,
     `B win rate: ${winRate}`,
     `verdict: ${verdict}`,
     "",
-    "Weight changes (A -> B):",
-    formatWeightDelta(baseline, candidate),
-    "",
+    ...(weightDelta !== undefined ? ["Weight changes (A -> B):", weightDelta, ""] : []),
     "This tool never writes any file — it only reports. Adopt B by hand-copying",
     "it over default-weights.json once the numbers above hold up.",
   ].join("\n");
@@ -126,15 +162,10 @@ export const runCompareWeightsCli = async (
   argv: string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
 ): Promise<{ exitCode: number; output: string }> => {
-  let pool: MatchWorkerPool | undefined;
+  let weightPool: MatchWorkerPool<MatchTask> | undefined;
+  let policyPool: MatchWorkerPool<PolicyMatchTask> | undefined;
   try {
     const args = parseArguments(argv);
-    const baseline = loadWeights(args.baselinePath);
-    const candidate = loadWeights(args.candidatePath);
-    log(
-      `[compare] baseline=${args.baselinePath} candidate=${args.candidatePath} seeds=${args.seeds}\n`,
-    );
-    pool = new MatchWorkerPool(args.concurrency);
     let prng = createPrng(args.seed);
     const seeds: number[] = [];
     for (let index = 0; index < args.seeds; index += 1) {
@@ -142,10 +173,61 @@ export const runCompareWeightsCli = async (
       prng = step.prng;
       seeds.push(step.value);
     }
-    const result = await evaluateCandidate(seeds, baseline, candidate, pool);
+
+    if (!isCrossVersion(args)) {
+      const baselinePath = args.baselineWeightsPath ?? DEFAULT_WEIGHTS_PATH.pathname;
+      // Guaranteed by parseArguments' validation once isCrossVersion is false
+      // (candidateModule/candidateRef are both unset, so candidateWeightsPath
+      // must be the one that's set) — a runtime check reads clearer here than a
+      // non-null assertion.
+      if (!args.candidateWeightsPath) throw new Error("MISSING_CANDIDATE");
+      const candidatePath = args.candidateWeightsPath;
+      const baseline = loadWeightsFile(baselinePath, WEIGHT_KEYS);
+      const candidate = loadWeightsFile(candidatePath, WEIGHT_KEYS);
+      log(`[compare] baseline=${baselinePath} candidate=${candidatePath} seeds=${args.seeds}\n`);
+      weightPool = new MatchWorkerPool<MatchTask>(
+        args.concurrency,
+        new URL("./tune-worker.ts", import.meta.url),
+      );
+      const result = await evaluateCandidate(seeds, baseline, candidate, weightPool);
+      return {
+        exitCode: 0,
+        output: `${formatCompareReport(
+          args,
+          baselinePath,
+          candidatePath,
+          seeds,
+          result,
+          formatWeightDelta(baseline, candidate),
+        )}\n`,
+      };
+    }
+
+    log(
+      `[compare] cross-version comparison (parallel, concurrency=${args.concurrency}), seeds=${args.seeds}\n`,
+    );
+    // ref snapshots resolve once here, on the main thread — workers only ever
+    // import() an already-materialized path, never run git themselves (see
+    // policy-loader.ts's resolveModulePath doc comment).
+    const baselineModulePath = resolveModulePath(
+      policySource(args.baselineRef, args.baselineModule),
+    );
+    const candidateModulePath = resolveModulePath(
+      policySource(args.candidateRef, args.candidateModule),
+    );
+    policyPool = new MatchWorkerPool<PolicyMatchTask>(
+      args.concurrency,
+      new URL("./policy-match-worker.ts", import.meta.url),
+    );
+    const result = await evaluateCandidatePolicies(
+      seeds,
+      resolvedSource(baselineModulePath, args.baselineWeightsPath),
+      resolvedSource(candidateModulePath, args.candidateWeightsPath),
+      policyPool,
+    );
     return {
       exitCode: 0,
-      output: `${formatCompareReport(args, baseline, candidate, seeds, result)}\n`,
+      output: `${formatCompareReport(args, baselineModulePath, candidateModulePath, seeds, result)}\n`,
     };
   } catch (error) {
     return {
@@ -153,7 +235,7 @@ export const runCompareWeightsCli = async (
       output: `${error instanceof Error ? error.message : "UNKNOWN"}\n${usage}`,
     };
   } finally {
-    await pool?.close();
+    await Promise.all([weightPool?.close(), policyPool?.close()]);
   }
 };
 

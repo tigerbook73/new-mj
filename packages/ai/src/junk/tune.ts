@@ -1,7 +1,14 @@
 import { createPrng, nextUint32, SEAT_IDS, type SeatId } from "@new-mj/core";
-import { playJunkMatch, strengthPolicy, type SeatPolicy } from "./arena.ts";
+import { playJunkMatch, strengthPolicy, type JunkMatchResult, type SeatPolicy } from "./arena.ts";
+import { buildPolicy } from "./policy-loader.ts";
 import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./strategy.ts";
-import type { MatchTask, MatchTaskResult, MatchWorkerPool } from "./tune-pool.ts";
+import type { MatchTask, MatchTaskResult, MatchWorkerPool, PolicyMatchTask } from "./tune-pool.ts";
+
+/** Two MatchWorkerPool instantiations flow through this file: the weight-based
+ * one (tune:junk's hot loop, tune-worker.ts) and the cross-version policy-based
+ * one (evaluateCandidatePolicies below, policy-match-worker.ts). */
+type WeightMatchPool = MatchWorkerPool<MatchTask>;
+type PolicyMatchPool = MatchWorkerPool<PolicyMatchTask>;
 
 /** Exported so compare-weights-cli.ts can validate an arbitrary candidate JSON
  * file has exactly this key set without duplicating the list. */
@@ -41,11 +48,20 @@ const gaussian = (random: () => number): number => {
  * moves by roughly the same *relative* percentage regardless of its absolute
  * scale — shantenWeight ~100 vs pairBonus ~2 — so a single additive step
  * wouldn't be comparable across dimensions), clamped to keep pathological drift
- * finite.
+ * finite. `eligibleKeys` is normally all of WEIGHT_KEYS, but a caller can pass a
+ * subset (see TuneOptions.weightKeys / tune-cli.ts's --only) to pin every other
+ * weight and search along just one dimension — a plain 1D step-size-adaptive
+ * line search falls out of this "coordinate descent over one key" mechanism for
+ * free when the eligible set has exactly one key in it.
  */
-const mutate = (weights: JunkWeights, sigma: number, random: () => number): JunkWeights => {
+const mutate = (
+  weights: JunkWeights,
+  sigma: number,
+  random: () => number,
+  eligibleKeys: readonly (keyof JunkWeights)[],
+): JunkWeights => {
   const mutated = { ...weights };
-  const key = WEIGHT_KEYS[Math.floor(random() * WEIGHT_KEYS.length)]!;
+  const key = eligibleKeys[Math.floor(random() * eligibleKeys.length)]!;
   mutated[key] = clamp(mutated[key] * Math.exp(sigma * gaussian(random)), 0.01, 10_000);
   return mutated;
 };
@@ -65,6 +81,18 @@ export type MatchupResult = {
   totalMatches: number;
 };
 
+/** Shared by runMatchTask (weight-based, worker-pool-capable) and
+ * evaluateCandidatePolicies (policy-based, see below) so both reduce a finished
+ * match to a candidate/baseline score split the exact same way. */
+const splitMatchScore = (
+  result: JunkMatchResult,
+  candidateSeats: readonly SeatId[],
+): { candidateTotal: number; baselineTotal: number } => {
+  const candidateTotal = candidateSeats.reduce<number>((sum, seat) => sum + result.scores[seat], 0);
+  const baselineTotal = result.scores.reduce((sum, score) => sum + score, 0) - candidateTotal;
+  return { candidateTotal, baselineTotal };
+};
+
 /**
  * Plays one (seed, seat-split) match and reduces it to a candidate/baseline score
  * split. Pure and side-effect-free by design — this is the exact unit of work a
@@ -81,12 +109,86 @@ export const runMatchTask = (task: MatchTask): MatchTaskResult => {
   ) as [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
   const result = playJunkMatch(task.seed, policies);
   if ("error" in result) return { ok: false, candidateTotal: 0, baselineTotal: 0 };
-  const candidateTotal = task.candidateSeats.reduce<number>(
-    (sum, seat) => sum + result.scores[seat],
-    0,
+  return { ok: true, ...splitMatchScore(result, task.candidateSeats) };
+};
+
+/** A policy source already reduced to serializable fields (see
+ * policy-loader.ts's resolveModulePath) — the currency runPolicyMatchTask and
+ * evaluateCandidatePolicies pass around, since a live SeatPolicy closure can't
+ * cross a worker_thread postMessage boundary. */
+export type ResolvedPolicySource = Readonly<{ modulePath: string; weightsPath?: string }>;
+
+/** Policy-based counterpart to runMatchTask: imports both sides (buildPolicy
+ * caches via Node's own module cache, so repeated calls with the same
+ * modulePath across many tasks in one thread don't re-execute the module) and
+ * plays one (seed, seat-split) match. This is the unit of work
+ * policy-match-worker.ts ships to a worker thread, and also what the
+ * sequential fallback below calls directly on the main thread. */
+export const runPolicyMatchTask = async (task: PolicyMatchTask): Promise<MatchTaskResult> => {
+  const [baselinePolicy, candidatePolicy] = await Promise.all([
+    buildPolicy(task.baselineModulePath, task.baselineWeightsPath),
+    buildPolicy(task.candidateModulePath, task.candidateWeightsPath),
+  ]);
+  const policies = SEAT_IDS.map((seat) =>
+    task.candidateSeats.includes(seat) ? candidatePolicy : baselinePolicy,
+  ) as [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
+  const result = playJunkMatch(task.seed, policies);
+  if ("error" in result) return { ok: false, candidateTotal: 0, baselineTotal: 0 };
+  return { ok: true, ...splitMatchScore(result, task.candidateSeats) };
+};
+
+const policyMatchTask = (
+  seed: number,
+  candidateSeats: readonly SeatId[],
+  baseline: ResolvedPolicySource,
+  candidate: ResolvedPolicySource,
+): PolicyMatchTask => ({
+  seed,
+  candidateSeats,
+  baselineModulePath: baseline.modulePath,
+  ...(baseline.weightsPath !== undefined ? { baselineWeightsPath: baseline.weightsPath } : {}),
+  candidateModulePath: candidate.modulePath,
+  ...(candidate.weightsPath !== undefined ? { candidateWeightsPath: candidate.weightsPath } : {}),
+});
+
+/**
+ * Policy-based counterpart to evaluateCandidate, for when baseline/candidate
+ * aren't just two weight values on the same code — e.g. a cross-version
+ * comparison via policy-loader.ts's resolveModulePath. Takes already-resolved
+ * module paths (not live SeatPolicy functions, which can't cross a
+ * worker_thread postMessage boundary) so it can dispatch through a pool the
+ * same way evaluateCandidate does; runs sequentially (still via the identical
+ * runPolicyMatchTask, just called directly) when no pool is given. Reuses the
+ * same CANDIDATE_SEAT_SPLITS duplicate-deal design so seat-position effects
+ * cancel out the same way.
+ */
+export const evaluateCandidatePolicies = async (
+  seeds: readonly number[],
+  baseline: ResolvedPolicySource,
+  candidate: ResolvedPolicySource,
+  pool?: PolicyMatchPool,
+): Promise<MatchupResult> => {
+  const tasks: PolicyMatchTask[] = seeds.flatMap((seed) =>
+    CANDIDATE_SEAT_SPLITS.map((candidateSeats) =>
+      policyMatchTask(seed, candidateSeats, baseline, candidate),
+    ),
   );
-  const baselineTotal = result.scores.reduce((sum, score) => sum + score, 0) - candidateTotal;
-  return { ok: true, candidateTotal, baselineTotal };
+  const results = pool
+    ? await pool.runAll(tasks)
+    : await Promise.all(tasks.map(runPolicyMatchTask));
+
+  let candidateScore = 0;
+  let baselineScore = 0;
+  let candidateWins = 0;
+  let totalMatches = 0;
+  for (const result of results) {
+    if (!result.ok) continue;
+    totalMatches += 1;
+    candidateScore += result.candidateTotal;
+    baselineScore += result.baselineTotal;
+    if (result.candidateTotal > result.baselineTotal) candidateWins += 1;
+  }
+  return { candidateScore, baselineScore, candidateWins, totalMatches };
 };
 
 /**
@@ -104,7 +206,7 @@ export const evaluateCandidate = async (
   seeds: readonly number[],
   baseline: JunkWeights,
   candidate: JunkWeights,
-  pool?: MatchWorkerPool,
+  pool?: WeightMatchPool,
 ): Promise<MatchupResult> => {
   const tasks: MatchTask[] = seeds.flatMap((seed) =>
     CANDIDATE_SEAT_SPLITS.map((candidateSeats) => ({
@@ -182,7 +284,15 @@ export type TuneOptions = {
   onGeneration?: (log: TuneGenerationLog) => void;
   /** Runs every generation's matches through this pool instead of sequentially
    * on the main thread. Omit for the (slower but dependency-free) default. */
-  pool?: MatchWorkerPool;
+  pool?: WeightMatchPool;
+  /** Restricts mutation to this subset of JunkWeights keys (see mutate's doc
+   * comment) — every other weight stays pinned at its DEFAULT_JUNK_WEIGHTS
+   * value for the whole run. Defaults to WEIGHT_KEYS (search all of them),
+   * same as before this option existed. Useful for isolating a single
+   * newly-introduced weight (e.g. tenpaiProbabilityWeight) from the rest of an
+   * already-tuned vector, so a run's accept/reject history only ever reflects
+   * that one dimension. */
+  weightKeys?: readonly (keyof JunkWeights)[];
 };
 
 const SUCCESS_WINDOW = 10;
@@ -210,6 +320,7 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
     stagnationPatience = 30,
     maxSigma = 1,
     pool,
+    weightKeys = WEIGHT_KEYS,
   } = options;
   let incumbent = DEFAULT_JUNK_WEIGHTS;
   let sigma = initialSigma;
@@ -222,7 +333,7 @@ export const tuneJunkWeights = async (seed: number, options: TuneOptions): Promi
   for (let generation = 1; generation <= maxGenerations; generation += 1) {
     const mutationSeedStep = nextUint32(prng);
     prng = mutationSeedStep.prng;
-    const candidate = mutate(incumbent, sigma, seededRandom(mutationSeedStep.value));
+    const candidate = mutate(incumbent, sigma, seededRandom(mutationSeedStep.value), weightKeys);
 
     const seeds: number[] = [];
     for (let index = 0; index < seedsPerGeneration; index += 1) {
@@ -296,7 +407,7 @@ export const evaluateTunedWeights = async (
   seed: number,
   evalSeeds: number,
   report: TuneReport,
-  pool?: MatchWorkerPool,
+  pool?: WeightMatchPool,
 ): Promise<FinalEvaluation> => {
   let prng = createPrng(seed ^ 0x5bd1_e995);
   const seeds: number[] = [];
@@ -370,6 +481,8 @@ export const formatTuneReport = (
   return [
     "=== Junk AI weight tuning report ===",
     `search seed: ${report.seed}  seeds/generation: ${options.seedsPerGeneration}`,
+    `weights searched: ${(options.weightKeys ?? WEIGHT_KEYS).join(", ")}` +
+      (options.weightKeys ? " (restricted via --only, everything else pinned)" : ""),
     `ran ${ranGenerations}/${options.maxGenerations} generations, ${accepted} accepted ` +
       `— stopped: ${STOP_REASON_TEXT[report.stopReason]}`,
     "",

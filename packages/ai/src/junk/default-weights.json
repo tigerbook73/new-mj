@@ -10,7 +10,9 @@
   "meldBonus": 3,
   "qiduiPotential": 3.5,
   "shantenWeight": 100,
-  "improvementWeight": 3,
+  "tenpaiProbabilityWeight": 25,
   "safetyBonus": 4,
-  "isolationPotential": 1.5
+  "isolationPotential": 1.5,
+  "chiHurdle": 8,
+  "pengHurdle": 4
 }

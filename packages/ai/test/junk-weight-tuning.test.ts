@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_JUNK_WEIGHTS, JUNK_FAN_WEIGHTS } from "../src/junk/strategy.ts";
-import { MatchWorkerPool } from "../src/junk/tune-pool.ts";
+import { MatchWorkerPool, type MatchTask } from "../src/junk/tune-pool.ts";
 import {
   evaluateCandidate,
   evaluateTunedWeights,
@@ -137,8 +137,29 @@ describe("junk weight tuning", () => {
     },
   );
 
+  it(
+    "restricting weightKeys pins every other weight at its default for the whole run",
+    { tags: ["slow"] },
+    async () => {
+      // Enough generations that, at the default 20% target acceptance rate,
+      // some mutations should actually get accepted — a run where nothing was
+      // ever accepted would make "only the restricted key moved" true but
+      // uninformative (the incumbent never changes either way).
+      const report = await tuneJunkWeights(5, {
+        maxGenerations: 30,
+        minGenerations: 30,
+        seedsPerGeneration: 1,
+        weightKeys: ["tenpaiProbabilityWeight"],
+      });
+      expect(report.generations.some((g) => g.accepted)).toBe(true);
+      const { tenpaiProbabilityWeight: _tuned, ...restOfTuned } = report.tunedWeights;
+      const { tenpaiProbabilityWeight: _default, ...restOfDefault } = DEFAULT_JUNK_WEIGHTS;
+      expect(restOfTuned).toEqual(restOfDefault);
+    },
+  );
+
   describe("worker pool", () => {
-    let pool: MatchWorkerPool | undefined;
+    let pool: MatchWorkerPool<MatchTask> | undefined;
 
     afterEach(async () => {
       await pool?.close();
@@ -157,7 +178,10 @@ describe("junk weight tuning", () => {
 
         const sequential = await evaluateCandidate(seeds, DEFAULT_JUNK_WEIGHTS, candidate);
 
-        pool = new MatchWorkerPool(2);
+        pool = new MatchWorkerPool<MatchTask>(
+          2,
+          new URL("../src/junk/tune-worker.ts", import.meta.url),
+        );
         const parallel = await evaluateCandidate(seeds, DEFAULT_JUNK_WEIGHTS, candidate, pool);
 
         expect(parallel).toEqual(sequential);

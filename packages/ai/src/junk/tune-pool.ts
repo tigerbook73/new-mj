@@ -2,6 +2,12 @@ import { Worker } from "node:worker_threads";
 import type { SeatId } from "@new-mj/core";
 import type { JunkWeights } from "./strategy.ts";
 
+/** Weight-based match task (tune:junk / compare-weights-cli.ts's same-code
+ * path, dispatched to tune-worker.ts). See policy-match-worker.ts's
+ * PolicyMatchTask for the cross-version counterpart — both share the same
+ * generic MatchWorkerPool<TTask> below; the pool never inspects task
+ * contents, it only ships whatever it's given to whichever worker script the
+ * caller points it at. */
 export type MatchTask = {
   seed: number;
   candidateSeats: readonly SeatId[];
@@ -15,28 +21,51 @@ export type MatchTaskResult = {
   baselineTotal: number;
 };
 
+/**
+ * Cross-version counterpart to MatchTask (grouped here since the pool below is
+ * generic over task shape and this is the other task kind that flows through
+ * it) — module paths instead of weight objects, since the two sides may be
+ * different code/formula versions, not just different weight values on the
+ * same code (see policy-loader.ts). `*ModulePath` must already be a real,
+ * resolved file path (policy-loader.ts's resolveModulePath) before building
+ * this task: workers only ever `import()`, they never run `git show` — doing
+ * the ref snapshot once on the main thread avoids every worker redundantly
+ * re-snapshotting its own copy.
+ */
+export type PolicyMatchTask = {
+  seed: number;
+  candidateSeats: readonly SeatId[];
+  baselineModulePath: string;
+  baselineWeightsPath?: string;
+  candidateModulePath: string;
+  candidateWeightsPath?: string;
+};
+
 type PendingResolve = (result: MatchTaskResult) => void;
 
 /**
- * Fixed-size worker_threads pool dedicated to running one MatchTask per message.
- * Matches are pure, independent, and CPU-bound (the real cost is shanten
- * computation inside strategy.ts, not I/O), which makes them embarrassingly
- * parallel across cores. The pool is meant to be created once and reused for an
- * entire tuning run — not spawned per generation — so thread-startup cost is
- * amortized across many matches instead of paid repeatedly.
+ * Fixed-size worker_threads pool dedicated to running one task per message.
+ * Generic over the task shape (`TTask`) so multiple task kinds that all reduce
+ * to the same MatchTaskResult can share this implementation instead of each
+ * hand-rolling their own pool. Matches are pure, independent, and CPU-bound
+ * (the real cost is shanten computation inside strategy.ts, not I/O), which
+ * makes them embarrassingly parallel across cores. The pool is meant to be
+ * created once and reused for an entire run — not spawned per generation/task
+ * — so thread-startup cost is amortized across many matches instead of paid
+ * repeatedly.
  *
  * No external worker-pool library: same "hand-write it" call as tune.ts's
- * optimizer itself (see AGENTS.md) — this pool is small and single-purpose
- * enough that a dependency isn't proportionate to what it buys.
+ * optimizer itself (see AGENTS.md) — this pool only ever does "post a plain
+ * object, get a plain object back", none of the task priority/cancellation/
+ * backpressure needs that would make a dependency pay for itself.
  */
-export class MatchWorkerPool {
+export class MatchWorkerPool<TTask> {
   private readonly workers: Worker[] = [];
   private readonly idle: Worker[] = [];
   private readonly pending = new Map<Worker, PendingResolve>();
-  private readonly queue: Array<{ task: MatchTask; resolve: PendingResolve }> = [];
+  private readonly queue: Array<{ task: TTask; resolve: PendingResolve }> = [];
 
-  constructor(size: number) {
-    const workerUrl = new URL("./tune-worker.ts", import.meta.url);
+  constructor(size: number, workerUrl: URL) {
     for (let index = 0; index < Math.max(1, size); index += 1) {
       const worker = new Worker(workerUrl);
       worker.on("message", (result: MatchTaskResult) => this.onSettled(worker, result));
@@ -66,14 +95,14 @@ export class MatchWorkerPool {
     worker.postMessage(next.task);
   }
 
-  run(task: MatchTask): Promise<MatchTaskResult> {
+  run(task: TTask): Promise<MatchTaskResult> {
     return new Promise((resolve) => {
       this.queue.push({ task, resolve });
       this.dispatchNext();
     });
   }
 
-  runAll(tasks: readonly MatchTask[]): Promise<MatchTaskResult[]> {
+  runAll(tasks: readonly TTask[]): Promise<MatchTaskResult[]> {
     return Promise.all(tasks.map((task) => this.run(task)));
   }
 
