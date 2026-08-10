@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import baseline from "./fixtures/baselines/canonical-production-selection-001.baseline.json" with { type: "json" };
+import baseline from "./fixtures/baselines/discard-001-production-v1.baseline.json" with { type: "json" };
 import { CANONICAL_PRODUCTION_SELECTION } from "./canonical-fixtures.ts";
 import { createJunkFixtureProvider } from "./fixture-provider.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "./report.ts";
@@ -13,7 +13,7 @@ const fixture = CANONICAL_PRODUCTION_SELECTION;
 
 const manifest: CalibrationManifest = {
   schemaVersion: CALIBRATION_SCHEMA_VERSION,
-  id: "junk-structural-calibration-canonical",
+  id: "canonical-baseline",
   version: 1,
   scenarios: [fixture.scenario],
 };
@@ -21,7 +21,7 @@ const manifest: CalibrationManifest = {
 const run: CalibrationRun = {
   runId: "run-single-001",
   gitSha: "working-tree",
-  command: "pnpm --filter @new-mj/ai evaluate --scenario canonical-production-selection-001",
+  command: "pnpm --filter @new-mj/ai evaluate run discard-001",
   configHash: "config-single-001",
   startedAt: "2026-08-10T00:00:00.000Z",
   workerCount: 1,
@@ -51,7 +51,7 @@ describe("single calibration runner", () => {
     );
     expect(fixture.input.legalActions).toContainEqual(report.evaluations[0]?.candidates[0]?.action);
     expect(serializeCalibrationReport(report)).toContain('"schemaVersion": 1');
-    expect(formatCalibrationSummary(report)).toContain("canonical-production-selection-001");
+    expect(formatCalibrationSummary(report)).toContain("discard-001");
   });
 
   it("fails before provider execution when the scenario is absent", () => {

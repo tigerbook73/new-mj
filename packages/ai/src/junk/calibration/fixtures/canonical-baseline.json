@@ -1,18 +1,17 @@
 {
   "schemaVersion": 1,
-  "id": "junk-structural-calibration-canonical",
+  "id": "canonical-baseline",
   "version": 1,
   "purpose": "canonical-baseline",
   "description": "固定普通牌型输入，用于记录当前生产 Junk AI 的可重复决策基线。",
   "scenarios": [
     {
-      "id": "canonical-production-selection-001",
+      "id": "discard-001",
       "version": 1,
       "source": {
         "kind": "fixture",
-        "fixtureId": "canonical-production-selection-001"
+        "fixtureId": "hand-shape-001"
       },
-      "seed": 1,
       "description": "含连续搭子、孤张和字牌的 14 张普通手牌弃牌选择。",
       "tags": ["standard-only", "discard-selection", "hand-shape"]
     }

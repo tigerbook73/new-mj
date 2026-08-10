@@ -76,6 +76,8 @@
 - 顺序批量 runner 已接入 JSONL record：流式消费、不整体加载，按 `scenarioId` 查找 manifest，经 resolver 构造 normalized scenario 后复用统一 evaluator；重复或不存在的 scenario 显式失败，报告沿用稳定排序，worker/重试/断点恢复仍未实现。
 - 批量报告已增加聚合指标：场景数、ok/failed/skipped、总耗时、吞吐、p50/p95 evaluator 延迟和失败摘要；单个 evaluator 异常保留为 failed evaluation，不丢弃整批结果，未知/重复 scenario 仍快速失败。
 - fixture 元数据去重已完成：fixture JSON 不再重复保存 `id/version/seed`；registry 的 `fixtureId` 是输入资产身份，manifest scenario 的 `version` 是场景版本，fixture source 不使用 seed，避免多个权威来源漂移。
+- ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case（如 `canonical-baseline`、`discard-001`、`hand-shape-001`、`discard-001-production-v1`）；CLI 输出文件使用 `junk-` 前缀，便于跨玩法汇总。
+- seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不再保存无效 seed。
 
 下一步第一个具体动作：在批量 runner 中接入 JSONL reader，并在聚合层按 scenario ID 稳定排序；先不实现大批量 worker pool。
 

@@ -23,7 +23,7 @@ export const evaluateProductionFixture = (
   return {
     scenarioId,
     evaluator: "production-weighted",
-    evaluatorVersion: options.evaluatorVersion ?? "current",
+    evaluatorVersion: options.evaluatorVersion ?? "v1",
     selectedCandidateId,
     candidates: [
       {

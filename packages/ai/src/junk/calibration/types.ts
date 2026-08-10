@@ -29,7 +29,6 @@ export type CalibrationScenario = Readonly<{
   id: string;
   version: number;
   source: CalibrationScenarioSource;
-  seed: number;
   description?: string;
   tags?: readonly string[];
 }>;

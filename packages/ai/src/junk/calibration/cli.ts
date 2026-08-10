@@ -23,7 +23,7 @@ const usage =
   "  --help                                      Show this help\n\n" +
   "Examples:\n" +
   "  pnpm --filter @new-mj/ai evaluate list\n" +
-  "  pnpm --filter @new-mj/ai evaluate run canonical-production-selection-001\n";
+  "  pnpm --filter @new-mj/ai evaluate run discard-001\n";
 
 type Arguments = Readonly<{
   list: boolean;
@@ -84,9 +84,10 @@ const listScenarios = (): string =>
     ...(JUNK_CALIBRATION_MANIFEST.description
       ? [`description: ${JUNK_CALIBRATION_MANIFEST.description}`]
       : []),
-    ...JUNK_CALIBRATION_MANIFEST.scenarios.map(
-      (scenario) => `- ${scenario.id} (${scenario.source.kind}, seed=${scenario.seed})`,
-    ),
+    ...JUNK_CALIBRATION_MANIFEST.scenarios.map((scenario) => {
+      const seed = scenario.source.kind === "generated" ? `, seed=${scenario.source.seed}` : "";
+      return `- ${scenario.id} (${scenario.source.kind}${seed})`;
+    }),
   ].join("\n") + "\n";
 
 export const runCalibrationCli = (
@@ -116,8 +117,8 @@ export const runCalibrationCli = (
       },
     );
     const outputDir = path.resolve(args.outputDir);
-    const jsonPath = path.join(outputDir, `${runId}.json`);
-    const markdownPath = path.join(outputDir, `${runId}.md`);
+    const jsonPath = path.join(outputDir, `junk-${runId}.json`);
+    const markdownPath = path.join(outputDir, `junk-${runId}.md`);
     const exists = runtime.exists ?? existsSync;
     if (exists(jsonPath) || exists(markdownPath)) {
       throw new Error(`OUTPUT_ALREADY_EXISTS: ${runId}`);

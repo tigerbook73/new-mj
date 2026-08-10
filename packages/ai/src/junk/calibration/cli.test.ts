@@ -19,7 +19,7 @@ describe("calibration CLI", () => {
   it("lists stable canonical scenario IDs", () => {
     const result = runCalibrationCli(["list"]);
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("canonical-production-selection-001");
+    expect(result.output).toContain("discard-001");
   });
 
   it("writes JSON and Markdown reports without overwriting a run", () => {
@@ -27,7 +27,7 @@ describe("calibration CLI", () => {
     const directories: string[] = [];
     const args = [
       "run",
-      "canonical-production-selection-001",
+      "discard-001",
       "--output-dir",
       "/tmp/calibration-cli-test",
       "--run-id",
@@ -42,11 +42,11 @@ describe("calibration CLI", () => {
     };
     const result = runCalibrationCli(args, runtime);
     expect(result.exitCode).toBe(0);
-    expect(files.get("/tmp/calibration-cli-test/cli-test-001.json")).toContain(
+    expect(files.get("/tmp/calibration-cli-test/junk-cli-test-001.json")).toContain(
       '"schemaVersion": 1',
     );
-    expect(files.get("/tmp/calibration-cli-test/cli-test-001.md")).toContain(
-      "canonical-production-selection-001",
+    expect(files.get("/tmp/calibration-cli-test/junk-cli-test-001.md")).toContain(
+      "discard-001",
     );
     expect(directories).toEqual(["/tmp/calibration-cli-test"]);
 

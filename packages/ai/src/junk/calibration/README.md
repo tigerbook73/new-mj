@@ -5,13 +5,13 @@ provider、evaluator 和 runner 提供。
 
 ## 当前 manifest
 
-`fixtures/junk-structural-calibration-canonical.json` 是当前唯一已接入的
+`fixtures/canonical-baseline.json` 是当前唯一已接入的
 manifest：
 
 - `purpose: canonical-baseline`：固定普通牌型输入，用于记录生产 AI 的可重复决策；
 - `source.kind: fixture`：输入来自版本化 JSON fixture；
 - `version`：manifest 和 scenario 的数据版本，不是 evaluator 版本；
-- `seed`：场景来源的稳定标识。fixture 当前不通过随机生成使用它；
+- `seed`：仅由 `generated` source 携带并驱动确定性生成；fixture 不使用 seed；
 - `description`/`tags`：帮助人和 AI 快速理解场景用途，不参与执行逻辑。
 
 具体输入位于同目录的 `fixtures/*.json`，只包括牌种、牌副本、玩家视角和合法动作；
@@ -29,7 +29,7 @@ header，后续每行是一个带 `scenarioId` 和数据版本的独立记录，
 
 ```bash
 pnpm --filter @new-mj/ai evaluate list
-pnpm --filter @new-mj/ai evaluate run canonical-production-selection-001
+pnpm --filter @new-mj/ai evaluate run discard-001
 ```
 
 `run` 当前只执行生产权重 evaluator，输出选中的动作和统一 JSON/Markdown 报告；

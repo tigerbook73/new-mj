@@ -150,4 +150,8 @@ registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹
 
 fixture 元数据已去重：fixture JSON 不再保存 `id/version/seed`；registry 的 `fixtureId` 管理输入资产身份，manifest scenario 管理版本，fixture source 不使用 seed。
 
+ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case；CLI 输出文件使用 `junk-` 前缀，避免跨玩法汇总时重名。
+
+seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不保存无效 seed。
+
 下一动作：设计 executor 的 worker 等价性测试，确保顺序与 worker 模式共享任务函数并产生相同决策和稳定报告；先不改变生产 evaluator。
