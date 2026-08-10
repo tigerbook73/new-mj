@@ -14,9 +14,11 @@ describe("runCaptureJunkPolicyCli", () => {
     expect(directories).toHaveLength(1);
     expect(directories[0]).toContain(".compare-scratch/unit-test-label/junk");
     expect(copies.map(({ destination }) => destination.split("/").at(-1)).sort()).toEqual([
+      "analysis.ts",
       "default-weights.json",
       "strategy.ts",
       "tile-probability.ts",
+      "weights.ts",
     ]);
   });
 

@@ -35,7 +35,7 @@
 
 ## 当前状态
 
-步骤 0、0b、1、2 已完成；当前进入步骤 3：结构分析、2-ply 与动作评分模块边界。开始前先建立对应临时专门计划，不提前改变生产模块或行为。
+步骤 0、0b、1、2 已完成；当前进行步骤 3：结构分析、2-ply 与动作评分模块边界。weights 与无权重 analysis/cache 已从 `strategy.ts` 抽出，剩余工作是 hand-quality、2-ply 与 action-scoring 的单向拆分。
 
 影响后续判断的结论：
 
@@ -43,8 +43,10 @@
 - canonical fixture 与固定可见状态 snapshot 共用主链；production-weighted、one-ply-all、two-ply-all 有六份不可自动覆盖的版本化 baseline。generated provider 延后到步骤 5，不提前定义牌型生成语义。
 - `standard-only@v1` 已作为第四路只读 evaluator 接入 canonical single-scenario 报告；对每个合法弃牌记录普通标准型向听数、进张牌种/牌种数和按玩家可见信息估计的剩余进张张数，不加权、不选动作，也不包含七对或番型目标。
 - 首个 canonical 样例已证明最小字段能解释非单调候选：弃 `5p` 为 2 向听、15 种/50 张进张，弃 `3m` 虽为 16 种/53 张进张却退到 3 向听；当前无需提前加入面子/雀头/搭子分解。进张张数不是墙内真值、自摸概率、完整胡牌概率或终局 EV。
+- `strategy.ts` 同时是生产 facade 与跨 Git ref policy-loader 的加载根；物理拆分必须同步维护可复制的闭包依赖，并验证 current、historical ref 和显式 module path，不能只移动函数。
+- policy capture 现在显式复制 `strategy.ts`、`analysis.ts`、`weights.ts`、默认权重 JSON 和概率 helper；Git ref loader 仍按该 ref 当时实际存在的顶层生产闭包取快照，因此旧 ref 不要求拥有新模块。
 
-下一步第一个具体动作：为步骤 3 建立临时专门计划，先画出现有 `strategy.ts` 中结构分析、2-ply 续行与动作评分的调用/数据边界，并用 import/导出清单确定最小可抽取模块；只做等价重构，不改变生产评分、默认权重、候选筛选或 AI 对外行为。
+下一步第一个具体动作：执行步骤 3 slice 2，抽取 hand-quality 与 2-ply continuation，保持 cache key、upper/lower cliff、立即胡 fallback、候选集合和所有现有 probe 分数不变。
 
 ## 专题路线图
 

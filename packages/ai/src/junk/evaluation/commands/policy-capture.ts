@@ -18,7 +18,13 @@ const usage = "Usage: pnpm --filter @new-mj/ai evaluate policy capture <label>\n
 
 const junkSrcDir = fileURLToPath(new URL("../../", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
-const policyFiles = ["strategy.ts", "default-weights.json", "tile-probability.ts"] as const;
+const policyFiles = [
+  "analysis.ts",
+  "default-weights.json",
+  "strategy.ts",
+  "tile-probability.ts",
+  "weights.ts",
+] as const;
 
 const isValidLabel = (label: string): boolean =>
   label !== "." && label !== ".." && /^[a-zA-Z0-9._-]+$/.test(label);

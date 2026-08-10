@@ -2,7 +2,6 @@ import {
   STANDARD_TILE_SET,
   evaluateUkeireBatch,
   evaluateUkeireAfterDiscardDraws,
-  evaluateUkeire,
   shantenWithExposedMelds,
   tileIdOf,
   ukeire,
@@ -11,174 +10,31 @@ import {
   type Meld,
   type TileId,
   type TileKind,
-  type UkeireEvaluation,
 } from "@new-mj/core";
-import defaultWeightsData from "./default-weights.json" with { type: "json" };
+import {
+  analyzeJunkHand,
+  createJunkAnalysisCache,
+  junkHandAnalysisKey,
+  tileCountsOf,
+  type JunkAnalysisCache,
+  type ShapeInput,
+} from "./analysis.ts";
 import { probabilityAtLeastOneDraw } from "./tile-probability.ts";
+import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./weights.ts";
 
-/** Every magic number that shapes handQuality/fanPotential/scoreAction, made
- * overridable so an offline tuner (see junk/tune.ts) can search this space
- * instead of it being hand-picked. */
-export type JunkWeights = {
-  qidui: number;
-  pengpenghu: number;
-  menqing: number;
-  qingyise: number;
-  hunyise: number;
-  gangkai: number;
-  /** buGang bonus = gangkai - buGangPenalty (upgrading a peng is less disruptive than a fresh anGang). */
-  buGangPenalty: number;
-  /** fanPotential: bonus per closed pair, when no chi melds exist. */
-  pairBonus: number;
-  /** fanPotential: bonus per non-chi meld, when no chi melds exist. */
-  meldBonus: number;
-  /** fanPotential: seven-pairs-trajectory bonus while no melds exist yet. */
-  qiduiPotential: number;
-  /** handQuality: shanten weight (-shanten * shantenWeight). */
-  shantenWeight: number;
-  /** handQuality: weight on the *probability* of drawing an improving tile within
-   * the seat's estimated remaining draws this game (see tile-probability.ts and
-   * GameProgress) — not a raw live-copy count. A wait backed by more live copies
-   * still scores higher (probability rises with successCount), but the same live
-   * count is worth less late in the wall than early, which a flat per-copy weight
-   * could never express. */
-  tenpaiProbabilityWeight: number;
-  /** scoreHandShapeAfterDiscard: bonus for discarding an already-visible tile. */
-  safetyBonus: number;
-  /** handQuality: flat bonus for a concealed, unpaired suited tile that has no
-   * same-suit tile within two ranks (a genuine floating tile, not mid-run/tatsu
-   * material already scored elsewhere). Honor tiles get nothing — they can only
-   * ever pair, never form a run — so this is what makes discarding an isolated
-   * honor outscore discarding an isolated number tile even while shanten ties. */
-  isolationPotential: number;
-  /** scoreAction: flat penalty subtracted from a chi claim's score before it's
-   * compared against pass — a margin the claim must clear, not just beat pass
-   * by any amount. handQuality already prices in chi's certain costs (loses
-   * menqing, forecloses pengpenghu), but that point estimate carries real
-   * uncertainty (known gaps: no opponent-behavior model, no zimo/peng/chi
-   * channel split — see docs/process/plan.md); requiring a
-   * clear margin guards against committing to an irreversible open hand over a
-   * claim that only *looks* better because of the formula's own noise. */
-  chiHurdle: number;
-  /** Same idea as chiHurdle, for peng/minGang — smaller by default since those
-   * only cost menqing, not pengpenghu too (see the same doc's note correcting
-   * an earlier claim that chi also costs qingyise — it doesn't). */
-  pengHurdle: number;
-};
-
-/** Loaded from default-weights.json rather than hardcoded here, so adopting a
- * tuned candidate (evaluation/commands/weights-tune.ts --write) is a data-file edit, not a code
- * change. Frozen so an accidental in-place mutation (e.g. a `mutate()` bug that
- * forgets to spread) throws immediately in strict mode instead of silently
- * corrupting the shared default for every future call. */
-export const DEFAULT_JUNK_WEIGHTS: JunkWeights = Object.freeze({ ...defaultWeightsData });
-
-/** The original hand-picked fan-type weights, kept as a stable named export for
- * any existing import. Derived from DEFAULT_JUNK_WEIGHTS (not a second literal)
- * so it can never drift out of sync with the JSON file. */
-export const JUNK_FAN_WEIGHTS = {
-  qidui: DEFAULT_JUNK_WEIGHTS.qidui,
-  pengpenghu: DEFAULT_JUNK_WEIGHTS.pengpenghu,
-  menqing: DEFAULT_JUNK_WEIGHTS.menqing,
-  qingyise: DEFAULT_JUNK_WEIGHTS.qingyise,
-  hunyise: DEFAULT_JUNK_WEIGHTS.hunyise,
-  gangkai: DEFAULT_JUNK_WEIGHTS.gangkai,
-} as const;
-
-type ShapeInput = Readonly<{ hand: readonly TileId[]; melds: readonly Meld[] }>;
+export { createJunkAnalysisCache, type JunkAnalysisCache } from "./analysis.ts";
+export { DEFAULT_JUNK_WEIGHTS, JUNK_FAN_WEIGHTS, type JunkWeights } from "./weights.ts";
 
 type LiveCopyContext = Readonly<{
   meldCounts: Uint8Array;
   discardCounts: Uint8Array;
 }>;
 
-export type JunkAnalysisCache = Readonly<{
-  get: (key: string) => UkeireEvaluation | undefined;
-  set: (key: string, value: UkeireEvaluation) => void;
-  clear: () => void;
-  readonly hits: number;
-  readonly misses: number;
-  readonly size: number;
-}>;
-
-/** 创建一个有上限的结构分析 LRU；只缓存纯 hand-shape 结果，不持有局面状态。 */
-export const createJunkAnalysisCache = (maxEntries = 32): JunkAnalysisCache => {
-  if (!Number.isSafeInteger(maxEntries) || maxEntries <= 0)
-    throw new Error("maxEntries must be a positive safe integer");
-  const entries = new Map<string, UkeireEvaluation>();
-  let hits = 0;
-  let misses = 0;
-  return {
-    get(key) {
-      const value = entries.get(key);
-      if (!value) {
-        misses += 1;
-        return undefined;
-      }
-      hits += 1;
-      entries.delete(key);
-      entries.set(key, value);
-      return value;
-    },
-    set(key, value) {
-      entries.delete(key);
-      entries.set(key, value);
-      while (entries.size > maxEntries) entries.delete(entries.keys().next().value!);
-    },
-    clear() {
-      entries.clear();
-      hits = 0;
-      misses = 0;
-    },
-    get hits() {
-      return hits;
-    },
-    get misses() {
-      return misses;
-    },
-    get size() {
-      return entries.size;
-    },
-  };
-};
-
 type HandAnalysisCache = JunkAnalysisCache;
 
 const kindOf = (tile: TileId): TileKind => STANDARD_TILE_SET.kindOf(tile);
 const kindIndexOf = (kind: TileKind): number => STANDARD_TILE_SET.kindIndexOf(kind);
 
-const countsOf = (tiles: readonly TileId[]): Uint8Array => {
-  const counts = new Uint8Array(STANDARD_TILE_SET.kinds.length);
-  for (const tile of tiles) counts[kindIndexOf(kindOf(tile))]! += 1;
-  return counts;
-};
-
-const handAnalysisKey = (input: ShapeInput): string => {
-  const counts = countsOf(input.hand);
-  return `${input.melds.length}/${input.melds.length === 0 ? 1 : 0}/${counts.join("")}`;
-};
-
-const handAnalysisOf = (input: ShapeInput, cache?: HandAnalysisCache): UkeireEvaluation => {
-  if (!cache) {
-    return evaluateUkeire(
-      input.hand,
-      { sevenPairs: input.melds.length === 0 },
-      STANDARD_TILE_SET,
-      input.melds.length,
-    );
-  }
-  const key = handAnalysisKey(input);
-  const cached = cache.get(key);
-  if (cached) return cached;
-  const analysis = evaluateUkeire(
-    input.hand,
-    { sevenPairs: input.melds.length === 0 },
-    STANDARD_TILE_SET,
-    input.melds.length,
-  );
-  cache.set(key, analysis);
-  return analysis;
-};
 const removeTiles = (hand: readonly TileId[], tiles: readonly TileId[]): TileId[] | undefined => {
   const remaining = [...hand];
   for (const tile of tiles) {
@@ -286,7 +142,7 @@ const liveUkeireCount = (
   visibleDiscards: readonly TileId[],
   context?: LiveCopyContext,
 ): number => {
-  const handCounts = countsOf(input.hand);
+  const handCounts = tileCountsOf(input.hand);
   let total = 0;
   for (const kind of kinds) {
     total += remainingLiveCopies(input, kind, visibleDiscards, context, handCounts);
@@ -303,7 +159,7 @@ const remainingLiveCopies = (
 ): number => {
   const index = kindIndexOf(kind);
   const known = context
-    ? (handCounts ?? countsOf(input.hand))[index]! +
+    ? (handCounts ?? tileCountsOf(input.hand))[index]! +
       context.meldCounts[index]! +
       context.discardCounts[index]!
     : input.hand.filter((tile) => kindOf(tile) === kind).length +
@@ -317,11 +173,11 @@ const createLiveCopyContext = (
   visibleDiscards: readonly TileId[],
   additionalMelds: readonly Meld[] = [],
 ): LiveCopyContext => ({
-  meldCounts: countsOf([
+  meldCounts: tileCountsOf([
     ...input.melds.flatMap((meld) => meld.tiles),
     ...additionalMelds.flatMap((meld) => meld.tiles),
   ]),
-  discardCounts: countsOf(visibleDiscards),
+  discardCounts: tileCountsOf(visibleDiscards),
 });
 
 /**
@@ -371,7 +227,7 @@ const handQuality = (
   liveCopyContext?: LiveCopyContext,
   analysisCache?: HandAnalysisCache,
 ): number => {
-  const analysis = handAnalysisOf(input, analysisCache);
+  const analysis = analyzeJunkHand(input, analysisCache);
   const shanten = analysis.shanten;
   // 曾经只在 shanten<=1 时才算 ukeire（避免中局无收益穷举），实测这个门槛让
   // 中局"留一手换未来更多可能性"这类判断完全看不到进张信号——shanten/ukeire
@@ -617,7 +473,7 @@ export const probeSelfDrawTwoPly = (
       : directDrawAnalyses?.[index];
     if (!analysis) throw new Error("MISSING_TWO_CHANGE_ANALYSIS");
     if (!twoChangeBatchSource) {
-      structuralCache.set(handAnalysisKey(afterDraw), directDrawAnalyses![index]!);
+      structuralCache.set(junkHandAnalysisKey(afterDraw), directDrawAnalyses![index]!);
     }
     if (analysis.shanten < 0) {
       winProbability += probability;

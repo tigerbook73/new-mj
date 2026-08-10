@@ -3,7 +3,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const junkRoot = fileURLToPath(new URL("../src/junk/", import.meta.url));
-const productionFiles = ["default-weights.json", "strategy.ts", "tile-probability.ts"] as const;
+const productionFiles = [
+  "analysis.ts",
+  "default-weights.json",
+  "strategy.ts",
+  "tile-probability.ts",
+  "weights.ts",
+] as const;
 
 describe("Junk production boundary", () => {
   it("keeps only production assets at the Junk source root", () => {
