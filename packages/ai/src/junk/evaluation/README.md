@@ -53,6 +53,10 @@ pnpm --filter @new-mj/ai evaluate batch manifest.json snapshots.jsonl \
 JSON 快照；中断后用 `--resume <checkpoint.json>` 恢复。恢复时 manifest/evaluator/content hash
 任一不匹配都会失败，不会静默复用旧结果。generated/replay batch 要等对应 provider 落地。
 
+batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
+manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
+只是薄 adapter，绑定 snapshot resolver、Junk evaluator worker 和 `junk-` 输出前缀。
+
 当前决策 baseline 位于 `fixtures/baselines/*.baseline.json`。它保存输入内容哈希、评估器版本、
 期望动作、候选 ID，并可选择保存候选分数及容差；baseline 文件作为版本化资产，不由运行
 结果覆盖。通用 comparator 将结果分类为 matched、changed 或 incompatible，并分别报告

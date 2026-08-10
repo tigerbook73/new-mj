@@ -2,11 +2,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { executeCalibrationTasksInWorkers } from "../../evaluation/executor.ts";
+import {
+  runResumableCalibrationBatch,
+  type CalibrationBatchCheckpoint,
+} from "../../evaluation/batch.ts";
 import { readCalibrationJsonl, type CalibrationJsonlRecord } from "../../evaluation/jsonl.ts";
 import { formatCalibrationSummary, serializeCalibrationReport } from "../../evaluation/report.ts";
-import { runCalibrationJsonlBatchWithExecutor } from "../../evaluation/runner.ts";
+import type { CalibrationEvaluationTaskExecutor } from "../../evaluation/runner.ts";
 import type {
-  CalibrationEvaluationResult,
   CalibrationEvaluatorKind,
   CalibrationManifest,
 } from "../../evaluation/types.ts";
@@ -24,13 +27,6 @@ export const batchUsage =
   "  --output-dir <dir>             Final report directory\n" +
   "  --run-id <id>                  Stable output filename prefix\n";
 
-type BatchCheckpoint = Readonly<{
-  schemaVersion: 1;
-  manifest: Readonly<{ id: string; version: number }>;
-  evaluator: CalibrationEvaluatorKind;
-  evaluations: readonly CalibrationEvaluationResult[];
-}>;
-
 type Runtime = Readonly<{
   now?: () => Date;
   gitSha?: string;
@@ -39,7 +35,7 @@ type Runtime = Readonly<{
   write?: (filePath: string, content: string) => void;
   makeDirectory?: (directory: string) => void;
   records?: (filePath: string) => AsyncIterable<CalibrationJsonlRecord<JunkProductionSnapshotData>>;
-  execute?: Parameters<typeof runCalibrationJsonlBatchWithExecutor<JunkProductionSnapshotData, JunkEvaluationTaskInput["input"]>>[3];
+  execute?: CalibrationEvaluationTaskExecutor<JunkEvaluationTaskInput["input"]>;
 }>;
 
 const positiveInteger = (value: string | undefined, name: string): number => {
@@ -86,11 +82,6 @@ export const runBatchCalibrationCli = async (
     const read = runtime.read ?? ((filePath: string) => readFileSync(filePath, "utf8"));
     const write = runtime.write ?? ((filePath: string, content: string) => writeFileSync(filePath, content));
     const manifest = JSON.parse(read(manifestPath)) as CalibrationManifest;
-    const resume = resumePath ? JSON.parse(read(resumePath)) as BatchCheckpoint : undefined;
-    if (resume && (resume.schemaVersion !== 1 || !Array.isArray(resume.evaluations)))
-      throw new Error("INVALID_CHECKPOINT");
-    if (resume && (resume.manifest.id !== manifest.id || resume.manifest.version !== manifest.version || resume.evaluator !== evaluator))
-      throw new Error("INCOMPATIBLE_CHECKPOINT");
     const startedAt = (runtime.now ?? (() => new Date()))();
     const stableRunId = runId ?? `batch-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
     const directory = path.resolve(outputDir);
@@ -99,7 +90,6 @@ export const runBatchCalibrationCli = async (
     const exists = runtime.exists ?? existsSync;
     if (exists(jsonPath) || exists(markdownPath))
       throw new Error(`OUTPUT_ALREADY_EXISTS: ${stableRunId}`);
-    const completed: CalibrationEvaluationResult[] = [...(resume?.evaluations ?? [])];
     const execute = runtime.execute ?? ((tasks) => executeCalibrationTasksInWorkers(
       tasks.map((task) => ({ ...task, input: { ...task.input, evaluator } })),
       {
@@ -110,19 +100,20 @@ export const runBatchCalibrationCli = async (
       },
     ));
     const sourceRecords = (runtime.records ?? readCalibrationJsonl<JunkProductionSnapshotData>)(recordsPath);
-    const validatedRecords = (async function* () {
-      for await (const record of sourceRecords) {
-        if (record.header.manifestId !== manifest.id ||
-            record.header.manifestVersion !== manifest.version ||
-            record.header.schemaVersion !== manifest.schemaVersion) {
-          throw new Error("JSONL_MANIFEST_MISMATCH");
-        }
-        yield record;
-      }
-    })();
-    const report = await runCalibrationJsonlBatchWithExecutor(
+    const checkpointStore = checkpointPath || resumePath ? {
+      load: (): CalibrationBatchCheckpoint | undefined =>
+        resumePath ? JSON.parse(read(resumePath)) as CalibrationBatchCheckpoint : undefined,
+      save: (checkpoint: CalibrationBatchCheckpoint): void => {
+        if (!checkpointPath) return;
+        (runtime.makeDirectory ?? ((value) => mkdirSync(value, { recursive: true })))(
+          path.dirname(path.resolve(checkpointPath)),
+        );
+        write(checkpointPath, `${JSON.stringify(checkpoint, null, 2)}\n`);
+      },
+    } : undefined;
+    const report = await runResumableCalibrationBatch(
       manifest,
-      validatedRecords,
+      sourceRecords,
       (scenario, data) => normalizeJunkSnapshot(scenario, data),
       execute,
       {
@@ -134,22 +125,9 @@ export const runBatchCalibrationCli = async (
         workerCount: workers,
       },
       {
+        evaluator,
         chunkSize,
-        ...(resume ? { resumeEvaluations: resume.evaluations } : {}),
-        onCheckpoint: ({ evaluations }) => {
-          completed.push(...evaluations);
-          if (checkpointPath) {
-            (runtime.makeDirectory ?? ((value) => mkdirSync(value, { recursive: true })))(
-              path.dirname(path.resolve(checkpointPath)),
-            );
-            write(checkpointPath, `${JSON.stringify({
-              schemaVersion: 1,
-              manifest: { id: manifest.id, version: manifest.version },
-              evaluator,
-              evaluations: completed,
-            }, null, 2)}\n`);
-          }
-        },
+        ...(checkpointStore ? { checkpointStore } : {}),
       },
     );
     (runtime.makeDirectory ?? ((value) => mkdirSync(value, { recursive: true })))(directory);
