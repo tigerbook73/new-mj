@@ -41,7 +41,7 @@ export type PolicyMatchTask = {
   candidateWeightsPath?: string;
 };
 
-type PendingResolve = (result: MatchTaskResult) => void;
+type PendingResolve<TResult> = (result: TResult) => void;
 
 /**
  * Fixed-size worker_threads pool dedicated to running one task per message.
@@ -59,26 +59,31 @@ type PendingResolve = (result: MatchTaskResult) => void;
  * object, get a plain object back", none of the task priority/cancellation/
  * backpressure needs that would make a dependency pay for itself.
  */
-export class MatchWorkerPool<TTask> {
+export class MatchWorkerPool<TTask, TResult = MatchTaskResult> {
   private readonly workers: Worker[] = [];
   private readonly idle: Worker[] = [];
-  private readonly pending = new Map<Worker, PendingResolve>();
-  private readonly queue: Array<{ task: TTask; resolve: PendingResolve }> = [];
+  private readonly pending = new Map<Worker, PendingResolve<TResult>>();
+  private readonly queue: Array<{ task: TTask; resolve: PendingResolve<TResult> }> = [];
 
-  constructor(size: number, workerUrl: URL) {
+  constructor(
+    size: number,
+    workerUrl: URL,
+    workerErrorResult: (error: unknown) => TResult = () =>
+      ({ ok: false, candidateTotal: 0, baselineTotal: 0 }) as TResult,
+  ) {
     for (let index = 0; index < Math.max(1, size); index += 1) {
       const worker = new Worker(workerUrl);
-      worker.on("message", (result: MatchTaskResult) => this.onSettled(worker, result));
+      worker.on("message", (result: TResult) => this.onSettled(worker, result));
       worker.on("error", (error) => {
         process.stderr.write(`[tune-pool] worker error: ${String(error)}\n`);
-        this.onSettled(worker, { ok: false, candidateTotal: 0, baselineTotal: 0 });
+        this.onSettled(worker, workerErrorResult(error));
       });
       this.workers.push(worker);
       this.idle.push(worker);
     }
   }
 
-  private onSettled(worker: Worker, result: MatchTaskResult): void {
+  private onSettled(worker: Worker, result: TResult): void {
     const resolve = this.pending.get(worker);
     this.pending.delete(worker);
     this.idle.push(worker);
@@ -95,14 +100,14 @@ export class MatchWorkerPool<TTask> {
     worker.postMessage(next.task);
   }
 
-  run(task: TTask): Promise<MatchTaskResult> {
+  run(task: TTask): Promise<TResult> {
     return new Promise((resolve) => {
       this.queue.push({ task, resolve });
       this.dispatchNext();
     });
   }
 
-  runAll(tasks: readonly TTask[]): Promise<MatchTaskResult[]> {
+  runAll(tasks: readonly TTask[]): Promise<TResult[]> {
     return Promise.all(tasks.map((task) => this.run(task)));
   }
 

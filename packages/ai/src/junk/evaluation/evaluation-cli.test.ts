@@ -11,6 +11,14 @@ describe("Junk evaluation command suite", () => {
     expect(result.output).toContain("policy diff");
     expect(result.output).toContain("weights compare");
     expect(result.output).toContain("weights tune");
+    expect(result.output).toContain("arena run");
+  });
+
+  it("routes arena help without starting workers", async () => {
+    const result = await runEvaluationCli(["arena", "run", "--help"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("evaluate arena run");
+    expect(result.output).toContain("--matches");
   });
 
   it("routes weights tune help without starting a search", async () => {

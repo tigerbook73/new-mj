@@ -1,4 +1,5 @@
 import { createEvaluationCommandRegistry } from "../../evaluation/commands.ts";
+import { runArenaCli } from "../arena-cli.ts";
 import { runDecisionDiffCli } from "../decision-diff-cli.ts";
 import { runCompareWeightsCli } from "../compare-weights-cli.ts";
 import { runTuneCli } from "../tune-cli.ts";
@@ -30,6 +31,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["weights", "compare"],
     summary: "Compare two weight or policy configurations",
     run: runCompareWeightsCli,
+  },
+  {
+    path: ["arena", "run"],
+    summary: "Run production-policy Junk self-play sessions",
+    run: runArenaCli,
   },
   {
     path: ["weights", "tune"],

@@ -106,6 +106,8 @@ Junk adapter 负责：
 
 `weights tune` 已完成：无顶层副作用的 handler 接入统一 run metadata、计算前防覆盖和 JSON/文本报告；调参搜索、worker pool、进度输出、held-out 门槛与显式 `--write` 权限保持不变。单测覆盖默认只读产物和预检，真实单 worker 最小搜索完成 1 generation、1 search seed、1 held-out seed 并生成两份产物；旧 `tune:junk` root alias/entry 已删除。
 
+`arena run` 已完成：`MatchWorkerPool` 将结果类型泛型化但保留现有 A/B 默认结果，arena adapter 复用 `playJunkMatch` 并通过专用 worker 并行独立 session；报告汇总每座总分与四档名次，并明确同策略 arena 只验证管线/观察座次牌序偏差，不作为策略强弱证据。注入式测试与单 worker `1 match × 1 round` 真实 smoke 均通过，生成 JSON/文本产物。
+
 ### 4. 收尾与恢复步骤 1
 
 - 更新 `packages/ai/AGENTS.md` 与 evaluation README 的统一入口和扩展方式；

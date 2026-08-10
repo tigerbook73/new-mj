@@ -63,9 +63,11 @@
 
 本检查点 AI fast verify 全绿（26 files passed、3 skipped；119 tests passed、11 skipped；build 成功）。`verify:full` 已完成 typecheck/lint，但 slow test 长时间无输出后人工中止，不能记为通过；本 slice 的真实调参链由上述最小搜索 smoke 覆盖，完整 slow 门禁留到 0b 收尾再次执行。
 
+`arena run` 迁移完成：统一命令通过结果类型泛型化的 `MatchWorkerPool` 和专用 worker 并行执行现有 `playJunkMatch`，输出每座累计分与名次次数的 JSON/文本报告；报告明确同生产策略自对弈只验证管线并观察座次/牌序偏差，不是策略强弱证据。注入式命令测试及单 worker `1 match × 1 round` 真实 smoke 均通过，默认策略未改变。AI fast verify 全绿（27 files passed、3 skipped；122 tests passed、11 skipped；build 成功）。
+
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
 
-下一步第一个具体动作：实现 `evaluate arena run` 的薄 adapter，复用现有 self-play driver 与 match worker，先补命令 help/注入式等价测试，再完成单 worker 最小真实 smoke。
+下一步第一个具体动作：迁移 `policy capture` 到 `evaluate policy capture`，保持只写 `.compare-scratch` 的有界权限，先接无顶层副作用 handler 和目标路径/防覆盖测试，再删除旧 root alias/entry。
 
 ## 专题路线图
 
