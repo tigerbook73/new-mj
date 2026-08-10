@@ -1,7 +1,8 @@
-import { createCalibrationReport } from "./report.ts";
+import { createCalibrationBatchSummary, createCalibrationReport } from "./report.ts";
 import type { CalibrationJsonlRecord } from "./jsonl.ts";
 import type {
   CalibrationEvaluationResult,
+  CalibrationEvaluatorKind,
   CalibrationManifest,
   CalibrationReport,
   CalibrationRun,
@@ -57,9 +58,11 @@ export const runCalibrationJsonlBatch = async <TRecordData, TInput>(
   resolveRecord: CalibrationJsonlRecordResolver<TRecordData, TInput>,
   evaluator: CalibrationEvaluator<TInput>,
   run: CalibrationRun,
+  options: Readonly<{ evaluatorKind: CalibrationEvaluatorKind }> = { evaluatorKind: "standard-only" },
 ): Promise<CalibrationReport> => {
   const evaluations: CalibrationEvaluationResult[] = [];
   const seen = new Set<string>();
+  const startedAt = performance.now();
   for await (const record of records) {
     if (seen.has(record.scenarioId)) {
       throw new Error(`DUPLICATE_SCENARIO: ${record.scenarioId}`);
@@ -68,8 +71,24 @@ export const runCalibrationJsonlBatch = async <TRecordData, TInput>(
     const scenario = manifest.scenarios.find(({ id }) => id === record.scenarioId);
     if (!scenario) throw new Error(`SCENARIO_NOT_FOUND: ${record.scenarioId}`);
     const normalized = resolveRecord(scenario, record.data);
-    const evaluation = evaluator(normalized);
-    evaluations.push({ ...evaluation, scenarioContentHash: normalized.contentHash });
+    try {
+      const evaluation = evaluator(normalized);
+      evaluations.push({ ...evaluation, scenarioContentHash: normalized.contentHash });
+    } catch (error) {
+      evaluations.push({
+        scenarioId: scenario.id,
+        evaluator: options.evaluatorKind,
+        evaluatorVersion: "unknown",
+        candidates: [],
+        performance: { durationMs: 0, cacheHits: 0, cacheMisses: 0 },
+        status: "failed",
+        error: { code: "EVALUATOR_FAILED", message: error instanceof Error ? error.message : "unknown error" },
+      });
+    }
   }
-  return createCalibrationReport(run, manifest, evaluations);
+  const report = createCalibrationReport(run, manifest, evaluations);
+  return {
+    ...report,
+    batch: createCalibrationBatchSummary(evaluations, performance.now() - startedAt),
+  };
 };

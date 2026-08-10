@@ -61,7 +61,8 @@ reader 只负责 header、逐行解析和基础字段校验；具体 `data` 的 
 
 顺序批量 runner 会流式消费这些 records，按 `scenarioId` 查找 manifest，交给 resolver
 构造 normalized scenario，再交给统一 evaluator；输入不会整体加载，重复或不存在的
-scenario 会失败。runner 当前只保证顺序消费和稳定报告排序，尚未接入 worker、重试或进度恢复。
+scenario 会失败。报告额外记录场景数、成功/失败/跳过数量、总耗时、吞吐、p50/p95
+延迟和失败摘要。runner 当前只保证顺序消费和稳定报告排序，尚未接入 worker、重试或进度恢复。
 
 reader 只负责逐行解析和基础字段校验；具体 `data` 的 schema、TileId 转换和场景
 合法性仍由对应 provider 负责。

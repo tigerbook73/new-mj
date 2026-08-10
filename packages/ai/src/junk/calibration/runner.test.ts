@@ -102,5 +102,28 @@ describe("JSONL batch runner", () => {
       "hash-scenario-a",
       "hash-scenario-b",
     ]);
+    expect(report.batch?.scenarioCount).toBe(2);
+    expect(report.batch?.statusCounts.ok).toBe(2);
+    expect(report.batch?.latencyMs.p50).toBe(0);
+    expect(report.batch?.failures).toEqual([]);
+  });
+
+  it("keeps an evaluator failure in the batch report", async () => {
+    const records = parseCalibrationJsonl<{ value: number }>(
+      '{"type":"header","schemaVersion":1,"manifestId":"m","manifestVersion":1,"shardId":"part-0000","shardIndex":0}\n' +
+        '{"type":"scenario","schemaVersion":1,"scenarioId":"scenario-a","data":{"value":1}}',
+    );
+    const report = await runCalibrationJsonlBatch(
+      { ...manifest, scenarios: [{ ...fixture.scenario, id: "scenario-a" }] },
+      (async function* () { for (const record of records) yield record; })(),
+      (scenario, data) => ({ scenario, input: data, contentHash: "hash-a" }),
+      () => { throw new Error("synthetic evaluator failure"); },
+      run,
+      { evaluatorKind: "production-weighted" },
+    );
+    expect(report.evaluations[0]?.status).toBe("failed");
+    expect(report.batch?.failures).toEqual([
+      { scenarioId: "scenario-a", message: "synthetic evaluator failure" },
+    ]);
   });
 });

@@ -87,4 +87,14 @@ export type CalibrationReport = Readonly<{
   run: CalibrationRun;
   manifest: Pick<CalibrationManifest, "id" | "version">;
   evaluations: readonly CalibrationEvaluationResult[];
+  batch?: CalibrationBatchSummary;
+}>;
+
+export type CalibrationBatchSummary = Readonly<{
+  scenarioCount: number;
+  statusCounts: Readonly<{ ok: number; failed: number; skipped: number }>;
+  durationMs: number;
+  throughputPerSecond: number;
+  latencyMs: Readonly<{ p50: number; p95: number }>;
+  failures: readonly Readonly<{ scenarioId: string; message: string }>[];
 }>;

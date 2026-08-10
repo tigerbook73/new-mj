@@ -146,4 +146,6 @@ registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹
 
 顺序批量 runner 已接入 JSONL record：按 scenario ID 查 manifest、经 resolver 构造 normalized scenario 并复用 evaluator，输入不整体加载，重复/未知 scenario 显式失败，结果交给现有稳定排序报告；worker、重试和断点恢复留待 executor 阶段。
 
-下一动作：为顺序批量 runner 增加报告级吞吐/分位耗时和失败摘要，再设计 executor 的 worker 等价性测试；先不改变生产 evaluator。
+批量报告已增加场景数、状态计数、总耗时、吞吐、p50/p95 evaluator 延迟和失败摘要；evaluator 异常转为 failed evaluation 保留在报告中，未知/重复 scenario 仍快速失败。
+
+下一动作：设计 executor 的 worker 等价性测试，确保顺序与 worker 模式共享任务函数并产生相同决策和稳定报告；先不改变生产 evaluator。
