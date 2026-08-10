@@ -11,7 +11,18 @@ import { runSingleCalibrationScenario } from "./runner.ts";
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".calibration-runs");
 const usage =
-  "Usage: calibrate:junk --list | --scenario <id> [--output-dir <dir>] [--run-id <id>]\n";
+  "Usage: pnpm --filter @new-mj/ai calibrate <command> [options]\n\n" +
+  "Commands:\n" +
+  "  --list                                      List available calibration scenarios\n" +
+  "  --scenario <id>                             Run one scenario\n\n" +
+  "Options:\n" +
+  "  --output-dir <dir>                          Write JSON/Markdown reports here\n" +
+  "                                              (default: packages/ai/.calibration-runs)\n" +
+  "  --run-id <id>                               Stable report filename prefix\n" +
+  "  --help                                      Show this help\n\n" +
+  "Examples:\n" +
+  "  pnpm --filter @new-mj/ai calibrate --list\n" +
+  "  pnpm --filter @new-mj/ai calibrate --scenario canonical-production-selection-001\n";
 
 type Arguments = Readonly<{
   list: boolean;
@@ -74,6 +85,7 @@ export const runCalibrationCli = (
   runtime: Runtime = {},
 ): { exitCode: number; output: string } => {
   try {
+    if (argv.includes("--help")) return { exitCode: 0, output: usage };
     const args = parseArguments(argv);
     if (args.list) return { exitCode: 0, output: listScenarios() };
     const now = runtime.now ?? (() => new Date());

@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { runCalibrationCli } from "./cli.ts";
 
 describe("calibration CLI", () => {
+  it("prints help successfully", () => {
+    const result = runCalibrationCli(["--help"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("--scenario <id>");
+    expect(result.output).toContain("--output-dir <dir>");
+    expect(result.output).toContain("--run-id <id>");
+  });
+
   it("lists stable canonical scenario IDs", () => {
     const result = runCalibrationCli(["--list"]);
     expect(result.exitCode).toBe(0);
