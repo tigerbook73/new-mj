@@ -43,6 +43,8 @@
 
 本步骤先建立全部测试的责任矩阵，再实施不损失覆盖的低风险重分类；存在语义取舍的移动、合并或删除会给出建议与备选，不自行决定。
 
+已确认：旧 `snapshot:junk-ai` 保留“捕获未提交 policy 供 A/B 比较”的能力，但后续重命名为 `capture:junk-policy` 并收窄 policy 依赖；它不属于 evaluation 局面 snapshot。
+
 影响后续判断的结论：
 
 - 通用 `packages/ai/src/evaluation/` 拥有 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint 契约；玩法层只注入 provider、evaluator task 和输出命名。

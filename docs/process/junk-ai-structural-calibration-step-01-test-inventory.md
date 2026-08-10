@@ -55,6 +55,11 @@
 - `policy-loader.test.ts` 包含纯校验和依赖 Git/scratch 文件系统的集成路径；
 - evaluation baseline 测试与旧 strategy fixture 的职责是否重叠。
 
+已确认的工具结论：`snapshot-junk-cli.ts` 保存的是未提交 policy 代码，不是 evaluation
+局面 snapshot，能力继续保留；目标重命名为 `capture:junk-policy`/`capture-policy-cli.ts`，
+并将复制范围收窄到 policy 实际依赖。它仍是 compare-weights/decision-diff 的开发辅助入口，
+不并入通用 evaluation provider。具体改名与依赖边界在整体责任矩阵完成后统一实施。
+
 ### 3. 分批实施低风险重分类
 
 - 先移动/拆分快速纯测试与跨模块测试，使位置和 slow 边界符合既有策略；
