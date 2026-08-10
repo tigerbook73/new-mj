@@ -37,7 +37,8 @@ export const CANONICAL_JUNK_SCENARIO_PROVIDER = {
 };
 
 export const CANONICAL_JUNK_FIXTURES: readonly JunkProductionFixture[] =
-  JUNK_CALIBRATION_MANIFEST.scenarios.filter(({ source }) => source.kind === "fixture")
+  JUNK_CALIBRATION_MANIFEST.scenarios
+    .filter(({ source }) => source.kind === "fixture")
     .map((scenario) => CANONICAL_JUNK_FIXTURE_PROVIDER.resolve(scenario))
     .map(({ scenario, input, contentHash }) => ({ scenario, input, contentHash }));
 

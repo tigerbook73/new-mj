@@ -90,7 +90,12 @@ export const normalizeJunkSnapshot = (
     })),
     ...(data.view.justDrawn ? { justDrawn: tileId(data.view.justDrawn) } : {}),
     ...(data.view.lastDiscard
-      ? { lastDiscard: { seat: data.view.lastDiscard.seat, tile: tileId(data.view.lastDiscard.tile) } }
+      ? {
+          lastDiscard: {
+            seat: data.view.lastDiscard.seat,
+            tile: tileId(data.view.lastDiscard.tile),
+          },
+        }
       : {}),
   };
   const legalActions: JunkAction[] = data.legalActions.map((action) => ({
@@ -98,8 +103,10 @@ export const normalizeJunkSnapshot = (
     tile: tileId(action.tile),
   }));
   const handIds = new Set(view.hand);
-  assert(legalActions.every((action) => action.type !== "discard" || handIds.has(action.tile)),
-    "every discard action must reference a tile in hand");
+  assert(
+    legalActions.every((action) => action.type !== "discard" || handIds.has(action.tile)),
+    "every discard action must reference a tile in hand",
+  );
   return { scenario, input: { view, legalActions }, contentHash: contentHashOf(data) };
 };
 

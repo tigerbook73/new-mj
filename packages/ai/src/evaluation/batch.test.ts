@@ -33,27 +33,34 @@ describe("resumable calibration batch", () => {
       manifest,
       records(),
       (scenario, data) => ({ scenario, input: data, contentHash: "hash-a" }),
-      async (tasks) => tasks.map((task) => ({
-        taskId: task.taskId,
-        result: {
-          scenarioId: task.taskId,
-          evaluator: "one-ply-all" as const,
-          evaluatorVersion: "v1",
-          candidates: [],
-          performance: { durationMs: 1, cacheHits: 0, cacheMisses: 0 },
-          status: "ok" as const,
-        },
-      })),
+      async (tasks) =>
+        tasks.map((task) => ({
+          taskId: task.taskId,
+          result: {
+            scenarioId: task.taskId,
+            evaluator: "one-ply-all" as const,
+            evaluatorVersion: "v1",
+            candidates: [],
+            performance: { durationMs: 1, cacheHits: 0, cacheMisses: 0 },
+            status: "ok" as const,
+          },
+        })),
       {
-        runId: "run-a", gitSha: "sha", command: "test", configHash: "hash",
-        startedAt: "2026-08-10T00:00:00.000Z", workerCount: 1,
+        runId: "run-a",
+        gitSha: "sha",
+        command: "test",
+        configHash: "hash",
+        startedAt: "2026-08-10T00:00:00.000Z",
+        workerCount: 1,
       },
       {
         evaluator: "one-ply-all",
         chunkSize: 1,
         checkpointStore: {
           load: () => undefined,
-          save: (value) => { checkpoint = value; },
+          save: (value) => {
+            checkpoint = value;
+          },
         },
       },
     );
@@ -62,12 +69,15 @@ describe("resumable calibration batch", () => {
   });
 
   it("rejects a JSONL shard for another manifest", async () => {
-    await expect(runResumableCalibrationBatch(
-      manifest, records("other"),
-      (scenario, data) => ({ scenario, input: data, contentHash: "hash-a" }),
-      async () => [],
-      { runId: "r", gitSha: "s", command: "c", configHash: "h", startedAt: "t", workerCount: 1 },
-      { evaluator: "production-weighted" },
-    )).rejects.toThrow("JSONL_MANIFEST_MISMATCH");
+    await expect(
+      runResumableCalibrationBatch(
+        manifest,
+        records("other"),
+        (scenario, data) => ({ scenario, input: data, contentHash: "hash-a" }),
+        async () => [],
+        { runId: "r", gitSha: "s", command: "c", configHash: "h", startedAt: "t", workerCount: 1 },
+        { evaluator: "production-weighted" },
+      ),
+    ).rejects.toThrow("JSONL_MANIFEST_MISMATCH");
   });
 });

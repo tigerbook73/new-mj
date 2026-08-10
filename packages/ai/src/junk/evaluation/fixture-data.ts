@@ -1,4 +1,10 @@
-import { tileIdOf, type JunkAction, type JunkPhase, type JunkPlayerView, type TileKind } from "@new-mj/core";
+import {
+  tileIdOf,
+  type JunkAction,
+  type JunkPhase,
+  type JunkPlayerView,
+  type TileKind,
+} from "@new-mj/core";
 import { contentHashOf } from "./hash.ts";
 import type { CalibrationScenario } from "../../evaluation/types.ts";
 import type { JunkProductionFixture } from "./fixture-provider.ts";

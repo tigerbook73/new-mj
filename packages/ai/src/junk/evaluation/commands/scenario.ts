@@ -12,6 +12,7 @@ import {
 } from "../../../evaluation/report.ts";
 import { evaluateProductionFixture } from "../production-evaluator.ts";
 import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../diagnostic-evaluators.ts";
+import { evaluateStructuralMetrics } from "../structural-metrics.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../../../evaluation/runner.ts";
 import {
   compareCalibrationBaseline,
@@ -129,6 +130,7 @@ export const runCalibrationCli = (
       CANONICAL_JUNK_SCENARIO_PROVIDER,
       [
         (normalized) => evaluateProductionFixture(normalized.scenario.id, normalized.input),
+        (normalized) => evaluateStructuralMetrics(normalized.scenario.id, normalized.input),
         (normalized) => evaluateOnePlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateTwoPlyAll(normalized.scenario.id, normalized.input),
       ],

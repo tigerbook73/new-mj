@@ -2,13 +2,20 @@
   "view": {
     "seat": 0,
     "hand": [
-      { "kind": "2m", "copy": 0 }, { "kind": "3m", "copy": 0 },
-      { "kind": "4m", "copy": 0 }, { "kind": "6m", "copy": 0 },
-      { "kind": "7m", "copy": 0 }, { "kind": "2p", "copy": 0 },
-      { "kind": "3p", "copy": 0 }, { "kind": "4p", "copy": 0 },
-      { "kind": "6p", "copy": 0 }, { "kind": "7p", "copy": 0 },
-      { "kind": "8p", "copy": 0 }, { "kind": "3s", "copy": 0 },
-      { "kind": "4s", "copy": 0 }, { "kind": "1z", "copy": 0 }
+      { "kind": "2m", "copy": 0 },
+      { "kind": "3m", "copy": 0 },
+      { "kind": "4m", "copy": 0 },
+      { "kind": "6m", "copy": 0 },
+      { "kind": "7m", "copy": 0 },
+      { "kind": "2p", "copy": 0 },
+      { "kind": "3p", "copy": 0 },
+      { "kind": "4p", "copy": 0 },
+      { "kind": "6p", "copy": 0 },
+      { "kind": "7p", "copy": 0 },
+      { "kind": "8p", "copy": 0 },
+      { "kind": "3s", "copy": 0 },
+      { "kind": "4s", "copy": 0 },
+      { "kind": "1z", "copy": 0 }
     ],
     "wallCount": 43,
     "currentSeat": 0,

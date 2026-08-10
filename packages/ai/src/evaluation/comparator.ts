@@ -1,7 +1,4 @@
-import type {
-  CalibrationEvaluationResult,
-  CalibrationEvaluatorKind,
-} from "./types.ts";
+import type { CalibrationEvaluationResult, CalibrationEvaluatorKind } from "./types.ts";
 
 export type CalibrationBaseline = Readonly<{
   schemaVersion: 1;
@@ -47,23 +44,33 @@ export const compareCalibrationBaseline = (
   actual: CalibrationEvaluationResult,
 ): CalibrationBaselineComparison => {
   const changes: Array<{ kind: CalibrationBaselineChangeKind; message: string }> = [];
-  if (actual.scenarioId !== baseline.scenarioId ||
-      actual.scenarioContentHash !== baseline.scenarioContentHash) {
+  if (
+    actual.scenarioId !== baseline.scenarioId ||
+    actual.scenarioContentHash !== baseline.scenarioContentHash
+  ) {
     changes.push({ kind: "input-mismatch", message: "scenario identity or content hash differs" });
   }
-  if (actual.evaluator !== baseline.evaluator ||
-      actual.evaluatorVersion !== baseline.evaluatorVersion) {
+  if (
+    actual.evaluator !== baseline.evaluator ||
+    actual.evaluatorVersion !== baseline.evaluatorVersion
+  ) {
     changes.push({ kind: "evaluator-mismatch", message: "evaluator identity or version differs" });
   }
   if (changes.length > 0) {
-    return { baselineId: baseline.baselineId, scenarioId: actual.scenarioId,
-      status: "incompatible", changes };
+    return {
+      baselineId: baseline.baselineId,
+      scenarioId: actual.scenarioId,
+      status: "incompatible",
+      changes,
+    };
   }
   if (actual.status !== "ok") {
     changes.push({ kind: "evaluation-failed", message: actual.error?.message ?? actual.status });
   }
-  if (baseline.expected.selectedCandidateId !== undefined &&
-      actual.selectedCandidateId !== baseline.expected.selectedCandidateId) {
+  if (
+    baseline.expected.selectedCandidateId !== undefined &&
+    actual.selectedCandidateId !== baseline.expected.selectedCandidateId
+  ) {
     changes.push({ kind: "selection-changed", message: "selected candidate differs" });
   }
   if (baseline.expected.candidateIds) {
@@ -75,12 +82,15 @@ export const compareCalibrationBaseline = (
   }
   if (baseline.expected.scores) {
     const tolerance = baseline.limits?.scoreTolerance ?? 0;
-    const actualScores = new Map(actual.candidates.map(({ candidateId, metrics }) =>
-      [candidateId, metrics.score]));
-    const scoreChanged = Object.entries(baseline.expected.scores).some(([candidateId, expected]) => {
-      const received = actualScores.get(candidateId);
-      return typeof received !== "number" || Math.abs(received - expected) > tolerance;
-    });
+    const actualScores = new Map(
+      actual.candidates.map(({ candidateId, metrics }) => [candidateId, metrics.score]),
+    );
+    const scoreChanged = Object.entries(baseline.expected.scores).some(
+      ([candidateId, expected]) => {
+        const received = actualScores.get(candidateId);
+        return typeof received !== "number" || Math.abs(received - expected) > tolerance;
+      },
+    );
     if (scoreChanged) changes.push({ kind: "score-changed", message: "candidate scores differ" });
   }
   return {

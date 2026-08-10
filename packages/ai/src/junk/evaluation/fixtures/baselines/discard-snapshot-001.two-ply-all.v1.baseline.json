@@ -6,11 +6,34 @@
   "evaluator": "two-ply-all",
   "evaluatorVersion": "v1",
   "manifest": { "id": "canonical-baseline", "version": 1 },
-  "config": { "weights": "default", "twoPly": true, "candidateScope": "all-discard-actions", "cliff": false },
-  "environment": { "runtime": "Node.js", "portability": "decision-only; performance informational" },
+  "config": {
+    "weights": "default",
+    "twoPly": true,
+    "candidateScope": "all-discard-actions",
+    "cliff": false
+  },
+  "environment": {
+    "runtime": "Node.js",
+    "portability": "decision-only; performance informational"
+  },
   "expected": {
     "selectedCandidateId": "{\"type\":\"discard\",\"tile\":108}",
-    "candidateIds": ["{\"type\":\"discard\",\"tile\":4}", "{\"type\":\"discard\",\"tile\":8}", "{\"type\":\"discard\",\"tile\":12}", "{\"type\":\"discard\",\"tile\":20}", "{\"type\":\"discard\",\"tile\":24}", "{\"type\":\"discard\",\"tile\":40}", "{\"type\":\"discard\",\"tile\":44}", "{\"type\":\"discard\",\"tile\":48}", "{\"type\":\"discard\",\"tile\":56}", "{\"type\":\"discard\",\"tile\":60}", "{\"type\":\"discard\",\"tile\":64}", "{\"type\":\"discard\",\"tile\":80}", "{\"type\":\"discard\",\"tile\":84}", "{\"type\":\"discard\",\"tile\":108}"]
+    "candidateIds": [
+      "{\"type\":\"discard\",\"tile\":4}",
+      "{\"type\":\"discard\",\"tile\":8}",
+      "{\"type\":\"discard\",\"tile\":12}",
+      "{\"type\":\"discard\",\"tile\":20}",
+      "{\"type\":\"discard\",\"tile\":24}",
+      "{\"type\":\"discard\",\"tile\":40}",
+      "{\"type\":\"discard\",\"tile\":44}",
+      "{\"type\":\"discard\",\"tile\":48}",
+      "{\"type\":\"discard\",\"tile\":56}",
+      "{\"type\":\"discard\",\"tile\":60}",
+      "{\"type\":\"discard\",\"tile\":64}",
+      "{\"type\":\"discard\",\"tile\":80}",
+      "{\"type\":\"discard\",\"tile\":84}",
+      "{\"type\":\"discard\",\"tile\":108}"
+    ]
   },
   "limits": { "performance": "informational" },
   "notes": "中盘 snapshot 全部合法弃牌 two-ply 续行基线；不锁定排序或耗时。"

@@ -7,7 +7,10 @@
   "evaluatorVersion": "v1",
   "manifest": { "id": "canonical-baseline", "version": 1 },
   "config": { "strategy": "production-default", "twoPly": true },
-  "environment": { "runtime": "Node.js", "portability": "decision-only; performance informational" },
+  "environment": {
+    "runtime": "Node.js",
+    "portability": "decision-only; performance informational"
+  },
   "expected": {
     "selectedCandidateId": "{\"type\":\"discard\",\"tile\":52}",
     "candidateIds": ["{\"type\":\"discard\",\"tile\":52}"]

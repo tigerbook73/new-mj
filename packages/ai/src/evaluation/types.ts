@@ -4,10 +4,7 @@ export const CALIBRATION_SCHEMA_VERSION = 1 as const;
 export type CalibrationHorizon = "early" | "mid" | "late";
 
 export type CalibrationEvaluatorKind =
-  | "production-weighted"
-  | "one-ply-all"
-  | "standard-only"
-  | "two-ply-all";
+  "production-weighted" | "one-ply-all" | "standard-only" | "two-ply-all";
 
 export type CalibrationScenarioSource =
   | Readonly<{ kind: "fixture"; fixtureId: string }>
@@ -48,7 +45,8 @@ export type CalibrationManifest = Readonly<{
   scenarios: readonly CalibrationScenario[];
 }>;
 
-export type CalibrationMetricValue = number | string | boolean | null;
+export type CalibrationMetricValue =
+  number | string | boolean | null | readonly (number | string | boolean | null)[];
 
 export type CalibrationCandidateResult = Readonly<{
   candidateId: string;

@@ -32,7 +32,10 @@ const parseValue = (line: string, lineNumber: number): Record<string, unknown> =
   return value as Record<string, unknown>;
 };
 
-const parseHeader = (record: Record<string, unknown>, lineNumber: number): CalibrationJsonlHeader => {
+const parseHeader = (
+  record: Record<string, unknown>,
+  lineNumber: number,
+): CalibrationJsonlHeader => {
   const shardIndex = record.shardIndex;
   const shardCount = record.shardCount;
   if (
@@ -73,7 +76,9 @@ const parseRecord = <T>(
 };
 
 /** Parses JSONL text; the first non-empty line is a file header. */
-export function* parseCalibrationJsonl<T = unknown>(text: string): Generator<CalibrationJsonlRecord<T>> {
+export function* parseCalibrationJsonl<T = unknown>(
+  text: string,
+): Generator<CalibrationJsonlRecord<T>> {
   const lines = text.split(/\r?\n/);
   let header: CalibrationJsonlHeader | undefined;
   for (const [index, line] of lines.entries()) {

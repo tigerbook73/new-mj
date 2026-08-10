@@ -21,17 +21,19 @@ export type CalibrationBatchCheckpoint = Readonly<{
 }>;
 
 export type CalibrationCheckpointStore = Readonly<{
-  load: () => CalibrationBatchCheckpoint | undefined | Promise<CalibrationBatchCheckpoint | undefined>;
+  load: () =>
+    CalibrationBatchCheckpoint | undefined | Promise<CalibrationBatchCheckpoint | undefined>;
   save: (checkpoint: CalibrationBatchCheckpoint) => void | Promise<void>;
 }>;
 
 export type ResumableCalibrationBatchOptions = Pick<
   CalibrationBatchExecutorOptions,
   "chunkSize" | "onProgress"
-> & Readonly<{
-  evaluator: CalibrationEvaluatorKind;
-  checkpointStore?: CalibrationCheckpointStore;
-}>;
+> &
+  Readonly<{
+    evaluator: CalibrationEvaluatorKind;
+    checkpointStore?: CalibrationCheckpointStore;
+  }>;
 
 const validateCheckpoint = (
   checkpoint: CalibrationBatchCheckpoint,
@@ -40,9 +42,11 @@ const validateCheckpoint = (
 ): void => {
   if (checkpoint.schemaVersion !== 1 || !Array.isArray(checkpoint.evaluations))
     throw new Error("INVALID_CHECKPOINT");
-  if (checkpoint.manifest.id !== manifest.id ||
-      checkpoint.manifest.version !== manifest.version ||
-      checkpoint.evaluator !== evaluator)
+  if (
+    checkpoint.manifest.id !== manifest.id ||
+    checkpoint.manifest.version !== manifest.version ||
+    checkpoint.evaluator !== evaluator
+  )
     throw new Error("INCOMPATIBLE_CHECKPOINT");
 };
 
@@ -51,9 +55,11 @@ const validateRecordHeaders = async function* <TData>(
   records: AsyncIterable<CalibrationJsonlRecord<TData>>,
 ): AsyncGenerator<CalibrationJsonlRecord<TData>> {
   for await (const record of records) {
-    if (record.header.manifestId !== manifest.id ||
-        record.header.manifestVersion !== manifest.version ||
-        record.header.schemaVersion !== manifest.schemaVersion)
+    if (
+      record.header.manifestId !== manifest.id ||
+      record.header.manifestVersion !== manifest.version ||
+      record.header.schemaVersion !== manifest.schemaVersion
+    )
       throw new Error("JSONL_MANIFEST_MISMATCH");
     yield record;
   }

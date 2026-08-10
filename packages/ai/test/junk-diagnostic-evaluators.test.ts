@@ -3,8 +3,12 @@ import {
   CANONICAL_JUNK_SCENARIO_PROVIDER,
   JUNK_CALIBRATION_MANIFEST,
 } from "../src/junk/evaluation/canonical-fixtures.ts";
-import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../src/junk/evaluation/diagnostic-evaluators.ts";
+import {
+  evaluateOnePlyAll,
+  evaluateTwoPlyAll,
+} from "../src/junk/evaluation/diagnostic-evaluators.ts";
 import { evaluateProductionFixture } from "../src/junk/evaluation/production-evaluator.ts";
+import { evaluateStructuralMetrics } from "../src/junk/evaluation/structural-metrics.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../src/evaluation/runner.ts";
 
 describe("Junk diagnostic evaluators", () => {
@@ -17,6 +21,7 @@ describe("Junk diagnostic evaluators", () => {
         CANONICAL_JUNK_SCENARIO_PROVIDER,
         [
           ({ scenario, input }) => evaluateProductionFixture(scenario.id, input),
+          ({ scenario, input }) => evaluateStructuralMetrics(scenario.id, input),
           ({ scenario, input }) => evaluateOnePlyAll(scenario.id, input),
           ({ scenario, input }) => evaluateTwoPlyAll(scenario.id, input),
         ],
@@ -32,15 +37,25 @@ describe("Junk diagnostic evaluators", () => {
       expect(report.evaluations.map(({ evaluator }) => evaluator).sort()).toEqual([
         "one-ply-all",
         "production-weighted",
+        "standard-only",
         "two-ply-all",
       ]);
-      expect(report.evaluations.every(({ scenarioContentHash }) =>
-        scenarioContentHash === report.evaluations[0]?.scenarioContentHash)).toBe(true);
+      expect(
+        report.evaluations.every(
+          ({ scenarioContentHash }) =>
+            scenarioContentHash === report.evaluations[0]?.scenarioContentHash,
+        ),
+      ).toBe(true);
       expect(report.evaluations.every(({ status }) => status === "ok")).toBe(true);
-      expect(report.evaluations.find(({ evaluator }) => evaluator === "one-ply-all")?.candidates)
-        .toHaveLength(14);
-      expect(report.evaluations.find(({ evaluator }) => evaluator === "two-ply-all")?.candidates)
-        .toHaveLength(14);
+      expect(
+        report.evaluations.find(({ evaluator }) => evaluator === "one-ply-all")?.candidates,
+      ).toHaveLength(14);
+      expect(
+        report.evaluations.find(({ evaluator }) => evaluator === "two-ply-all")?.candidates,
+      ).toHaveLength(14);
+      expect(
+        report.evaluations.find(({ evaluator }) => evaluator === "standard-only")?.candidates,
+      ).toHaveLength(14);
     },
   );
 });

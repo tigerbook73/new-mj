@@ -45,14 +45,16 @@ pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
 ```
 
-`scenario run` 对同一个规范化输入执行三路 evaluator，并写入同一份 JSON/Markdown 报告：
+`scenario run` 对同一个规范化输入执行四路 evaluator，并写入同一份 JSON/Markdown 报告：
 
 - `production-weighted`：当前生产混合路径，作为行为基线；
+- `standard-only`：全部合法弃牌的只读普通标准型结构指标，不加权、不选动作；
 - `one-ply-all`：全部合法动作的一轮生产加权评分，不执行 2-ply/cliff；
 - `two-ply-all`：全部合法弃牌的现有 2-ply 续行计算，不执行 cliff，属于较慢的诊断路径。
 
-这三路仍使用当前生产权重，不代表无权重结构指标；后者属于后续 `StructuralMetrics`
-步骤。
+`standard-only` 当前报告弃牌后的普通标准型向听数、进张牌种/牌种数，以及按玩家
+可见信息估计的剩余进张张数；它不包含七对、番型权重，也不代表墙内真值、自摸概率、
+完整胡牌概率或终局 EV。其余三路仍使用当前生产权重。
 
 `scenario batch` 当前消费外部 manifest 和自包含 snapshot JSONL。一次 batch 只运行一个 evaluator，
 使 checkpoint 明确绑定一种计算语义；需要三路结果时用相同输入分别运行三次。`--workers`

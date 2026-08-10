@@ -4,7 +4,11 @@ import {
   formatCalibrationSummary,
   serializeCalibrationReport,
 } from "./report.ts";
-import { CALIBRATION_SCHEMA_VERSION, type CalibrationManifest, type CalibrationRun } from "./types.ts";
+import {
+  CALIBRATION_SCHEMA_VERSION,
+  type CalibrationManifest,
+  type CalibrationRun,
+} from "./types.ts";
 
 const manifest: CalibrationManifest = {
   schemaVersion: CALIBRATION_SCHEMA_VERSION,
@@ -66,6 +70,8 @@ describe("calibration report contract", () => {
     expect(formatCalibrationSummary(report)).toContain(
       "scenario-a / standard-only@v1: ok, selected=discard-3m, 2ms",
     );
-    expect(formatCalibrationSummary(report)).toContain("evaluations: 1 (ok=1, failed=0, skipped=0)");
+    expect(formatCalibrationSummary(report)).toContain(
+      "evaluations: 1 (ok=1, failed=0, skipped=0)",
+    );
   });
 });

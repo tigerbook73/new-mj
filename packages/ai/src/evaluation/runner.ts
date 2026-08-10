@@ -215,7 +215,9 @@ export const runCalibrationJsonlBatch = async <TRecordData, TInput>(
   resolveRecord: CalibrationJsonlRecordResolver<TRecordData, TInput>,
   evaluator: CalibrationEvaluator<TInput>,
   run: CalibrationRun,
-  options: Readonly<{ evaluatorKind: CalibrationEvaluatorKind }> = { evaluatorKind: "standard-only" },
+  options: Readonly<{ evaluatorKind: CalibrationEvaluatorKind }> = {
+    evaluatorKind: "standard-only",
+  },
 ): Promise<CalibrationReport> => {
   const evaluations: CalibrationEvaluationResult[] = [];
   const seen = new Set<string>();
@@ -239,7 +241,10 @@ export const runCalibrationJsonlBatch = async <TRecordData, TInput>(
         candidates: [],
         performance: { durationMs: 0, cacheHits: 0, cacheMisses: 0 },
         status: "failed",
-        error: { code: "EVALUATOR_FAILED", message: error instanceof Error ? error.message : "unknown error" },
+        error: {
+          code: "EVALUATOR_FAILED",
+          message: error instanceof Error ? error.message : "unknown error",
+        },
       });
     }
   }

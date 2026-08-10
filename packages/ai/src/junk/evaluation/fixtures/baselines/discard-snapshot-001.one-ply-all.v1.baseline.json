@@ -7,10 +7,28 @@
   "evaluatorVersion": "v1",
   "manifest": { "id": "canonical-baseline", "version": 1 },
   "config": { "weights": "default", "twoPly": false, "candidateScope": "all-legal-actions" },
-  "environment": { "runtime": "Node.js", "portability": "decision-only; performance informational" },
+  "environment": {
+    "runtime": "Node.js",
+    "portability": "decision-only; performance informational"
+  },
   "expected": {
     "selectedCandidateId": "{\"type\":\"discard\",\"tile\":108}",
-    "candidateIds": ["{\"type\":\"discard\",\"tile\":4}", "{\"type\":\"discard\",\"tile\":8}", "{\"type\":\"discard\",\"tile\":12}", "{\"type\":\"discard\",\"tile\":20}", "{\"type\":\"discard\",\"tile\":24}", "{\"type\":\"discard\",\"tile\":40}", "{\"type\":\"discard\",\"tile\":44}", "{\"type\":\"discard\",\"tile\":48}", "{\"type\":\"discard\",\"tile\":56}", "{\"type\":\"discard\",\"tile\":60}", "{\"type\":\"discard\",\"tile\":64}", "{\"type\":\"discard\",\"tile\":80}", "{\"type\":\"discard\",\"tile\":84}", "{\"type\":\"discard\",\"tile\":108}"]
+    "candidateIds": [
+      "{\"type\":\"discard\",\"tile\":4}",
+      "{\"type\":\"discard\",\"tile\":8}",
+      "{\"type\":\"discard\",\"tile\":12}",
+      "{\"type\":\"discard\",\"tile\":20}",
+      "{\"type\":\"discard\",\"tile\":24}",
+      "{\"type\":\"discard\",\"tile\":40}",
+      "{\"type\":\"discard\",\"tile\":44}",
+      "{\"type\":\"discard\",\"tile\":48}",
+      "{\"type\":\"discard\",\"tile\":56}",
+      "{\"type\":\"discard\",\"tile\":60}",
+      "{\"type\":\"discard\",\"tile\":64}",
+      "{\"type\":\"discard\",\"tile\":80}",
+      "{\"type\":\"discard\",\"tile\":84}",
+      "{\"type\":\"discard\",\"tile\":108}"
+    ]
   },
   "limits": { "performance": "informational" },
   "notes": "中盘 snapshot 全部合法动作的一轮默认权重评分基线；不锁定排序或耗时。"

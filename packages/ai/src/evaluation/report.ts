@@ -35,7 +35,9 @@ export const createCalibrationBatchSummary = (
     .filter((duration) => Number.isFinite(duration) && duration >= 0)
     .sort((left, right) => left - right);
   const percentile = (rank: number): number =>
-    durations.length === 0 ? 0 : durations[Math.min(durations.length - 1, Math.ceil(durations.length * rank) - 1)]!;
+    durations.length === 0
+      ? 0
+      : durations[Math.min(durations.length - 1, Math.ceil(durations.length * rank) - 1)]!;
   const statusCounts = {
     ok: evaluations.filter(({ status }) => status === "ok").length,
     failed: evaluations.filter(({ status }) => status === "failed").length,
@@ -94,8 +96,7 @@ export const formatCalibrationSummary = (report: CalibrationReport): string => {
     lines.push("", "Baseline comparisons:");
     for (const comparison of report.baselineComparisons) {
       lines.push(`- ${comparison.baselineId}: ${comparison.status}`);
-      for (const change of comparison.changes)
-        lines.push(`  - ${change.kind}: ${change.message}`);
+      for (const change of comparison.changes) lines.push(`  - ${change.kind}: ${change.message}`);
     }
   }
   return `${lines.join("\n")}\n`;

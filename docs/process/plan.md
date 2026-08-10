@@ -37,7 +37,7 @@
 
 ## 当前状态
 
-步骤 0b AI evaluation 工具统一收口与步骤 1 测试职责重分类均已完成。下一阶段为步骤 2：只读 `StructuralMetrics` 诊断契约；开始前先建立对应临时专门计划，不在工具收口提交中提前实现。
+步骤 0b AI evaluation 工具统一收口、步骤 1 测试职责重分类与步骤 2 只读 `StructuralMetrics` 诊断契约均已完成。下一阶段为步骤 3：结构分析、2-ply 与动作评分模块边界；开始前先建立对应临时专门计划，不提前改变生产模块或行为。
 
 影响后续判断的结论：
 
@@ -46,6 +46,8 @@
 - 两个场景 × 三路 evaluator 共六份版本化 baseline；文件名使用 `<scenario-id>.<evaluator>.v<baseline-revision>.baseline.json`，决策和候选集合是回归字段，耗时仅供参考，baseline 不由命令自动创建或覆盖。
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
+- `standard-only@v1` 已作为第四路只读 evaluator 接入 canonical single-scenario 报告；对每个合法弃牌记录普通标准型向听数、进张牌种/牌种数和按玩家可见信息估计的剩余进张张数，不加权、不选动作，也不包含七对或番型目标。
+- 首个 canonical 样例已证明最小字段能解释非单调候选：弃 `5p` 为 2 向听、15 种/50 张进张，弃 `3m` 虽为 16 种/53 张进张却退到 3 向听；当前无需提前加入面子/雀头/搭子分解。进张张数不是墙内真值、自摸概率、完整胡牌概率或终局 EV。
 
 工具收口检查点：六类 CLI 迁移矩阵和最小 typed command registry 已完成；`evaluate scenario list/run/batch` 已接入；`evaluate policy diff` 已接入无顶层副作用的 handler。最小真实运行同策略 1 seed 共评估 674 个决策点、0 分歧；AI verify 通过（23 files passed、3 skipped；112 tests passed、11 skipped；build 成功）。所有工具迁移完成后，scenario 旧短命令兼容 alias 已删除。
 
@@ -71,7 +73,9 @@ evaluation 工具物理目录收口完成：`src/junk/` 顶层非测试资产只
 
 工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
 
-下一步第一个具体动作：为步骤 2 建立临时专门计划，先从现有 canonical fixture 抽取一个只读 `StructuralMetrics` 报告样例，验证字段能否解释候选差异；不修改生产评分、默认权重、候选筛选或 AI 对外行为。
+步骤 2 验证：真实 `discard-001` CLI 报告四路 evaluator 均成功且共享 content hash；AI fast verify 全绿（29 files passed、3 skipped；127 tests passed、11 skipped；typecheck/lint/build 成功），根 `pnpm verify` 全绿（含 43 个 Web E2E）。首次 sandbox 内运行仅因历史 policy-loader 测试的 `spawnSync git EPERM` 失败，允许只读 git 子进程后同命令通过。本步骤未修改 core，不触发新增 fuzz 要求。
+
+下一步第一个具体动作：为步骤 3 建立临时专门计划，先画出现有 `strategy.ts` 中结构分析、2-ply 续行与动作评分的调用/数据边界，并用 import/导出清单确定最小可抽取模块；只做等价重构，不改变生产评分、默认权重、候选筛选或 AI 对外行为。
 
 ## 专题路线图
 
@@ -80,8 +84,8 @@ evaluation 工具物理目录收口完成：`src/junk/` 顶层非测试资产只
 - 0 已完成：可重复的基线 bench 与验证平台
 - 0b 已完成：AI evaluation 工具统一收口
 - 1 已完成：AI/Junk 测试盘点与职责重分类
-- 2 下一步：只读 StructuralMetrics 诊断契约
-- 3 待开始：结构分析、2-ply 与动作评分模块边界
+- 2 已完成：只读 StructuralMetrics 诊断契约
+- 3 下一步：结构分析、2-ply 与动作评分模块边界
 - 4 待开始：人工确认的 canonical fixtures
 - 5 待开始：自动牌型生成器与样本报告
 - 6 待开始：保守 Pareto 支配诊断/过滤

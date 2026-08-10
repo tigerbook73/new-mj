@@ -1,8 +1,5 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
-import type {
-  CalibrationScenario,
-  NormalizedCalibrationScenario,
-} from "../../evaluation/types.ts";
+import type { CalibrationScenario, NormalizedCalibrationScenario } from "../../evaluation/types.ts";
 import { contentHashOf } from "./hash.ts";
 import { createJunkProductionFixture, type JunkProductionFixtureData } from "./fixture-data.ts";
 import type { CalibrationManifest } from "../../evaluation/types.ts";
@@ -24,16 +21,19 @@ export type JunkFixtureProvider = Readonly<{
   ) => NormalizedCalibrationScenario<JunkProductionFixtureInput>;
 }>;
 
-export type JunkProductionFixtureDataRegistry = Readonly<
-  Record<string, JunkProductionFixtureData>
->;
+export type JunkProductionFixtureDataRegistry = Readonly<Record<string, JunkProductionFixtureData>>;
 
 export const createJunkFixtureProvider = (
   fixtures: readonly JunkProductionFixture[],
 ): JunkFixtureProvider => {
-  const byId = new Map(fixtures.map((fixture) => [fixture.scenario.source.kind === "fixture"
-    ? fixture.scenario.source.fixtureId
-    : fixture.scenario.id, fixture]));
+  const byId = new Map(
+    fixtures.map((fixture) => [
+      fixture.scenario.source.kind === "fixture"
+        ? fixture.scenario.source.fixtureId
+        : fixture.scenario.id,
+      fixture,
+    ]),
+  );
   return {
     resolve: (scenario) => {
       if (scenario.source.kind !== "fixture") {

@@ -13,4 +13,6 @@ const stableValue = (value: unknown): unknown => {
 };
 
 export const contentHashOf = (value: unknown): string =>
-  `sha256:${createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex")}`;
+  `sha256:${createHash("sha256")
+    .update(JSON.stringify(stableValue(value)))
+    .digest("hex")}`;
