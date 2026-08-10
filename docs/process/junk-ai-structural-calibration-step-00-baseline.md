@@ -1,6 +1,6 @@
 # 普通胡牌基础牌形校准：step 0
 
-状态：当前步骤，平台设计完成；已完成工具边界盘点、source provider 契约、最小 report 契约、真实 fixture/生产 evaluator adapter、单场景 report runner 和 AI 包内 CLI 入口，下一步是 canonical baseline 登记/比较。本文件只描述平台计划，不记录过程日记。
+状态：当前步骤。通用 evaluation/worker/JSONL/report 基础设施已具备，功能闭环仍缺代表性 snapshot、三路 evaluator 同输入对照和 baseline comparator。本文件只保留平台计划、完成矩阵和影响后续判断的缺口，不记录过程日记。
 
 ## 目标与非目标
 
@@ -38,7 +38,7 @@ step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator；ste
 ### 2. 用数据驱动测试，保证复用和开发效率
 
 - canonical fixture、snapshot、批量种子和报告配置使用统一 manifest；
-- canonical scenario 本身只保存可读、可版本化的纯数据；当前 TypeScript fixture registry 只是 bootstrap，step 0 完成前必须迁移为 manifest/fixture 数据文件；
+- canonical scenario 本身只保存可读、可版本化的纯数据；manifest/fixture 已数据化，registry 只负责按 `fixtureId` 绑定数据，不承载场景逻辑；
 - manifest/少量 canonical fixture 使用 JSON；大规模 generated、snapshot、replay 数据使用 JSONL 流式记录，避免单个 JSON 数组的内存和解析成本；JSONL 记录必须自包含，支持分片、失败重跑和稳定聚合，后续可增加 gzip reader；
 - 测试只选择 manifest、评估器和断言级别，不修改平台代码；
 - 断言分层为：结构字段/不变量、候选集合、决策差异、性能阈值和报告 schema；
@@ -132,34 +132,22 @@ baseline 不是一次运行的日志，而是可引用、可比较的版本化�
 - 普通测试、slow bench、性能门禁和人工报告有明确入口与边界；
 - 最小端到端验证不改变生产策略，且不把大样本/全量 2-ply 纳入普通 `pnpm verify`。
 
-## 最早验证与下一动作
+## 当前完成矩阵
 
-最早验证不是跑大样本，而是写出一个最小 manifest、一个统一报告样例和一条单场景复现命令，确认三种现有评估路径能在不改 bench 框架的情况下产出同构结果。
+| 交付项 | 状态 | 对后续判断有价值的结论 |
+| --- | --- | --- |
+| 1. manifest、统一结果、报告、baseline 资产 | 基本完成 | scenario 是纯数据；输入用 `contentHash` 绑定 baseline；报告稳定排序且不覆盖既有资产 |
+| 2. canonical + snapshot + 三路 evaluator | 未完成 | 已有 canonical fixture 和 production-weighted；仍缺代表性 snapshot、full-candidate、现有 2-ply 同输入输出 |
+| 3. 通用断言、decision diff、baseline comparator | 部分完成 | 已有 schema/hash/顺序/worker 等价断言；仍缺候选差异和 baseline 回归分类 |
+| 4. 有界 worker 与性能报告 | 基本完成 | worker 与顺序共享 task function；支持分块、吞吐、p50/p95、checkpoint 和 hash-safe resume |
+| 5. 人/AI 使用入口 | 部分完成 | 单场景 `evaluate list/run` 可用；批量 CLI、checkpoint 文件格式和 baseline compare 尚未开放 |
 
-已完成：canonical manifest 与 fixture 已迁移为版本化 JSON；provider 从数据重建真实 `JunkPlayerView` 与合法动作，执行通用校验、TileId 转换并生成稳定 `contentHash`。报告 evaluation 已记录该哈希，新增数据场景无需修改 provider/runner。
+基础设施已经覆盖 Top-down §1、§3、§4 和 §7 的主要边界，但不能代替本步骤要求的功能闭环。`standard-only` 的新结构契约属于 step 2；step 0 的三路现有评价固定为 production-weighted、full-candidate 和现有 2-ply，不提前实现 `StructuralMetrics`。
 
-补充完成：manifest/scene 增加用途、描述和 tags 元数据，calibration README 说明当前 manifest、字段、命令和 source 支持边界；已明确当前 loader 仍有显式 fixture 注册限制。
+## 当前下一动作
 
-当前单场景 baseline 已登记为 `packages/ai/src/junk/evaluation/fixtures/baselines/*.baseline.json`；它固定输入哈希、evaluator 版本、期望动作和候选数，不把耗时作为硬门槛，也不允许运行结果覆盖该资产。
+1. 增加一个代表性 snapshot source/provider，并让它进入与 canonical 相同的 manifest/runner/report 主链；
+2. 在同一 canonical/snapshot 输入上接入 full-candidate 和现有 2-ply evaluator，与 production-weighted 形成三路同构结果；
+3. 增加最小 decision diff/baseline comparator 后，再回到批量 CLI 与 checkpoint 持久化入口。
 
-registry/JSONL 最小边界已落地：registry 按 `source.fixtureId` 精确匹配；JSONL reader 首行校验 manifest/schema/shard header，后续逐行校验相同 schema version，具体领域校验继续由 provider 负责。推荐文件名为 `<manifest-id>.v<manifest-version>.part-<index>.jsonl`。
-
-顺序批量 runner 已接入 JSONL record：按 scenario ID 查 manifest、经 resolver 构造 normalized scenario 并复用 evaluator，输入不整体加载，重复/未知 scenario 显式失败，结果交给现有稳定排序报告；worker、重试和断点恢复留待 executor 阶段。
-
-批量报告已增加场景数、状态计数、总耗时、吞吐、p50/p95 evaluator 延迟和失败摘要；evaluator 异常转为 failed evaluation 保留在报告中，未知/重复 scenario 仍快速失败。
-
-executor 边界已初步落地：task 带稳定 `taskId`，顺序与有界并发模式共享纯 task function 并保持输入顺序；当前只是 async executor seam，CPU 密集任务仍需后续 worker_threads adapter 才能获得多核收益。
-
-通用 `worker_threads` adapter 已落地并通过顺序/worker 等价性测试；worker 只接收可结构化克隆的输入，主线程负责稳定聚合和生命周期，CLI 默认仍使用顺序模式。
-
-evaluator task 已接入批量 runner：JSONL resolver 留在主线程，顺序/worker executor 调用同一个可序列化 production evaluator task，完整 report 的 scenario、选中动作和 content hash 等价。
-
-worker batch 分块与恢复边界已落地：`chunkSize` 限制 normalized tasks 内存，`onProgress` 暴露 seen/executed/resumed/failed，`onCheckpoint` 逐 chunk 交付可持久化 evaluation；恢复结果必须匹配 scenario content hash，过期或缺失 hash 快速失败。
-
-fixture 元数据已去重：fixture JSON 不再保存 `id/version/seed`；registry 的 `fixtureId` 管理输入资产身份，manifest scenario 管理版本，fixture source 不使用 seed。
-
-ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case；CLI 输出文件使用 `junk-` 前缀，避免跨玩法汇总时重名。
-
-seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不保存无效 seed。
-
-下一动作：确定批量 CLI 命令与 checkpoint 文件 schema；推荐在现有 `evaluate` 下增加独立批量动词，并显式提供 workers/chunk-size/resume 参数，确认命名后再实现。
+第一个具体动作：定义代表性 snapshot 的纯数据 schema 和 provider adapter；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。

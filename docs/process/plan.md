@@ -41,7 +41,7 @@
 
 专门计划：[step 0：基线 bench 与验证平台](junk-ai-structural-calibration-step-00-baseline.md)。
 
-本步骤完成条件与下一动作见专门计划文件。当前已完成现有工具的只读输入/输出边界盘点，尚未写新的 bench runner。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
+本步骤完成条件与下一动作见专门计划文件。当前通用 evaluation/worker/JSONL/report 基础设施已具备，但功能闭环仍缺代表性 snapshot、full-candidate/现有 2-ply evaluator 同输入对照和 baseline comparator。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
 
 ### 已完成的关键盘点（step 0）
 
@@ -83,7 +83,7 @@
 - ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case（如 `canonical-baseline`、`discard-001`、`hand-shape-001`、`discard-001-production-v1`）；CLI 输出文件使用 `junk-` 前缀，便于跨玩法汇总。
 - seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不再保存无效 seed。
 
-下一步第一个具体动作：确定批量 CLI 命令与 checkpoint 文件 schema；推荐在现有 `evaluate` 下增加独立批量动词，并显式提供 workers/chunk-size/resume 参数，确认命名后再实现。
+下一步第一个具体动作：定义代表性 snapshot 的纯数据 schema 和 provider adapter，使其进入与 canonical 相同的 manifest/runner/report 主链；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
 
 ## 专题路线图
 
