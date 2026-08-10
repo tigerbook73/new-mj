@@ -8,7 +8,7 @@ import { formatCalibrationSummary, serializeCalibrationReport } from "../../eval
 import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { runSingleCalibrationScenario } from "../../evaluation/runner.ts";
 
-const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const packageRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate <command> [options]\n\n" +
