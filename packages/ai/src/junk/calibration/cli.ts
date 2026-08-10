@@ -11,7 +11,7 @@ import { runSingleCalibrationScenario } from "./runner.ts";
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".calibration-runs");
 const usage =
-  "Usage: pnpm --filter @new-mj/ai calibrate <command> [options]\n\n" +
+  "Usage: pnpm --filter @new-mj/ai evaluate <command> [options]\n\n" +
   "Commands:\n" +
   "  --list                                      List available calibration scenarios\n" +
   "  --scenario <id>                             Run one scenario\n\n" +
@@ -21,8 +21,8 @@ const usage =
   "  --run-id <id>                               Stable report filename prefix\n" +
   "  --help                                      Show this help\n\n" +
   "Examples:\n" +
-  "  pnpm --filter @new-mj/ai calibrate --list\n" +
-  "  pnpm --filter @new-mj/ai calibrate --scenario canonical-production-selection-001\n";
+  "  pnpm --filter @new-mj/ai evaluate --list\n" +
+  "  pnpm --filter @new-mj/ai evaluate --scenario canonical-production-selection-001\n";
 
 type Arguments = Readonly<{
   list: boolean;
@@ -70,7 +70,8 @@ const currentGitSha = (): string => {
   }
 };
 
-const commandFor = (argv: readonly string[]): string => `pnpm calibrate:junk ${argv.join(" ")}`;
+const commandFor = (argv: readonly string[]): string =>
+  `pnpm --filter @new-mj/ai evaluate ${argv.join(" ")}`;
 
 const listScenarios = (): string =>
   [

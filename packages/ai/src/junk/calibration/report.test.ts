@@ -16,7 +16,7 @@ const manifest: CalibrationManifest = {
 const run: CalibrationRun = {
   runId: "run-001",
   gitSha: "abc1234",
-  command: "calibrate:junk --manifest structural-smoke",
+  command: "pnpm --filter @new-mj/ai evaluate --manifest structural-smoke",
   configHash: "config-001",
   startedAt: "2026-08-10T00:00:00.000Z",
   workerCount: 1,

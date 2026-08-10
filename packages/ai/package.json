@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "calibrate": "node src/junk/calibration/cli-entry.ts",
+    "evaluate": "node src/junk/calibration/cli-entry.ts",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src test",
     "test": "vitest run --tags-filter '!slow'",

@@ -18,7 +18,7 @@ const manifest: CalibrationManifest = {
 const run: CalibrationRun = {
   runId: "run-single-001",
   gitSha: "working-tree",
-  command: "calibrate:junk --scenario canonical-production-selection-001",
+  command: "pnpm --filter @new-mj/ai evaluate --scenario canonical-production-selection-001",
   configHash: "config-single-001",
   startedAt: "2026-08-10T00:00:00.000Z",
   workerCount: 1,
