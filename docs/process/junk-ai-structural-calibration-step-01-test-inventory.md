@@ -44,7 +44,7 @@
 | `src/strategy.test.ts` | 通用 fallback 策略 unit | keep / fast |
 | `src/evaluation/{batch,comparator,executor,jsonl,report}.test.ts` | 通用 evaluation unit/contract | keep / fast；worker 等价仍属通用契约 |
 | `src/junk/tile-probability.test.ts` | 概率纯函数 unit | keep / fast |
-| `src/junk/strategy.test.ts` | 2-ply、生产 fixture、strength、weights 混合 | split-by-responsibility；先保留全部断言 |
+| `src/junk/strategy.test.ts` | 纯策略 unit/fixture | keep / fast；已分成 two-ply、production fixtures、strength、weights 四个 describe，避免复制共享 TileId/view 构造 |
 | `test/junk-decision-diff.test.ts` | 完整引擎 decision-diff smoke | 已移入 `test/` / slow |
 | `src/junk/policy-loader.test.ts` + `test/junk-policy-loader.test.ts` | 权重/来源校验 unit + 模块/Git/fs integration | 已拆分；纯校验 fast，真实 import/Git 路径归 integration |
 | `src/junk/capture-policy-cli.test.ts` | 未提交 policy 捕获 CLI unit/fs | 已完成改名并收窄为三个实际 policy 依赖；fast |
@@ -57,7 +57,15 @@
 | `test/junk-policy-match-pool.test.ts` | policy worker 与顺序等价 | keep / slow |
 | `src/junk/tune.test.ts` + `test/junk-weight-tuning.test.ts` | 报告 unit + slow 搜索/worker | 已拆分；fast unit 与 slow integration 各自归位 |
 
-第一批只实施 `move/rename/split` 且不改变断言；`strategy.test.ts` 的结构真值与生产回归拆分，以及 provider/runner 的重复接线，等逐例覆盖映射后再处理。
+盘点后测试文件由 21 个变为 22 个：增加的文件来自 tuning 与 runner 的责任拆分，不是新增行为覆盖。所有原断言均有明确接替位置；provider 中移除的真实执行断言由更强的两场景 × 三 evaluator baseline 集成测试覆盖。
+
+最终审计结论：
+
+- `strategy.test.ts` 全部直接消费纯策略导出并共享复杂 fixture helper，物理拆分会制造重复；保留单文件但按四类责任分组。后续 `StructuralMetrics` 使用独立测试文件，不继续加入该文件。
+- canonical baseline 与 strategy fixture 分别承担资产级决策/候选集合回归和具体牌理原因回归，不合并或删除。
+- 普通 fast 集合包含纯函数、provider/CLI unit、通用 evaluation contract 和小型 adapter integration；完整 self-play、decision-diff、tuning 搜索及 policy worker 等价保持 slow/full。
+- Git policy-loader 集成测试不属于纯 unit，已移入 `test/`；其运行未达到 slow 耗时标准，因此仍进入普通 verify，沙箱运行需要允许 Git 子进程。
+- 步骤 2 的结构字段/不变量、步骤 4 的人工 canonical fixture、步骤 5 的 generated provider、步骤 9 的 paired-seed/held-out 分别使用独立测试落点，不在本步骤提前补实现。
 
 ### 2. 形成目标责任矩阵
 

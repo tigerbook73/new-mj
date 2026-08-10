@@ -37,6 +37,7 @@
 - baseline 是版本化、不可由运行结果覆盖的资产，至少绑定 manifest/scenario 版本、`contentHash`、evaluator 版本和可比较决策；耗时等易波动指标默认只作信息记录。
 - `evaluate` CLI 属于本 package；新增场景或 evaluator 应复用现有 provider/runner/report 契约，不复制临时命令、报告格式或 bench 框架代码。worker、重试、断点恢复属于 executor 层，不能散落在测试或 evaluator 中。
 - resumable batch 的 manifest/header 校验、checkpoint schema/store 和恢复编排属于 `src/evaluation/batch.ts`；玩法 CLI 只绑定 provider、evaluator worker 和输出命名，不复制 batch 生命周期。
+- evaluation 测试责任固定为：`src/evaluation/*.test.ts` 验证通用契约，`src/junk/evaluation/*.test.ts` 只放 provider/CLI 等贴近实现的 unit，真实 Junk evaluator/baseline/worker 跨模块接线放 `test/junk-evaluation-*.test.ts`。`strategy.test.ts` 只保留现有纯策略 unit/牌理 fixture；后续 `StructuralMetrics` 使用独立测试文件。
 
 ## DoD
 
