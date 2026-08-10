@@ -49,9 +49,9 @@
 | `src/junk/policy-loader.test.ts` + `test/junk-policy-loader.test.ts` | 权重/来源校验 unit + 模块/Git/fs integration | 已拆分；纯校验 fast，真实 import/Git 路径归 integration |
 | `src/junk/capture-policy-cli.test.ts` | 未提交 policy 捕获 CLI unit/fs | 已完成改名并收窄为三个实际 policy 依赖；fast |
 | `src/junk/evaluation/{cli,batch-cli}.test.ts` | 注入 runtime 的 Junk CLI contract | keep / fast |
-| `src/junk/evaluation/{fixture-provider,snapshot-provider}.test.ts` | provider unit + 真实 runner/evaluator 接线 | split provider unit 与 adapter integration |
-| `src/junk/evaluation/diagnostic-evaluators.test.ts` | 三路真实 evaluator contract | move 到 `test/` / fast integration |
-| `src/junk/evaluation/baselines.test.ts` | 六份资产 × 真实策略回归 | move 到 `test/` / fast integration；与 strategy fixture 不等价 |
+| `src/junk/evaluation/{fixture-provider,snapshot-provider}.test.ts` | provider 数据校验/转换 unit | 已移除重复 runner 接线，只保留 fast provider 责任 |
+| `test/junk-diagnostic-evaluators.test.ts` | 三路真实 evaluator contract | 已移入 `test/` / fast integration |
+| `test/junk-evaluation-baselines.test.ts` | 六份资产 × 真实策略回归 | 已移入 `test/` / fast integration；与 strategy fixture 不等价 |
 | `src/evaluation/runner.test.ts` + `test/junk-evaluation-runner.test.ts` | 通用 runner/batch/resume contract + Junk fixture/worker adapter | 已拆分；5 个通用契约与 2 个真实 Junk 集成断言责任独立 |
 | `test/junk-arena.test.ts` | 完整引擎/self-play/cache lifecycle | keep；纯结果形状 fast，完整对局 slow |
 | `test/junk-policy-match-pool.test.ts` | policy worker 与顺序等价 | keep / slow |

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CANONICAL_JUNK_SCENARIO_PROVIDER,
   JUNK_CALIBRATION_MANIFEST,
-} from "./canonical-fixtures.ts";
-import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
-import { evaluateProductionFixture } from "./production-evaluator.ts";
-import { runSingleCalibrationScenarioEvaluators } from "../../evaluation/runner.ts";
+} from "../src/junk/evaluation/canonical-fixtures.ts";
+import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../src/junk/evaluation/diagnostic-evaluators.ts";
+import { evaluateProductionFixture } from "../src/junk/evaluation/production-evaluator.ts";
+import { runSingleCalibrationScenarioEvaluators } from "../src/evaluation/runner.ts";
 
 describe("Junk diagnostic evaluators", () => {
   it.each(["discard-001", "discard-snapshot-001"])(

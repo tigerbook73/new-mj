@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { compareCalibrationBaseline } from "../../evaluation/comparator.ts";
-import { runSingleCalibrationScenarioEvaluators } from "../../evaluation/runner.ts";
-import { CANONICAL_JUNK_SCENARIO_PROVIDER, JUNK_CALIBRATION_MANIFEST } from "./canonical-fixtures.ts";
-import { JUNK_EVALUATION_BASELINES } from "./baselines.ts";
-import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
-import { evaluateProductionFixture } from "./production-evaluator.ts";
+import { compareCalibrationBaseline } from "../src/evaluation/comparator.ts";
+import { runSingleCalibrationScenarioEvaluators } from "../src/evaluation/runner.ts";
+import { CANONICAL_JUNK_SCENARIO_PROVIDER, JUNK_CALIBRATION_MANIFEST } from "../src/junk/evaluation/canonical-fixtures.ts";
+import { JUNK_EVALUATION_BASELINES } from "../src/junk/evaluation/baselines.ts";
+import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../src/junk/evaluation/diagnostic-evaluators.ts";
+import { evaluateProductionFixture } from "../src/junk/evaluation/production-evaluator.ts";
 
 describe("versioned Junk evaluation baselines", () => {
   it.each(["discard-001", "discard-snapshot-001"])("matches all three routes for %s", (scenarioId) => {

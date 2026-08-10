@@ -43,7 +43,7 @@
 
 本步骤先建立全部测试的责任矩阵，再实施不损失覆盖的低风险重分类；存在语义取舍的移动、合并或删除会给出建议与备选，不自行决定。
 
-已完成三批重分类：policy capture、decision-diff、tuning 和 policy-loader 已按 unit/integration/slow 分层；evaluation runner 的 5 个通用契约与 2 个 Junk fixture/worker 集成断言也已拆分，覆盖不变。
+已完成四批重分类：policy capture、decision-diff、tuning、policy-loader、通用 runner 与 Junk evaluation adapters 已按 unit/integration/slow 分层；provider 测试只负责数据转换，三路 evaluator、baseline 和真实 worker 接线集中在 `test/`，覆盖不变。
 
 影响后续判断的结论：
 
@@ -53,7 +53,7 @@
 - 批量失败通过报告与 hash-safe checkpoint/resume 重跑；不自动 retry 确定性错误，不采集容易误导的跨 worker CPU/resource 汇总。
 - generated source 只预留 schema；generator/provider 明确归入路线图步骤 5，不在平台步骤提前定义牌型生成语义。三路 evaluator 若需随无权重结构契约调整，在后续步骤重新评审，不回改 step 0 基线语义。
 
-下一步第一个具体动作：整理 Junk evaluation adapter 测试：将 baseline/三路 evaluator 的跨模块回归移入 `test/`，并拆开 fixture/snapshot provider unit 与真实 runner 接线。
+下一步第一个具体动作：逐例审计 `strategy.test.ts`，建立 2-ply probe、生产决策 fixture、strength config、weight override 的覆盖映射；先拆文件，不改 fixture 或断言。
 
 ## 专题路线图
 
