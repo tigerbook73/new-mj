@@ -22,7 +22,7 @@
 
 以“场景输入 → 评估器集合 → 统一结果 → 报告/基线产物”为唯一主链，场景和评估器通过注册/配置接入，不在测试文件里拼接临时 bench 逻辑。
 
-场景输入至少包含：
+场景 provider 解析后的标准输入至少包含：
 
 - 可重放的场景 ID、来源和版本；
 - 手牌、公开牌河、副露、摸牌上下文和必要的牌山信息；
@@ -30,6 +30,10 @@
 - 期望用途：契约回归、决策差异、性能基线或探索性扫描。
 
 评估器输出统一为结构化结果，至少包含候选列表、选中决策、结构指标、运行计时、缓存命中、错误/跳过原因和 evaluator version。生产版权重筛选与诊断评价必须能在同一输入上并列运行。
+
+Provider 分层固定为：`ScenarioProvider`（fixture/snapshot/generated/replay）、`EvaluatorProvider`（生产权重/`standard-only`/2-ply/decision diff）和统一 `Executor`（单线程/有界 worker）；baseline/候选差异使用纯 `Comparator`，JSON/Markdown 使用 `ReportWriter`。性能采集作为横切 wrapper，不为每类测试复制 runner。
+
+step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator；step 2 再决定是否引入更底层的结构诊断输入，避免基线平台提前锁死 `StructuralMetrics` 契约。
 
 ### 2. 用数据驱动测试，保证复用和开发效率
 

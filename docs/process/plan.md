@@ -53,8 +53,12 @@
 - 命名结论：现有文件名/函数名不作为兼容约束；后续可按“场景、评估器、任务执行、报告、baseline”职责重命名或拆分，外部命令只需提供迁移说明。
 - 最小契约验证已完成：新增 `packages/ai/src/junk/calibration/` 下的 manifest、统一 evaluation result、versioned report 类型，以及稳定排序的 JSON 和固定 Markdown 摘要；两个契约测试证明 worker 完成顺序不会改变报告顺序，摘要能直接显示场景、评估器、状态、选中候选和耗时。
 - 本次验证结果：calibration 定向测试 2/2 通过，AI typecheck 通过，AI lint 通过；尚未接入真实 fixture、现有 evaluator adapter、批量 runner 或 worker pool。
+- provider 边界已确定：场景来源使用 `ScenarioProvider`，评估逻辑使用 `EvaluatorProvider`，单线程/worker 使用统一 `Executor`；baseline/候选差异使用纯 `Comparator`，JSON/Markdown 使用 `ReportWriter`，性能采集是横切 wrapper，不单独复制一套测试类型。
+- 场景来源统一用带 `kind` 的 source 描述（fixture/snapshot/generated/replay），再解析为 `NormalizedScenario`；step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator，step 2 再决定更底层的结构诊断输入，不提前锁死 `StructuralMetrics`。
+- 不为每种测试建立独立 runner；fixture、snapshot、generated、replay 是场景来源的不同 provider，生产权重、`standard-only`、2-ply、decision diff 是 evaluator provider，baseline 是比较层而不是 evaluator。
+- 正式 AI play 的 player 上下文与缓存观测不属于当前 bench step，已作为独立 backlog 记录；当前平台只保留评估运行所需的 cache/performance 摘要。
 
-下一步第一个具体动作：用一个真实 canonical fixture 接入一个现有 evaluator adapter，生成第一份真实 calibration report；先保持单线程和只读路径，不接入批量 runner 或 worker pool。
+下一步第一个具体动作：先把场景输入从固定牌局字段扩展为带判别类型的 source provider，并用一个真实 canonical fixture 接入现有生产 evaluator；保持单线程和只读路径，不接入批量 runner 或 worker pool。
 
 ## 专题路线图
 
