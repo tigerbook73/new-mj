@@ -20,7 +20,6 @@
     "check:deps": "node tools/check-deps.ts",
     "cli:junk:play": "node packages/core/src/rulesets/junk/cli.ts play",
     "fuzz:junk": "node packages/core/src/rulesets/junk/cli.ts fuzz",
-    "tune:junk": "node packages/ai/src/junk/tune-entry.ts",
     "capture:junk-policy": "node packages/ai/src/junk/capture-policy-cli-entry.ts",
     "sb:start": "supabase start",
     "sb:stop": "supabase stop",

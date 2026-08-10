@@ -1,5 +1,13 @@
 import { writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  assertTextEvaluationArtifactsAvailable,
+  writeTextEvaluationArtifacts,
+  type TextArtifactRuntime,
+} from "../evaluation/text-artifacts.ts";
 import {
   evaluateTunedWeights,
   formatTuneReport,
@@ -27,12 +35,17 @@ type Arguments = {
   stagnationPatience: number;
   maxSigma: number;
   concurrency: number;
+  outputDir: string;
+  runId?: string;
   write: boolean;
   /** Restricts the search to this subset of JunkWeights keys (see tune.ts's
    * mutate/TuneOptions.weightKeys); undefined means "search all of them",
    * same as before this flag existed. */
   only?: (keyof JunkWeights)[];
 };
+
+const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 const defaultConcurrency = (): number => {
   try {
@@ -47,7 +60,7 @@ const usage =
   "[--seeds-per-generation <int>] [--eval-seeds <int>] [--sigma <float>] [--max-sigma <float>] " +
   "[--sigma-convergence-ratio <float>] [--stagnation-patience <int>] [--concurrency <int>] " +
   `[--only <comma-separated JunkWeights keys, e.g. tenpaiProbabilityWeight — one of: ${WEIGHT_KEYS.join(",")}>] ` +
-  "[--write]\n";
+  "[--output-dir <dir>] [--run-id <id>] [--write]\n";
 
 const parseArguments = (argv: string[]): Arguments => {
   const write = argv.includes("--write");
@@ -67,6 +80,7 @@ const parseArguments = (argv: string[]): Arguments => {
     stagnationPatience: 30,
     maxSigma: 1,
     concurrency: defaultConcurrency(),
+    outputDir: defaultOutputDir,
     write,
   };
   for (let index = 0; index < pairs.length; index += 2) {
@@ -83,6 +97,8 @@ const parseArguments = (argv: string[]): Arguments => {
     else if (flag === "--sigma-convergence-ratio") result.sigmaConvergenceRatio = Number(value);
     else if (flag === "--stagnation-patience") result.stagnationPatience = Number(value);
     else if (flag === "--concurrency") result.concurrency = Number(value);
+    else if (flag === "--output-dir") result.outputDir = value;
+    else if (flag === "--run-id") result.runId = value;
     else if (flag === "--only") {
       const requested = value.split(",").map((key) => key.trim());
       const invalid = requested.filter((key) => !(WEIGHT_KEYS as string[]).includes(key));
@@ -113,7 +129,26 @@ const parseArguments = (argv: string[]): Arguments => {
   ) {
     throw new Error("INVALID_NUMERIC_ARGUMENT");
   }
+  if (result.runId !== undefined && !/^[a-zA-Z0-9._-]+$/.test(result.runId))
+    throw new Error("INVALID_RUN_ID");
   return result;
+};
+
+type TuneCliRuntime = TextArtifactRuntime &
+  Readonly<{
+    now?: () => Date;
+    gitSha?: () => string;
+    createPool?: (concurrency: number) => MatchWorkerPool<MatchTask>;
+    tune?: typeof tuneJunkWeights;
+    evaluate?: typeof evaluateTunedWeights;
+  }>;
+
+const currentGitSha = (): string => {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    return "unknown";
+  }
 };
 
 /**
@@ -141,28 +176,35 @@ const writeTunedWeights = (
   return { attempted: true, written: true, path: DEFAULT_WEIGHTS_PATH.pathname };
 };
 
-/** Progress goes to stderr (never stdout) so `pnpm tune:junk > report.txt` still
- * captures only the final report; `log` is injectable so this stays testable. */
+/** Progress goes to stderr while the final report and artifact paths go to
+ * stdout; `log` is injectable so this stays testable. */
 export const runTuneCli = async (
   argv: readonly string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
+  runtime: TuneCliRuntime = {},
 ): Promise<{ exitCode: number; output: string }> => {
   if (argv.includes("--help")) return { exitCode: 0, output: usage };
   let pool: MatchWorkerPool<MatchTask> | undefined;
   try {
     const args = parseArguments([...argv]);
+    const startedAt = (runtime.now ?? (() => new Date()))();
+    const runId = args.runId ?? `run-${startedAt.toISOString().replace(/[:.]/g, "-")}`;
+    const fileStem = `junk-weights-tune-${runId}`;
+    assertTextEvaluationArtifactsAvailable(args.outputDir, fileStem, runtime);
     const worstCaseMatches = args.maxGenerations * args.seedsPerGeneration * 2 + args.evalSeeds * 2;
     log(
       `[tune] max-generations=${args.maxGenerations} (min ${args.minGenerations}, stops early on ` +
         `convergence) seeds/generation=${args.seedsPerGeneration} eval-seeds=${args.evalSeeds} ` +
         `concurrency=${args.concurrency}  worst case ~${worstCaseMatches} matches\n`,
     );
-    pool = new MatchWorkerPool<MatchTask>(
-      args.concurrency,
-      new URL("./tune-worker.ts", import.meta.url),
-    );
-    const startedAt = Date.now();
-    const report = await tuneJunkWeights(args.seed, {
+    pool = runtime.createPool
+      ? runtime.createPool(args.concurrency)
+      : new MatchWorkerPool<MatchTask>(
+          args.concurrency,
+          new URL("./tune-worker.ts", import.meta.url),
+        );
+    const searchStartedAt = Date.now();
+    const report = await (runtime.tune ?? tuneJunkWeights)(args.seed, {
       maxGenerations: args.maxGenerations,
       minGenerations: args.minGenerations,
       seedsPerGeneration: args.seedsPerGeneration,
@@ -173,7 +215,7 @@ export const runTuneCli = async (
       pool,
       ...(args.only ? { weightKeys: args.only } : {}),
       onGeneration: (generationLog) => {
-        const elapsedSec = (Date.now() - startedAt) / 1000;
+        const elapsedSec = (Date.now() - searchStartedAt) / 1000;
         // "eta" here is time-to-cap, an upper bound — early stopping usually means
         // the run finishes well before this, not exactly at it.
         const etaToCapSec =
@@ -189,10 +231,15 @@ export const runTuneCli = async (
     });
     log(
       `[tune] search stopped after ${report.generations.length} generations ` +
-        `(${report.stopReason}) in ${((Date.now() - startedAt) / 1000).toFixed(0)}s, ` +
+        `(${report.stopReason}) in ${((Date.now() - searchStartedAt) / 1000).toFixed(0)}s, ` +
         "running held-out evaluation...\n",
     );
-    const finalEval = await evaluateTunedWeights(args.seed, args.evalSeeds, report, pool);
+    const finalEval = await (runtime.evaluate ?? evaluateTunedWeights)(
+      args.seed,
+      args.evalSeeds,
+      report,
+      pool,
+    );
     const writeStatus: TuneWriteStatus = args.write
       ? writeTunedWeights(finalEval, report, log)
       : { attempted: false };
@@ -201,9 +248,37 @@ export const runTuneCli = async (
     // (it has `only`, the CLI-facing name), so that has to be added explicitly
     // or formatTuneReport always falls back to "search all of them".
     const reportOptions = { ...args, ...(args.only ? { weightKeys: args.only } : {}) };
+    const textReport = `${formatTuneReport(report, finalEval, reportOptions, writeStatus)}\n`;
+    const paths = writeTextEvaluationArtifacts(
+      args.outputDir,
+      fileStem,
+      {
+        run: {
+          schemaVersion: 1,
+          runId,
+          command: `pnpm --filter @new-mj/ai evaluate weights tune ${argv.join(" ")}`.trim(),
+          gitSha: (runtime.gitSha ?? currentGitSha)(),
+          startedAt: startedAt.toISOString(),
+        },
+        data: {
+          seed: args.seed,
+          maxGenerations: args.maxGenerations,
+          minGenerations: args.minGenerations,
+          seedsPerGeneration: args.seedsPerGeneration,
+          evalSeeds: args.evalSeeds,
+          concurrency: args.concurrency,
+          searchedWeights: args.only ?? WEIGHT_KEYS,
+          report,
+          finalEvaluation: finalEval,
+          writeStatus,
+        },
+      },
+      textReport,
+      runtime,
+    );
     return {
       exitCode: 0,
-      output: `${formatTuneReport(report, finalEval, reportOptions, writeStatus)}\n`,
+      output: `${textReport}json: ${paths.jsonPath}\ntext: ${paths.textPath}\n`,
     };
   } catch (error) {
     return {

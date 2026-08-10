@@ -20,7 +20,7 @@
 
 ### Junk AI 大规模调参与权重采纳
 
-运行一次真实规模的 `pnpm tune:junk`，人工 review 报告后决定是否用 `--write` 采纳候选权重，或手动更新 `default-weights.json`。不把自对弈胜率直接当作牌理真值。
+运行一次真实规模的 `pnpm --filter @new-mj/ai evaluate weights tune`，人工 review 报告后决定是否用 `--write` 采纳候选权重，或手动更新 `default-weights.json`。不把自对弈胜率直接当作牌理真值。
 
 ### Junk AI 自我优化基础设施推广评估
 

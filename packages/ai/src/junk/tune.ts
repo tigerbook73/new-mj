@@ -5,7 +5,7 @@ import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./strategy.ts";
 import type { MatchTask, MatchTaskResult, MatchWorkerPool, PolicyMatchTask } from "./tune-pool.ts";
 
 /** Two MatchWorkerPool instantiations flow through this file: the weight-based
- * one (tune:junk's hot loop, tune-worker.ts) and the cross-version policy-based
+ * one (weights tune's hot loop, tune-worker.ts) and the cross-version policy-based
  * one (evaluateCandidatePolicies below, policy-match-worker.ts). */
 type WeightMatchPool = MatchWorkerPool<MatchTask>;
 type PolicyMatchPool = MatchWorkerPool<PolicyMatchTask>;

@@ -98,11 +98,13 @@ Junk adapter 负责：
 4. `policy capture`：复用已收窄的三个 policy 依赖；仅写 gitignored scratch。
 5. scenario `list/run/batch`：完成兼容 alias 清理，固定最终 help。
 
+工具命令全部迁移后，再做一次物理目录收口：`src/junk/` 顶层只保留生产策略及其直接依赖，arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/` 的职责子目录。随后增加生产路径不得 import `junk/evaluation/**` 的依赖护栏，并把公共 barrel 改为显式生产 API。`strategy.ts` 内部的生产评分、已投产 2-ply 与纯诊断 evaluator 拆分留到专题步骤 3，避免与本步骤的 CLI 生命周期迁移混做。
+
 每迁移一项，先加新入口等价测试，再删除对应旧 CLI/entry/root script；不同时重写算法。
 
 `weights compare` 已完成：`evaluate weights compare` 注册为无顶层副作用的 handler；同代码权重 A/B 和跨版本 policy A/B 共用 `MatchupResult` 产物收尾，保留 `MatchWorkerPool`、双向同牌序、参数语义和只读边界。两条路径各以同策略 1 seed、单 worker 完成 smoke，均为 2 场、50%/平局并生成 JSON/文本报告；旧 `compare:junk-weights` entry/root script 已删除。
 
-当前正在迁移 `weights tune`：`evaluate weights tune` 已注册，原脚本拆为无顶层副作用的 handler 与临时兼容 entry，help 不启动搜索。下一步接入只读报告产物；调参搜索、worker pool、进度输出、held-out 门槛与 `--write` 权限保持不变，显式写默认权重仍由 Junk handler 单独负责，不下沉到通用产物层。
+`weights tune` 已完成：无顶层副作用的 handler 接入统一 run metadata、计算前防覆盖和 JSON/文本报告；调参搜索、worker pool、进度输出、held-out 门槛与显式 `--write` 权限保持不变。单测覆盖默认只读产物和预检，真实单 worker 最小搜索完成 1 generation、1 search seed、1 held-out seed 并生成两份产物；旧 `tune:junk` root alias/entry 已删除。
 
 ### 4. 收尾与恢复步骤 1
 

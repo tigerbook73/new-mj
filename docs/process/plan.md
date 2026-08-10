@@ -59,9 +59,13 @@
 
 `weights compare` 迁移完成：同代码权重与跨版本 policy 两条 A/B 路径共用统一产物收尾，`MatchWorkerPool` 和比赛算法未改；两条路径各以同策略 1 seed、单 worker 完成 2 场 smoke，均为 50%/平局并生成 JSON/文本报告。旧 `compare:junk-weights` 双入口已删除。
 
-`weights tune` 迁移进行中：`evaluate weights tune` 已注册为无顶层副作用的 handler，旧 root alias 暂留；help 不启动搜索，尚未改变调参和写权重逻辑。
+`weights tune` 迁移完成：统一入口现会在计算前防覆盖，并写入带 run metadata 的 JSON/文本报告；搜索、worker、进度、held-out 门槛和显式 `--write` 权限未改变。注入式测试覆盖默认只读与预检；真实单 worker 最小搜索以 1 generation、1 search seed、1 held-out seed 跑通并生成两份产物。旧 `tune:junk` root alias/entry 已删除。
 
-下一步第一个具体动作：给 `weights tune` 接入只读报告产物并完成最小搜索 smoke；保留搜索、worker、进度、held-out 门槛及显式 `--write` 权限，写默认权重的能力不下沉到通用层。
+本检查点 AI fast verify 全绿（26 files passed、3 skipped；119 tests passed、11 skipped；build 成功）。`verify:full` 已完成 typecheck/lint，但 slow test 长时间无输出后人工中止，不能记为通过；本 slice 的真实调参链由上述最小搜索 smoke 覆盖，完整 slow 门禁留到 0b 收尾再次执行。
+
+工具命令全部迁移后增加物理目录收尾：`src/junk/` 顶层只保留生产策略及直接依赖，离线 arena/tune/diff/policy/worker/command adapter 迁入 `src/junk/evaluation/`，增加生产路径不得反向 import evaluation 的护栏并显式收窄公共 barrel。`strategy.ts` 内生产评分、已投产 2-ply 与纯诊断 evaluator 的进一步拆分留到路线图步骤 3。
+
+下一步第一个具体动作：实现 `evaluate arena run` 的薄 adapter，复用现有 self-play driver 与 match worker，先补命令 help/注入式等价测试，再完成单 worker 最小真实 smoke。
 
 ## 专题路线图
 
