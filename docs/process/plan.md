@@ -43,46 +43,6 @@
 
 本步骤完成条件与下一动作见专门计划文件。当前通用 evaluation/worker/JSONL/report 基础设施已具备，但功能闭环仍缺代表性 snapshot、full-candidate/现有 2-ply evaluator 同输入对照和 baseline comparator。步骤完成后，删除该临时计划文件，并将结果摘要归并到本文件。
 
-### 已完成的关键盘点（step 0）
-
-- 可复用：`playJunkMatch`/`strengthPolicy` 的确定性自对弈驱动、`runMatchTask`/`runPolicyMatchTask` 的纯任务单元、`MatchWorkerPool` 的有界 `worker_threads` 调度、`policy-loader` 的代码版本/权重加载，以及现有顺序与并行结果等价测试。
-- 可复用但需 adapter：`arena` 目前只返回累计分数和排名；`decision-diff` 只面向两策略自对弈决策分歧；`tune` 的报告和任务围绕权重搜索；它们可提供执行/比较积木，但不能直接作为结构校准平台契约。
-- 不直接复用：`snapshot-junk-cli` 是未提交代码的 scratch 复制工具，不是 baseline 资产库；现有各 CLI 的参数解析和文本报告是一次性入口，不能让每个新场景继续复制格式逻辑。
-- 测试现状：arena、tune、worker pool、decision-diff 和 snapshot 已有 slow/冒烟覆盖，能证明管线连通和部分确定性；尚未覆盖统一 manifest、场景级任务 ID、报告 schema、失败重跑、baseline 比较和批量性能分位数。
-- 性能现状：worker pool 已通过同一任务函数实现顺序/并行等价，但结果类型只表达成功/失败和分数，缺少任务 ID、耗时、重试、进度和可诊断错误；`runAll` 保持输入顺序聚合，但尚未形成通用批量报告。
-- 命名结论：现有文件名/函数名不作为兼容约束；后续可按“场景、评估器、任务执行、报告、baseline”职责重命名或拆分，外部命令只需提供迁移说明。
-- 最小契约验证已完成：新增 `packages/ai/src/evaluation/` 通用框架和 `packages/ai/src/junk/evaluation/` Junk adapter，包含 manifest、统一 evaluation result、versioned report 类型，以及稳定排序的 JSON 和固定 Markdown 摘要；两个契约测试证明 worker 完成顺序不会改变报告顺序，摘要能直接显示场景、评估器、状态、选中候选和耗时。
-- 初始契约验证结果：calibration 定向测试 2/2 通过，AI typecheck 通过，AI lint 通过；当时尚未接入真实 fixture、现有 evaluator adapter、批量 runner 或 worker pool。
-- provider 边界已确定：场景来源使用 `ScenarioProvider`，评估逻辑使用 `EvaluatorProvider`，单线程/worker 使用统一 `Executor`；baseline/候选差异使用纯 `Comparator`，JSON/Markdown 使用 `ReportWriter`，性能采集是横切 wrapper，不单独复制一套测试类型。
-- 场景来源统一用带 `kind` 的 source 描述（fixture/snapshot/generated/replay），再解析为 `NormalizedScenario`；step 0 先适配现有 `JunkPlayerView + legalActions` 的生产 evaluator，step 2 再决定更底层的结构诊断输入，不提前锁死 `StructuralMetrics`。
-- 不为每种测试建立独立 runner；fixture、snapshot、generated、replay 是场景来源的不同 provider，生产权重、`standard-only`、2-ply、decision diff 是 evaluator provider，baseline 是比较层而不是 evaluator。
-- 正式 AI play 的 player 上下文与缓存观测不属于当前 bench step，已作为独立 backlog 记录；当前平台只保留评估运行所需的 cache/performance 摘要。
-- source provider 已落地为判别联合并支持 `NormalizedCalibrationScenario`；当前 fixture provider 只解析 `fixture` source，其他来源会显式失败，不会静默当作 fixture。
-- 已接入第一个真实 canonical fixture 和生产 evaluator adapter：复用现有 `chooseJunkAction(JunkPlayerView, legalActions)`，默认确定性 argmax，只验证合法且可重复的生产决策，不提前定义结构指标。
-- 上一轮验证结果：calibration 2 个测试文件、4/4 测试通过，AI typecheck 通过，AI lint 通过；当时仍未串接完整单场景 report runner，也未接入批量 runner/worker pool。
-- 单场景 runner 已落地：按 manifest 查找 scenario，调用 provider 和 evaluator，再生成统一 JSON/Markdown report；runner 不包含业务评分、并发、重试或文件 I/O。
-- 本轮验证结果：calibration 3 个测试文件、6/6 测试通过，AI typecheck 通过，AI lint 通过；报告链路已用真实 fixture 验证，仍未接入稳定 CLI、批量 runner、baseline 存储或 worker pool。
-- canonical fixture 已提取为 registry 和稳定 manifest；AI 包内 CLI 现支持 `list`、`run <scenario-id>`、`--output-dir <dir>`、`--run-id <id>`，同时写 JSON 原始报告和 Markdown 摘要，已有 run ID 不覆盖，默认临时产物目录为 `packages/ai/.evaluation-runs/`。
-- 本轮验证结果：calibration 4 个测试文件、8/8 测试通过，AI typecheck/lint 通过；真实命令 `pnpm --filter @new-mj/ai evaluate list` 与单 scenario 输出冒烟均通过。CLI 仍是单线程，不负责 baseline 登记/比较、批量调度或 worker pool。
-- 命令归属结论：calibration 是 `@new-mj/ai` 的包内能力，canonical script 放在 `packages/ai/package.json`；root 不新增快捷命令，临时输出忽略规则也放在 `packages/ai/.gitignore`。
-- canonical scenario 设计结论：scenario 本身必须是纯数据，代码只负责 schema 校验、牌种到 TileId 的转换、`JunkPlayerView`/合法动作构造和 evaluator；当前 `canonical-fixtures.ts` 仅是临时原型，step 0 完成前必须迁移为版本化 manifest/fixture 数据文件，并补 `contentHash`。
-- canonical 数据迁移已完成：manifest 与 fixture 使用版本化 JSON，fixture 数据只表达牌种、动作副本和玩家视角字段；provider 负责通用校验、TileId 构造和稳定 `sha256:<hex>` 内容哈希，报告 evaluation 记录 `scenarioContentHash`，Markdown 摘要也显示该哈希。
-- 迁移验证结果：calibration 4 个测试文件、10/10 测试通过，AI typecheck 与 lint 通过；现有 canonical 生产 evaluator 仍返回同一类合法、确定性决策。数据文件新增场景时不需要修改 provider 或 runner 代码。
-- manifest 说明已补齐：manifest 增加 `purpose`/`description`，scenario 增加可读 `description`/`tags`，并新增 calibration README 解释当前 canonical-baseline 的用途、字段和已实现/未实现的 source 类型；README 同时明确当前 loader 仍需显式注册 fixture。
-- 大数据格式边界已记录：manifest 和少量 canonical fixture 使用 JSON；大量 generated/snapshot/replay 场景使用一条记录一行的 JSONL，以支持流式读取、按行校验、分片分发和失败场景重跑。JSONL 记录必须自包含且报告按稳定 scenario ID 聚合排序；`.jsonl.gz` reader 留给批量 runner，不在当前单场景入口临时实现。
-- 当前单场景 baseline 已登记为版本化资产：保存 manifest/scenario 版本、`scenarioContentHash`、evaluator 版本、期望动作和合法动作数；决策与候选数量作为可比较结果，耗时仅作信息指标，baseline 文件不由运行结果覆盖。
-- registry/JSONL 最小边界已落地：fixture registry 按 `source.fixtureId` 精确匹配，避免多 scenario 静默复用错误数据；JSONL reader 逐行解析、跳过空行并报告行号错误，记录包含 `schemaVersion`、`scenarioId` 和自包含 `data`，领域 provider 继续负责具体校验和转换。
-- JSONL 文件级契约已确定并落地：首个非空行为 header，包含 manifest/schema/shard 元数据，后续 scenario record 必须使用相同 schema version；推荐文件名为 `<manifest-id>.v<manifest-version>.part-<index>.jsonl`，空行可跳过，报告按 scenario ID 稳定排序。
-- 顺序批量 runner 已接入 JSONL record：流式消费、不整体加载，按 `scenarioId` 查找 manifest，经 resolver 构造 normalized scenario 后复用统一 evaluator；重复或不存在的 scenario 显式失败，报告沿用稳定排序，worker/重试/断点恢复仍未实现。
-- 批量报告已增加聚合指标：场景数、ok/failed/skipped、总耗时、吞吐、p50/p95 evaluator 延迟和失败摘要；单个 evaluator 异常保留为 failed evaluation，不丢弃整批结果，未知/重复 scenario 仍快速失败。
-- executor 边界已初步落地：task 使用稳定 `taskId` 和共享纯函数，顺序/有界并发模式保持相同输入顺序和结果聚合；当前只是 async executor seam，尚未宣称获得 worker 多核收益。
-- 通用 `worker_threads` adapter 已落地并通过等价性测试：worker 只接收可结构化克隆的 task input，按 module URL/export name 调用纯函数，主线程按输入顺序聚合并负责终止 worker；CLI 默认仍不切换并发。
-- evaluator task 已接入批量 runner：主线程负责 JSONL resolver，顺序/worker executor 运行同一个可序列化 production evaluator task，完整 report 的 scenario、选中动作和 content hash 等价。
-- worker batch 分块与恢复边界已落地：`chunkSize` 限制 normalized tasks 内存，`onProgress` 暴露 seen/executed/resumed/failed，`onCheckpoint` 逐 chunk 交付可持久化 evaluation；恢复结果必须匹配 scenario content hash，过期或缺失 hash 快速失败。
-- fixture 元数据去重已完成：fixture JSON 不再重复保存 `id/version/seed`；registry 的 `fixtureId` 是输入资产身份，manifest scenario 的 `version` 是场景版本，fixture source 不使用 seed，避免多个权威来源漂移。
-- ID 命名规则已落地：calibration 内部 ID 使用无玩法前缀的简短 kebab-case（如 `canonical-baseline`、`discard-001`、`hand-shape-001`、`discard-001-production-v1`）；CLI 输出文件使用 `junk-` 前缀，便于跨玩法汇总。
-- seed 归属已收紧：只有 `generated` source 携带 seed 并用于确定性生成；fixture scenario 不再保存无效 seed。
-
 下一步第一个具体动作：定义代表性 snapshot 的纯数据 schema 和 provider adapter，使其进入与 canonical 相同的 manifest/runner/report 主链；不继续扩展 worker/CLI，也不引入 step 2 的 `StructuralMetrics`。
 
 ## 专题路线图
