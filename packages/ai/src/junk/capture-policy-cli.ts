@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 /**
  * Convenience for the "two uncommitted experimental versions side by side"
- * workflow policy-loader.ts's doc comment describes: `pnpm snapshot:junk-ai
+ * workflow policy-loader.ts's doc comment describes: `pnpm capture:junk-policy
  * before` copies the current packages/ai/src/junk/ into
  * packages/ai/.compare-scratch/before/junk/ *once*, then you keep editing
  * src/junk/ normally — no copy-then-restore dance, and no risk of putting the
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
  * — this script is only for versions that aren't commits yet.
  */
 
-const usage = "Usage: junk/snapshot-junk-cli.ts <label>\n";
+const usage = "Usage: junk/capture-policy-cli.ts <label>\n";
 
 const junkSrcDir = fileURLToPath(new URL(".", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -22,7 +22,7 @@ const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
 const isValidLabel = (label: string): boolean =>
   label !== "." && label !== ".." && /^[a-zA-Z0-9._-]+$/.test(label);
 
-export const runSnapshotJunkCli = (
+export const runCaptureJunkPolicyCli = (
   argv: string[],
   log: (line: string) => void = (line) => process.stderr.write(line),
 ): { exitCode: number; output: string } => {

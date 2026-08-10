@@ -35,7 +35,29 @@
 - 记录快速/完整测试实际运行边界，识别未标 slow 的秒级计算或被误标 slow 的纯函数；
 - 先按文件分类；仅对混合职责文件下钻到 describe/case，不制作事无巨细的测试过程日志。
 
-首个具体动作：生成 20 个现有测试文件的责任矩阵，优先审计 `strategy.test.ts`、`junk-weight-tuning.test.ts`、`evaluation/runner.test.ts` 与 `policy-loader.test.ts` 的混合边界。
+首个具体动作：生成 21 个现有测试文件的责任矩阵，优先审计 `strategy.test.ts`、`junk-weight-tuning.test.ts`、`junk/evaluation/runner.test.ts` 与 `policy-loader.test.ts` 的混合边界。
+
+### 当前责任矩阵
+
+| 当前测试 | 主要责任 / 层级 | 目标结论 |
+| --- | --- | --- |
+| `src/strategy.test.ts` | 通用 fallback 策略 unit | keep / fast |
+| `src/evaluation/{batch,comparator,executor,jsonl,report}.test.ts` | 通用 evaluation unit/contract | keep / fast；worker 等价仍属通用契约 |
+| `src/junk/tile-probability.test.ts` | 概率纯函数 unit | keep / fast |
+| `src/junk/strategy.test.ts` | 2-ply、生产 fixture、strength、weights 混合 | split-by-responsibility；先保留全部断言 |
+| `test/junk-decision-diff.test.ts` | 完整引擎 decision-diff smoke | 已移入 `test/` / slow |
+| `src/junk/policy-loader.test.ts` | 权重校验 unit + 模块/Git/fs integration | split；纯校验留 `src/`，Git/import 路径进 `test/` |
+| `src/junk/capture-policy-cli.test.ts` | 未提交 policy 捕获 CLI unit/fs | 已完成 capture-policy 改名；fast，仍待收窄复制范围 |
+| `src/junk/evaluation/{cli,batch-cli}.test.ts` | 注入 runtime 的 Junk CLI contract | keep / fast |
+| `src/junk/evaluation/{fixture-provider,snapshot-provider}.test.ts` | provider unit + 真实 runner/evaluator 接线 | split provider unit 与 adapter integration |
+| `src/junk/evaluation/diagnostic-evaluators.test.ts` | 三路真实 evaluator contract | move 到 `test/` / fast integration |
+| `src/junk/evaluation/baselines.test.ts` | 六份资产 × 真实策略回归 | move 到 `test/` / fast integration；与 strategy fixture 不等价 |
+| `src/junk/evaluation/runner.test.ts` | 通用 runner contract + Junk worker adapter | split：通用断言移到 `src/evaluation/runner.test.ts`，真实 worker 接线进 `test/` |
+| `test/junk-arena.test.ts` | 完整引擎/self-play/cache lifecycle | keep；纯结果形状 fast，完整对局 slow |
+| `test/junk-policy-match-pool.test.ts` | policy worker 与顺序等价 | keep / slow |
+| `src/junk/tune.test.ts` + `test/junk-weight-tuning.test.ts` | 报告 unit + slow 搜索/worker | 已拆分；fast unit 与 slow integration 各自归位 |
+
+第一批只实施 `move/rename/split` 且不改变断言；`strategy.test.ts` 的结构真值与生产回归拆分，以及 provider/runner 的重复接线，等逐例覆盖映射后再处理。
 
 ### 2. 形成目标责任矩阵
 
@@ -55,10 +77,10 @@
 - `policy-loader.test.ts` 包含纯校验和依赖 Git/scratch 文件系统的集成路径；
 - evaluation baseline 测试与旧 strategy fixture 的职责是否重叠。
 
-已确认的工具结论：`snapshot-junk-cli.ts` 保存的是未提交 policy 代码，不是 evaluation
-局面 snapshot，能力继续保留；目标重命名为 `capture:junk-policy`/`capture-policy-cli.ts`，
-并将复制范围收窄到 policy 实际依赖。它仍是 compare-weights/decision-diff 的开发辅助入口，
-不并入通用 evaluation provider。具体改名与依赖边界在整体责任矩阵完成后统一实施。
+已确认的工具结论：原 snapshot CLI 保存的是未提交 policy 代码，不是 evaluation 局面
+snapshot，现已重命名为 `capture:junk-policy`/`capture-policy-cli.ts`。能力继续保留，并将复制
+范围收窄到 policy 实际依赖。它仍是 compare-weights/decision-diff 的开发辅助入口，不并入
+通用 evaluation provider。
 
 ### 3. 分批实施低风险重分类
 

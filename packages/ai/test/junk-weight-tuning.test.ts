@@ -6,7 +6,6 @@ import {
   evaluateTunedWeights,
   formatTuneReport,
   tuneJunkWeights,
-  type TuneReport,
 } from "../src/junk/tune.ts";
 
 // Tiny by design — this is a smoke test of the tuning *pipeline* (does it run
@@ -18,47 +17,7 @@ import {
 // the "toHaveLength" assertion below meaningful rather than a coincidence.
 const TINY_OPTIONS = { maxGenerations: 2, seedsPerGeneration: 1 } as const;
 
-const SYNTHETIC_REPORT: TuneReport = {
-  seed: 1,
-  generations: [],
-  baselineWeights: DEFAULT_JUNK_WEIGHTS,
-  tunedWeights: DEFAULT_JUNK_WEIGHTS,
-  stopReason: "max-generations",
-};
-const SYNTHETIC_EVAL = {
-  seeds: [1],
-  candidateScore: 1,
-  baselineScore: 0,
-  candidateWins: 1,
-  totalMatches: 1,
-};
-
 describe("junk weight tuning", () => {
-  describe("formatTuneReport write status", () => {
-    it("describes an unattempted write as a manual-adoption reminder", () => {
-      const text = formatTuneReport(SYNTHETIC_REPORT, SYNTHETIC_EVAL, TINY_OPTIONS);
-      expect(text).toContain("does not change any file");
-    });
-
-    it("describes a successful write with the file path", () => {
-      const text = formatTuneReport(SYNTHETIC_REPORT, SYNTHETIC_EVAL, TINY_OPTIONS, {
-        attempted: true,
-        written: true,
-        path: "/tmp/default-weights.json",
-      });
-      expect(text).toContain("wrote the tuned weights to /tmp/default-weights.json");
-    });
-
-    it("describes a skipped write with the reason", () => {
-      const text = formatTuneReport(SYNTHETIC_REPORT, SYNTHETIC_EVAL, TINY_OPTIONS, {
-        attempted: true,
-        written: false,
-        reason: "held-out evaluation did not show an improvement",
-      });
-      expect(text).toContain("skipped — held-out evaluation did not show an improvement");
-    });
-  });
-
   it(
     "runs end-to-end, keeps defaults immutable, and produces a readable report",
     { tags: ["slow"] },
