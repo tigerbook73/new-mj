@@ -35,7 +35,7 @@
 
 ## 当前状态
 
-步骤 0、0b、1、2、3、4 已完成；下一步进入步骤 5：自动牌型生成器与样本报告。生产策略保持 weights、无权重 analysis/cache、hand-quality、2-ply continuation、action-scoring 和兼容 facade 的单向边界。
+步骤 0、0b、1、2、3、4、5 已完成；下一步进入步骤 6：保守 Pareto 支配诊断/过滤。生产策略保持 weights、无权重 analysis/cache、hand-quality、2-ply continuation、action-scoring 和兼容 facade 的单向边界。
 
 影响后续判断的结论：
 
@@ -49,8 +49,10 @@
 - AI/Core 慢速测试已按正确性边界审计：Core 保留向听/表等价性质、回放与每玩法 100 局 fuzz；重复 conservation、AI 真实调参循环、30 局 arena 统计与强弱胜率暂时退出自动门禁，恢复条件见 `backlog.md`。单局 arena/policy worker/decision-diff 接线正确性仍在 `verify:full`，真实调参与万局收尾改走手工入口。
 - AI `evaluate` CLI 与其 TypeScript 检查统一启用 `development` export condition，直接消费 Core `src`；离线诊断不再依赖预先构建且可能过期的 Core `dist`，worker 继承同一 Node condition。
 - 自动 fuzz 冒烟统一由每玩法 1000 局降为 100 局，保留专题收尾人工万局门禁；根 E2E 的 lobby 失败实为 Server 5 秒超时后 Turbo 中断 Web 的级联结果，replay 套件现由四个测试客户端按合法动作推进、不再借生产 AI bot 造 fixture，真实默认 AI advice 冒烟只对单条用例使用 10 秒预算。
+- `scenario generate` 已接入 `standard-concealed-v1`：显式 seed 从完整牌集生成无副露 14 张玩家视角，按牌种计数全局去重后再以稳定序号分片；manifest 中每个样本保存独立 seed/version，provider 会重建并校验内容，不能把任意 JSONL 冒充该 seed。生成分布不读取 canonical expectation、权重或生产评分，也不代表实战阶段分布；代表性中盘继续由固定 snapshot 提供。
+- generated JSONL 已复用通用 batch/checkpoint/worker/report 主链并支持四路 evaluator；Markdown 逐场景记录候选数、选择、耗时和 cache hit/miss，JSON 保留完整候选指标。固定 seed `20260814` 的 3 样本接线报告四路均为 3/3 成功，`standard-only`、`one-ply-all`、`two-ply-all` 均覆盖每场 14 个合法弃牌动作；该小样本只证明链路，不作为校准结论。
 
-下一步第一个具体动作：开始步骤 5 前先补充生成器专门计划，定义确定性 seed、普通标准型输入合法性、去重/分片边界与样本报告验收；不得从当前两份 canonical expectation 反推或硬编码生成分布。
+下一步第一个具体动作：开始步骤 6 前先补充 Pareto 诊断专门计划，明确只在同一向听层内以进张牌种数和玩家可见剩余进张张数判断严格支配，并定义冲突、并列与不可比较候选的报告/测试验收；本步先只读标注，不改变生产候选或动作。
 
 ## 专题路线图
 
@@ -62,8 +64,8 @@
 - 2 已完成：只读 StructuralMetrics 诊断契约
 - 3 已完成：结构分析、2-ply 与动作评分模块边界
 - 4 已完成：人工确认的 canonical fixtures
-- 5 下一步：自动牌型生成器与样本报告
-- 6 待开始：保守 Pareto 支配诊断/过滤
+- 5 已完成：自动牌型生成器与样本报告
+- 6 下一步：保守 Pareto 支配诊断/过滤
 - 7 待开始：无权重全量 2-ply 三路诊断对照
 - 8 待开始：isolationPotential 影响边界校准
 - 9 待开始：普通路线的 paired-seed 与 held-out 验证

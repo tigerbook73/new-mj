@@ -88,7 +88,9 @@ export const formatCalibrationSummary = (report: CalibrationReport): string => {
     const selected = evaluation.selectedCandidateId ?? "-";
     lines.push(
       `- ${evaluation.scenarioId} / ${evaluation.evaluator}@${evaluation.evaluatorVersion}: ` +
-        `${evaluation.status}, selected=${selected}, ${evaluation.performance.durationMs}ms` +
+        `${evaluation.status}, selected=${selected}, ${evaluation.performance.durationMs}ms, ` +
+        `candidates=${evaluation.candidates.length}, ` +
+        `cache=${evaluation.performance.cacheHits}/${evaluation.performance.cacheMisses}` +
         (evaluation.scenarioContentHash ? `, content=${evaluation.scenarioContentHash}` : ""),
     );
   }

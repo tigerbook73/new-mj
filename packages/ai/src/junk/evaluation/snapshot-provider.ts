@@ -67,12 +67,13 @@ const createDiscard = (discard: SnapshotDiscard): DiscardEntry => ({
   ...(discard.claimedBy === undefined ? {} : { claimedBy: discard.claimedBy }),
 });
 
-export const normalizeJunkSnapshot = (
+const normalizeJunkVisibleDecision = (
   scenario: CalibrationScenario,
   data: JunkProductionSnapshotData,
+  sourceKind: "snapshot" | "generated",
 ): NormalizedCalibrationScenario<JunkProductionFixtureInput> => {
-  if (scenario.source.kind !== "snapshot") {
-    throw new Error("INVALID_SNAPSHOT_DATA: scenario source must be snapshot");
+  if (scenario.source.kind !== sourceKind) {
+    throw new Error(`INVALID_SNAPSHOT_DATA: scenario source must be ${sourceKind}`);
   }
   assert(data.view.seats.length === 4, "exactly four seat snapshots are required");
   const view: JunkPlayerView = {
@@ -108,6 +109,44 @@ export const normalizeJunkSnapshot = (
     "every discard action must reference a tile in hand",
   );
   return { scenario, input: { view, legalActions }, contentHash: contentHashOf(data) };
+};
+
+export const normalizeJunkSnapshot = (
+  scenario: CalibrationScenario,
+  data: JunkProductionSnapshotData,
+): NormalizedCalibrationScenario<JunkProductionFixtureInput> =>
+  normalizeJunkVisibleDecision(scenario, data, "snapshot");
+
+export const normalizeJunkGeneratedDecision = (
+  scenario: CalibrationScenario,
+  data: JunkProductionSnapshotData,
+): NormalizedCalibrationScenario<JunkProductionFixtureInput> => {
+  assert(data.view.phase === "playing", "generated decision must be in playing phase");
+  assert(
+    data.view.currentSeat === data.view.seat,
+    "generated decision must belong to current seat",
+  );
+  assert(data.view.hand.length === 14, "generated concealed hand must contain 14 tiles");
+  assert(
+    data.view.seats.every(({ melds }) => melds.length === 0),
+    "generated sample has no melds",
+  );
+  assert(
+    data.legalActions.length === data.view.hand.length,
+    "generated actions must cover the hand",
+  );
+  const handRefs = new Set(data.view.hand.map(({ kind, copy }) => `${kind}:${copy}`));
+  assert(handRefs.size === data.view.hand.length, "generated hand contains duplicate TileIds");
+  assert(
+    data.legalActions.every(({ tile }) => handRefs.has(`${tile.kind}:${tile.copy}`)),
+    "generated actions must reference the hand",
+  );
+  assert(
+    new Set(data.legalActions.map(({ tile }) => `${tile.kind}:${tile.copy}`)).size ===
+      data.legalActions.length,
+    "generated actions must be unique",
+  );
+  return normalizeJunkVisibleDecision(scenario, data, "generated");
 };
 
 export const createJunkSnapshotProvider = (

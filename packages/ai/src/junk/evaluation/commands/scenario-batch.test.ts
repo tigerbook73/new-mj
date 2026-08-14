@@ -4,6 +4,8 @@ import { runBatchCalibrationCli } from "./scenario-batch.ts";
 import { JUNK_CALIBRATION_MANIFEST } from "../canonical-fixtures.ts";
 import { evaluateProductionFixture } from "../production-evaluator.ts";
 import type { JunkProductionSnapshotData } from "../snapshot-provider.ts";
+import { generateJunkSamples } from "../generated-samples.ts";
+import { evaluateStructuralMetrics } from "../structural-metrics.ts";
 
 const scenario = JUNK_CALIBRATION_MANIFEST.scenarios.find(
   ({ id }) => id === "discard-snapshot-001",
@@ -89,5 +91,56 @@ describe("evaluation batch CLI", () => {
     );
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain("INCOMPATIBLE_CHECKPOINT");
+  });
+
+  it("runs standard-only over generated records", async () => {
+    const generated = generateJunkSamples({ seed: 7, count: 1 });
+    const sample = generated.samples[0]!;
+    const generatedRecords = async function* () {
+      yield {
+        type: "scenario" as const,
+        schemaVersion: 1,
+        scenarioId: sample.scenario.id,
+        data: sample.data,
+        header: {
+          type: "header" as const,
+          schemaVersion: 1,
+          manifestId: generated.manifest.id,
+          manifestVersion: generated.manifest.version,
+          shardId: "part-0000",
+          shardIndex: 0,
+          shardCount: 1,
+        },
+      };
+    };
+    const files = new Map([["manifest.json", JSON.stringify(generated.manifest)]]);
+    const result = await runBatchCalibrationCli(
+      [
+        "manifest.json",
+        "generated.jsonl",
+        "--evaluator",
+        "standard-only",
+        "--run-id",
+        "generated-test",
+        "--output-dir",
+        "/tmp/generated-batch-test",
+      ],
+      {
+        gitSha: "abc1234",
+        exists: () => false,
+        read: (filePath) => files.get(filePath)!,
+        write: (filePath, content) => files.set(filePath, content),
+        makeDirectory: () => undefined,
+        records: generatedRecords,
+        execute: async (tasks) =>
+          tasks.map((task) => ({
+            taskId: task.taskId,
+            result: evaluateStructuralMetrics(task.input.scenarioId, task.input.input),
+          })),
+      },
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("standard-only@v1");
+    expect(result.output).toContain("candidates=14");
   });
 });

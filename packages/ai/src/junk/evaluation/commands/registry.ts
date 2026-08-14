@@ -3,6 +3,7 @@ import { runArenaCli } from "./arena.ts";
 import { runCaptureJunkPolicyCli } from "./policy-capture.ts";
 import { runDecisionDiffCli } from "./policy-diff.ts";
 import { runBatchCalibrationCli } from "./scenario-batch.ts";
+import { runGenerateSamplesCli } from "./scenario-generate.ts";
 import { runCalibrationCli } from "./scenario.ts";
 import { runCompareWeightsCli } from "./weights-compare.ts";
 import { runTuneCli } from "./weights-tune.ts";
@@ -22,6 +23,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["scenario", "batch"],
     summary: "Evaluate a JSONL scenario batch",
     run: runBatchCalibrationCli,
+  },
+  {
+    path: ["scenario", "generate"],
+    summary: "Generate deterministic standard-hand JSONL samples",
+    run: runGenerateSamplesCli,
   },
   {
     path: ["policy", "capture"],

@@ -73,5 +73,6 @@ describe("calibration report contract", () => {
     expect(formatCalibrationSummary(report)).toContain(
       "evaluations: 1 (ok=1, failed=0, skipped=0)",
     );
+    expect(formatCalibrationSummary(report)).toContain("candidates=0, cache=4/1");
   });
 });

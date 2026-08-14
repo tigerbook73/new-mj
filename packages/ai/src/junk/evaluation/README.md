@@ -39,6 +39,8 @@ pnpm --filter @new-mj/ai evaluate scenario list
 pnpm --filter @new-mj/ai evaluate scenario run discard-001
 pnpm --filter @new-mj/ai evaluate scenario run discard-001 \
   --baseline src/junk/evaluation/fixtures/baselines/discard-001.production-weighted.v1.baseline.json
+pnpm --filter @new-mj/ai evaluate scenario generate --seed 20260814 --count 1000 \
+  --shard-index 0 --shard-count 4
 pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
   --evaluator two-ply-all --workers 4 --chunk-size 64 \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
@@ -60,12 +62,22 @@ pnpm --filter @new-mj/ai evaluate arena run --help
 可见信息估计的剩余进张张数；它不包含七对、番型权重，也不代表墙内真值、自摸概率、
 完整胡牌概率或终局 EV。其余三路仍使用当前生产权重。
 
-`scenario batch` 当前消费外部 manifest 和自包含 snapshot JSONL。一次 batch 只运行一个 evaluator，
-使 checkpoint 明确绑定一种计算语义；需要三路结果时用相同输入分别运行三次。`--workers`
+`scenario generate` 生成确定性的无副露 14 张标准牌型弃牌样本。生成器从完整牌集按 seed
+洗牌，不读取 canonical expectation、权重或生产评分；按牌种计数去重后才依据全局稳定序号
+做 modulo 分片，因此各 shard 不重叠，合并后等于同 seed/count 的未分片样本。每个 shard
+输出内容相同的完整 manifest 副本和一份自包含 JSONL，文件名都带 `part-NNNN`，可独立搬运。
+当前生成分布只用于基础牌形覆盖，不代表实战阶段分布；中盘代表性仍由固定 snapshot 提供。
+
+`scenario batch` 当前消费外部 manifest 和自包含 snapshot/generated JSONL。一次 batch 只运行一个 evaluator，
+使 checkpoint 明确绑定一种计算语义；需要四路结果时用相同输入分别运行四次。`--workers`
 使用已有 worker_threads executor，`--chunk-size` 决定每次交付 checkpoint 的场景数。
 `--checkpoint` 在每个 chunk 后写入包含 manifest 版本、evaluator 和已完成 evaluations 的完整
 JSON 快照；中断后用 `--resume <checkpoint.json>` 恢复。恢复时 manifest/evaluator/content hash
-任一不匹配都会失败，不会静默复用旧结果。generated/replay batch 要等对应 provider 落地。
+任一不匹配都会失败，不会静默复用旧结果。replay batch 要等对应 provider 落地。
+
+generated 输入可运行全部四路 evaluator，包括只读 `standard-only`。四路报告应使用相同
+manifest/content hash 分别生成；不跨 evaluator 合并分数。Markdown 摘要逐场景记录候选数、
+选择、耗时和 cache hit/miss，JSON 保留完整候选指标。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
@@ -83,14 +95,14 @@ production-weighted/one-ply-all/two-ply-all。它们保存输入内容哈希、�
 场景、评估器和 baseline 资产修订版。文件内 scenario version、`evaluatorVersion` 与这里的
 baseline revision 是三个独立版本维度。
 
-generated source 的 schema 已预留，但 generator/provider 按专题路线图第 5 步接入；step 0
-不提前定义生成牌型语义。批量失败保留在报告/checkpoint 中，通过 hash-safe resume 重跑；
+generated source 由 `scenario generate` 与 generated provider 接入；当前版本固定为
+`standard-concealed-v1`。批量失败保留在报告/checkpoint 中，通过 hash-safe resume 重跑；
 不自动 retry 确定性错误，也不采集容易误导的跨 worker CPU/resource 汇总。
 
 ## 来源类型
 
 schema 预留了 `fixture`、`snapshot`、`generated` 和 `replay`。目前已实现
-`fixture` 和 `snapshot` provider；generated/replay 会明确报告不支持，不会静默转换。
+`fixture`、`snapshot` 和 `generated` provider；replay 会明确报告不支持，不会静默转换。
 
 当前 canonical loader 仍显式注册 JSON fixture。新增场景在完善通用 registry 前，
 需要同时更新 manifest 和 `canonical-fixtures.ts` 的数据注册；这属于当前实现限制。

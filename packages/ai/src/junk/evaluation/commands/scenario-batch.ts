@@ -14,12 +14,13 @@ import {
 import type { CalibrationEvaluationTaskExecutor } from "../../../evaluation/runner.ts";
 import type { CalibrationEvaluatorKind, CalibrationManifest } from "../../../evaluation/types.ts";
 import { normalizeJunkSnapshot, type JunkProductionSnapshotData } from "../snapshot-provider.ts";
+import { normalizeGeneratedJunkSample } from "../generated-samples.ts";
 import type { JunkEvaluationTaskInput } from "../evaluation-task.ts";
 
 export const batchUsage =
   "Usage: pnpm --filter @new-mj/ai evaluate scenario batch <manifest.json> <scenarios.jsonl> [options]\n\n" +
   "Options:\n" +
-  "  --evaluator <production-weighted|one-ply-all|two-ply-all>\n" +
+  "  --evaluator <production-weighted|standard-only|one-ply-all|two-ply-all>\n" +
   "  --workers <n>                 Worker thread count (default: 1)\n" +
   "  --chunk-size <n>               Scenarios per checkpoint (default: 64)\n" +
   "  --checkpoint <file>            Write resumable JSON after every chunk\n" +
@@ -80,7 +81,7 @@ export const runBatchCalibrationCli = async (
       else if (flag === "--resume") resumePath = value;
       else throw new Error(`UNKNOWN_ARGUMENT: ${flag}`);
     }
-    if (!["production-weighted", "one-ply-all", "two-ply-all"].includes(evaluator))
+    if (!["production-weighted", "standard-only", "one-ply-all", "two-ply-all"].includes(evaluator))
       throw new Error(`UNSUPPORTED_BATCH_EVALUATOR: ${evaluator}`);
     const read = runtime.read ?? ((filePath: string) => readFileSync(filePath, "utf8"));
     const write =
@@ -126,7 +127,10 @@ export const runBatchCalibrationCli = async (
     const report = await runResumableCalibrationBatch(
       manifest,
       sourceRecords,
-      (scenario, data) => normalizeJunkSnapshot(scenario, data),
+      (scenario, data) =>
+        scenario.source.kind === "generated"
+          ? normalizeGeneratedJunkSample(scenario, data)
+          : normalizeJunkSnapshot(scenario, data),
       execute,
       {
         runId: stableRunId,
