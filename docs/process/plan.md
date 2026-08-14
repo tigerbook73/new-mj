@@ -31,17 +31,17 @@
 当前待验证：
 
 - 结构指标与生产权重可能产生冲突；先记录差异和非支配关系，不预设“向听差 1/2”或 `isolationPotential` 的权重结论；
-- 当前 `StructuralMetrics` 足够解释首个 canonical 差异；只有后续样本出现无法解释的决策差异时，才增加面子、雀头或搭子分解字段。
+- 当前 `StructuralMetrics` 的向听、理论/存活进张种类和存活张数足够解释已确认差异；只有后续样本出现无法解释的决策差异时，才增加面子、雀头或搭子分解字段。
 
 ## 当前状态
 
-步骤 0、0b、1、2、3、4、5 已完成；下一步进入步骤 6：保守 Pareto 支配诊断/过滤。生产策略保持 weights、无权重 analysis/cache、hand-quality、2-ply continuation、action-scoring 和兼容 facade 的单向边界。
+步骤 0、0b、1、2、3、4、5、6 已完成；下一步进入步骤 7：无权重全量 2-ply 三路诊断对照。生产策略保持 weights、无权重 analysis/cache、hand-quality、2-ply continuation、action-scoring 和兼容 facade 的单向边界。
 
 影响后续判断的结论：
 
 - 通用 `packages/ai/src/evaluation/` 已统一 manifest/report/comparator、JSONL、worker executor 和 resumable batch/checkpoint；Junk 只注入 provider、evaluator task 和输出命名。离线 scenario、policy、weights、arena 工具统一位于 `src/junk/evaluation/`，生产路径不得反向依赖。
 - canonical fixture 与固定可见状态 snapshot 共用主链；最小人工确认集合固定为两类关系：`discard-001` 的“较低向听 vs 更宽进张”冲突，以及 `discard-snapshot-001` 同向听下的严格进张宽度优势。关系、精确指标和理由位于独立版本化 expectation，不让 `standard-only` 选择动作；production-weighted、one-ply-all、two-ply-all 的六份 baseline 保持不变。
-- `standard-only@v1` 已作为第四路只读 evaluator 接入 canonical single-scenario 报告；对每个合法弃牌记录普通标准型向听数、进张牌种/牌种数和按玩家可见信息估计的剩余进张张数，不加权、不选动作，也不包含七对或番型目标。
+- `standard-only@v2` 已作为第四路只读 evaluator 接入 canonical 与 batch 报告；对每个合法弃牌记录普通标准型向听数、理论进张牌种/牌种数，以及按玩家可见信息估计的存活进张种类和剩余张数，不加权、不选动作，也不包含七对或番型目标。
 - 首个 canonical 样例已证明最小字段能解释非单调候选：弃 `5p` 为 2 向听、15 种/50 张进张，弃 `3m` 虽为 16 种/53 张进张却退到 3 向听；当前无需提前加入面子/雀头/搭子分解。进张张数不是墙内真值、自摸概率、完整胡牌概率或终局 EV。
 - `strategy.ts` 同时是生产 facade 与跨 Git ref policy-loader 的加载根；动作模拟、单层评分、cliff/fallback 和两层候选编排现集中在 `action-scoring.ts`，facade 只保留兼容导出、胜利动作优先、argmax/softmax 与最终动作选择；生产边界与 evaluation 框架的耐久约束以 `packages/ai/AGENTS.md` 为准，具体命令和当前来源支持以 evaluation README 为准。
 - 静态牌形质量位于 `hand-quality.ts`，自摸二层 continuation probe 位于 `two-ply.ts`；`strategy.ts` 继续按原路径导出既有 API。最终一次对 `HEAD` 与当前实现的 3-seed policy diff 覆盖 2110 个决策点且分歧为 0，原始 action 引用、cliff、fallback、全部评分、现有 probe/production fixtures 与六份 baseline 均保持不变。
@@ -51,8 +51,10 @@
 - 自动 fuzz 冒烟统一由每玩法 1000 局降为 100 局，保留专题收尾人工万局门禁；根 E2E 的 lobby 失败实为 Server 5 秒超时后 Turbo 中断 Web 的级联结果，replay 套件现由四个测试客户端按合法动作推进、不再借生产 AI bot 造 fixture，真实默认 AI advice 冒烟只对单条用例使用 10 秒预算。
 - `scenario generate` 已接入 `standard-concealed-v1`：显式 seed 从完整牌集生成无副露 14 张玩家视角，按牌种计数全局去重后再以稳定序号分片；manifest 中每个样本保存独立 seed/version，provider 会重建并校验内容，不能把任意 JSONL 冒充该 seed。生成分布不读取 canonical expectation、权重或生产评分，也不代表实战阶段分布；代表性中盘继续由固定 snapshot 提供。
 - generated JSONL 已复用通用 batch/checkpoint/worker/report 主链并支持四路 evaluator；Markdown 逐场景记录候选数、选择、耗时和 cache hit/miss，JSON 保留完整候选指标。固定 seed `20260814` 的 3 样本接线报告四路均为 3/3 成功，`standard-only`、`one-ply-all`、`two-ply-all` 均覆盖每场 14 个合法弃牌动作；该小样本只证明链路，不作为校准结论。
+- 同向听 Pareto 诊断只用 `liveImprovingKindCount` 与 `liveImprovingTileCount`：两项都不差且至少一项更好才严格支配；理论种类仅作解释，不同向听、完全并列和宽度/张数冲突均不产生支配。每个候选只读记录同向听前沿及支配、被支配、并列、不可比较 ID；未接入生产筛选或动作选择。
+- live 指标扣除自身手牌、四家公开牌河与公开副露，并按 TileId 去重，避免被鸣牌同时作为牌河墓碑和副露引用时重复扣减；不使用对手暗手、真实牌墙或隐藏信息。固定 seed `20260814` 的 100 个无副露/无牌河生成场景中，1400 个动作有 904 个在各自同向听层被支配，生产选择有 12 次落入该集合；这只证明诊断能发现差异，不能替代带公开信息 snapshot、人工复核或成为生产过滤依据。
 
-下一步第一个具体动作：开始步骤 6 前先补充 Pareto 诊断专门计划，明确只在同一向听层内以进张牌种数和玩家可见剩余进张张数判断严格支配，并定义冲突、并列与不可比较候选的报告/测试验收；本步先只读标注，不改变生产候选或动作。
+下一步第一个具体动作：开始步骤 7 前先补充三路 2-ply 诊断专门计划，分别固定“无权重全量候选 + 当前加权 leaf”“无权重全量候选 + `standard-only` 结构 leaf”“当前生产筛选 + 当前 2-ply”的入口、候选集合、选择语义与可比报告字段；先用 canonical 和小批 generated 样本验证三路没有被误称为胡牌概率或终局 EV。
 
 ## 专题路线图
 
@@ -65,8 +67,8 @@
 - 3 已完成：结构分析、2-ply 与动作评分模块边界
 - 4 已完成：人工确认的 canonical fixtures
 - 5 已完成：自动牌型生成器与样本报告
-- 6 下一步：保守 Pareto 支配诊断/过滤
-- 7 待开始：无权重全量 2-ply 三路诊断对照
+- 6 已完成：保守 Pareto 支配诊断/过滤
+- 7 下一步：无权重全量 2-ply 三路诊断对照
 - 8 待开始：isolationPotential 影响边界校准
 - 9 待开始：普通路线的 paired-seed 与 held-out 验证
 - 10 后续独立专题候选：番型路线收益模型可行性；不在本专题自动启动

@@ -8,6 +8,7 @@ import {
 type ExpectedStructuralMetrics = Readonly<{
   standardShanten: number;
   improvingKindCount: number;
+  liveImprovingKindCount: number;
   liveImprovingTileCount: number;
 }>;
 
@@ -59,6 +60,10 @@ const loadCanonicalStructuralExpectations = (
       assert(
         Number.isSafeInteger(metrics.improvingKindCount) && metrics.improvingKindCount >= 0,
         `${expectation.id} ${side} improving kind count`,
+      );
+      assert(
+        Number.isSafeInteger(metrics.liveImprovingKindCount) && metrics.liveImprovingKindCount >= 0,
+        `${expectation.id} ${side} live improving kind count`,
       );
       assert(
         Number.isSafeInteger(metrics.liveImprovingTileCount) && metrics.liveImprovingTileCount >= 0,

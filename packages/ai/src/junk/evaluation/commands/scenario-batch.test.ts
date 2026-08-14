@@ -140,7 +140,10 @@ describe("evaluation batch CLI", () => {
       },
     );
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("standard-only@v1");
+    expect(result.output).toContain("standard-only@v2");
     expect(result.output).toContain("candidates=14");
+    expect(files.get("/tmp/generated-batch-test/junk-generated-test.json")).toContain(
+      '"sameShantenParetoFrontier"',
+    );
   });
 });
