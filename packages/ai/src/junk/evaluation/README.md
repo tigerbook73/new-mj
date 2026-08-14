@@ -51,7 +51,7 @@ pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
 ```
 
-`scenario run` 对同一个规范化输入执行五路 evaluator，并写入同一份 JSON/Markdown 报告：
+`scenario run` 对同一个规范化输入执行六路 evaluator，并写入同一份 JSON/Markdown 报告：
 
 - `production-weighted`：当前生产混合路径，作为行为基线；
 - `standard-only`：全部合法弃牌的只读普通标准型结构指标，不加权、不选动作；
@@ -60,6 +60,8 @@ pnpm --filter @new-mj/ai evaluate arena run --help
   cliff，并选择加权值最高者；
 - `two-ply-structural-all`：全部合法弃牌进入纯标准型结构续行，每个自摸分支报告最低向听
   层的 Pareto 前沿和聚合指标；不把偏序压成分数，因此不选择首层动作。
+- `isolation-boundary`：用默认权重和仅关闭 `isolationPotential` 的权重做 one-ply/two-ply
+  paired 对照；只在一层及结构 2-ply 指标完全等价的候选组内报告排名影响，不选择动作。
 
 `standard-only@v2` 当前报告弃牌后的普通标准型向听数、理论进张牌种/牌种数，以及按玩家
 可见信息估计的存活进张牌种数和剩余进张张数；它不包含七对、番型权重，也不代表墙内
@@ -78,13 +80,14 @@ ID。该标注只用于离线诊断，不选择动作，也不筛除生产候选
 当前生成分布只用于基础牌形覆盖，不代表实战阶段分布；中盘代表性仍由固定 snapshot 提供。
 
 `scenario batch` 当前消费外部 manifest 和自包含 snapshot/generated JSONL。一次 batch 只运行一个 evaluator，
-使 checkpoint 明确绑定一种计算语义；需要五路结果时用相同输入分别运行五次。`--workers`
+使 checkpoint 明确绑定一种计算语义；需要六路结果时用相同输入分别运行六次。`--workers`
 使用已有 worker_threads executor，`--chunk-size` 决定每次交付 checkpoint 的场景数。
 `--checkpoint` 在每个 chunk 后写入包含 manifest 版本、evaluator 和已完成 evaluations 的完整
 JSON 快照；中断后用 `--resume <checkpoint.json>` 恢复。恢复时 manifest/evaluator/content hash
 任一不匹配都会失败，不会静默复用旧结果。replay batch 要等对应 provider 落地。
 
-generated 输入可运行全部五路 evaluator，包括两个只读结构 evaluator。五路报告应使用相同
+generated 输入可运行全部六路 evaluator，包括两个只读结构 evaluator和 isolation paired
+诊断。六路报告应使用相同
 manifest/content hash 分别生成；不跨 evaluator 合并分数。Markdown 摘要逐场景记录候选数、
 选择、耗时和 cache hit/miss，JSON 保留完整候选指标。
 
@@ -94,6 +97,11 @@ cliff/fallback/最终选择。纯结构路径在玩家可见信息下仍未知�
 `immediateCompletionMass` 只表示下一次自摸直接完成标准型的估计质量，
 `conditionalExpectedBestShanten` 只在非立即完成分支上统计第二弃牌可达的最低向听，
 都不是整局胡牌概率或终局 EV。
+
+`isolation-boundary@v1` 的结构等价组要求普通向听、存活进张种类/张数，以及结构 2-ply
+的进张质量、立即完成质量、条件期望最佳向听和第二弃牌前沿统计完全相同。报告中的
+`WithIsolation`/`WithoutIsolation` 只相差 `isolationPotential` 权重；组外排名变化不得归因
+为 isolation 边界，组内变化也只说明当前启发式的边际影响，不证明胜率或 EV 改善。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI

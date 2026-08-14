@@ -14,6 +14,7 @@ import { evaluateProductionFixture } from "../production-evaluator.ts";
 import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../diagnostic-evaluators.ts";
 import { evaluateStructuralMetrics } from "../structural-metrics.ts";
 import { evaluateStructuralTwoPlyAll } from "../structural-two-ply.ts";
+import { evaluateIsolationBoundary } from "../isolation-boundary.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../../../evaluation/runner.ts";
 import {
   compareCalibrationBaseline,
@@ -135,6 +136,7 @@ export const runCalibrationCli = (
         (normalized) => evaluateOnePlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateTwoPlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralTwoPlyAll(normalized.scenario.id, normalized.input),
+        (normalized) => evaluateIsolationBoundary(normalized.scenario.id, normalized.input),
       ],
       {
         runId,

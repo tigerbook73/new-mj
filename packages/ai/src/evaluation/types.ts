@@ -8,7 +8,8 @@ export type CalibrationEvaluatorKind =
   | "one-ply-all"
   | "standard-only"
   | "two-ply-all"
-  | "two-ply-structural-all";
+  | "two-ply-structural-all"
+  | "isolation-boundary";
 
 export type CalibrationScenarioSource =
   | Readonly<{ kind: "fixture"; fixtureId: string }>
