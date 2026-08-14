@@ -9,6 +9,7 @@ import {
 } from "../src/junk/evaluation/diagnostic-evaluators.ts";
 import { evaluateProductionFixture } from "../src/junk/evaluation/production-evaluator.ts";
 import { evaluateStructuralMetrics } from "../src/junk/evaluation/structural-metrics.ts";
+import { evaluateStructuralTwoPlyAll } from "../src/junk/evaluation/structural-two-ply.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../src/evaluation/runner.ts";
 
 describe("Junk diagnostic evaluators", () => {
@@ -24,6 +25,7 @@ describe("Junk diagnostic evaluators", () => {
           ({ scenario, input }) => evaluateStructuralMetrics(scenario.id, input),
           ({ scenario, input }) => evaluateOnePlyAll(scenario.id, input),
           ({ scenario, input }) => evaluateTwoPlyAll(scenario.id, input),
+          ({ scenario, input }) => evaluateStructuralTwoPlyAll(scenario.id, input),
         ],
         {
           runId: "three-routes",
@@ -39,6 +41,7 @@ describe("Junk diagnostic evaluators", () => {
         "production-weighted",
         "standard-only",
         "two-ply-all",
+        "two-ply-structural-all",
       ]);
       expect(
         report.evaluations.every(
@@ -56,6 +59,19 @@ describe("Junk diagnostic evaluators", () => {
       expect(
         report.evaluations.find(({ evaluator }) => evaluator === "standard-only")?.candidates,
       ).toHaveLength(14);
+      const structuralTwoPly = report.evaluations.find(
+        ({ evaluator }) => evaluator === "two-ply-structural-all",
+      );
+      expect(structuralTwoPly?.candidates).toHaveLength(14);
+      expect(structuralTwoPly?.selectedCandidateId).toBeUndefined();
+      expect(
+        report.evaluations.find(({ evaluator }) => evaluator === "two-ply-all")
+          ?.selectedCandidateId,
+      ).toBeDefined();
+      expect(
+        report.evaluations.find(({ evaluator }) => evaluator === "production-weighted")
+          ?.selectedCandidateId,
+      ).toBeDefined();
     },
   );
 });

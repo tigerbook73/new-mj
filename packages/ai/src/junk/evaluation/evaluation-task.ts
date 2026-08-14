@@ -7,6 +7,7 @@ import type { JunkProductionFixtureInput } from "./fixture-provider.ts";
 import { evaluateOnePlyAll, evaluateTwoPlyAll } from "./diagnostic-evaluators.ts";
 import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { evaluateStructuralMetrics } from "./structural-metrics.ts";
+import { evaluateStructuralTwoPlyAll } from "./structural-two-ply.ts";
 
 export type JunkEvaluationTaskInput = CalibrationEvaluationTaskInput<JunkProductionFixtureInput> &
   Readonly<{ evaluator: CalibrationEvaluatorKind }>;
@@ -18,5 +19,7 @@ export const evaluateJunkTask = (task: JunkEvaluationTaskInput): CalibrationEval
   if (task.evaluator === "standard-only")
     return evaluateStructuralMetrics(task.scenarioId, task.input);
   if (task.evaluator === "two-ply-all") return evaluateTwoPlyAll(task.scenarioId, task.input);
+  if (task.evaluator === "two-ply-structural-all")
+    return evaluateStructuralTwoPlyAll(task.scenarioId, task.input);
   throw new Error(`UNSUPPORTED_BATCH_EVALUATOR: ${task.evaluator}`);
 };

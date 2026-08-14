@@ -96,6 +96,9 @@ describe("evaluation CLI", () => {
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"evaluator": "standard-only"',
     );
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
+      '"evaluator": "two-ply-structural-all"',
+    );
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.md")).toContain("discard-001");
     expect(directories).toEqual(["/tmp/evaluation-cli-test"]);
 
