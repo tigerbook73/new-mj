@@ -5,6 +5,7 @@ import { runDecisionDiffCli } from "./policy-diff.ts";
 import { runBatchCalibrationCli } from "./scenario-batch.ts";
 import { runGenerateSamplesCli } from "./scenario-generate.ts";
 import { runCalibrationCli } from "./scenario.ts";
+import { runPairedStructuralValidationCli } from "./scenario-validate.ts";
 import { runCompareWeightsCli } from "./weights-compare.ts";
 import { runTuneCli } from "./weights-tune.ts";
 
@@ -28,6 +29,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["scenario", "generate"],
     summary: "Generate deterministic standard-hand JSONL samples",
     run: runGenerateSamplesCli,
+  },
+  {
+    path: ["scenario", "validate"],
+    summary: "Run paired development and held-out structural validation",
+    run: runPairedStructuralValidationCli,
   },
   {
     path: ["policy", "capture"],

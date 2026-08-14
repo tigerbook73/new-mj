@@ -41,6 +41,8 @@ pnpm --filter @new-mj/ai evaluate scenario run discard-001 \
   --baseline src/junk/evaluation/fixtures/baselines/discard-001.production-weighted.v1.baseline.json
 pnpm --filter @new-mj/ai evaluate scenario generate --seed 20260814 --count 1000 \
   --shard-index 0 --shard-count 4
+pnpm --filter @new-mj/ai evaluate scenario validate --development-seed 20260814 \
+  --held-out-seed 20260815 --count 100
 pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
   --evaluator two-ply-all --workers 4 --chunk-size 64 \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
@@ -102,6 +104,13 @@ cliff/fallback/最终选择。纯结构路径在玩家可见信息下仍未知�
 的进张质量、立即完成质量、条件期望最佳向听和第二弃牌前沿统计完全相同。报告中的
 `WithIsolation`/`WithoutIsolation` 只相差 `isolationPotential` 权重；组外排名变化不得归因
 为 isolation 边界，组内变化也只说明当前启发式的边际影响，不证明胜率或 EV 改善。
+
+`scenario validate` 固定执行 `paired-standard-heldout-v1`：开发集和留出集由两个不同的
+`standard-concealed-v1` 顶层 seed 生成，命令同时校验场景 seed 与内容 hash 不重叠；基线和
+候选逐场景共用输入。当前候选参数只允许覆盖 `isolationPotential`，默认以 0 作为关闭该项的
+探针。选择若在同向听层被另一候选同时以存活进张种类和张数严格支配，计为结构支配错误；
+开发集和留出集都不增加才通过结构门禁。该命令只写 JSON/文本报告，不写默认权重；通过门禁
+也不代表胜率或 EV 改善，任何生产采纳仍需独立 A/B 与人工确认。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI

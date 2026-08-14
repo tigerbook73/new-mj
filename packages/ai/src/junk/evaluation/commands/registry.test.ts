@@ -8,6 +8,7 @@ describe("Junk evaluation command suite", () => {
     expect(result.output).toContain("scenario list");
     expect(result.output).toContain("scenario run");
     expect(result.output).toContain("scenario batch");
+    expect(result.output).toContain("scenario validate");
     expect(result.output).toContain("policy diff");
     expect(result.output).toContain("policy capture");
     expect(result.output).toContain("weights compare");
