@@ -12,6 +12,14 @@ export {
 } from "./action-scoring.ts";
 export { scoreHandShapeAfterDiscard, type GameProgress } from "./hand-quality.ts";
 export {
+  evaluateStructuralDiscard,
+  recommendStructuralDiscard,
+  type StructuralDiscardCandidate,
+  type StructuralDiscardOptions,
+  type StructuralDiscardResult,
+  type StructuralShape,
+} from "./structural-discard.ts";
+export {
   probeSelfDrawTwoPly,
   type SelfDrawTwoPlyOutcome,
   type SelfDrawTwoPlyProbe,
