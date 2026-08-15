@@ -80,7 +80,23 @@ describe("structural claim/pass policy", () => {
     expect(result.action).toBe(actions[1]);
   });
 
-  it("prioritizes hu and conservatively passes an unmodeled minGang", () => {
+  it("searches replacement draws for minGang and chooses a strict structural improvement", () => {
+    const player = {
+      ...view(["2m", "3m", "4m", "5m", "6m", "7m", "8p", "8p", "3s", "3s", "3s", "6s", "7s"]),
+      lastDiscard: { seat: 1 as const, tile: tileIdOf("3s", 3) },
+    };
+    const minGang: JunkAction = { type: "minGang" };
+    const pass: JunkAction = { type: "pass" };
+    const result = evaluateStructuralClaim(player, [minGang, pass]);
+    const candidate = result.candidates.find(({ action }) => action.type === "minGang")!;
+
+    expect(candidate).toMatchObject({ supported: true, drawKindCount: 33 });
+    expect(candidate.leafCount).toBeGreaterThan(0);
+    expect(candidate.immediateCompletionMass).toBeGreaterThan(0);
+    expect(result.action).toBe(minGang);
+  });
+
+  it("passes when minGang has no replacement-draw branch and prioritizes hu", () => {
     const player = view(["1m", "1m", "1m"]);
     const pass: JunkAction = { type: "pass" };
     expect(recommendStructuralClaim(player, [{ type: "minGang" }, pass])).toBe(pass);

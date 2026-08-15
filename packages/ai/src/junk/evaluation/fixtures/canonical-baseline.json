@@ -45,6 +45,13 @@
       "source": { "kind": "snapshot", "snapshotId": "claim-chi-tied-pass-001" },
       "description": "吃牌后的最佳结构与 pass 打平，结构策略应 pass。",
       "tags": ["standard-only", "claim-selection", "chi", "pass", "existing-meld"]
+    },
+    {
+      "id": "claim-mingang-replacement-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-mingang-replacement-001" },
+      "description": "明杠补牌存在立即完成质量，结构策略应 minGang。",
+      "tags": ["standard-only", "claim-selection", "minGang", "replacement-draw"]
     }
   ]
 }

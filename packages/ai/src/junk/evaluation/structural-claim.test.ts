@@ -26,4 +26,19 @@ describe("structural-claim evaluator", () => {
     expect(JSON.parse(production.selectedCandidateId!).type).toBe(expectedType);
     expect(structural.candidates).toHaveLength(2);
   });
+
+  it("reports the canonical minGang replacement-draw search", () => {
+    const scenario = JUNK_CALIBRATION_MANIFEST.scenarios.find(
+      ({ id }) => id === "claim-mingang-replacement-001",
+    )!;
+    const normalized = CANONICAL_JUNK_SCENARIO_PROVIDER.resolve(scenario);
+    const structural = evaluateStructuralClaimPolicy(scenario.id, normalized.input);
+    const minGang = structural.candidates.find(
+      ({ candidateId }) => JSON.parse(candidateId).type === "minGang",
+    )!;
+
+    expect(JSON.parse(structural.selectedCandidateId!).type).toBe("minGang");
+    expect(minGang.metrics).toMatchObject({ supported: true, drawKindCount: 33 });
+    expect(minGang.metrics.immediateCompletionMass).toBeGreaterThan(0);
+  });
 });

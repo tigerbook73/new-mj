@@ -42,7 +42,7 @@ export type StructuralDiscardOptions = Readonly<{
 const DEFAULT_MAX_FIRST_CANDIDATES = 5;
 const AGGREGATE_COMPARISON_EPSILON = 1e-12;
 
-const visibleTileIds = (view: JunkPlayerView): Set<TileId> =>
+export const visibleStructuralTileIds = (view: JunkPlayerView): Set<TileId> =>
   new Set([
     ...view.hand,
     ...(view.lastDiscard ? [view.lastDiscard.tile] : []),
@@ -52,7 +52,7 @@ const visibleTileIds = (view: JunkPlayerView): Set<TileId> =>
     ]),
   ]);
 
-const visibleKindCounts = (tiles: ReadonlySet<TileId>): Map<TileKind, number> => {
+export const structuralVisibleKindCounts = (tiles: ReadonlySet<TileId>): Map<TileKind, number> => {
   const counts = new Map<TileKind, number>();
   for (const tile of tiles) {
     const kind = STANDARD_TILE_SET.kindOf(tile);
@@ -61,7 +61,7 @@ const visibleKindCounts = (tiles: ReadonlySet<TileId>): Map<TileKind, number> =>
   return counts;
 };
 
-const shapeOf = (
+export const structuralShapeOf = (
   hand: readonly TileId[],
   visibleCounts: ReadonlyMap<TileKind, number>,
   existingMelds: number,
@@ -82,9 +82,14 @@ export const evaluateVisibleStructuralShape = (
   view: JunkPlayerView,
   hand: readonly TileId[],
   existingMelds: number,
-): StructuralShape => shapeOf(hand, visibleKindCounts(visibleTileIds(view)), existingMelds);
+): StructuralShape =>
+  structuralShapeOf(
+    hand,
+    structuralVisibleKindCounts(visibleStructuralTileIds(view)),
+    existingMelds,
+  );
 
-const compareShape = (left: StructuralShape, right: StructuralShape): number =>
+export const compareStructuralShape = (left: StructuralShape, right: StructuralShape): number =>
   left.standardShanten - right.standardShanten ||
   right.liveImprovingKindCount - left.liveImprovingKindCount ||
   right.liveImprovingTileCount - left.liveImprovingTileCount;
@@ -136,7 +141,7 @@ const compareFinal = (
       right.conditionalExpectedBestLiveImprovingTileCount ?? -1,
       left.conditionalExpectedBestLiveImprovingTileCount ?? -1,
     ) ||
-    compareShape(left.onePly, right.onePly) ||
+    compareStructuralShape(left.onePly, right.onePly) ||
     compareAction(left.action, right.action)
   );
 };
@@ -150,15 +155,15 @@ export const evaluateStructuralDiscard = (
   legalActions: readonly JunkAction[],
   options: StructuralDiscardOptions = {},
 ): StructuralDiscardResult => {
-  const occupied = visibleTileIds(view);
-  const visibleCounts = visibleKindCounts(occupied);
+  const occupied = visibleStructuralTileIds(view);
+  const visibleCounts = structuralVisibleKindCounts(occupied);
   const existingMelds = view.seats[view.seat]!.melds.length;
   const discards = legalActions.filter(
     (action): action is Extract<JunkAction, { type: "discard" }> => action.type === "discard",
   );
   const base = discards.map((action) => ({
     action,
-    onePly: shapeOf(
+    onePly: structuralShapeOf(
       view.hand.filter((tile) => tile !== action.tile),
       visibleCounts,
       existingMelds,
@@ -176,7 +181,8 @@ export const evaluateStructuralDiscard = (
       .filter(({ dominated }) => !dominated)
       .sort(
         (left, right) =>
-          compareShape(left.onePly, right.onePly) || compareAction(left.action, right.action),
+          compareStructuralShape(left.onePly, right.onePly) ||
+          compareAction(left.action, right.action),
       )
       .slice(0, maxFirstCandidates)
       .map(({ action }) => action.tile),
@@ -227,11 +233,11 @@ export const evaluateStructuralDiscard = (
           continue;
         }
         const leafVisible = new Set(occupied).add(drawnTile);
-        const leafCounts = visibleKindCounts(leafVisible);
+        const leafCounts = structuralVisibleKindCounts(leafVisible);
         const bestLeaf = uniqueDiscardActions(afterDraw)
           .map((action) => ({
             action,
-            shape: shapeOf(
+            shape: structuralShapeOf(
               afterDraw.filter((tile) => tile !== action.tile),
               leafCounts,
               existingMelds,
@@ -239,7 +245,8 @@ export const evaluateStructuralDiscard = (
           }))
           .sort(
             (left, right) =>
-              compareShape(left.shape, right.shape) || compareAction(left.action, right.action),
+              compareStructuralShape(left.shape, right.shape) ||
+              compareAction(left.action, right.action),
           )[0];
         if (!bestLeaf) continue;
         leafCount += 1;

@@ -66,8 +66,9 @@ pnpm --filter @new-mj/ai evaluate arena run --help
   层的 Pareto 前沿和聚合指标；不把偏序压成分数，因此不选择首层动作。
 - `structural-bounded`：未接入默认生产的纯结构弃牌候选；报告一层支配标记、是否进入固定
   五候选搜索预算、2-ply 聚合指标和最终选择，用于与 full teacher 做显式对照。
-- `structural-claim`：未接入默认生产的 `hu + chi/peng + pass` 结构候选；报告每个动作是否
-  已建模、普通结构指标和 claim 后最佳弃牌。结构打平时 pass，minGang 补牌未建模时也 pass。
+- `structural-claim`：未接入默认生产的 `hu + chi/peng/minGang + pass` 结构候选；报告每个动作
+  是否已建模、普通结构指标和 claim 后最佳弃牌。minGang 额外报告至多 34 种可见剩余补牌、
+  立即完成质量和非完成分支的条件期望最佳结构；结构打平或没有补牌分支时 pass。
 - `isolation-boundary`：用默认权重和仅关闭 `isolationPotential` 的权重做 one-ply/two-ply
   paired 对照；只在一层及结构 2-ply 指标完全等价的候选组内报告排名影响，不选择动作。
 

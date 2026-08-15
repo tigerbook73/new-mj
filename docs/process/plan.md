@@ -4,7 +4,7 @@
 
 ## 当前任务
 
-当前专题是逐步建立新的纯结构 Junk 策略。“弃牌-only 的 bounded 2-ply 影子候选”slice 已完成；生产默认仍是现有加权策略，`isolationPotential` 保持 `1.5`。
+当前专题是逐步建立新的纯结构 Junk 策略。minGang 补牌结构 slice 已完成；生产默认仍是现有加权策略，`isolationPotential` 保持 `1.5`。
 
 ## 当前状态
 
@@ -29,12 +29,13 @@
 - `structural-bounded@v1` evaluation adapter 已接入 canonical `scenario run` 和 generated/snapshot `scenario batch`；报告保留全部首弃的一层指标、支配/截断标记、实际搜索数、2-ply 聚合指标及最终选择。`discard-001` 真实 CLI 冒烟七路全成功，bounded 选择与当前生产均为 `5p`，单次信息性耗时约 `40.8ms`；报告写入临时目录，不归档。
 - `bounded-structural-teacher-v1` 固定开发/留出 split、动作一致率、全部差异 seed、teacher 相对 bounded 的四项结构差值，以及两路 P50/P95；门槛是两组一致率均不低于 `99%` 且 bounded/full P95 比值均不高于 `0.6`。默认每组 1000 个样本，只走人工慢速 evaluation，不进入 `verify`。
 - seed `20260814` 的 1000 个开发场景 bounded/full 一致 `1000/1000`，平均搜索 4.30 个首弃，P50/P95 为 `27.37/33.85ms`，full 为 `85.33/95.41ms`，P95 比值 `0.355`；seed `20260815` 的 1000 个留出场景一致 `999/1000`，平均搜索 4.31 个，P50/P95 为 `26.93/33.41ms`，full 为 `83.46/94.51ms`，比值 `0.354`。唯一差异 seed `3520660970` 的立即完成与条件期望向听相同，teacher 仅多约 `0.066` 条件期望进张种类和 `0.131` 张；当前固定上限 5 通过近似门槛，但不声称等价于 full。报告位于临时目录，不归档。
-- `structural-claim.ts` 提供未接入默认入口的 `hu + chi/peng + pass` 影子候选：pass 比较当前 13 张保留结构，chi/peng 模拟副露并枚举下一弃牌后比较最佳普通牌型向听、存活进张种类和张数；claim 必须严格更好，结构打平时 pass。既有 fixture 已覆盖并通过“chi 破坏听牌则 pass”“peng 后进入听牌则 claim”“等宽等向听 chi 则 pass”；hu 始终优先。minGang 因补牌分支尚未建模而保守 pass，anGang/buGang、七对、番型和防守仍不在新路径。
-- snapshot provider 已支持版本化 `chi/peng/minGang/hu/pass` legal action；三条 claim 边界已升级为 canonical snapshot。`structural-claim@v1` adapter 已接入八路 `scenario run`、batch allowlist 和 worker task；三条 canonical 中结构/生产均分别选择 `pass/peng/pass`。真实 `claim-peng-reaches-tenpai-001` CLI 八路全成功，结构 adapter 用约 `1.27ms` 选择 peng；弃牌专属 evaluator 在 claim 输入上稳定返回空候选，不伪造选择。报告位于临时目录，不归档。
+- `structural-claim.ts` 提供未接入默认入口的 `hu + chi/peng/minGang + pass` 影子候选：pass 比较当前 13 张保留结构，chi/peng 模拟副露并枚举下一弃牌后比较最佳普通牌型向听、存活进张种类和张数；claim 必须严格更好，结构打平时 pass。既有 fixture 已覆盖并通过“chi 破坏听牌则 pass”“peng 后进入听牌则 claim”“等宽等向听 chi 则 pass”；hu 始终优先。anGang/buGang、七对、番型和防守仍不在新路径。
+- minGang 不获得固定奖励：移除三张同 kind 手牌并增加一个副露后，按本人可见剩余副本枚举至多 34 种补牌；已完成质量优先，其余分支枚举至多 11 种不同 kind 弃牌并聚合条件期望最佳向听、进张种类和张数。pass 以零立即完成质量和当前结构参与固定字典序，浮点比较使用 `1e-12` 容差；无最近弃牌、手中不足三张、无未知副本或墙空时 minGang 不支持并 pass。预算由 `34 × 11` 固定，不按墙钟时间截断；该质量仍是信息集估计，不是真实杠尾概率或终局 EV。
+- snapshot provider 已支持版本化 `chi/peng/minGang/hu/pass` legal action；四条 claim 边界已升级为 canonical snapshot。`structural-claim@v1` adapter 已接入八路 `scenario run`、batch allowlist 和 worker task，并报告 minGang 补牌分支数、叶子数和聚合结构。`claim-mingang-replacement-001` 中 3s 四张均可见，候选枚举其余 33 种补牌、31 个非完成叶子，立即完成质量 `0.06557377049180328`，条件结构为 0 向听、2 种/8 张；结构候选用约 `9.28ms` 选择 minGang，当前生产仍选择 pass。八路 CLI 全成功，报告位于临时目录，不归档。
 
 ## 下一步第一个具体动作
 
-建立 minGang 补牌结构 slice brief：定义“明杠 → 按可见剩余副本枚举补牌 → 最佳弃牌”的确定性 teacher、与 pass 的比较顺序和固定性能预算；在 fixture 验证前继续保守 pass。
+建立自回合 gang 结构 slice brief：先分别确认 anGang 移除四张并新增副露、buGang 移除一张并升级既有 peng 的状态变换，再定义两者共用的补牌搜索、与直接弃牌的比较边界和 canonical fixture；实现前不改变生产入口。
 
 ## 阻塞与遗留问题
 

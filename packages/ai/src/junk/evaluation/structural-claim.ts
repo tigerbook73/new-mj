@@ -23,6 +23,14 @@ export const evaluateStructuralClaimPolicy = (
         standardShanten: candidate.shape?.standardShanten ?? null,
         liveImprovingKindCount: candidate.shape?.liveImprovingKindCount ?? null,
         liveImprovingTileCount: candidate.shape?.liveImprovingTileCount ?? null,
+        drawKindCount: candidate.drawKindCount,
+        leafCount: candidate.leafCount,
+        immediateCompletionMass: candidate.immediateCompletionMass,
+        conditionalExpectedBestShanten: candidate.conditionalExpectedBestShanten,
+        conditionalExpectedBestLiveImprovingKindCount:
+          candidate.conditionalExpectedBestLiveImprovingKindCount,
+        conditionalExpectedBestLiveImprovingTileCount:
+          candidate.conditionalExpectedBestLiveImprovingTileCount,
       },
     })),
     performance: {
