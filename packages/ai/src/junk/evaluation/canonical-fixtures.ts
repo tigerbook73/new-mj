@@ -1,6 +1,9 @@
 import manifestData from "./fixtures/canonical-baseline.json" with { type: "json" };
 import fixtureData from "./fixtures/hand-shape-001.json" with { type: "json" };
 import snapshotData from "./fixtures/midgame-shape-001.snapshot.json" with { type: "json" };
+import claimChiBreaksTenpaiData from "./fixtures/claim-chi-breaks-tenpai-001.snapshot.json" with { type: "json" };
+import claimPengReachesTenpaiData from "./fixtures/claim-peng-reaches-tenpai-001.snapshot.json" with { type: "json" };
+import claimChiTiedPassData from "./fixtures/claim-chi-tied-pass-001.snapshot.json" with { type: "json" };
 import {
   createJunkFixtureProviderFromRegistry,
   type JunkProductionFixture,
@@ -26,7 +29,14 @@ export const CANONICAL_JUNK_FIXTURE_PROVIDER = createJunkFixtureProviderFromRegi
 
 export const CANONICAL_JUNK_SNAPSHOT_PROVIDER = createJunkSnapshotProvider(
   JUNK_CALIBRATION_MANIFEST,
-  { "midgame-shape-001": snapshotData as unknown as JunkProductionSnapshotData },
+  {
+    "midgame-shape-001": snapshotData as unknown as JunkProductionSnapshotData,
+    "claim-chi-breaks-tenpai-001":
+      claimChiBreaksTenpaiData as unknown as JunkProductionSnapshotData,
+    "claim-peng-reaches-tenpai-001":
+      claimPengReachesTenpaiData as unknown as JunkProductionSnapshotData,
+    "claim-chi-tied-pass-001": claimChiTiedPassData as unknown as JunkProductionSnapshotData,
+  },
 );
 
 export const CANONICAL_JUNK_SCENARIO_PROVIDER = {

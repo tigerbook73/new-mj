@@ -16,6 +16,7 @@ import { evaluateStructuralMetrics } from "../structural-metrics.ts";
 import { evaluateStructuralTwoPlyAll } from "../structural-two-ply.ts";
 import { evaluateIsolationBoundary } from "../isolation-boundary.ts";
 import { evaluateStructuralBounded } from "../structural-bounded.ts";
+import { evaluateStructuralClaimPolicy } from "../structural-claim.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../../../evaluation/runner.ts";
 import {
   compareCalibrationBaseline,
@@ -138,6 +139,7 @@ export const runCalibrationCli = (
         (normalized) => evaluateTwoPlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralTwoPlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralBounded(normalized.scenario.id, normalized.input),
+        (normalized) => evaluateStructuralClaimPolicy(normalized.scenario.id, normalized.input),
         (normalized) => evaluateIsolationBoundary(normalized.scenario.id, normalized.input),
       ],
       {

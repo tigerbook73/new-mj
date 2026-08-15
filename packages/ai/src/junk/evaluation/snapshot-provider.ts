@@ -42,7 +42,11 @@ export type JunkProductionSnapshotData = Readonly<{
     justDrawn?: TileRef;
     lastDiscard?: Readonly<{ seat: 0 | 1 | 2 | 3; tile: TileRef }>;
   }>;
-  legalActions: readonly Readonly<{ type: "discard"; tile: TileRef }>[];
+  legalActions: readonly (
+    | Readonly<{ type: "discard"; tile: TileRef }>
+    | Readonly<{ type: "chi"; tiles: readonly [TileRef, TileRef] }>
+    | Readonly<{ type: "peng" | "minGang" | "hu" | "pass" }>
+  )[];
 }>;
 
 export type JunkSnapshotDataRegistry = Readonly<Record<string, JunkProductionSnapshotData>>;
@@ -99,10 +103,13 @@ const normalizeJunkVisibleDecision = (
         }
       : {}),
   };
-  const legalActions: JunkAction[] = data.legalActions.map((action) => ({
-    type: "discard",
-    tile: tileId(action.tile),
-  }));
+  const legalActions: JunkAction[] = data.legalActions.map((action) => {
+    if (action.type === "discard") return { type: "discard", tile: tileId(action.tile) };
+    if (action.type === "chi") {
+      return { type: "chi", tiles: [tileId(action.tiles[0]), tileId(action.tiles[1])] };
+    }
+    return { type: action.type };
+  });
   const handIds = new Set(view.hand);
   assert(
     legalActions.every((action) => action.type !== "discard" || handIds.has(action.tile)),
@@ -132,18 +139,22 @@ export const normalizeJunkGeneratedDecision = (
     "generated sample has no melds",
   );
   assert(
-    data.legalActions.length === data.view.hand.length,
+    data.legalActions.length === data.view.hand.length &&
+      data.legalActions.every(({ type }) => type === "discard"),
     "generated actions must cover the hand",
+  );
+  const discardActions = data.legalActions.filter(
+    (action): action is Readonly<{ type: "discard"; tile: TileRef }> => action.type === "discard",
   );
   const handRefs = new Set(data.view.hand.map(({ kind, copy }) => `${kind}:${copy}`));
   assert(handRefs.size === data.view.hand.length, "generated hand contains duplicate TileIds");
   assert(
-    data.legalActions.every(({ tile }) => handRefs.has(`${tile.kind}:${tile.copy}`)),
+    discardActions.every(({ tile }) => handRefs.has(`${tile.kind}:${tile.copy}`)),
     "generated actions must reference the hand",
   );
   assert(
-    new Set(data.legalActions.map(({ tile }) => `${tile.kind}:${tile.copy}`)).size ===
-      data.legalActions.length,
+    new Set(discardActions.map(({ tile }) => `${tile.kind}:${tile.copy}`)).size ===
+      discardActions.length,
     "generated actions must be unique",
   );
   return normalizeJunkVisibleDecision(scenario, data, "generated");
