@@ -20,6 +20,12 @@ export {
   type StructuralShape,
 } from "./structural-discard.ts";
 export {
+  evaluateStructuralClaim,
+  recommendStructuralClaim,
+  type StructuralClaimCandidate,
+  type StructuralClaimResult,
+} from "./structural-claim.ts";
+export {
   probeSelfDrawTwoPly,
   type SelfDrawTwoPlyOutcome,
   type SelfDrawTwoPlyProbe,

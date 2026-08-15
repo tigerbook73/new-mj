@@ -45,6 +45,7 @@ const AGGREGATE_COMPARISON_EPSILON = 1e-12;
 const visibleTileIds = (view: JunkPlayerView): Set<TileId> =>
   new Set([
     ...view.hand,
+    ...(view.lastDiscard ? [view.lastDiscard.tile] : []),
     ...view.seats.flatMap(({ melds, discards }) => [
       ...melds.flatMap(({ tiles }) => tiles),
       ...discards.map(({ tile }) => tile),
@@ -75,6 +76,13 @@ const shapeOf = (
     liveImprovingTileCount: liveCopies.reduce((sum, copies) => sum + copies, 0),
   };
 };
+
+/** Standard-only shape under the player's current visible information set. */
+export const evaluateVisibleStructuralShape = (
+  view: JunkPlayerView,
+  hand: readonly TileId[],
+  existingMelds: number,
+): StructuralShape => shapeOf(hand, visibleKindCounts(visibleTileIds(view)), existingMelds);
 
 const compareShape = (left: StructuralShape, right: StructuralShape): number =>
   left.standardShanten - right.standardShanten ||
