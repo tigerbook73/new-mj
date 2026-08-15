@@ -43,6 +43,8 @@ pnpm --filter @new-mj/ai evaluate scenario generate --seed 20260814 --count 1000
   --shard-index 0 --shard-count 4
 pnpm --filter @new-mj/ai evaluate scenario validate --development-seed 20260814 \
   --held-out-seed 20260815 --count 100
+pnpm --filter @new-mj/ai evaluate scenario teacher-audit --development-seed 20260814 \
+  --held-out-seed 20260815 --count 1000
 pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
   --evaluator two-ply-all --workers 4 --chunk-size 64 \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
@@ -114,6 +116,13 @@ cliff/fallback/最终选择。纯结构路径在玩家可见信息下仍未知�
 开发集和留出集都不增加才通过结构门禁。该命令只写 JSON/文本报告，不写默认权重；通过门禁
 也不代表胜率或 EV 改善，任何生产采纳仍需独立 A/B 与人工确认。JSON 同时保留所有决策变化
 及基线/候选结构支配错误的场景 seed，供相同生成器重建后人工复核。
+
+`scenario teacher-audit` 固定执行 `bounded-structural-teacher-v1`，在互不重叠的开发集和
+留出集上逐场景配对 bounded 与 full teacher。JSON 保存动作一致率、全部差异场景 seed、
+teacher 相对 bounded 的立即完成/条件期望向听/进张种类与张数差值，以及两路耗时的
+P50/P95。首个门槛固定为两组一致率均不低于 `99%`，且 bounded/full 的 P95 比值均不高于
+`0.6`；门槛只判断当前 shortlist 近似是否值得继续评估，不证明牌理、胜率或终局 EV，
+也不切换生产入口。默认每组 1000 个样本；这是人工慢速 evaluation 命令，不进入 `verify`。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI

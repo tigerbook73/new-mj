@@ -27,10 +27,12 @@
 - 结构候选只使用本人可见信息：手牌、所有公开牌河与副露按 `TileId` 去重后估算剩余副本。它不读取真实牌墙、对手暗手或推测分布，因此是信息集结构估计，不是实战摸牌概率或终局 EV。
 - 新候选已从 Junk facade 导出供后续显式评估，但 `recommendJunkAction`/`chooseJunkAction` 未切换；claim、番型、七对和防守仍未进入新路径。
 - `structural-bounded@v1` evaluation adapter 已接入 canonical `scenario run` 和 generated/snapshot `scenario batch`；报告保留全部首弃的一层指标、支配/截断标记、实际搜索数、2-ply 聚合指标及最终选择。`discard-001` 真实 CLI 冒烟七路全成功，bounded 选择与当前生产均为 `5p`，单次信息性耗时约 `40.8ms`；报告写入临时目录，不归档。
+- `bounded-structural-teacher-v1` 固定开发/留出 split、动作一致率、全部差异 seed、teacher 相对 bounded 的四项结构差值，以及两路 P50/P95；门槛是两组一致率均不低于 `99%` 且 bounded/full P95 比值均不高于 `0.6`。默认每组 1000 个样本，只走人工慢速 evaluation，不进入 `verify`。
+- seed `20260814` 的 1000 个开发场景 bounded/full 一致 `1000/1000`，平均搜索 4.30 个首弃，P50/P95 为 `27.37/33.85ms`，full 为 `85.33/95.41ms`，P95 比值 `0.355`；seed `20260815` 的 1000 个留出场景一致 `999/1000`，平均搜索 4.31 个，P50/P95 为 `26.93/33.41ms`，full 为 `83.46/94.51ms`，比值 `0.354`。唯一差异 seed `3520660970` 的立即完成与条件期望向听相同，teacher 仅多约 `0.066` 条件期望进张种类和 `0.131` 张；当前固定上限 5 通过近似门槛，但不声称等价于 full。报告位于临时目录，不归档。
 
 ## 下一步第一个具体动作
 
-建立 bounded/full teacher 的大样本配对审计命令与验收字段：固定开发/留出 seed，至少各 1000 个场景，报告一致率、差异 seed、结构损失和 bounded/full 的 P50/P95；先确定门槛，不切换默认生产入口。
+建立新结构策略的 claim/pass slice brief：盘点现有 chi/peng/gang/pass canonical fixture，定义不使用旧权重的结构比较与首个可验收竖切；在设计确认前不接入默认生产入口。
 
 ## 阻塞与遗留问题
 
