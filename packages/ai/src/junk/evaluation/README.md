@@ -110,7 +110,8 @@ cliff/fallback/最终选择。纯结构路径在玩家可见信息下仍未知�
 候选逐场景共用输入。当前候选参数只允许覆盖 `isolationPotential`，默认以 0 作为关闭该项的
 探针。选择若在同向听层被另一候选同时以存活进张种类和张数严格支配，计为结构支配错误；
 开发集和留出集都不增加才通过结构门禁。该命令只写 JSON/文本报告，不写默认权重；通过门禁
-也不代表胜率或 EV 改善，任何生产采纳仍需独立 A/B 与人工确认。
+也不代表胜率或 EV 改善，任何生产采纳仍需独立 A/B 与人工确认。JSON 同时保留所有决策变化
+及基线/候选结构支配错误的场景 seed，供相同生成器重建后人工复核。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI

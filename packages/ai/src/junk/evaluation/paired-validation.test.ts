@@ -20,6 +20,7 @@ describe("paired structural validation", () => {
       heldOut: { seed: 202, scenarioCount: 1 },
     });
     expect(typeof result.accepted).toBe("boolean");
+    expect(Array.isArray(result.development.decisionDifferenceScenarioSeeds)).toBe(true);
   });
 
   it("rejects identical top-level seeds before evaluating a held-out split", () => {

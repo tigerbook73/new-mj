@@ -7,6 +7,7 @@ export type StructuralValidationSplit = Readonly<{
   seed: number;
   scenarioCount: number;
   decisionDifferenceCount: number;
+  decisionDifferenceScenarioSeeds: readonly number[];
   baselineDominatedSelectionCount: number;
   candidateDominatedSelectionCount: number;
   baselineDominatedScenarioSeeds: readonly number[];
@@ -61,7 +62,7 @@ const evaluateSplit = (
   candidateWeights: JunkWeights,
 ): StructuralValidationSplit => {
   const generated = generateJunkSamples({ seed, count });
-  let decisionDifferenceCount = 0;
+  const decisionDifferenceScenarioSeeds: number[] = [];
   const baselineDominatedScenarioSeeds: number[] = [];
   const candidateDominatedScenarioSeeds: number[] = [];
   for (const sample of generated.samples) {
@@ -75,7 +76,9 @@ const evaluateSplit = (
     );
     const baselineId = JSON.stringify(baseline);
     const candidateId = JSON.stringify(candidate);
-    if (baselineId !== candidateId) decisionDifferenceCount += 1;
+    if (baselineId !== candidateId) {
+      decisionDifferenceScenarioSeeds.push(scenarioSeed(sample.scenario.source));
+    }
     const structural = evaluateStructuralMetrics(sample.scenario.id, normalized.input);
     const byId = new Map(structural.candidates.map((entry) => [entry.candidateId, entry]));
     const baselineDominatedBy = byId.get(baselineId)?.metrics.dominatedByCandidateIds;
@@ -93,7 +96,8 @@ const evaluateSplit = (
   return {
     seed,
     scenarioCount: generated.samples.length,
-    decisionDifferenceCount,
+    decisionDifferenceCount: decisionDifferenceScenarioSeeds.length,
+    decisionDifferenceScenarioSeeds,
     baselineDominatedSelectionCount: baselineDominatedScenarioSeeds.length,
     candidateDominatedSelectionCount: candidateDominatedScenarioSeeds.length,
     baselineDominatedScenarioSeeds,

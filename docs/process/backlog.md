@@ -22,6 +22,10 @@
 
 运行一次真实规模的 `pnpm --filter @new-mj/ai evaluate weights tune`，人工 review 报告后决定是否用 `--write` 采纳候选权重，或手动更新 `default-weights.json`。不把自对弈胜率直接当作牌理真值。
 
+### 严格结构支配护栏与 isolation 重新评估
+
+先在生产候选选择前只过滤同向听层中被存活进张种类和张数严格支配的弃牌，再重新评估将 `isolationPotential` 从 `1.5` 降为 `0`。必须保留向听与进张宽度冲突、Pareto 不可比较候选；用 canonical fixture、paired held-out 和同种子自对弈共同验收，不因 isolation=0 单独自对弈占优就直接采纳。
+
 ### Junk AI 自我优化基础设施推广评估
 
 评估 Feature 参数化、自对弈 arena、调参脚本和调参算法是否适合杭州/血战到底。可复用 Layer B（打分求和）、Layer C（强度旋钮）和 Layer D（自对弈引擎/调参算法）的模式；玩法专属 Feature 抽取仍需各玩法单独设计。
