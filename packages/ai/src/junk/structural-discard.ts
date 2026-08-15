@@ -39,6 +39,9 @@ export type StructuralDiscardOptions = Readonly<{
   applyDominanceGuardrail?: boolean;
 }>;
 
+const DEFAULT_MAX_FIRST_CANDIDATES = 5;
+const AGGREGATE_COMPARISON_EPSILON = 1e-12;
+
 const visibleTileIds = (view: JunkPlayerView): Set<TileId> =>
   new Set([
     ...view.hand,
@@ -110,13 +113,21 @@ const compareFinal = (
 ): number => {
   const leftShanten = left.conditionalExpectedBestShanten ?? Number.POSITIVE_INFINITY;
   const rightShanten = right.conditionalExpectedBestShanten ?? Number.POSITIVE_INFINITY;
+  const compareAggregate = (leftValue: number, rightValue: number): number =>
+    leftValue === rightValue || Math.abs(leftValue - rightValue) <= AGGREGATE_COMPARISON_EPSILON
+      ? 0
+      : leftValue - rightValue;
   return (
-    (right.immediateCompletionMass ?? -1) - (left.immediateCompletionMass ?? -1) ||
-    leftShanten - rightShanten ||
-    (right.conditionalExpectedBestLiveImprovingKindCount ?? -1) -
-      (left.conditionalExpectedBestLiveImprovingKindCount ?? -1) ||
-    (right.conditionalExpectedBestLiveImprovingTileCount ?? -1) -
-      (left.conditionalExpectedBestLiveImprovingTileCount ?? -1) ||
+    compareAggregate(right.immediateCompletionMass ?? -1, left.immediateCompletionMass ?? -1) ||
+    compareAggregate(leftShanten, rightShanten) ||
+    compareAggregate(
+      right.conditionalExpectedBestLiveImprovingKindCount ?? -1,
+      left.conditionalExpectedBestLiveImprovingKindCount ?? -1,
+    ) ||
+    compareAggregate(
+      right.conditionalExpectedBestLiveImprovingTileCount ?? -1,
+      left.conditionalExpectedBestLiveImprovingTileCount ?? -1,
+    ) ||
     compareShape(left.onePly, right.onePly) ||
     compareAction(left.action, right.action)
   );
@@ -151,7 +162,7 @@ export const evaluateStructuralDiscard = (
     dominated:
       applyGuardrail && base.some((other) => strictlyDominates(other.onePly, candidate.onePly)),
   }));
-  const maxFirstCandidates = options.maxFirstCandidates ?? 4;
+  const maxFirstCandidates = options.maxFirstCandidates ?? DEFAULT_MAX_FIRST_CANDIDATES;
   const searchedActions = new Set(
     withDominance
       .filter(({ dominated }) => !dominated)
