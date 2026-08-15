@@ -5,6 +5,7 @@ import claimChiBreaksTenpaiData from "./fixtures/claim-chi-breaks-tenpai-001.sna
 import claimPengReachesTenpaiData from "./fixtures/claim-peng-reaches-tenpai-001.snapshot.json" with { type: "json" };
 import claimChiTiedPassData from "./fixtures/claim-chi-tied-pass-001.snapshot.json" with { type: "json" };
 import claimMinGangReplacementData from "./fixtures/claim-mingang-replacement-001.snapshot.json" with { type: "json" };
+import selfGangEquivalenceData from "./fixtures/self-gang-equivalence-001.snapshot.json" with { type: "json" };
 import {
   createJunkFixtureProviderFromRegistry,
   type JunkProductionFixture,
@@ -39,6 +40,7 @@ export const CANONICAL_JUNK_SNAPSHOT_PROVIDER = createJunkSnapshotProvider(
     "claim-chi-tied-pass-001": claimChiTiedPassData as unknown as JunkProductionSnapshotData,
     "claim-mingang-replacement-001":
       claimMinGangReplacementData as unknown as JunkProductionSnapshotData,
+    "self-gang-equivalence-001": selfGangEquivalenceData as unknown as JunkProductionSnapshotData,
   },
 );
 

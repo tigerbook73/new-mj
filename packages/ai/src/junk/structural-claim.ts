@@ -1,7 +1,5 @@
 import {
   STANDARD_TILE_SET,
-  computeShanten,
-  tileIdOf,
   type JunkAction,
   type JunkPlayerView,
   type TileId,
@@ -9,10 +7,8 @@ import {
 } from "@new-mj/core";
 import {
   compareStructuralShape,
+  evaluateStructuralContinuation,
   evaluateVisibleStructuralShape,
-  structuralShapeOf,
-  structuralVisibleKindCounts,
-  visibleStructuralTileIds,
   type StructuralShape,
 } from "./structural-discard.ts";
 
@@ -122,59 +118,13 @@ const evaluateMinGang = (
     ? view.hand.filter((tile) => kindOf(tile) === claimedKind).slice(0, 3)
     : [];
   const afterClaim = matching.length === 3 ? removeTiles(view.hand, matching) : undefined;
-  const occupied = visibleStructuralTileIds(view);
-  const unknownTileCount = STANDARD_TILE_SET.size - occupied.size;
-  if (!afterClaim || view.wallCount <= 0 || unknownTileCount <= 0) {
+  if (!afterClaim) {
     return { action, supported: false, shape: null, bestDiscard: null, ...emptyAggregate };
   }
 
-  const visibleCounts = structuralVisibleKindCounts(occupied);
   const meldCount = view.seats[view.seat]!.melds.length + 1;
-  let drawKindCount = 0;
-  let leafCount = 0;
-  let completionMass = 0;
-  let continuationMass = 0;
-  let weightedShanten = 0;
-  let weightedKinds = 0;
-  let weightedTiles = 0;
-  for (const kind of STANDARD_TILE_SET.kinds) {
-    const remaining = Math.max(0, STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0));
-    if (remaining === 0) continue;
-    const drawnTile = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
-      tileIdOf(kind, copy),
-    ).find((tile) => !occupied.has(tile));
-    if (drawnTile === undefined) continue;
-    drawKindCount += 1;
-    const probability = remaining / unknownTileCount;
-    const afterDraw = [...afterClaim, drawnTile];
-    if (
-      computeShanten(afterDraw, { sevenPairs: false }, STANDARD_TILE_SET, undefined, meldCount) < 0
-    ) {
-      completionMass += probability;
-      continue;
-    }
-    const leafCounts = structuralVisibleKindCounts(new Set(occupied).add(drawnTile));
-    const bestLeaf = uniqueDiscards(afterDraw)
-      .map((discard) => ({
-        discard,
-        shape: structuralShapeOf(
-          afterDraw.filter((tile) => tile !== discard),
-          leafCounts,
-          meldCount,
-        ),
-      }))
-      .sort(
-        (left, right) =>
-          compareStructuralShape(left.shape, right.shape) || left.discard - right.discard,
-      )[0];
-    if (!bestLeaf) continue;
-    leafCount += 1;
-    continuationMass += probability;
-    weightedShanten += probability * bestLeaf.shape.standardShanten;
-    weightedKinds += probability * bestLeaf.shape.liveImprovingKindCount;
-    weightedTiles += probability * bestLeaf.shape.liveImprovingTileCount;
-  }
-  if (drawKindCount === 0) {
+  const continuation = evaluateStructuralContinuation(view, afterClaim, meldCount);
+  if (continuation.drawKindCount === 0) {
     return { action, supported: false, shape: null, bestDiscard: null, ...emptyAggregate };
   }
   return {
@@ -182,15 +132,7 @@ const evaluateMinGang = (
     supported: true,
     shape: null,
     bestDiscard: null,
-    drawKindCount,
-    leafCount,
-    immediateCompletionMass: completionMass,
-    conditionalExpectedBestShanten:
-      continuationMass > 0 ? weightedShanten / continuationMass : null,
-    conditionalExpectedBestLiveImprovingKindCount:
-      continuationMass > 0 ? weightedKinds / continuationMass : null,
-    conditionalExpectedBestLiveImprovingTileCount:
-      continuationMass > 0 ? weightedTiles / continuationMass : null,
+    ...continuation,
   };
 };
 

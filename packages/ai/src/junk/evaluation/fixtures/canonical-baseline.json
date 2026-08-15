@@ -52,6 +52,13 @@
       "source": { "kind": "snapshot", "snapshotId": "claim-mingang-replacement-001" },
       "description": "明杠补牌存在立即完成质量，结构策略应 minGang。",
       "tags": ["standard-only", "claim-selection", "minGang", "replacement-draw"]
+    },
+    {
+      "id": "self-gang-equivalence-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "self-gang-equivalence-001" },
+      "description": "暗杠和补杠均与各自等价弃牌结构打平，纯结构策略应 discard。",
+      "tags": ["standard-only", "self-turn", "anGang", "buGang", "discard"]
     }
   ]
 }

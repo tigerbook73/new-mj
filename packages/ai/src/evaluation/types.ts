@@ -11,6 +11,7 @@ export type CalibrationEvaluatorKind =
   | "two-ply-structural-all"
   | "structural-bounded"
   | "structural-claim"
+  | "structural-turn"
   | "isolation-boundary";
 
 export type CalibrationScenarioSource =

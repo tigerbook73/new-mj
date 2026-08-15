@@ -45,7 +45,9 @@ export type JunkProductionSnapshotData = Readonly<{
   legalActions: readonly (
     | Readonly<{ type: "discard"; tile: TileRef }>
     | Readonly<{ type: "chi"; tiles: readonly [TileRef, TileRef] }>
-    | Readonly<{ type: "peng" | "minGang" | "hu" | "pass" }>
+    | Readonly<{ type: "anGang"; kind: TileKind }>
+    | Readonly<{ type: "buGang"; tile: TileRef }>
+    | Readonly<{ type: "peng" | "minGang" | "hu" | "pass" | "zimo" }>
   )[];
 }>;
 
@@ -108,6 +110,8 @@ const normalizeJunkVisibleDecision = (
     if (action.type === "chi") {
       return { type: "chi", tiles: [tileId(action.tiles[0]), tileId(action.tiles[1])] };
     }
+    if (action.type === "anGang") return { type: "anGang", kind: action.kind };
+    if (action.type === "buGang") return { type: "buGang", tile: tileId(action.tile) };
     return { type: action.type };
   });
   const handIds = new Set(view.hand);

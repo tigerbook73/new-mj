@@ -39,6 +39,15 @@ export type StructuralDiscardOptions = Readonly<{
   applyDominanceGuardrail?: boolean;
 }>;
 
+export type StructuralContinuation = Readonly<{
+  drawKindCount: number;
+  leafCount: number;
+  immediateCompletionMass: number | null;
+  conditionalExpectedBestShanten: number | null;
+  conditionalExpectedBestLiveImprovingKindCount: number | null;
+  conditionalExpectedBestLiveImprovingTileCount: number | null;
+}>;
+
 const DEFAULT_MAX_FIRST_CANDIDATES = 5;
 const AGGREGATE_COMPARISON_EPSILON = 1e-12;
 
@@ -120,19 +129,115 @@ const uniqueDiscardActions = (
   });
 };
 
-const compareFinal = (
-  left: StructuralDiscardCandidate,
-  right: StructuralDiscardCandidate,
+/** Full fixed-budget draw -> best-discard continuation under the visible information set. */
+export const evaluateStructuralContinuation = (
+  view: JunkPlayerView,
+  handBeforeDraw: readonly TileId[],
+  existingMelds: number,
+): StructuralContinuation => {
+  const occupied = visibleStructuralTileIds(view);
+  const visibleCounts = structuralVisibleKindCounts(occupied);
+  const unknownTileCount = STANDARD_TILE_SET.size - occupied.size;
+  if (unknownTileCount <= 0 || view.wallCount <= 0) {
+    return {
+      drawKindCount: 0,
+      leafCount: 0,
+      immediateCompletionMass: null,
+      conditionalExpectedBestShanten: null,
+      conditionalExpectedBestLiveImprovingKindCount: null,
+      conditionalExpectedBestLiveImprovingTileCount: null,
+    };
+  }
+  let drawKindCount = 0;
+  let leafCount = 0;
+  let completionMass = 0;
+  let continuationMass = 0;
+  let weightedShanten = 0;
+  let weightedKinds = 0;
+  let weightedTiles = 0;
+  for (const kind of STANDARD_TILE_SET.kinds) {
+    const remaining = Math.max(0, STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0));
+    if (remaining === 0) continue;
+    const drawnTile = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
+      tileIdOf(kind, copy),
+    ).find((tile) => !occupied.has(tile));
+    if (drawnTile === undefined) continue;
+    drawKindCount += 1;
+    const probability = remaining / unknownTileCount;
+    const afterDraw = [...handBeforeDraw, drawnTile];
+    if (
+      computeShanten(
+        afterDraw,
+        { sevenPairs: false },
+        STANDARD_TILE_SET,
+        undefined,
+        existingMelds,
+      ) < 0
+    ) {
+      completionMass += probability;
+      continue;
+    }
+    const leafCounts = structuralVisibleKindCounts(new Set(occupied).add(drawnTile));
+    const bestLeaf = uniqueDiscardActions(afterDraw)
+      .map((action) => ({
+        action,
+        shape: structuralShapeOf(
+          afterDraw.filter((tile) => tile !== action.tile),
+          leafCounts,
+          existingMelds,
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          compareStructuralShape(left.shape, right.shape) ||
+          compareAction(left.action, right.action),
+      )[0];
+    if (!bestLeaf) continue;
+    leafCount += 1;
+    continuationMass += probability;
+    weightedShanten += probability * bestLeaf.shape.standardShanten;
+    weightedKinds += probability * bestLeaf.shape.liveImprovingKindCount;
+    weightedTiles += probability * bestLeaf.shape.liveImprovingTileCount;
+  }
+  return {
+    drawKindCount,
+    leafCount,
+    immediateCompletionMass: completionMass,
+    conditionalExpectedBestShanten:
+      continuationMass > 0 ? weightedShanten / continuationMass : null,
+    conditionalExpectedBestLiveImprovingKindCount:
+      continuationMass > 0 ? weightedKinds / continuationMass : null,
+    conditionalExpectedBestLiveImprovingTileCount:
+      continuationMass > 0 ? weightedTiles / continuationMass : null,
+  };
+};
+
+export const compareStructuralContinuation = (
+  left: Pick<
+    StructuralContinuation,
+    | "immediateCompletionMass"
+    | "conditionalExpectedBestShanten"
+    | "conditionalExpectedBestLiveImprovingKindCount"
+    | "conditionalExpectedBestLiveImprovingTileCount"
+  >,
+  right: Pick<
+    StructuralContinuation,
+    | "immediateCompletionMass"
+    | "conditionalExpectedBestShanten"
+    | "conditionalExpectedBestLiveImprovingKindCount"
+    | "conditionalExpectedBestLiveImprovingTileCount"
+  >,
 ): number => {
-  const leftShanten = left.conditionalExpectedBestShanten ?? Number.POSITIVE_INFINITY;
-  const rightShanten = right.conditionalExpectedBestShanten ?? Number.POSITIVE_INFINITY;
   const compareAggregate = (leftValue: number, rightValue: number): number =>
     leftValue === rightValue || Math.abs(leftValue - rightValue) <= AGGREGATE_COMPARISON_EPSILON
       ? 0
       : leftValue - rightValue;
   return (
     compareAggregate(right.immediateCompletionMass ?? -1, left.immediateCompletionMass ?? -1) ||
-    compareAggregate(leftShanten, rightShanten) ||
+    compareAggregate(
+      left.conditionalExpectedBestShanten ?? Number.POSITIVE_INFINITY,
+      right.conditionalExpectedBestShanten ?? Number.POSITIVE_INFINITY,
+    ) ||
     compareAggregate(
       right.conditionalExpectedBestLiveImprovingKindCount ?? -1,
       left.conditionalExpectedBestLiveImprovingKindCount ?? -1,
@@ -140,7 +245,16 @@ const compareFinal = (
     compareAggregate(
       right.conditionalExpectedBestLiveImprovingTileCount ?? -1,
       left.conditionalExpectedBestLiveImprovingTileCount ?? -1,
-    ) ||
+    )
+  );
+};
+
+const compareFinal = (
+  left: StructuralDiscardCandidate,
+  right: StructuralDiscardCandidate,
+): number => {
+  return (
+    compareStructuralContinuation(left, right) ||
     compareStructuralShape(left.onePly, right.onePly) ||
     compareAction(left.action, right.action)
   );
@@ -187,7 +301,6 @@ export const evaluateStructuralDiscard = (
       .slice(0, maxFirstCandidates)
       .map(({ action }) => action.tile),
   );
-  const unknownTileCount = STANDARD_TILE_SET.size - occupied.size;
   let leafCount = 0;
 
   const candidates: StructuralDiscardCandidate[] = withDominance.map((candidate) => {
@@ -202,70 +315,17 @@ export const evaluateStructuralDiscard = (
       };
     }
     const afterFirstDiscard = view.hand.filter((tile) => tile !== candidate.action.tile);
-    let completionMass = 0;
-    let continuationMass = 0;
-    let weightedShanten = 0;
-    let weightedKinds = 0;
-    let weightedTiles = 0;
-    if (unknownTileCount > 0 && view.wallCount > 0) {
-      for (const kind of STANDARD_TILE_SET.kinds) {
-        const remaining = Math.max(
-          0,
-          STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0),
-        );
-        if (remaining === 0) continue;
-        const drawnTile = Array.from({ length: STANDARD_TILE_SET.copiesPerKind }, (_, copy) =>
-          tileIdOf(kind, copy),
-        ).find((tile) => !occupied.has(tile));
-        if (drawnTile === undefined) continue;
-        const probability = remaining / unknownTileCount;
-        const afterDraw = [...afterFirstDiscard, drawnTile];
-        if (
-          computeShanten(
-            afterDraw,
-            { sevenPairs: false },
-            STANDARD_TILE_SET,
-            undefined,
-            existingMelds,
-          ) < 0
-        ) {
-          completionMass += probability;
-          continue;
-        }
-        const leafVisible = new Set(occupied).add(drawnTile);
-        const leafCounts = structuralVisibleKindCounts(leafVisible);
-        const bestLeaf = uniqueDiscardActions(afterDraw)
-          .map((action) => ({
-            action,
-            shape: structuralShapeOf(
-              afterDraw.filter((tile) => tile !== action.tile),
-              leafCounts,
-              existingMelds,
-            ),
-          }))
-          .sort(
-            (left, right) =>
-              compareStructuralShape(left.shape, right.shape) ||
-              compareAction(left.action, right.action),
-          )[0];
-        if (!bestLeaf) continue;
-        leafCount += 1;
-        continuationMass += probability;
-        weightedShanten += probability * bestLeaf.shape.standardShanten;
-        weightedKinds += probability * bestLeaf.shape.liveImprovingKindCount;
-        weightedTiles += probability * bestLeaf.shape.liveImprovingTileCount;
-      }
-    }
+    const continuation = evaluateStructuralContinuation(view, afterFirstDiscard, existingMelds);
+    leafCount += continuation.leafCount;
     return {
       ...candidate,
       searched: true,
-      immediateCompletionMass: completionMass,
-      conditionalExpectedBestShanten:
-        continuationMass > 0 ? weightedShanten / continuationMass : null,
+      immediateCompletionMass: continuation.immediateCompletionMass,
+      conditionalExpectedBestShanten: continuation.conditionalExpectedBestShanten,
       conditionalExpectedBestLiveImprovingKindCount:
-        continuationMass > 0 ? weightedKinds / continuationMass : null,
+        continuation.conditionalExpectedBestLiveImprovingKindCount,
       conditionalExpectedBestLiveImprovingTileCount:
-        continuationMass > 0 ? weightedTiles / continuationMass : null,
+        continuation.conditionalExpectedBestLiveImprovingTileCount,
     };
   });
   const selected = candidates.filter(({ searched }) => searched).sort(compareFinal)[0];

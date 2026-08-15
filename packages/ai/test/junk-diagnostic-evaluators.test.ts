@@ -13,6 +13,7 @@ import { evaluateStructuralTwoPlyAll } from "../src/junk/evaluation/structural-t
 import { evaluateIsolationBoundary } from "../src/junk/evaluation/isolation-boundary.ts";
 import { evaluateStructuralBounded } from "../src/junk/evaluation/structural-bounded.ts";
 import { evaluateStructuralClaimPolicy } from "../src/junk/evaluation/structural-claim.ts";
+import { evaluateStructuralTurnPolicy } from "../src/junk/evaluation/structural-turn.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../src/evaluation/runner.ts";
 
 describe("Junk diagnostic evaluators", () => {
@@ -31,6 +32,7 @@ describe("Junk diagnostic evaluators", () => {
           ({ scenario, input }) => evaluateStructuralTwoPlyAll(scenario.id, input),
           ({ scenario, input }) => evaluateStructuralBounded(scenario.id, input),
           ({ scenario, input }) => evaluateStructuralClaimPolicy(scenario.id, input),
+          ({ scenario, input }) => evaluateStructuralTurnPolicy(scenario.id, input),
           ({ scenario, input }) => evaluateIsolationBoundary(scenario.id, input),
         ],
         {
@@ -49,6 +51,7 @@ describe("Junk diagnostic evaluators", () => {
         "standard-only",
         "structural-bounded",
         "structural-claim",
+        "structural-turn",
         "two-ply-all",
         "two-ply-structural-all",
       ]);

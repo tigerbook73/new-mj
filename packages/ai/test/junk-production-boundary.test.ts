@@ -11,6 +11,7 @@ const productionFiles = [
   "strategy.ts",
   "structural-claim.ts",
   "structural-discard.ts",
+  "structural-turn.ts",
   "tile-probability.ts",
   "two-ply.ts",
   "weights.ts",

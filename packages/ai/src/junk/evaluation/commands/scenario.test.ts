@@ -106,6 +106,9 @@ describe("evaluation CLI", () => {
       '"evaluator": "structural-claim"',
     );
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
+      '"evaluator": "structural-turn"',
+    );
+    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"evaluator": "isolation-boundary"',
     );
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.md")).toContain("discard-001");

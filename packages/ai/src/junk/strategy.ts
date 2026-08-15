@@ -26,6 +26,12 @@ export {
   type StructuralClaimResult,
 } from "./structural-claim.ts";
 export {
+  evaluateStructuralTurn,
+  recommendStructuralTurn,
+  type StructuralTurnCandidate,
+  type StructuralTurnResult,
+} from "./structural-turn.ts";
+export {
   probeSelfDrawTwoPly,
   type SelfDrawTwoPlyOutcome,
   type SelfDrawTwoPlyProbe,

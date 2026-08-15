@@ -11,6 +11,7 @@ import { evaluateStructuralTwoPlyAll } from "./structural-two-ply.ts";
 import { evaluateIsolationBoundary } from "./isolation-boundary.ts";
 import { evaluateStructuralBounded } from "./structural-bounded.ts";
 import { evaluateStructuralClaimPolicy } from "./structural-claim.ts";
+import { evaluateStructuralTurnPolicy } from "./structural-turn.ts";
 
 export type JunkEvaluationTaskInput = CalibrationEvaluationTaskInput<JunkProductionFixtureInput> &
   Readonly<{ evaluator: CalibrationEvaluatorKind }>;
@@ -28,6 +29,8 @@ export const evaluateJunkTask = (task: JunkEvaluationTaskInput): CalibrationEval
     return evaluateStructuralBounded(task.scenarioId, task.input);
   if (task.evaluator === "structural-claim")
     return evaluateStructuralClaimPolicy(task.scenarioId, task.input);
+  if (task.evaluator === "structural-turn")
+    return evaluateStructuralTurnPolicy(task.scenarioId, task.input);
   if (task.evaluator === "isolation-boundary")
     return evaluateIsolationBoundary(task.scenarioId, task.input);
   throw new Error(`UNSUPPORTED_BATCH_EVALUATOR: ${task.evaluator}`);
