@@ -53,7 +53,7 @@ pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
 ```
 
-`scenario run` 对同一个规范化输入执行六路 evaluator，并写入同一份 JSON/Markdown 报告：
+`scenario run` 对同一个规范化输入执行七路 evaluator，并写入同一份 JSON/Markdown 报告：
 
 - `production-weighted`：当前生产混合路径，作为行为基线；
 - `standard-only`：全部合法弃牌的只读普通标准型结构指标，不加权、不选动作；
@@ -62,6 +62,8 @@ pnpm --filter @new-mj/ai evaluate arena run --help
   cliff，并选择加权值最高者；
 - `two-ply-structural-all`：全部合法弃牌进入纯标准型结构续行，每个自摸分支报告最低向听
   层的 Pareto 前沿和聚合指标；不把偏序压成分数，因此不选择首层动作。
+- `structural-bounded`：未接入默认生产的纯结构弃牌候选；报告一层支配标记、是否进入固定
+  五候选搜索预算、2-ply 聚合指标和最终选择，用于与 full teacher 做显式对照。
 - `isolation-boundary`：用默认权重和仅关闭 `isolationPotential` 的权重做 one-ply/two-ply
   paired 对照；只在一层及结构 2-ply 指标完全等价的候选组内报告排名影响，不选择动作。
 
@@ -82,14 +84,14 @@ ID。该标注只用于离线诊断，不选择动作，也不筛除生产候选
 当前生成分布只用于基础牌形覆盖，不代表实战阶段分布；中盘代表性仍由固定 snapshot 提供。
 
 `scenario batch` 当前消费外部 manifest 和自包含 snapshot/generated JSONL。一次 batch 只运行一个 evaluator，
-使 checkpoint 明确绑定一种计算语义；需要六路结果时用相同输入分别运行六次。`--workers`
+使 checkpoint 明确绑定一种计算语义；需要七路结果时用相同输入分别运行七次。`--workers`
 使用已有 worker_threads executor，`--chunk-size` 决定每次交付 checkpoint 的场景数。
 `--checkpoint` 在每个 chunk 后写入包含 manifest 版本、evaluator 和已完成 evaluations 的完整
 JSON 快照；中断后用 `--resume <checkpoint.json>` 恢复。恢复时 manifest/evaluator/content hash
 任一不匹配都会失败，不会静默复用旧结果。replay batch 要等对应 provider 落地。
 
-generated 输入可运行全部六路 evaluator，包括两个只读结构 evaluator和 isolation paired
-诊断。六路报告应使用相同
+generated 输入可运行全部七路 evaluator，包括 bounded 结构候选、两个只读结构 evaluator
+和 isolation paired 诊断。七路报告应使用相同
 manifest/content hash 分别生成；不跨 evaluator 合并分数。Markdown 摘要逐场景记录候选数、
 选择、耗时和 cache hit/miss，JSON 保留完整候选指标。
 

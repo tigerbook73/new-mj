@@ -20,7 +20,7 @@ import type { JunkEvaluationTaskInput } from "../evaluation-task.ts";
 export const batchUsage =
   "Usage: pnpm --filter @new-mj/ai evaluate scenario batch <manifest.json> <scenarios.jsonl> [options]\n\n" +
   "Options:\n" +
-  "  --evaluator <production-weighted|standard-only|one-ply-all|two-ply-all|two-ply-structural-all|isolation-boundary>\n" +
+  "  --evaluator <production-weighted|standard-only|one-ply-all|two-ply-all|two-ply-structural-all|structural-bounded|isolation-boundary>\n" +
   "  --workers <n>                 Worker thread count (default: 1)\n" +
   "  --chunk-size <n>               Scenarios per checkpoint (default: 64)\n" +
   "  --checkpoint <file>            Write resumable JSON after every chunk\n" +
@@ -88,6 +88,7 @@ export const runBatchCalibrationCli = async (
         "one-ply-all",
         "two-ply-all",
         "two-ply-structural-all",
+        "structural-bounded",
         "isolation-boundary",
       ].includes(evaluator)
     )

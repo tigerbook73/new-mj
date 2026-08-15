@@ -5,7 +5,7 @@ import { JUNK_CALIBRATION_MANIFEST } from "../canonical-fixtures.ts";
 import { evaluateProductionFixture } from "../production-evaluator.ts";
 import type { JunkProductionSnapshotData } from "../snapshot-provider.ts";
 import { generateJunkSamples } from "../generated-samples.ts";
-import { evaluateStructuralMetrics } from "../structural-metrics.ts";
+import { evaluateStructuralBounded } from "../structural-bounded.ts";
 
 const scenario = JUNK_CALIBRATION_MANIFEST.scenarios.find(
   ({ id }) => id === "discard-snapshot-001",
@@ -93,7 +93,7 @@ describe("evaluation batch CLI", () => {
     expect(result.output).toContain("INCOMPATIBLE_CHECKPOINT");
   });
 
-  it("runs standard-only over generated records", async () => {
+  it("runs structural-bounded over generated records", async () => {
     const generated = generateJunkSamples({ seed: 7, count: 1 });
     const sample = generated.samples[0]!;
     const generatedRecords = async function* () {
@@ -119,7 +119,7 @@ describe("evaluation batch CLI", () => {
         "manifest.json",
         "generated.jsonl",
         "--evaluator",
-        "standard-only",
+        "structural-bounded",
         "--run-id",
         "generated-test",
         "--output-dir",
@@ -135,15 +135,15 @@ describe("evaluation batch CLI", () => {
         execute: async (tasks) =>
           tasks.map((task) => ({
             taskId: task.taskId,
-            result: evaluateStructuralMetrics(task.input.scenarioId, task.input.input),
+            result: evaluateStructuralBounded(task.input.scenarioId, task.input.input),
           })),
       },
     );
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("standard-only@v2");
+    expect(result.output).toContain("structural-bounded@v1");
     expect(result.output).toContain("candidates=14");
     expect(files.get("/tmp/generated-batch-test/junk-generated-test.json")).toContain(
-      '"sameShantenParetoFrontier"',
+      '"searchedCandidateCount"',
     );
   });
 });

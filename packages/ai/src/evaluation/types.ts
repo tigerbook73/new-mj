@@ -9,6 +9,7 @@ export type CalibrationEvaluatorKind =
   | "standard-only"
   | "two-ply-all"
   | "two-ply-structural-all"
+  | "structural-bounded"
   | "isolation-boundary";
 
 export type CalibrationScenarioSource =

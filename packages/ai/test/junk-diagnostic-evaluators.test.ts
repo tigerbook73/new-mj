@@ -11,6 +11,7 @@ import { evaluateProductionFixture } from "../src/junk/evaluation/production-eva
 import { evaluateStructuralMetrics } from "../src/junk/evaluation/structural-metrics.ts";
 import { evaluateStructuralTwoPlyAll } from "../src/junk/evaluation/structural-two-ply.ts";
 import { evaluateIsolationBoundary } from "../src/junk/evaluation/isolation-boundary.ts";
+import { evaluateStructuralBounded } from "../src/junk/evaluation/structural-bounded.ts";
 import { runSingleCalibrationScenarioEvaluators } from "../src/evaluation/runner.ts";
 
 describe("Junk diagnostic evaluators", () => {
@@ -27,6 +28,7 @@ describe("Junk diagnostic evaluators", () => {
           ({ scenario, input }) => evaluateOnePlyAll(scenario.id, input),
           ({ scenario, input }) => evaluateTwoPlyAll(scenario.id, input),
           ({ scenario, input }) => evaluateStructuralTwoPlyAll(scenario.id, input),
+          ({ scenario, input }) => evaluateStructuralBounded(scenario.id, input),
           ({ scenario, input }) => evaluateIsolationBoundary(scenario.id, input),
         ],
         {
@@ -43,6 +45,7 @@ describe("Junk diagnostic evaluators", () => {
         "one-ply-all",
         "production-weighted",
         "standard-only",
+        "structural-bounded",
         "two-ply-all",
         "two-ply-structural-all",
       ]);
@@ -67,6 +70,15 @@ describe("Junk diagnostic evaluators", () => {
       );
       expect(structuralTwoPly?.candidates).toHaveLength(14);
       expect(structuralTwoPly?.selectedCandidateId).toBeUndefined();
+      const structuralBounded = report.evaluations.find(
+        ({ evaluator }) => evaluator === "structural-bounded",
+      );
+      expect(structuralBounded?.candidates).toHaveLength(14);
+      expect(structuralBounded?.selectedCandidateId).toBeDefined();
+      const searchedCount =
+        structuralBounded?.candidates.filter(({ metrics }) => metrics.searched).length ?? 0;
+      expect(searchedCount).toBeGreaterThan(0);
+      expect(searchedCount).toBeLessThanOrEqual(5);
       expect(
         report.evaluations.find(({ evaluator }) => evaluator === "two-ply-all")
           ?.selectedCandidateId,

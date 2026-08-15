@@ -26,10 +26,11 @@
 - 原上限 4 的三处 bounded/full 差异均来自一层指标完全相同的候选在截断边界两侧，且条件期望向听存在约 `2e-16` 的累加噪声；可复现 seed `1077643932`、`1351392336`、`537634752` 已固化为回归用例。上限 5 加固定浮点容差后，seed `20260814`/`20260815` 各 100 个场景均达到 bounded/full `100/100` 一致，平均搜索 4.38/4.39 个首弃，扫描约比 full 快 `2.84`/`3.20` 倍。生成样本和扫描报告仍是临时可重建数据，不归档。
 - 结构候选只使用本人可见信息：手牌、所有公开牌河与副露按 `TileId` 去重后估算剩余副本。它不读取真实牌墙、对手暗手或推测分布，因此是信息集结构估计，不是实战摸牌概率或终局 EV。
 - 新候选已从 Junk facade 导出供后续显式评估，但 `recommendJunkAction`/`chooseJunkAction` 未切换；claim、番型、七对和防守仍未进入新路径。
+- `structural-bounded@v1` evaluation adapter 已接入 canonical `scenario run` 和 generated/snapshot `scenario batch`；报告保留全部首弃的一层指标、支配/截断标记、实际搜索数、2-ply 聚合指标及最终选择。`discard-001` 真实 CLI 冒烟七路全成功，bounded 选择与当前生产均为 `5p`，单次信息性耗时约 `40.8ms`；报告写入临时目录，不归档。
 
 ## 下一步第一个具体动作
 
-把 `structural-discard` 接成独立的 `structural-bounded` evaluation adapter，并让 canonical scenario run/batch 能显式选择它；不得接入默认生产入口。
+建立 bounded/full teacher 的大样本配对审计命令与验收字段：固定开发/留出 seed，至少各 1000 个场景，报告一致率、差异 seed、结构损失和 bounded/full 的 P50/P95；先确定门槛，不切换默认生产入口。
 
 ## 阻塞与遗留问题
 
