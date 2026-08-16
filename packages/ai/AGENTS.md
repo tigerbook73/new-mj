@@ -23,11 +23,9 @@
 
 ## 质量变更
 
-- 权重或评分公式成为默认值前必须有 A/B 证据，不能只凭 code review 直觉。
-  - 权重幅度：使用 `evaluate weights compare` 或 tune 的 held-out 自对弈胜率/分差。
-  - 评分公式：使用场景化 fixture 断言具体决策变化；`evaluate policy diff` 只用于前置侦察，不能替代 fixture。
+- candidate 成为新 baseline 前必须有场景化 fixture、policy diff、同 seed 换位对局和性能证据，不能只凭 code review 直觉；`evaluate policy diff` 只用于前置侦察，不能替代 fixture。
 - `policy-loader` 支持 Git ref 和显式 `strategy.ts` module；未提交版本用 `evaluate policy capture` 保存完整生产闭包。跨 ref 比较只适用于未跨越 `@new-mj/core` 的改动。
-- evaluation 工具默认只写报告，不采纳候选；唯一例外是人工显式的 `weights tune --write`，且仍受 held-out 门槛约束。
+- evaluation 工具只写报告，不自动采纳候选或修改生产策略。
 
 ## Evaluation 框架
 

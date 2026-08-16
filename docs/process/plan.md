@@ -54,10 +54,11 @@
 - `structural-baseline@1` 已成为当前普通标准型生产策略的稳定身份：生产 facade 明确委托给版本化 v1 实现，行为 manifest 绑定 `canonical-baseline@1`，覆盖 discard、claim、self-turn/gang 以及 hu/zimo/draw。7 个 canonical 场景逐项锁定语义动作，完整 core 对局逐决策断言生产 facade 与 v1 返回同一合法动作；未来有意改变行为必须建立新 baseline 版本。既有 1000+1000 bounded/full teacher 一致率与 P95、50 seeds / 100 场完整策略 P95 作为 v1 建立时的环境证据记录在 evaluation README，不作为跨机器测试断言。
 - evaluation 已采用中性 baseline/candidate policy 契约：loader 默认加载模块自己的 `chooseJunkAction`，可用显式 export 名选择同模块候选；只有提供 `weightsPath` 时才进入 legacy 权重兼容路径。policy diff、Git ref/module loader、capture、跨线程 match task 和 arena 可直接承载 `structural-baseline@1` 与候选；通用 worker pool 已迁出 tune 命名，`tune-pool.ts` 只保留权重任务和兼容重导。`legacyWeightedPolicy` 名称显式标识历史包装器，现有 weights CLI 入口暂时保留。
 - legacy 搜索机制的可复用边界已写入 `docs/architecture/shanten.md`：dynamic cliff 的中性意图已经由结构支配过滤、固定五候选和 full teacher audit 覆盖；claim hurdle 已由“结构严格改善，否则 pass”覆盖；生产 hard budget 必须按候选/分支数而非墙钟时间；optimizer 提前停止不进入策略。analysis LRU 仅有 legacy 消费者，在 Node 24、canonical `discard-001` 三轮 50 次重复中每轮 `7189/60211` hit/miss，shared/fresh 耗时没有稳定收益，因此不迁移；有限总体函数也仅服务旧 `wallShare` 近似，保留信息集建模约束后随 legacy 删除。这些机制均未接回 production。
+- weighted tuning/evaluation 专用闭包已删除：weights tune/compare CLI、optimizer、tune worker/任务、isolation boundary/removal、paired isolation validate、旧 weighted-vs-structural compare/trace 壳及其专用测试和 backlog 均不再保留。跨模块换位对局迁为中性 `policy-match.ts`，与 `policy diff`、capture、arena、scenario provider、structural teacher 和通用 worker pool 继续服务 structural baseline/candidate；CLI 不再提供权重写回或以 legacy 为默认参照的命令。weighted runtime 与 legacy facade 仍留待下一 slice 删除。
 
 ## 下一步第一个具体动作
 
-建立 `remove-weighted-tuning` slice：先用依赖审计区分仍被 policy loader/capture 或中性 arena/worker 使用的能力，再删除 weights tune/compare 的权重专用 CLI、optimizer、tune worker/任务、isolation boundary/removal、paired isolation validate 及其专用测试和 backlog；保留并改接中性的 policy diff、policy match、arena、scenario provider、structural teacher 与报告能力。该 slice 不删除 weighted runtime/legacy facade，也不改变 `structural-baseline@1`。
+建立 `remove-weighted-runtime` slice：先把 public `recommendJunkAction`/`chooseJunkAction` 收窄为结构策略真实参数，并让 policy loader/capture 不再要求权重资产；随后删除 legacy facade、`default-weights.json`、`weights.ts`、`analysis.ts`、`hand-quality.ts`、`action-scoring.ts`、旧 `two-ply.ts`、`tile-probability.ts`，以及 production-weighted/one-ply/two-ply evaluator、旧 baseline 和只断言其内部数值的测试。保留 canonical 输入、structural evaluator/teacher、policy baseline/candidate 工具和已记录的设计结论；生产行为必须继续逐场景及完整对局等于 `structural-baseline@1`。
 
 ## 阻塞与遗留问题
 

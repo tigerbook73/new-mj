@@ -14,7 +14,6 @@ import { evaluateProductionFixture } from "../production-evaluator.ts";
 import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../diagnostic-evaluators.ts";
 import { evaluateStructuralMetrics } from "../structural-metrics.ts";
 import { evaluateStructuralTwoPlyAll } from "../structural-two-ply.ts";
-import { evaluateIsolationBoundary } from "../isolation-boundary.ts";
 import { evaluateStructuralBounded } from "../structural-bounded.ts";
 import { evaluateStructuralClaimPolicy } from "../structural-claim.ts";
 import { evaluateStructuralTurnPolicy } from "../structural-turn.ts";
@@ -142,7 +141,6 @@ export const runCalibrationCli = (
         (normalized) => evaluateStructuralBounded(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralClaimPolicy(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralTurnPolicy(normalized.scenario.id, normalized.input),
-        (normalized) => evaluateIsolationBoundary(normalized.scenario.id, normalized.input),
       ],
       {
         runId,

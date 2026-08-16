@@ -53,8 +53,6 @@ pnpm --filter @new-mj/ai evaluate scenario run discard-001 \
   --baseline src/junk/evaluation/fixtures/baselines/discard-001.production-weighted.v1.baseline.json
 pnpm --filter @new-mj/ai evaluate scenario generate --seed 20260814 --count 1000 \
   --shard-index 0 --shard-count 4
-pnpm --filter @new-mj/ai evaluate scenario validate --development-seed 20260814 \
-  --held-out-seed 20260815 --count 100
 pnpm --filter @new-mj/ai evaluate scenario teacher-audit --development-seed 20260814 \
   --held-out-seed 20260815 --count 1000
 pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
@@ -62,10 +60,6 @@ pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
 pnpm --filter @new-mj/ai evaluate policy diff --help
 pnpm --filter @new-mj/ai evaluate policy capture --help
-pnpm --filter @new-mj/ai evaluate structural compare --seed 20260816 --seeds 3 --rounds 4
-pnpm --filter @new-mj/ai evaluate structural trace --seed 2889165442 --rounds 4
-pnpm --filter @new-mj/ai evaluate weights compare --help
-pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
 ```
 
@@ -74,20 +68,21 @@ pnpm --filter @new-mj/ai evaluate arena run --help
 通用 policy source 由 `ref` 或 `modulePath`、可选 `exportName` 组成；默认导出是模块自己的
 `chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@1`，不再隐式改用 legacy
 weighted。`policy diff` 可用 `--baseline-export`/`--candidate-export` 比较同一模块中的显式策略
-导出；跨版本 match worker 也携带相同 export 字段。`weightsPath` 只为旧权重命令兼容保留：提供
-它时，当前模块会选择显式 weighted 导出，历史模块则使用它当时的 `chooseJunkAction`。
+导出；跨版本 match worker 也携带相同 export 字段。`weightsPath` 只为加载历史策略资产兼容
+保留：提供它时，当前模块会选择显式 weighted 导出，历史模块则使用它当时的
+`chooseJunkAction`。
 
 arena 的核心输入始终是四个 `SeatPolicy`，不预设评分范式；旧 weighted 包装器明确命名为
 `legacyWeightedPolicy`。通用 worker pool 位于 `match/worker-pool.ts`，要求调用方提供任务类型、
-结果类型和 worker 失败结果；`tune-pool.ts` 仅保留权重任务以及向后兼容重导。`policy capture`
-同时复制当前 structural 与 legacy 的完整生产闭包，首选用 `policy diff` 对照，旧 weights compare
-命令仍可在清理完成前使用。
+结果类型和 worker 失败结果。换位对局位于 `match/policy-match.ts`，顺序与 worker 路径调用同一
+任务函数；`policy capture` 同时复制当前 structural 与 legacy 的完整生产闭包，使用
+`policy diff` 对照决策。
 
 旧 dynamic cliff、claim hurdle、跨决策 analysis LRU 和有限总体概率函数的可复用性审计已固定
 在 `docs/architecture/shanten.md`。结论是保留设计意图和重建场景，不保留其 weighted 载体；
 当前 structural 的固定预算、严格结构比较和 teacher audit 已覆盖可复用部分。
 
-`scenario run` 对同一个规范化输入执行九路 evaluator，并写入同一份 JSON/Markdown 报告：
+`scenario run` 对同一个规范化输入执行八路 evaluator，并写入同一份 JSON/Markdown 报告：
 
 - `production-weighted`：显式 legacy weighted 路径，暂作历史行为诊断；
 - `standard-only`：全部合法弃牌的只读普通标准型结构指标，不加权、不选动作；
@@ -104,13 +99,10 @@ arena 的核心输入始终是四个 `SeatPolicy`，不预设评分范式；旧 
 - `structural-turn`：当前生产基线的 `zimo + anGang/buGang + discard` 结构组件；gang 复用
   补牌聚合，并同时对比 bounded 最佳弃牌及各自等价弃牌。纯结构打平时 discard，不为杠本身
   增加固定奖励；报告所有候选是否进入搜索及聚合指标。
-- `isolation-boundary`：用默认权重和仅关闭 `isolationPotential` 的权重做 one-ply/two-ply
-  paired 对照；只在一层及结构 2-ply 指标完全等价的候选组内报告排名影响，不选择动作。
-
-`standard-only@v2` 当前报告弃牌后的普通标准型向听数、理论进张牌种/牌种数，以及按玩家
-可见信息估计的存活进张牌种数和剩余进张张数；它不包含七对、番型权重，也不代表墙内
-真值、自摸概率、完整胡牌概率或终局 EV。`two-ply-structural-all` 同样不使用生产权重；
-其余三路使用当前生产权重。
+  `standard-only@v2` 当前报告弃牌后的普通标准型向听数、理论进张牌种/牌种数，以及按玩家
+  可见信息估计的存活进张牌种数和剩余进张张数；它不包含七对、番型权重，也不代表墙内
+  真值、自摸概率、完整胡牌概率或终局 EV。`two-ply-structural-all` 同样不使用生产权重；
+  其余三路使用当前生产权重。
 
 同一场景内的 Pareto 标注只比较向听数相同的候选，并只使用存活进张牌种数与剩余张数：
 两项都不差且至少一项更好才构成严格支配。不同向听、两项完全相同或一项更好另一项更差
@@ -130,8 +122,8 @@ ID。该标注只用于离线诊断，不选择动作，也不筛除生产候选
 JSON 快照；中断后用 `--resume <checkpoint.json>` 恢复。恢复时 manifest/evaluator/content hash
 任一不匹配都会失败，不会静默复用旧结果。replay batch 要等对应 provider 落地。
 
-generated 输入可运行全部九路 evaluator，包括 bounded/claim/turn 结构候选、两个只读结构
-evaluator 和 isolation paired 诊断。九路报告应使用相同
+generated 输入可运行全部八路 evaluator，包括 bounded/claim/turn 结构候选和两个只读结构
+evaluator。八路报告应使用相同
 manifest/content hash 分别生成；不跨 evaluator 合并分数。Markdown 摘要逐场景记录候选数、
 选择、耗时和 cache hit/miss，JSON 保留完整候选指标。
 
@@ -142,42 +134,12 @@ cliff/fallback/最终选择。纯结构路径在玩家可见信息下仍未知�
 `conditionalExpectedBestShanten` 只在非立即完成分支上统计第二弃牌可达的最低向听，
 都不是整局胡牌概率或终局 EV。
 
-`isolation-boundary@v1` 的结构等价组要求普通向听、存活进张种类/张数，以及结构 2-ply
-的进张质量、立即完成质量、条件期望最佳向听和第二弃牌前沿统计完全相同。报告中的
-`WithIsolation`/`WithoutIsolation` 只相差 `isolationPotential` 权重；组外排名变化不得归因
-为 isolation 边界，组内变化也只说明当前启发式的边际影响，不证明胜率或 EV 改善。
-
-`scenario validate` 固定执行 `paired-standard-heldout-v1`：开发集和留出集由两个不同的
-`standard-concealed-v1` 顶层 seed 生成，命令同时校验场景 seed 与内容 hash 不重叠；基线和
-候选逐场景共用输入。当前候选参数只允许覆盖 `isolationPotential`，默认以 0 作为关闭该项的
-探针。选择若在同向听层被另一候选同时以存活进张种类和张数严格支配，计为结构支配错误；
-开发集和留出集都不增加才通过结构门禁。该命令只写 JSON/文本报告，不写默认权重；通过门禁
-也不代表胜率或 EV 改善，任何生产采纳仍需独立 A/B 与人工确认。JSON 同时保留所有决策变化
-及基线/候选结构支配错误的场景 seed，供相同生成器重建后人工复核。
-
 `scenario teacher-audit` 固定执行 `bounded-structural-teacher-v1`，在互不重叠的开发集和
 留出集上逐场景配对 bounded 与 full teacher。JSON 保存动作一致率、全部差异场景 seed、
 teacher 相对 bounded 的立即完成/条件期望向听/进张种类与张数差值，以及两路耗时的
 P50/P95。首个门槛固定为两组一致率均不低于 `99%`，且 bounded/full 的 P95 比值均不高于
 `0.6`；门槛只判断当前 shortlist 近似是否值得继续评估，不证明牌理、胜率或终局 EV，
 也不切换生产入口。默认每组 1000 个样本；这是人工慢速 evaluation 命令，不进入 `verify`。
-
-`structural compare` 固定比较当前 weighted 生产策略与路线门禁后的普通型 structural 影子
-facade。候选仅在普通型严格占优、且没有清/混一色或碰碰胡离散信号的节点使用 structural；
-七对严格占优、普通型/七对打平和其他特殊路线节点均回退到 weighted，并分别计数。因此终局
-分差只由普通型节点的策略变化产生。`--component all|turn|claim` 可进一步选择完整结构候选、
-只替换 self-turn/discard 或只替换 claim；未选组件继续使用 weighted。每个 seed 运行两场相同
-牌墙/庄家序列的换位配对：候选先坐 0/2，再坐 1/3；报告按策略累计分数和胜场，并记录
-candidate 的逐 split 分数与单次决策 P50/P95/max。执行固定为单进程单并发，使墙钟耗时只在
-同一次运行、同一机器内比较；全部 seed、split、失败和 `STEP_LIMIT_EXCEEDED` 都写入临时
-报告。它不进入 `verify`、不改默认入口，小样本也不证明胜率或终局 EV；牌理反例必须另行
-固化 fixture。
-
-`structural trace` 对一个明确 match seed 重放 structural-even/odd 两个 mixed-policy split；
-实际策略继续驱动 core，另一策略只在完全相同的 `PlayerView + legalActions` 上 shadow 推荐。
-JSON 保存每个分歧的 round/step/seat、phase、完整 view、合法动作和两路动作，文本按 phase 与
-weighted->structural 动作类型汇总并展示前十项。shadow 选择只说明该节点可直接比较，不代表
-替换动作后的后续轨迹；报告用于选择可重建的人工 fixture，不自动归因最终分数或修改策略。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI

@@ -1,18 +1,20 @@
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { evaluateCandidatePolicies } from "../src/junk/evaluation/match/tune.ts";
-import type { MatchTaskResult, PolicyMatchTask } from "../src/junk/evaluation/match/tune-pool.ts";
+import {
+  evaluateCandidatePolicies,
+  type PolicyMatchTask,
+  type PolicyMatchTaskResult,
+} from "../src/junk/evaluation/match/policy-match.ts";
 import { MatchWorkerPool } from "../src/junk/evaluation/match/worker-pool.ts";
 
 const currentStrategyPath = fileURLToPath(new URL("../src/junk/strategy.ts", import.meta.url));
 
-// Both paths call the identical runPolicyMatchTask (see tune.ts) — this test
+// Both paths call the identical runPolicyMatchTask — this test
 // exists to catch a *wiring* mistake (wrong task fields, dropped results,
 // wrong ordering, or the worker resolving a different module than intended),
-// not to re-verify runPolicyMatchTask's own logic twice. Mirrors
-// junk-weight-tuning.test.ts's equivalent check for the weight-based pool.
+// not to re-verify runPolicyMatchTask's own logic twice.
 describe("policy-based worker pool", () => {
-  let pool: MatchWorkerPool<PolicyMatchTask, MatchTaskResult> | undefined;
+  let pool: MatchWorkerPool<PolicyMatchTask, PolicyMatchTaskResult> | undefined;
 
   afterEach(async () => {
     await pool?.close();
@@ -31,7 +33,7 @@ describe("policy-based worker pool", () => {
 
     const sequential = await evaluateCandidatePolicies(seeds, baseline, candidate);
 
-    pool = new MatchWorkerPool<PolicyMatchTask, MatchTaskResult>(
+    pool = new MatchWorkerPool<PolicyMatchTask, PolicyMatchTaskResult>(
       2,
       new URL("../src/junk/evaluation/match/policy-match-worker.ts", import.meta.url),
       () => ({ ok: false, candidateTotal: 0, baselineTotal: 0 }),

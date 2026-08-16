@@ -5,12 +5,7 @@ import { runDecisionDiffCli } from "./policy-diff.ts";
 import { runBatchCalibrationCli } from "./scenario-batch.ts";
 import { runGenerateSamplesCli } from "./scenario-generate.ts";
 import { runCalibrationCli } from "./scenario.ts";
-import { runStructuralCompareCli } from "./structural-compare.ts";
-import { runStructuralTraceCli } from "./structural-trace.ts";
-import { runPairedStructuralValidationCli } from "./scenario-validate.ts";
 import { runStructuralTeacherAuditCli } from "./scenario-teacher-audit.ts";
-import { runCompareWeightsCli } from "./weights-compare.ts";
-import { runTuneCli } from "./weights-tune.ts";
 
 const registry = createEvaluationCommandRegistry([
   {
@@ -34,11 +29,6 @@ const registry = createEvaluationCommandRegistry([
     run: runGenerateSamplesCli,
   },
   {
-    path: ["scenario", "validate"],
-    summary: "Run paired development and held-out structural validation",
-    run: runPairedStructuralValidationCli,
-  },
-  {
     path: ["scenario", "teacher-audit"],
     summary: "Audit bounded structural decisions against the full teacher",
     run: runStructuralTeacherAuditCli,
@@ -54,29 +44,9 @@ const registry = createEvaluationCommandRegistry([
     run: runDecisionDiffCli,
   },
   {
-    path: ["structural", "compare"],
-    summary: "Compare ordinary structural and weighted Junk policies",
-    run: runStructuralCompareCli,
-  },
-  {
-    path: ["structural", "trace"],
-    summary: "Trace same-view weighted and structural Junk decisions",
-    run: runStructuralTraceCli,
-  },
-  {
-    path: ["weights", "compare"],
-    summary: "Compare two weight or policy configurations",
-    run: runCompareWeightsCli,
-  },
-  {
     path: ["arena", "run"],
     summary: "Run production-policy Junk self-play sessions",
     run: runArenaCli,
-  },
-  {
-    path: ["weights", "tune"],
-    summary: "Search and evaluate candidate Junk weights",
-    run: runTuneCli,
   },
 ]);
 

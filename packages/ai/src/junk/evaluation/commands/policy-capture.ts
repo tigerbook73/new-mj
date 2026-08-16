@@ -66,7 +66,6 @@ export const runCaptureJunkPolicyCli = (
     output:
       `Policy capture written to ${destination}\n` +
       "Compare against it later with, e.g.:\n" +
-      `  pnpm --filter @new-mj/ai evaluate policy diff --baseline-module ${destination}/strategy.ts\n` +
-      `  pnpm --filter @new-mj/ai evaluate weights compare --candidate-module ${destination}/strategy.ts --candidate x\n`,
+      `  pnpm --filter @new-mj/ai evaluate policy diff --baseline-module ${destination}/strategy.ts\n`,
   };
 };

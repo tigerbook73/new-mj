@@ -11,8 +11,7 @@ export type CalibrationEvaluatorKind =
   | "two-ply-structural-all"
   | "structural-bounded"
   | "structural-claim"
-  | "structural-turn"
-  | "isolation-boundary";
+  | "structural-turn";
 
 export type CalibrationScenarioSource =
   | Readonly<{ kind: "fixture"; fixtureId: string }>

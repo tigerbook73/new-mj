@@ -10,7 +10,6 @@ import {
 import { evaluateProductionFixture } from "../src/junk/evaluation/production-evaluator.ts";
 import { evaluateStructuralMetrics } from "../src/junk/evaluation/structural-metrics.ts";
 import { evaluateStructuralTwoPlyAll } from "../src/junk/evaluation/structural-two-ply.ts";
-import { evaluateIsolationBoundary } from "../src/junk/evaluation/isolation-boundary.ts";
 import { evaluateStructuralBounded } from "../src/junk/evaluation/structural-bounded.ts";
 import { evaluateStructuralClaimPolicy } from "../src/junk/evaluation/structural-claim.ts";
 import { evaluateStructuralTurnPolicy } from "../src/junk/evaluation/structural-turn.ts";
@@ -33,7 +32,6 @@ describe("Junk diagnostic evaluators", () => {
           ({ scenario, input }) => evaluateStructuralBounded(scenario.id, input),
           ({ scenario, input }) => evaluateStructuralClaimPolicy(scenario.id, input),
           ({ scenario, input }) => evaluateStructuralTurnPolicy(scenario.id, input),
-          ({ scenario, input }) => evaluateIsolationBoundary(scenario.id, input),
         ],
         {
           runId: "three-routes",
@@ -45,7 +43,6 @@ describe("Junk diagnostic evaluators", () => {
         },
       );
       expect(report.evaluations.map(({ evaluator }) => evaluator).sort()).toEqual([
-        "isolation-boundary",
         "one-ply-all",
         "production-weighted",
         "standard-only",
@@ -93,10 +90,6 @@ describe("Junk diagnostic evaluators", () => {
         report.evaluations.find(({ evaluator }) => evaluator === "production-weighted")
           ?.selectedCandidateId,
       ).toBeDefined();
-      expect(
-        report.evaluations.find(({ evaluator }) => evaluator === "isolation-boundary")
-          ?.selectedCandidateId,
-      ).toBeUndefined();
     },
   );
 });

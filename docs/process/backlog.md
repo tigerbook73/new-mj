@@ -18,18 +18,6 @@
 
 该专题与当前普通牌形校准的关系：当前 calibration 只记录评估运行级别的性能、cache 命中和报告；正式 AI player 上下文属于生产观测能力，不自动并入 step 0。完成后可作为 snapshot/replay 场景来源，但不能把生产日志直接当作牌理真值。
 
-### Junk AI 大规模调参与权重采纳
-
-运行一次真实规模的 `pnpm --filter @new-mj/ai evaluate weights tune`，人工 review 报告后决定是否用 `--write` 采纳候选权重，或手动更新 `default-weights.json`。不把自对弈胜率直接当作牌理真值。
-
-### 严格结构支配护栏与 isolation 重新评估
-
-先在生产候选选择前只过滤同向听层中被存活进张种类和张数严格支配的弃牌，再重新评估将 `isolationPotential` 从 `1.5` 降为 `0`。必须保留向听与进张宽度冲突、Pareto 不可比较候选；用 canonical fixture、paired held-out 和同种子自对弈共同验收，不因 isolation=0 单独自对弈占优就直接采纳。
-
-### Junk AI 自我优化基础设施推广评估
-
-评估 Feature 参数化、自对弈 arena、调参脚本和调参算法是否适合杭州/血战到底。可复用 Layer B（打分求和）、Layer C（强度旋钮）和 Layer D（自对弈引擎/调参算法）的模式；玩法专属 Feature 抽取仍需各玩法单独设计。
-
 ### 番型路线收益模型可行性
 
 普通牌形校准完成后另开专题，评估番型数据、收益模型和可验证边界；不把不可可靠的胡牌概率伪装成诊断真值。
@@ -68,7 +56,6 @@
 
 当前自动门禁只保留不可替代的正确性覆盖；以下长跑暂不执行，恢复时先把“测试管线正确性”和“有意义的统计/效果评估”分开：
 
-- `packages/ai/test/junk-weight-tuning.test.ts`：真实自对弈调参循环整体暂停；先为 tuner 注入便宜、确定性的 evaluator，用小样本覆盖不可变默认值、收敛、sigma 上限、复现性和 `weightKeys`，真实调参继续通过 `evaluate weights tune` 手工运行；
 - `packages/ai/test/junk-arena.test.ts`：30 局 zero-sum 与强弱席位统计比较暂停；前者已有 core 结算守恒与单局 arena 接线覆盖，后者属于质量评估而非正确性断言；
 - Junk/杭州各自独立的“100 seeded games finish while preserving tile conservation”暂停，因为同文件的 replay + 100 局 fuzz 已覆盖规则执行与守恒；若未来拆走 fuzz 中的守恒断言再恢复；
 - 血战自动门禁保留 100 局 fuzz；专题收尾或玩法语义改动后的 10000 局全量接受测试改为人工运行，不常驻 `verify:full`。

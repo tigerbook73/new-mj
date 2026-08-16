@@ -8,12 +8,9 @@ describe("Junk evaluation command suite", () => {
     expect(result.output).toContain("scenario list");
     expect(result.output).toContain("scenario run");
     expect(result.output).toContain("scenario batch");
-    expect(result.output).toContain("scenario validate");
     expect(result.output).toContain("scenario teacher-audit");
     expect(result.output).toContain("policy diff");
     expect(result.output).toContain("policy capture");
-    expect(result.output).toContain("weights compare");
-    expect(result.output).toContain("weights tune");
     expect(result.output).toContain("arena run");
   });
 
@@ -28,20 +25,6 @@ describe("Junk evaluation command suite", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("evaluate arena run");
     expect(result.output).toContain("--matches");
-  });
-
-  it("routes weights tune help without starting a search", async () => {
-    const result = await runEvaluationCli(["weights", "tune", "--help"]);
-    expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("evaluate weights tune");
-    expect(result.output).toContain("--write");
-  });
-
-  it("routes weights compare help without starting workers", async () => {
-    const result = await runEvaluationCli(["weights", "compare", "--help"]);
-    expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("evaluate weights compare");
-    expect(result.output).toContain("--candidate");
   });
 
   it("routes command-specific help without running self-play", async () => {

@@ -1,6 +1,5 @@
 import { parentPort } from "node:worker_threads";
-import { runPolicyMatchTask } from "./tune.ts";
-import type { PolicyMatchTask } from "./tune-pool.ts";
+import { runPolicyMatchTask, type PolicyMatchTask } from "./policy-match.ts";
 
 if (!parentPort) throw new Error("policy-match-worker.ts must run inside a worker_threads Worker");
 const port = parentPort;
