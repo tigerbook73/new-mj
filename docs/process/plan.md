@@ -41,10 +41,11 @@
 - evaluation 新增单进程 `structural compare`：每个 seed 复用相同牌墙/庄家序列跑两场换位 match，structural 分别坐 0/2 与 1/3，按策略汇总分数、胜场、失败、步数上限及 weighted/structural 单次决策 P50/P95/max；报告保存全部 seed/split，写临时目录且不改生产入口。固定筛查门槛为 15 seeds / 30 场无失败、structural P95 不高于 50ms、总分不低于 weighted，且 canonical 普通型 fixture 无明确回退。
 - 顶层 seed `20260816` 的 3 seeds / 6 场小样本全部完成且无步数上限；structural/weighted 总分 `1/-1`、胜场 `3/3`，质量信号不确定。单次决策 structural P50/P95/max 为 `0.445/27.618/43.735ms`，weighted 为 `0.260/21.469/340.294ms`；结构 P95 慢约 29%，但低于 50ms 筛查线，也未出现 full 2-ply 式失控。报告位于 `/tmp/new-mj-structural-ab`，不归档。
 - 顶层 seed `20260815` 的正式 15 seeds / 30 场门禁无失败或 500 步上限；structural P50/P95/max 为 `0.272/26.307/381.883ms`，weighted 为 `0.249/22.706/65.129ms`，结构 P95 通过 50ms 性能线。structural/weighted 总分 `-21/21`、胜场 `12/16`、2 平，质量门禁失败，当前不得切生产。split 汇总是 structural 坐 0/2 时 `+11`（9 胜 4 负 2 平）、坐 1/3 时 `-32`（3 胜 12 负）；换位总和仍是采纳依据，但差异明显集中于 split，不能直接解释为某项普通牌理缺陷。7 个 canonical 普通型结构测试文件共 22 tests 全绿，未发现既有固定 fixture 回退；报告位于 `/tmp/new-mj-structural-ab`，不归档。
+- 独立顶层 seed `20260817` 的扩大验证覆盖 50 seeds / 100 场换位 match，仍无失败或步数上限；structural P50/P95/max 为 `0.260/26.590/46.935ms`，weighted 为 `0.250/22.894/337.735ms`，性能结论稳定。structural/weighted 总分 `-181/181`、胜场 `28/61`、11 平；50 个配对 seed 中 structural 净正 14、净负 35、1 平。structural-even/odd 分别为 `-90/-91`，说明大样本质量落后并非先前 split 不对称造成。筛选 2-ply 性能足够，但当前纯结构普通型策略明确未通过质量门禁，生产继续使用 weighted。
 
 ## 下一步第一个具体动作
 
-建立结构质量 trace slice brief：对门禁中配对净差最差的 seed `1366791565`（两 split 合计 structural `-10`）在真实 mixed-policy 对局的每个玩家视角同时计算 weighted 与 structural 推荐，保存首个及全部决策分歧的 round/step/seat、legalActions、可重建 view 和两路动作；先判断失分是否对应可复现的普通牌理反例、claim 边界或仅是后续轨迹/座位交互，不改算法且不切生产默认入口。
+建立结构质量 trace slice brief：对扩大样本中配对净差最差的 seed `2889165442`（两 split 合计 structural `-19`）在真实 mixed-policy 对局的每个玩家视角同时计算 weighted 与 structural 推荐，保存首个及全部决策分歧的 round/step/seat、legalActions、可重建 view 和两路动作；先判断失分是否对应可复现的普通牌理反例、claim 边界或后续轨迹交互，不改算法且不切生产默认入口。
 
 ## 阻塞与遗留问题
 
