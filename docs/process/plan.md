@@ -42,10 +42,12 @@
 - 顶层 seed `20260816` 的 3 seeds / 6 场小样本全部完成且无步数上限；structural/weighted 总分 `1/-1`、胜场 `3/3`，质量信号不确定。单次决策 structural P50/P95/max 为 `0.445/27.618/43.735ms`，weighted 为 `0.260/21.469/340.294ms`；结构 P95 慢约 29%，但低于 50ms 筛查线，也未出现 full 2-ply 式失控。报告位于 `/tmp/new-mj-structural-ab`，不归档。
 - 顶层 seed `20260815` 的正式 15 seeds / 30 场门禁无失败或 500 步上限；structural P50/P95/max 为 `0.272/26.307/381.883ms`，weighted 为 `0.249/22.706/65.129ms`，结构 P95 通过 50ms 性能线。structural/weighted 总分 `-21/21`、胜场 `12/16`、2 平，质量门禁失败，当前不得切生产。split 汇总是 structural 坐 0/2 时 `+11`（9 胜 4 负 2 平）、坐 1/3 时 `-32`（3 胜 12 负）；换位总和仍是采纳依据，但差异明显集中于 split，不能直接解释为某项普通牌理缺陷。7 个 canonical 普通型结构测试文件共 22 tests 全绿，未发现既有固定 fixture 回退；报告位于 `/tmp/new-mj-structural-ab`，不归档。
 - 独立顶层 seed `20260817` 的扩大验证覆盖 50 seeds / 100 场换位 match，仍无失败或步数上限；structural P50/P95/max 为 `0.260/26.590/46.935ms`，weighted 为 `0.250/22.894/337.735ms`，性能结论稳定。structural/weighted 总分 `-181/181`、胜场 `28/61`、11 平；50 个配对 seed 中 structural 净正 14、净负 35、1 平。structural-even/odd 分别为 `-90/-91`，说明大样本质量落后并非先前 split 不对称造成。筛选 2-ply 性能足够，但当前纯结构普通型策略明确未通过质量门禁，生产继续使用 weighted。
+- evaluation 新增 `structural trace`，在真实 mixed-policy 轨迹的同一个 `PlayerView + legalActions` 上同时计算 weighted/structural，并保存全部分歧的 round/step/seat、driver、完整 view、合法动作和两路选择；shadow 动作不应用到 core，因此只比较当前节点，不声称后续轨迹相同。seed `2889165442` 两个 split 精确复现 structural `-15/-4`，665 个决策点中有 170 个分歧（25.6%）：148 个 discard->discard、18 个 pass->peng、3 个 pass->chi、1 个 chi->chi，无 win/draw/gang 分歧。
+- 目标 trace 未发现违反现有结构排序的实现错误：首个弃牌分歧中两路条件期望向听相同，结构选择的进张种类/张数更高；18 个 pass->peng 中 13 个降低 1 向听、5 个同向听扩大进张，3 个 pass->chi 中 2 个降低 1 向听、1 个同向听扩大进张。当前证据不能把失分归因给某个节点，较可能是纯结构目标遗漏价值或 discard/claim 组件交互；报告位于 `/tmp/new-mj-structural-trace`，不归档。
 
 ## 下一步第一个具体动作
 
-建立结构质量 trace slice brief：对扩大样本中配对净差最差的 seed `2889165442`（两 split 合计 structural `-19`）在真实 mixed-policy 对局的每个玩家视角同时计算 weighted 与 structural 推荐，保存首个及全部决策分歧的 round/step/seat、legalActions、可重建 view 和两路动作；先判断失分是否对应可复现的普通牌理反例、claim 边界或后续轨迹交互，不改算法且不切生产默认入口。
+建立普通型结构组件消融 slice brief：新增两个仅供 evaluation 的混合 facade——weighted claim + structural turn/discard，以及 structural claim + weighted turn/discard；先用独立 15 seeds / 各 30 场换位 match 与全 weighted 基线比较，保持 win/draw 路由一致，分别报告分数、胜场、失败和逐 split 结果，以定位质量损失主要来自 discard 还是 claim，不调权重、不改结构算法且不切生产默认入口。
 
 ## 阻塞与遗留问题
 

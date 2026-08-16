@@ -51,6 +51,7 @@ pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
 pnpm --filter @new-mj/ai evaluate policy diff --help
 pnpm --filter @new-mj/ai evaluate policy capture --help
 pnpm --filter @new-mj/ai evaluate structural compare --seed 20260816 --seeds 3 --rounds 4
+pnpm --filter @new-mj/ai evaluate structural trace --seed 2889165442 --rounds 4
 pnpm --filter @new-mj/ai evaluate weights compare --help
 pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
@@ -136,6 +137,12 @@ seed 运行两场相同牌墙/庄家序列的换位配对：structural 先坐 0/
 分数和胜场，并分别记录单次决策 P50/P95/max。执行固定为单进程单并发，使墙钟耗时只在同一
 次运行、同一机器内比较；全部 seed、split、失败和 `STEP_LIMIT_EXCEEDED` 都写入临时报告。
 它不进入 `verify`、不改默认入口，小样本也不证明胜率或终局 EV；牌理反例必须另行固化 fixture。
+
+`structural trace` 对一个明确 match seed 重放 structural-even/odd 两个 mixed-policy split；
+实际策略继续驱动 core，另一策略只在完全相同的 `PlayerView + legalActions` 上 shadow 推荐。
+JSON 保存每个分歧的 round/step/seat、phase、完整 view、合法动作和两路动作，文本按 phase 与
+weighted->structural 动作类型汇总并展示前十项。shadow 选择只说明该节点可直接比较，不代表
+替换动作后的后续轨迹；报告用于选择可重建的人工 fixture，不自动归因最终分数或修改策略。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
