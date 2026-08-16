@@ -10,15 +10,9 @@ import {
   type PrngState,
   type SeatId,
 } from "@new-mj/core";
-import {
-  chooseLegacyWeightedJunkAction,
-  createJunkAnalysisCache,
-  type JunkStrengthConfig,
-  type JunkWeights,
-} from "../../strategy.ts";
+import { chooseJunkAction } from "../../strategy.ts";
 
-/** Per-seat decision function; a self-play arena plugs in one per seat so different
- * seats can play at different strength or with different tuned weights. */
+/** Per-seat decision function; a self-play arena plugs in one policy per seat. */
 export type SeatPolicy = ((
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
@@ -27,26 +21,8 @@ export type SeatPolicy = ((
   resetAnalysisContext?: () => void;
 };
 
-/** Wraps a strength config (and optional weight override) as a SeatPolicy backed by
- * the production decision function; omitting `weights` uses DEFAULT_JUNK_WEIGHTS. */
-export const legacyWeightedPolicy = (
-  strength: JunkStrengthConfig = {},
-  weights?: JunkWeights,
-): SeatPolicy => {
-  const analysisCache = strength.analysisCache ?? createJunkAnalysisCache();
-  const policy = ((view, legalActions) =>
-    chooseLegacyWeightedJunkAction(
-      view,
-      legalActions,
-      { ...strength, analysisCache },
-      weights,
-    )) as SeatPolicy;
-  policy.resetAnalysisContext = () => analysisCache.clear();
-  return policy;
-};
-
-/** @deprecated Weighted-tuning compatibility alias; generic arena callers pass SeatPolicy directly. */
-export const strengthPolicy = legacyWeightedPolicy;
+/** Wraps the current production baseline as an arena policy. */
+export const productionPolicy = (): SeatPolicy => chooseJunkAction;
 
 export type JunkMatchResult = {
   /** Cumulative score deltas across all played hands, one per seat. */

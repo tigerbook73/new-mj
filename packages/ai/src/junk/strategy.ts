@@ -1,17 +1,5 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
-import type { JunkAnalysisCache } from "./analysis.ts";
-import { scoreLegalActions, type ScoredAction } from "./action-scoring.ts";
 import { recommendStructuralBaselineV1Action } from "./structural-baseline.ts";
-import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./weights.ts";
-
-export { createJunkAnalysisCache, type JunkAnalysisCache } from "./analysis.ts";
-export {
-  scoreDiscardActionsTwoPlyAll,
-  scoreLegalActions,
-  scoreLegalActionsOnePlyAll,
-  type ScoredAction,
-} from "./action-scoring.ts";
-export { scoreHandShapeAfterDiscard, type GameProgress } from "./hand-quality.ts";
 export {
   evaluateStructuralDiscard,
   recommendStructuralDiscard,
@@ -41,12 +29,6 @@ export {
   type StructuralRouteResult,
 } from "./structural-routes.ts";
 export {
-  probeSelfDrawTwoPly,
-  type SelfDrawTwoPlyOutcome,
-  type SelfDrawTwoPlyProbe,
-} from "./two-ply.ts";
-export { DEFAULT_JUNK_WEIGHTS, JUNK_FAN_WEIGHTS, type JunkWeights } from "./weights.ts";
-export {
   JUNK_STRUCTURAL_BASELINE,
   recommendStructuralBaselineV1Action,
 } from "./structural-baseline.ts";
@@ -57,94 +39,22 @@ export {
  * zero-config production use (bot autoplay / advice); inject a seeded generator
  * for reproducible self-play/arena runs.
  */
-export type JunkStrengthConfig = {
-  temperature?: number;
-  random?: () => number;
-  analysisCache?: JunkAnalysisCache;
-};
-
 /** Complete ordinary-standard structural policy facade and production baseline. */
 export const recommendStructuralJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
 ): JunkAction | undefined => recommendStructuralBaselineV1Action(view, legalActions);
 
-const argmaxAction = (scored: readonly ScoredAction[]): JunkAction | undefined => {
-  let best: JunkAction | undefined;
-  let bestScore = Number.NEGATIVE_INFINITY;
-  for (const { action, score } of scored) {
-    if (score > bestScore) {
-      best = action;
-      bestScore = score;
-    }
-  }
-  return best;
-};
-
-/** Numerically stable softmax sampling over precomputed action scores. */
-const sampleSoftmax = (
-  scored: readonly ScoredAction[],
-  temperature: number,
-  random: () => number,
-): JunkAction | undefined => {
-  if (scored.length === 0) return undefined;
-  const maxScore = Math.max(...scored.map(({ score }) => score));
-  const weights = scored.map(({ score }) => Math.exp((score - maxScore) / temperature));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  const threshold = random() * total;
-  let cumulative = 0;
-  for (const [index, weight] of weights.entries()) {
-    cumulative += weight;
-    if (threshold < cumulative) return scored[index]!.action;
-  }
-  return scored[scored.length - 1]!.action;
-};
-
-/** Explicit legacy weighted policy retained for evaluation and rollback only. */
-export const recommendLegacyWeightedJunkAction = (
-  view: JunkPlayerView,
-  legalActions: readonly JunkAction[],
-  strength: JunkStrengthConfig = {},
-  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
-): JunkAction | undefined => {
-  const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
-  if (winning) return winning;
-  const scored = scoreLegalActions(view, legalActions, weights, strength.analysisCache);
-  const temperature = strength.temperature ?? 0;
-  if (temperature <= 0) return argmaxAction(scored);
-  return sampleSoftmax(scored, temperature, strength.random ?? Math.random);
-};
-
-export const chooseLegacyWeightedJunkAction = (
-  view: JunkPlayerView,
-  legalActions: readonly JunkAction[],
-  strength: JunkStrengthConfig = {},
-  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
-): JunkAction => {
-  const action = recommendLegacyWeightedJunkAction(view, legalActions, strength, weights);
-  if (!action) throw new Error("chooseLegacyWeightedJunkAction called with no legal actions");
-  return action;
-};
-
-/**
- * Production Junk recommendation. Strength and weights remain in the signature
- * for source compatibility during the post-switch cleanup, but no longer affect
- * the deterministic structural baseline.
- */
 export const recommendJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-  _strength: JunkStrengthConfig = {},
-  _weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
 ): JunkAction | undefined => recommendStructuralJunkAction(view, legalActions);
 
 export const chooseJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-  strength: JunkStrengthConfig = {},
-  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
 ): JunkAction => {
-  const action = recommendJunkAction(view, legalActions, strength, weights);
+  const action = recommendJunkAction(view, legalActions);
   if (!action) throw new Error("chooseJunkAction called with no legal actions");
   return action;
 };

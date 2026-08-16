@@ -11,7 +11,7 @@ const baseline: CalibrationBaseline = {
   baselineId: "scenario-a-one-ply-v1",
   scenarioId: "scenario-a",
   scenarioContentHash: "hash-a",
-  evaluator: "one-ply-all",
+  evaluator: "standard-only",
   evaluatorVersion: "v1",
   expected: {
     selectedCandidateId: "discard-a",
@@ -24,7 +24,7 @@ const baseline: CalibrationBaseline = {
 const actual: CalibrationEvaluationResult = {
   scenarioId: "scenario-a",
   scenarioContentHash: "hash-a",
-  evaluator: "one-ply-all",
+  evaluator: "standard-only",
   evaluatorVersion: "v1",
   selectedCandidateId: "discard-a",
   candidates: [

@@ -19,19 +19,12 @@ const usage = "Usage: pnpm --filter @new-mj/ai evaluate policy capture <label>\n
 const junkSrcDir = fileURLToPath(new URL("../../", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const policyFiles = [
-  "action-scoring.ts",
-  "analysis.ts",
-  "default-weights.json",
-  "hand-quality.ts",
   "strategy.ts",
   "structural-baseline.ts",
   "structural-claim.ts",
   "structural-discard.ts",
   "structural-routes.ts",
   "structural-turn.ts",
-  "tile-probability.ts",
-  "two-ply.ts",
-  "weights.ts",
 ] as const;
 
 const isValidLabel = (label: string): boolean =>

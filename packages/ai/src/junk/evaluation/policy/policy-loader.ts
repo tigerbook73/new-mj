@@ -1,18 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import type { SeatPolicy } from "../match/arena.ts";
-import type { JunkStrengthConfig, JunkWeights } from "../../strategy.ts";
 
 /**
  * Loads a `strategy.ts`-shaped module — either the current working tree's own
  * (default), an arbitrary file path (e.g. a hand-duplicated experimental copy
  * under packages/ai/.compare-scratch/, see AGENTS.md "两个都没提交的实验版本
  * 互相比"), or a committed git ref — as a SeatPolicy, so tools like
- * weights-compare.ts and policy-diff.ts can compare across code
- * versions, not just weight values, using the same in-process self-play
+ * policy-diff.ts can compare across code versions using the same in-process self-play
  * machinery (`SeatPolicy` doesn't care where the function came from — see
  * arena.ts).
  *
@@ -31,21 +29,15 @@ export type PolicySource = Readonly<{
   modulePath?: string;
   /** Named policy export. Defaults to chooseJunkAction. */
   exportName?: string;
-  /** Legacy compatibility: overrides DEFAULT_JUNK_WEIGHTS and selects the weighted export. */
-  weightsPath?: string;
 }>;
 
 type PolicyFunction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-  strength?: JunkStrengthConfig,
-  weights?: JunkWeights,
 ) => JunkAction | undefined;
 
 type StrategyModuleShape = Readonly<Record<string, unknown>> & {
   chooseJunkAction: PolicyFunction;
-  chooseLegacyWeightedJunkAction?: PolicyFunction;
-  DEFAULT_JUNK_WEIGHTS?: JunkWeights;
 };
 
 const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -57,8 +49,7 @@ const repoRoot = (): string =>
 /**
  * Pulls every non-test, non-CLI file directly inside packages/ai/src/junk/ at
  * `ref` into a fresh scratch directory — enough for strategy.ts's own dependency
- * closure (default-weights.json, tile-probability.ts if it existed yet at that
- * ref) without a real dependency resolver. The Junk source root is now restricted
+ * closure without a real dependency resolver. The Junk source root is restricted
  * to this production closure, so offline evaluation modules never tag along.
  */
 const snapshotRefToScratch = (ref: string): string => {
@@ -95,24 +86,6 @@ const isStrategyModuleShape = (value: unknown): value is StrategyModuleShape =>
   value !== null &&
   typeof (value as Record<string, unknown>).chooseJunkAction === "function";
 
-/** Shared by weights-compare.ts and policy-diff.ts: `expectedKeys` is
- * the *loaded module's own* weight key set (not necessarily the current working
- * tree's), since a `ref`/`modulePath` source may be a different code version
- * with a different JunkWeights shape (e.g. pre-Phase-1's improvementWeight). */
-export const loadWeightsFile = (filePath: string, expectedKeys: readonly string[]): JunkWeights => {
-  const parsed: unknown = JSON.parse(readFileSync(filePath, "utf8"));
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error(`INVALID_WEIGHTS_FILE: ${filePath}`);
-  }
-  const keys = Object.keys(parsed).sort();
-  if (keys.join(",") !== [...expectedKeys].sort().join(",")) {
-    throw new Error(
-      `INVALID_WEIGHTS_FILE: ${filePath} does not have the expected JunkWeights key set`,
-    );
-  }
-  return parsed as JunkWeights;
-};
-
 /**
  * The path-resolution half of loading a policy — snapshots `ref` via git if
  * given, resolves `modulePath`, or defaults to this package's current
@@ -138,35 +111,20 @@ export const resolveModulePath = (source: PolicySource): string => {
  * module and returns a SeatPolicy. Callable from any thread (main or worker):
  * it never touches git, only `import()` and an optional local JSON read.
  */
-export const buildPolicy = async (
-  modulePath: string,
-  weightsPath?: string,
-  exportName?: string,
-): Promise<SeatPolicy> => {
+export const buildPolicy = async (modulePath: string, exportName?: string): Promise<SeatPolicy> => {
   const imported: unknown = await import(pathToFileURL(modulePath).href);
   if (!isStrategyModuleShape(imported)) {
     throw new Error(`POLICY_SOURCE_INVALID_MODULE: ${modulePath} does not export chooseJunkAction`);
   }
-  const selectedExport =
-    exportName ??
-    (weightsPath && imported.chooseLegacyWeightedJunkAction
-      ? "chooseLegacyWeightedJunkAction"
-      : "chooseJunkAction");
+  const selectedExport = exportName ?? "chooseJunkAction";
   const choose = imported[selectedExport];
   if (typeof choose !== "function") {
     throw new Error(
       `POLICY_SOURCE_INVALID_EXPORT: ${modulePath} does not export ${selectedExport}`,
     );
   }
-  let weights: JunkWeights | undefined;
-  if (weightsPath) {
-    if (!imported.DEFAULT_JUNK_WEIGHTS) {
-      throw new Error(`POLICY_SOURCE_WEIGHTS_UNSUPPORTED: ${modulePath}`);
-    }
-    weights = loadWeightsFile(weightsPath, Object.keys(imported.DEFAULT_JUNK_WEIGHTS));
-  }
   return (view, legalActions) => {
-    const action = (choose as PolicyFunction)(view, legalActions, {}, weights);
+    const action = (choose as PolicyFunction)(view, legalActions);
     if (!action) throw new Error(`POLICY_RETURNED_NO_ACTION: ${selectedExport}`);
     return action;
   };
@@ -177,6 +135,6 @@ export const loadPolicy = async (
   label: string,
 ): Promise<{ policy: SeatPolicy; label: string; modulePath: string }> => {
   const modulePath = resolveModulePath(source);
-  const policy = await buildPolicy(modulePath, source.weightsPath, source.exportName);
+  const policy = await buildPolicy(modulePath, source.exportName);
   return { policy, label, modulePath };
 };

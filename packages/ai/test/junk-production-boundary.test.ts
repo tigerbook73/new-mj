@@ -4,19 +4,12 @@ import { describe, expect, it } from "vitest";
 
 const junkRoot = fileURLToPath(new URL("../src/junk/", import.meta.url));
 const productionFiles = [
-  "action-scoring.ts",
-  "analysis.ts",
-  "default-weights.json",
-  "hand-quality.ts",
   "strategy.ts",
   "structural-baseline.ts",
   "structural-claim.ts",
   "structural-discard.ts",
   "structural-routes.ts",
   "structural-turn.ts",
-  "tile-probability.ts",
-  "two-ply.ts",
-  "weights.ts",
 ] as const;
 
 describe("Junk production boundary", () => {

@@ -1,10 +1,6 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_JUNK_WEIGHTS,
-  recommendJunkAction,
-  recommendStructuralJunkAction,
-} from "./strategy.ts";
+import { recommendJunkAction, recommendStructuralJunkAction } from "./strategy.ts";
 
 const view = (phase: JunkPlayerView["phase"]): JunkPlayerView => ({
   seat: 0,
@@ -17,17 +13,12 @@ const view = (phase: JunkPlayerView["phase"]): JunkPlayerView => ({
 });
 
 describe("recommendStructuralJunkAction", () => {
-  it("is the production facade regardless of legacy strength and weight arguments", () => {
+  it("is the production facade", () => {
     const discard: JunkAction = { type: "discard", tile: 0 };
     const actions = [discard];
-    expect(
-      recommendJunkAction(
-        view("playing"),
-        actions,
-        { temperature: 100, random: () => 0.999 },
-        { ...DEFAULT_JUNK_WEIGHTS, isolationPotential: 999 },
-      ),
-    ).toBe(recommendStructuralJunkAction(view("playing"), actions));
+    expect(recommendJunkAction(view("playing"), actions)).toBe(
+      recommendStructuralJunkAction(view("playing"), actions),
+    );
   });
 
   it("covers empty, draw and winning flow actions", () => {

@@ -1,6 +1,6 @@
 import { parentPort } from "node:worker_threads";
 import type { SeatId } from "@new-mj/core";
-import { playJunkMatch, strengthPolicy } from "./arena.ts";
+import { playJunkMatch, productionPolicy } from "./arena.ts";
 
 export type ArenaTask = Readonly<{ seed: number; rounds: number }>;
 
@@ -15,10 +15,10 @@ export type ArenaTaskResult =
 
 export const runArenaTask = ({ seed, rounds }: ArenaTask): ArenaTaskResult => {
   const policies = [
-    strengthPolicy(),
-    strengthPolicy(),
-    strengthPolicy(),
-    strengthPolicy(),
+    productionPolicy(),
+    productionPolicy(),
+    productionPolicy(),
+    productionPolicy(),
   ] as const;
   const result = playJunkMatch(seed, policies, rounds);
   return "error" in result

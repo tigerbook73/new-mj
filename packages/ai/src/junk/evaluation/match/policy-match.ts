@@ -5,7 +5,6 @@ import type { MatchWorkerPool } from "./worker-pool.ts";
 
 export type PolicyMatchSource = Readonly<{
   modulePath: string;
-  weightsPath?: string;
   exportName?: string;
 }>;
 
@@ -47,8 +46,8 @@ const splitMatchScore = (
 
 export const runPolicyMatchTask = async (task: PolicyMatchTask): Promise<PolicyMatchTaskResult> => {
   const [baselinePolicy, candidatePolicy] = await Promise.all([
-    buildPolicy(task.baseline.modulePath, task.baseline.weightsPath, task.baseline.exportName),
-    buildPolicy(task.candidate.modulePath, task.candidate.weightsPath, task.candidate.exportName),
+    buildPolicy(task.baseline.modulePath, task.baseline.exportName),
+    buildPolicy(task.candidate.modulePath, task.candidate.exportName),
   ]);
   const policies = SEAT_IDS.map((seat) =>
     task.candidateSeats.includes(seat) ? candidatePolicy : baselinePolicy,

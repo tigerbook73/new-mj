@@ -4,10 +4,7 @@ export const CALIBRATION_SCHEMA_VERSION = 1 as const;
 export type CalibrationHorizon = "early" | "mid" | "late";
 
 export type CalibrationEvaluatorKind =
-  | "production-weighted"
-  | "one-ply-all"
   | "standard-only"
-  | "two-ply-all"
   | "two-ply-structural-all"
   | "structural-bounded"
   | "structural-claim"

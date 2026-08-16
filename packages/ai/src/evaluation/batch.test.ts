@@ -38,7 +38,7 @@ describe("resumable calibration batch", () => {
           taskId: task.taskId,
           result: {
             scenarioId: task.taskId,
-            evaluator: "one-ply-all" as const,
+            evaluator: "standard-only" as const,
             evaluatorVersion: "v1",
             candidates: [],
             performance: { durationMs: 1, cacheHits: 0, cacheMisses: 0 },
@@ -54,7 +54,7 @@ describe("resumable calibration batch", () => {
         workerCount: 1,
       },
       {
-        evaluator: "one-ply-all",
+        evaluator: "standard-only",
         chunkSize: 1,
         checkpointStore: {
           load: () => undefined,
@@ -76,7 +76,7 @@ describe("resumable calibration batch", () => {
         (scenario, data) => ({ scenario, input: data, contentHash: "hash-a" }),
         async () => [],
         { runId: "r", gitSha: "s", command: "c", configHash: "h", startedAt: "t", workerCount: 1 },
-        { evaluator: "production-weighted" },
+        { evaluator: "structural-bounded" },
       ),
     ).rejects.toThrow("JSONL_MANIFEST_MISMATCH");
   });

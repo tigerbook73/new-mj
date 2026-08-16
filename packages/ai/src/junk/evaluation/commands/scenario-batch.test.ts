@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import snapshotData from "../fixtures/midgame-shape-001.snapshot.json" with { type: "json" };
 import { runBatchCalibrationCli } from "./scenario-batch.ts";
 import { JUNK_CALIBRATION_MANIFEST } from "../canonical-fixtures.ts";
-import { evaluateProductionFixture } from "../production-evaluator.ts";
 import type { JunkProductionSnapshotData } from "../snapshot-provider.ts";
 import { generateJunkSamples } from "../generated-samples.ts";
 import { evaluateStructuralBounded } from "../structural-bounded.ts";
@@ -57,14 +56,14 @@ describe("evaluation batch CLI", () => {
         execute: async (tasks) =>
           tasks.map((task) => ({
             taskId: task.taskId,
-            result: evaluateProductionFixture(task.input.scenarioId, task.input.input),
+            result: evaluateStructuralBounded(task.input.scenarioId, task.input.input),
           })),
       },
     );
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("discard-snapshot-001");
     expect(files.get("/tmp/evaluation-batch-test/checkpoint.json")).toContain(
-      '"evaluator": "production-weighted"',
+      '"evaluator": "structural-bounded"',
     );
     expect(files.get("/tmp/evaluation-batch-test/junk-batch-test-001.json")).toContain(
       '"scenarioCount": 1',
@@ -84,7 +83,7 @@ describe("evaluation batch CLI", () => {
                   id: JUNK_CALIBRATION_MANIFEST.id,
                   version: JUNK_CALIBRATION_MANIFEST.version,
                 },
-                evaluator: "two-ply-all",
+                evaluator: "standard-only",
                 evaluations: [],
               }),
       },

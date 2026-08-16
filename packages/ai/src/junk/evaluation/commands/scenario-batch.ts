@@ -20,7 +20,7 @@ import type { JunkEvaluationTaskInput } from "../evaluation-task.ts";
 export const batchUsage =
   "Usage: pnpm --filter @new-mj/ai evaluate scenario batch <manifest.json> <scenarios.jsonl> [options]\n\n" +
   "Options:\n" +
-  "  --evaluator <production-weighted|standard-only|one-ply-all|two-ply-all|two-ply-structural-all|structural-bounded|structural-claim|structural-turn>\n" +
+  "  --evaluator <standard-only|two-ply-structural-all|structural-bounded|structural-claim|structural-turn>\n" +
   "  --workers <n>                 Worker thread count (default: 1)\n" +
   "  --chunk-size <n>               Scenarios per checkpoint (default: 64)\n" +
   "  --checkpoint <file>            Write resumable JSON after every chunk\n" +
@@ -61,7 +61,7 @@ export const runBatchCalibrationCli = async (
     const manifestPath = argv[0];
     const recordsPath = argv[1];
     if (!manifestPath || !recordsPath || argv.includes("--help")) throw new Error(batchUsage);
-    let evaluator: CalibrationEvaluatorKind = "production-weighted";
+    let evaluator: CalibrationEvaluatorKind = "structural-bounded";
     let workers = 1;
     let chunkSize = 64;
     let outputDir = "packages/ai/.evaluation-runs";
@@ -83,10 +83,7 @@ export const runBatchCalibrationCli = async (
     }
     if (
       ![
-        "production-weighted",
         "standard-only",
-        "one-ply-all",
-        "two-ply-all",
         "two-ply-structural-all",
         "structural-bounded",
         "structural-claim",

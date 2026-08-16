@@ -10,8 +10,6 @@ import {
   formatCalibrationSummary,
   serializeCalibrationReport,
 } from "../../../evaluation/report.ts";
-import { evaluateProductionFixture } from "../production-evaluator.ts";
-import { evaluateOnePlyAll, evaluateTwoPlyAll } from "../diagnostic-evaluators.ts";
 import { evaluateStructuralMetrics } from "../structural-metrics.ts";
 import { evaluateStructuralTwoPlyAll } from "../structural-two-ply.ts";
 import { evaluateStructuralBounded } from "../structural-bounded.ts";
@@ -133,10 +131,7 @@ export const runCalibrationCli = (
       args.scenarioId!,
       CANONICAL_JUNK_SCENARIO_PROVIDER,
       [
-        (normalized) => evaluateProductionFixture(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralMetrics(normalized.scenario.id, normalized.input),
-        (normalized) => evaluateOnePlyAll(normalized.scenario.id, normalized.input),
-        (normalized) => evaluateTwoPlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralTwoPlyAll(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralBounded(normalized.scenario.id, normalized.input),
         (normalized) => evaluateStructuralClaimPolicy(normalized.scenario.id, normalized.input),

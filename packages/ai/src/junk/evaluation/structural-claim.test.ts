@@ -3,7 +3,6 @@ import {
   CANONICAL_JUNK_SCENARIO_PROVIDER,
   JUNK_CALIBRATION_MANIFEST,
 } from "./canonical-fixtures.ts";
-import { evaluateProductionFixture } from "./production-evaluator.ts";
 import { evaluateStructuralClaimPolicy } from "./structural-claim.ts";
 
 describe("structural-claim evaluator", () => {
@@ -15,7 +14,6 @@ describe("structural-claim evaluator", () => {
     const scenario = JUNK_CALIBRATION_MANIFEST.scenarios.find(({ id }) => id === scenarioId)!;
     const normalized = CANONICAL_JUNK_SCENARIO_PROVIDER.resolve(scenario);
     const structural = evaluateStructuralClaimPolicy(scenarioId, normalized.input);
-    const production = evaluateProductionFixture(scenarioId, normalized.input);
 
     expect(structural).toMatchObject({
       evaluator: "structural-claim",
@@ -23,7 +21,6 @@ describe("structural-claim evaluator", () => {
       status: "ok",
     });
     expect(JSON.parse(structural.selectedCandidateId!).type).toBe(expectedType);
-    expect(JSON.parse(production.selectedCandidateId!).type).toBe(expectedType);
     expect(structural.candidates).toHaveLength(2);
   });
 

@@ -19,7 +19,7 @@ describe("evaluation CLI", () => {
       scenarioId: "discard-001",
       scenarioContentHash:
         "sha256:fd10b00c285fc0f6521a373c9a967afd1d61eb25e4665ebd65a6b1da3fc3c4d8",
-      evaluator: "production-weighted",
+      evaluator: "structural-bounded",
       evaluatorVersion: "v1",
       expected: { selectedCandidateId: "different" },
     };
@@ -86,12 +86,6 @@ describe("evaluation CLI", () => {
     expect(result.exitCode).toBe(0);
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"schemaVersion": 1',
-    );
-    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
-      '"evaluator": "one-ply-all"',
-    );
-    expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
-      '"evaluator": "two-ply-all"',
     );
     expect(files.get("/tmp/evaluation-cli-test/junk-cli-test-001.json")).toContain(
       '"evaluator": "standard-only"',

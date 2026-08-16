@@ -25,26 +25,18 @@ const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 
 /** exactOptionalPropertyTypes rejects `{ ref: undefined }` — build the source
  * object with only the keys the caller actually provided. */
-const policySource = (
-  ref?: string,
-  modulePath?: string,
-  weightsPath?: string,
-  exportName?: string,
-): PolicySource => ({
+const policySource = (ref?: string, modulePath?: string, exportName?: string): PolicySource => ({
   ...(ref !== undefined ? { ref } : {}),
   ...(modulePath !== undefined ? { modulePath } : {}),
-  ...(weightsPath !== undefined ? { weightsPath } : {}),
   ...(exportName !== undefined ? { exportName } : {}),
 });
 
 type Arguments = {
   baselineRef?: string;
   baselineModule?: string;
-  baselineWeights?: string;
   baselineExport?: string;
   candidateRef?: string;
   candidateModule?: string;
-  candidateWeights?: string;
   candidateExport?: string;
   seed: number;
   seeds: number;
@@ -55,9 +47,9 @@ type Arguments = {
 
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate policy diff\n" +
-  "  [--baseline-ref <git-ref> | --baseline-module <path>] [--baseline-weights <path>]\n" +
+  "  [--baseline-ref <git-ref> | --baseline-module <path>]\n" +
   "  [--baseline-export <name>]\n" +
-  "  [--candidate-ref <git-ref> | --candidate-module <path>] [--candidate-weights <path>]\n" +
+  "  [--candidate-ref <git-ref> | --candidate-module <path>]\n" +
   "  [--candidate-export <name>]\n" +
   "  [--seed <int>] [--seeds <int>] [--sample-size <int>]\n" +
   "  [--output-dir <dir>] [--run-id <id>]\n";
@@ -70,11 +62,9 @@ const parseArguments = (argv: string[]): Arguments => {
     if (!flag || value === undefined) throw new Error("MISSING_ARGUMENT_VALUE");
     if (flag === "--baseline-ref") result.baselineRef = value;
     else if (flag === "--baseline-module") result.baselineModule = value;
-    else if (flag === "--baseline-weights") result.baselineWeights = value;
     else if (flag === "--baseline-export") result.baselineExport = value;
     else if (flag === "--candidate-ref") result.candidateRef = value;
     else if (flag === "--candidate-module") result.candidateModule = value;
-    else if (flag === "--candidate-weights") result.candidateWeights = value;
     else if (flag === "--candidate-export") result.candidateExport = value;
     else if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--seeds") result.seeds = Number(value);
@@ -194,22 +184,9 @@ export const runDecisionDiffCli = async (
     log(`[decision-diff] loading baseline/candidate policies (seeds=${args.seeds})...\n`);
     const load = runtime.load ?? loadPolicy;
     const [baseline, candidate] = await Promise.all([
+      load(policySource(args.baselineRef, args.baselineModule, args.baselineExport), "baseline"),
       load(
-        policySource(
-          args.baselineRef,
-          args.baselineModule,
-          args.baselineWeights,
-          args.baselineExport,
-        ),
-        "baseline",
-      ),
-      load(
-        policySource(
-          args.candidateRef,
-          args.candidateModule,
-          args.candidateWeights,
-          args.candidateExport,
-        ),
+        policySource(args.candidateRef, args.candidateModule, args.candidateExport),
         "candidate",
       ),
     ]);

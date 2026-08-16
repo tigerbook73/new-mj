@@ -7,7 +7,7 @@
 ## 分层（单向依赖，自下而上）
 
 ```
-Layer 3  玩法专属 AI 评分     packages/ai/src/<ruleset>/（如 junk 的 JunkWeights/fanPotential）
+Layer 3  玩法专属 AI 策略     packages/ai/src/<ruleset>/（如 Junk structural baseline）
    ↑ 消费
 Layer 2  财神/通配符装饰层    设计上预留，未实现（见下）
    ↑ 消费
@@ -72,7 +72,7 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
 3. **公开 prober/可变闭包**：直接导出 `createTwoChangeShantenProber`。性能接口简单，
    但会把当前 DP scratch、调用顺序和实现细节变成公共契约，拒绝作为首选。
 4. **新增高层 2-ply API**：由 core 返回概率加权的最佳下一次弃牌。拒绝；概率池、
-   清一色/七对子路线和 `JunkWeights` 属于 AI，不应进入玩法无关 core。
+   清一色/七对子路线和策略选择属于 AI，不应进入玩法无关 core。
 
 ### 已确认边界与当前状态
 
@@ -84,8 +84,7 @@ kind 索引、加入牌 kind 索引、`ShantenOptions`、`TileSet` 和 `existing
 摸牌后的进张列表，继续组合现有 `evaluateUkeireBatch`。矩阵大小由调用方传入的两个
 kind 列表控制，不在 core 内隐式扩展到所有 34 种牌。
 
-下一步只在 AI 诊断路径评估是否消费该 API；在 A/B/profile 证明有收益前，不改默认 AI
-策略，也不把概率或 JunkWeights 下沉到 core。
+AI 结构策略已经消费该 API；概率聚合和最终动作选择仍留在 AI，不下沉到 core。
 
 ## Junk 纯结构策略分层
 
@@ -102,8 +101,8 @@ kind 列表控制，不在 core 内隐式扩展到所有 34 种牌。
 - 概率加权聚合产生的浮点结果在比较时使用固定 `1e-12` 容差，仅消除不同累加路径的舍入噪声；
   它不是质量权重，容差内继续比较下一项结构指标。
 
-该 bounded 路径是 Junk 普通标准型生产弃牌基线。旧加权策略仅保留为显式 legacy/evaluation
-对照与安全回退；番型、七对和防守必须在后续独立 slice 中用 fixture/A-B 证据逐项加入，
+该 bounded 路径是 Junk 普通标准型生产弃牌基线，也是当前树唯一生产实现。旧加权策略已由
+Git 历史承担回溯；番型、七对和防守必须在后续独立 slice 中用 fixture/A-B 证据逐项加入，
 不能借此边界隐式改变。
 
 ### Claim/pass 的结构比较
@@ -184,24 +183,24 @@ cliff 不迁移为公共工具。可重建场景包括 canonical `discard-001`�
 
 旧 `analysis.ts` 的 key 是“副露数 / 是否允许七对 / 34 种暗手计数”，有意不含牌河、公开副露
 或 wallCount，因为缓存值仅是 `evaluateUkeire` 的暗手结构事实。缓存容量默认为 32，每个座位
-跨决策复用、每手开始清空；实时分数和存活张数不得缓存。当前消费者全部位于 legacy
-`hand-quality → two-ply → action-scoring` 及其诊断路径，structural production 使用 core 批量
-API，没有消费者。
+跨决策复用、每手开始清空；实时分数和存活张数不得缓存。删除前的消费者全部位于 legacy
+`hand-quality → two-ply → action-scoring` 及其诊断路径；structural production 使用 core 批量
+API，因此当前树不保留该缓存。
 
 Node `v24.18.0`、canonical `discard-001` 的只读重复 benchmark（预热后每轮 50 次，共 3 轮）中，
 共享 32 项 LRU 每轮均为 `7,189 hits / 60,211 misses`；shared/fresh 耗时分别为
 `1352.3/1323.4ms`、`1337.0/1324.2ms`、`1286.8/1303.7ms`，没有稳定收益且呈明显容量抖动。
-因此不迁为 structural 能力，随 legacy 删除。若未来 profile 再次定位到相同 shape 重算，应在
+因此未迁为 structural 能力，已随 legacy 删除。若未来 profile 再次定位到相同 shape 重算，应在
 实际消费者旁建立局部 cache，以完整语义 key、明确生命周期、容量和命中 benchmark 重新验收。
 
 ### 有限总体抽样
 
-`probabilityAtLeastOneDraw` 计算有限总体无放回抽样“至少命中一次”；当前唯一生产消费者是旧
+已删除的 `probabilityAtLeastOneDraw` 计算有限总体无放回抽样“至少命中一次”；其唯一消费者是旧
 `handQuality`，它先把可见进张按 wall 在未知池中的份额折算成可能为非整数的 `wallShare`，再
 估算本人剩余摸牌次数。这个总体既不是真实牌墙，也不是条件终局模型。structural 路径只在
 “下一次未知摸牌”分支上按可见剩余副本聚合，不调用该函数。
 
 因此数学公式及“总体、成功数、抽取次数必须同属一个明确定义的信息集”的约束保留在本文，
-函数本身不迁为中性工具并随 legacy 删除。未来若引入多次摸牌概率，必须先定义谁能摸、未知池
+函数本身未迁为中性工具，已随 legacy 删除。未来若引入多次摸牌概率，必须先定义谁能摸、未知池
 包含哪些容器、公开信息如何去重、是否条件于对手行动，并用枚举小总体和实战边界 fixture
 验证；不得直接复用旧 `wallShare` 近似并称为胡牌概率或 EV。
