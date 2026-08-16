@@ -9,6 +9,7 @@ const productionFiles = [
   "default-weights.json",
   "hand-quality.ts",
   "strategy.ts",
+  "structural-baseline.ts",
   "structural-claim.ts",
   "structural-discard.ts",
   "structural-routes.ts",

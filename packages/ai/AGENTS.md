@@ -11,6 +11,7 @@
 
 - 决策函数只消费 core 的 view/actions；强度与随机性通过可选参数注入，默认 `Math.random`，测试与自对弈注入基于 core PRNG 的闭包。
 - Junk 默认生产使用普通标准型无权重结构 facade；`strategy.ts` 是兼容加载根，只保留最终动作选择并重导既有诊断 API。旧 `weights + analysis → hand-quality → two-ply → action-scoring` 路径只作为显式 legacy/evaluation 对照与回退资产。生产路径不得 import `evaluation/`。
+- 当前生产策略身份由 `JUNK_STRUCTURAL_BASELINE` 固定；有意改变 canonical 行为时新建 baseline 版本及对照资产，不静默改写既有版本。
 - legacy 默认权重只存于 `src/junk/default-weights.json`，由 `weights.ts` 加载并冻结；不得再把调权重作为生产演进路径。
 - `scoreLegalActions` 每回合共享一个 `standardShanten` memo；新增同回合候选分析应复用该模式，不建立重复 memo 或跨局缓存。
 

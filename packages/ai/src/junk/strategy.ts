@@ -1,8 +1,7 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import type { JunkAnalysisCache } from "./analysis.ts";
 import { scoreLegalActions, type ScoredAction } from "./action-scoring.ts";
-import { recommendStructuralClaim } from "./structural-claim.ts";
-import { recommendStructuralTurn } from "./structural-turn.ts";
+import { recommendStructuralBaselineV1Action } from "./structural-baseline.ts";
 import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./weights.ts";
 
 export { createJunkAnalysisCache, type JunkAnalysisCache } from "./analysis.ts";
@@ -47,6 +46,10 @@ export {
   type SelfDrawTwoPlyProbe,
 } from "./two-ply.ts";
 export { DEFAULT_JUNK_WEIGHTS, JUNK_FAN_WEIGHTS, type JunkWeights } from "./weights.ts";
+export {
+  JUNK_STRUCTURAL_BASELINE,
+  recommendStructuralBaselineV1Action,
+} from "./structural-baseline.ts";
 
 /**
  * Softmax temperature knob for action sampling. Omitted or <= 0 reproduces the
@@ -60,25 +63,11 @@ export type JunkStrengthConfig = {
   analysisCache?: JunkAnalysisCache;
 };
 
-const isClaimContext = (legalActions: readonly JunkAction[]): boolean =>
-  legalActions.some((action) => ["chi", "peng", "minGang", "hu", "pass"].includes(action.type));
-
 /** Complete ordinary-standard structural policy facade and production baseline. */
 export const recommendStructuralJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-): JunkAction | undefined => {
-  if (legalActions.length === 0) return undefined;
-  const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
-  if (winning) return winning;
-  const draw = legalActions.find((action) => action.type === "draw");
-  if (draw) return draw;
-
-  const recommended = isClaimContext(legalActions)
-    ? recommendStructuralClaim(view, legalActions)
-    : recommendStructuralTurn(view, legalActions);
-  return recommended && legalActions.includes(recommended) ? recommended : legalActions[0];
-};
+): JunkAction | undefined => recommendStructuralBaselineV1Action(view, legalActions);
 
 const argmaxAction = (scored: readonly ScoredAction[]): JunkAction | undefined => {
   let best: JunkAction | undefined;

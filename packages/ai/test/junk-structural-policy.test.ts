@@ -8,7 +8,7 @@ import {
   type SeatId,
 } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
-import { recommendStructuralJunkAction } from "../src/junk/strategy.ts";
+import { recommendJunkAction, recommendStructuralBaselineV1Action } from "../src/junk/strategy.ts";
 
 describe("structural Junk policy against the real core engine", () => {
   it("finishes a hand using only actions returned by core", { tags: ["slow"] }, () => {
@@ -29,7 +29,9 @@ describe("structural Junk policy against the real core engine", () => {
       const legalActions = junkRuleSet.getLegalActions(state, seat) as JunkAction[];
       expect(legalActions.length).toBeGreaterThan(0);
       const playerView = junkRuleSet.getPlayerView(state, seat) as JunkPlayerView;
-      const action = recommendStructuralJunkAction(playerView, legalActions);
+      const baselineAction = recommendStructuralBaselineV1Action(playerView, legalActions);
+      const action = recommendJunkAction(playerView, legalActions);
+      expect(action).toBe(baselineAction);
       expect(action).toBeDefined();
       expect(legalActions).toContain(action);
       const result = junkRuleSet.applyAction(state, seat, action!);

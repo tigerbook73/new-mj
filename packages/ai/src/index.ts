@@ -7,8 +7,10 @@ export * from "./strategy.ts";
 export {
   chooseJunkAction,
   chooseLegacyWeightedJunkAction,
+  JUNK_STRUCTURAL_BASELINE,
   recommendLegacyWeightedJunkAction,
   recommendJunkAction,
+  recommendStructuralBaselineV1Action,
   recommendStructuralJunkAction,
   type JunkStrengthConfig,
 } from "./junk/strategy.ts";

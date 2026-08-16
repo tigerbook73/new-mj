@@ -5,7 +5,7 @@ provider、evaluator 和 runner 提供。
 
 ## 当前 manifest
 
-`fixtures/canonical-baseline.json` 是当前唯一已接入的 manifest，同时登记手写 fixture
+`fixtures/canonical-baseline.json` 是当前接入 runner 的输入 manifest，同时登记手写 fixture
 和固定生产 snapshot：
 
 - `purpose: canonical-baseline`：固定普通牌型输入，用于记录生产 AI 的可重复决策；
@@ -19,6 +19,18 @@ fixture 身份由 registry 的 `fixtureId` 提供，版本由 manifest 中的 sc
 provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snapshot 使用
 `*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
 副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
+
+`fixtures/structural-baseline-v1.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
+`structural-baseline@1` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
+期望动作以及 hu/zimo/draw 流程动作。生产 facade 与完整 core 对局测试都对照同一个版本化 v1
+实现；有意改变这些行为时必须建立新版本，不能静默改写 v1。
+
+该版本建立时沿用已经完成的固定环境证据，不把耗时写成跨机器硬断言：bounded/full teacher
+在 seed `20260814` 的 1000 个开发场景一致 `1000/1000`，P95 为 `33.85/95.41ms`；seed
+`20260815` 的 1000 个留出场景一致 `999/1000`，P95 为 `33.41/94.51ms`。完整策略在 seed
+`20260817` 的 50 seeds / 100 场运行中无失败或步数上限，单次结构决策 P95 为 `26.590ms`。
+这些数值描述 v1 建立时的边界；后续 candidate 应在同环境重跑并与进入 slice 前的 structural
+baseline 比较。
 
 `fixtures/canonical-structural-expectations.json` 独立记录人工确认的候选关系、精确结构
 指标和理由；它不进入生产 fixture schema，也不让 `standard-only` 选择动作。加载时会

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "structural-baseline",
+  "version": 1,
+  "scope": "ordinary-standard",
+  "inputManifest": { "id": "canonical-baseline", "version": 1 },
+  "behavior": [
+    { "scenarioId": "discard-001", "expectedAction": { "type": "discard", "kind": "5p" } },
+    {
+      "scenarioId": "discard-snapshot-001",
+      "expectedAction": { "type": "discard", "kind": "1z" }
+    },
+    { "scenarioId": "claim-chi-breaks-tenpai-001", "expectedAction": { "type": "pass" } },
+    { "scenarioId": "claim-peng-reaches-tenpai-001", "expectedAction": { "type": "peng" } },
+    { "scenarioId": "claim-chi-tied-pass-001", "expectedAction": { "type": "pass" } },
+    {
+      "scenarioId": "claim-mingang-replacement-001",
+      "expectedAction": { "type": "minGang" }
+    },
+    {
+      "scenarioId": "self-gang-equivalence-001",
+      "expectedAction": { "type": "discard", "kind": "1m" }
+    }
+  ],
+  "flowActions": ["hu", "zimo", "draw"],
+  "excludedObjectives": ["seven-pairs", "fan-value", "defense"]
+}
