@@ -4,7 +4,7 @@
 
 ## 当前任务
 
-当前专题是逐步建立新的纯结构 Junk 策略。七对显式结构路线模型已建立，尚未接入 bounded 2-ply；生产默认仍是现有加权策略，`isolationPotential` 保持 `1.5`。
+当前专题是把已经验证的普通标准型结构策略纳入 Junk 生产入口。先完成统一影子 facade、全合法动作覆盖、性能门禁和 weighted/structural A/B，再用独立提交切换默认；生产当前仍是现有加权策略，`isolationPotential` 保持 `1.5`。
 
 ## 当前状态
 
@@ -25,7 +25,7 @@
 - 同一 API 关闭支配过滤并把首弃上限设为无限时作为离线 full teacher。canonical `discard-001` 和中盘 `discard-snapshot-001` 中 bounded/full 分别一致选择 `5p`、`1z`；单元测试固定搜索上限和“不搜索被支配首弃”不变量。
 - 原上限 4 的三处 bounded/full 差异均来自一层指标完全相同的候选在截断边界两侧，且条件期望向听存在约 `2e-16` 的累加噪声；可复现 seed `1077643932`、`1351392336`、`537634752` 已固化为回归用例。上限 5 加固定浮点容差后，seed `20260814`/`20260815` 各 100 个场景均达到 bounded/full `100/100` 一致，平均搜索 4.38/4.39 个首弃，扫描约比 full 快 `2.84`/`3.20` 倍。生成样本和扫描报告仍是临时可重建数据，不归档。
 - 结构候选只使用本人可见信息：手牌、所有公开牌河与副露按 `TileId` 去重后估算剩余副本。它不读取真实牌墙、对手暗手或推测分布，因此是信息集结构估计，不是实战摸牌概率或终局 EV。
-- 新候选已从 Junk facade 导出供后续显式评估，但 `recommendJunkAction`/`chooseJunkAction` 未切换；claim、番型、七对和防守仍未进入新路径。
+- 新候选已从 Junk facade 导出供后续显式评估，但 `recommendJunkAction`/`chooseJunkAction` 尚未切换。当前生产化范围只包括普通标准型的 discard、claim、gang 与 hu/zimo；七对、番型收益、防守和其他玩法路线全部延后，不作为本轮切换的前置条件，也不得混入本轮评分。
 - `structural-bounded@v1` evaluation adapter 已接入 canonical `scenario run` 和 generated/snapshot `scenario batch`；报告保留全部首弃的一层指标、支配/截断标记、实际搜索数、2-ply 聚合指标及最终选择。`discard-001` 真实 CLI 冒烟七路全成功，bounded 选择与当前生产均为 `5p`，单次信息性耗时约 `40.8ms`；报告写入临时目录，不归档。
 - `bounded-structural-teacher-v1` 固定开发/留出 split、动作一致率、全部差异 seed、teacher 相对 bounded 的四项结构差值，以及两路 P50/P95；门槛是两组一致率均不低于 `99%` 且 bounded/full P95 比值均不高于 `0.6`。默认每组 1000 个样本，只走人工慢速 evaluation，不进入 `verify`。
 - seed `20260814` 的 1000 个开发场景 bounded/full 一致 `1000/1000`，平均搜索 4.30 个首弃，P50/P95 为 `27.37/33.85ms`，full 为 `85.33/95.41ms`，P95 比值 `0.355`；seed `20260815` 的 1000 个留出场景一致 `999/1000`，平均搜索 4.31 个，P50/P95 为 `26.93/33.41ms`，full 为 `83.46/94.51ms`，比值 `0.354`。唯一差异 seed `3520660970` 的立即完成与条件期望向听相同，teacher 仅多约 `0.066` 条件期望进张种类和 `0.131` 张；当前固定上限 5 通过近似门槛，但不声称等价于 full。报告位于临时目录，不归档。
@@ -34,11 +34,13 @@
 - snapshot provider 已支持版本化 `chi/peng/minGang/hu/pass/anGang/buGang/zimo` legal action；四条 claim 边界已升级为 canonical snapshot。`structural-claim@v1` adapter 已接入当前九路 `scenario run`、batch allowlist 和 worker task，并报告 minGang 补牌分支数、叶子数和聚合结构。`claim-mingang-replacement-001` 中 3s 四张均可见，候选枚举其余 33 种补牌、31 个非完成叶子，立即完成质量 `0.06557377049180328`，条件结构为 0 向听、2 种/8 张；结构候选用约 `9.28ms` 选择 minGang，当前生产仍选择 pass。报告位于临时目录，不归档。
 - `structural-turn.ts` 提供未接入默认入口的 `zimo + anGang/buGang + discard` 影子候选。anGang 移除四张同 kind 暗牌并新增副露，buGang 移除 action tile 并升级既有 peng；两者共用固定最多 `34 × 11` 的补牌 continuation，同时必须严格胜过 bounded 最佳弃牌及各自等价弃牌，避免五候选截断制造虚假 gang 优势。zimo 始终优先，打平时 discard。
 - `self-gang-equivalence-001` canonical 同时覆盖 anGang 和 buGang：32 种补牌下，buGang 与打掉第四张的聚合结构完全相同；anGang 因锁死可拆暗刻，条件期望进张结构反而弱于直接弃一张。生产和结构候选均选择弃 `1m`；`structural-turn@v1` 报告全部 13 个动作并用约 `42.03ms` 完成，九路 CLI 全成功。报告位于临时目录，不归档；这证明纯标准结构不会主动 gang，未来若要选择 gang，必须在独立 slice 显式加入番型、抢杠或行动时机价值，而非恢复固定权重奖励。
-- Core 的 `sevenPairs: true` 是 standard 与 seven-pairs 取最小值的合并开关，不保留路线身份。`structural-routes.ts` 因此显式保留两路各自的向听、可见存活进张种类和张数，仅无副露时生成 seven-pairs 路线，并用向听、种类、张数固定字典序选择；完全打平时 standard，不消费 `qiduiPotential`。六对加单张 fixture 固定选择 seven-pairs 的 0 向听、1 种/3 张，已有副露时该路线为 null；该模型尚未接入弃牌搜索或生产入口。
+- Core 的 `sevenPairs: true` 是 standard 与 seven-pairs 取最小值的合并开关，不保留路线身份。已建立的 `structural-routes.ts` 及六对单张单测只保留为后续可复用的独立诊断资产；按当前范围决定，它不接入 bounded 2-ply、统一 facade 或生产入口，七对生产化转入 backlog。
+- 普通型生产化采用两阶段切换：先新增 `recommendStructuralJunkAction` 统一编排 hu/zimo、claim、self-turn/discard 和 draw 等流程动作，并在真实 core 对局中证明对每个非空 legalActions 都返回其中一个合法动作；再测完整对局 P50/P95 与 weighted/structural 同 seed A/B。A/B 用于发现严重退化、死循环和明确普通牌理反例，不把七对、番型或防守差异误判为本轮实现 bug。
+- 统一 facade 通过合法性、性能与 A/B 门禁后，才在独立提交把 `recommendJunkAction`/`chooseJunkAction` 默认切到普通型结构策略；旧 weighted 策略及 `default-weights.json` 保留为显式 legacy/evaluation 基线，暂不删除，确保可重复对照和安全回退。
 
 ## 下一步第一个具体动作
 
-建立七对弃牌接入 slice brief：固定一条七对路线改变首弃、一条 standard 路线保持原选择的 canonical fixture，并定义双路线进入一层支配、五候选 shortlist 和 2-ply 叶子的统一字段；实现前保持现有 structural-bounded 与生产入口不变。
+建立普通型统一 facade slice brief：定义 phase/legalActions 到 `structural-claim`、`structural-turn`、hu/zimo 和 draw 的完整路由及 fallback 契约；随后实现 `recommendStructuralJunkAction`，增加真实 core 对局合法动作覆盖测试，在该 slice 内仍不切换 `recommendJunkAction` 默认入口。
 
 ## 阻塞与遗留问题
 
