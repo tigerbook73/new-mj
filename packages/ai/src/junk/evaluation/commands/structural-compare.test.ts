@@ -11,6 +11,9 @@ describe("structural compare", () => {
     expect(result.structuralLatency.samples).toBeGreaterThan(0);
     expect(result.weightedLatency.samples).toBeGreaterThan(0);
     expect(result.structuralLatency.p95Ms).toBe(0.25);
+    expect(
+      Object.values(result.routeDecisions).reduce((sum, count) => sum + count, 0),
+    ).toBeGreaterThan(0);
   });
 
   it("writes a reproducible report without changing policy", async () => {
@@ -47,6 +50,12 @@ describe("structural compare", () => {
           stepLimitFailures: 0,
           structuralLatency: { samples: 2, p50Ms: 1, p95Ms: 2, maxMs: 2 },
           weightedLatency: { samples: 2, p50Ms: 1, p95Ms: 1, maxMs: 1 },
+          routeDecisions: {
+            "ordinary-standard": 10,
+            "seven-pairs": 2,
+            "other-special": 1,
+            ambiguous: 3,
+          },
         }),
         exists: (filePath) => files.has(filePath),
         makeDirectory: () => undefined,
@@ -55,6 +64,7 @@ describe("structural compare", () => {
     );
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("1 seeds x 2 seat splits");
+    expect(result.output).toContain("ordinary=10  seven-pairs=2  other-special=1  ambiguous=3");
     const artifact = JSON.parse(
       files.get("/tmp/structural-compare/junk-structural-compare-compare-001.json")!,
     );

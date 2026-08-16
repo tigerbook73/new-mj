@@ -7,7 +7,11 @@ import {
   writeTextEvaluationArtifacts,
   type TextArtifactRuntime,
 } from "../../../evaluation/text-artifacts.ts";
-import { recommendStructuralJunkAction } from "../../strategy.ts";
+import {
+  classifyOrdinaryStructuralGate,
+  recommendStructuralJunkAction,
+  type OrdinaryStructuralGateRoute,
+} from "../../strategy.ts";
 import { playJunkMatch, strengthPolicy, type SeatPolicy } from "../match/arena.ts";
 
 type Arguments = {
@@ -20,6 +24,7 @@ type Arguments = {
 
 type TimedPolicy = Readonly<{ policy: SeatPolicy; timingsMs: number[] }>;
 type Split = "structural-even" | "structural-odd";
+type RouteDecisionCounts = Record<OrdinaryStructuralGateRoute, number>;
 
 export type StructuralCompareMatch = Readonly<{
   seed: number;
@@ -40,6 +45,7 @@ export type StructuralCompareResult = Readonly<{
   stepLimitFailures: number;
   structuralLatency: LatencySummary;
   weightedLatency: LatencySummary;
+  routeDecisions: RouteDecisionCounts;
 }>;
 
 type LatencySummary = Readonly<{
@@ -119,12 +125,31 @@ const timedPolicy = (policy: SeatPolicy, now: () => number): TimedPolicy => {
   return { policy: timed, timingsMs };
 };
 
-const structuralPolicy = (): SeatPolicy =>
-  ((view, legalActions) => {
+const emptyRouteDecisionCounts = (): RouteDecisionCounts => ({
+  "ordinary-standard": 0,
+  "seven-pairs": 0,
+  "other-special": 0,
+  ambiguous: 0,
+});
+
+const structuralPolicy = (routeDecisions: RouteDecisionCounts): SeatPolicy => {
+  const weighted = strengthPolicy();
+  const policy = ((view, legalActions) => {
+    const isRouteDecision =
+      legalActions.length > 1 &&
+      !legalActions.some((action) => ["hu", "zimo", "draw"].includes(action.type));
+    if (isRouteDecision) {
+      const classification = classifyOrdinaryStructuralGate(view);
+      routeDecisions[classification.route] += 1;
+      if (classification.route !== "ordinary-standard") return weighted(view, legalActions);
+    }
     const action = recommendStructuralJunkAction(view, legalActions);
     if (!action) throw new Error("structural policy called with no legal actions");
     return action;
   }) as SeatPolicy;
+  if (weighted.resetAnalysisContext) policy.resetAnalysisContext = weighted.resetAnalysisContext;
+  return policy;
+};
 
 export const evaluateStructuralCompare = (
   seeds: readonly number[],
@@ -139,10 +164,11 @@ export const evaluateStructuralCompare = (
   let structuralWins = 0;
   let weightedWins = 0;
   let ties = 0;
+  const routeDecisions = emptyRouteDecisionCounts();
 
   for (const seed of seeds) {
     for (const split of ["structural-even", "structural-odd"] as const) {
-      const structural = timedPolicy(structuralPolicy(), now);
+      const structural = timedPolicy(structuralPolicy(routeDecisions), now);
       const weighted = timedPolicy(strengthPolicy(), now);
       const structuralSeats: readonly SeatId[] = split === "structural-even" ? [0, 2] : [1, 3];
       const policies = [0, 1, 2, 3].map((seat) =>
@@ -178,6 +204,7 @@ export const evaluateStructuralCompare = (
     stepLimitFailures: failures.filter((match) => match.error === "STEP_LIMIT_EXCEEDED").length,
     structuralLatency: summarizeLatency(structuralTimings),
     weightedLatency: summarizeLatency(weightedTimings),
+    routeDecisions,
   };
 };
 
@@ -185,18 +212,20 @@ const formatLatency = (value: number | null): string => (value === null ? "n/a" 
 
 const formatReport = (args: Arguments, seeds: readonly number[], result: StructuralCompareResult) =>
   [
-    "=== Junk ordinary structural A/B ===",
+    "=== Junk route-gated ordinary structural A/B ===",
     `seed: ${args.seed}  matches: ${result.matches.length} (${seeds.length} seeds x 2 seat splits)  rounds/match: ${args.rounds}`,
     `failures: ${result.failures}  step-limit failures: ${result.stepLimitFailures}`,
     "",
     `weighted score: ${result.weightedScore}  structural score: ${result.structuralScore}`,
     `structural/weighted/tied matches: ${result.structuralWins}/${result.weightedWins}/${result.ties}`,
+    `route decisions: ordinary=${result.routeDecisions["ordinary-standard"]}  seven-pairs=${result.routeDecisions["seven-pairs"]}  other-special=${result.routeDecisions["other-special"]}  ambiguous=${result.routeDecisions.ambiguous}`,
     "",
     "policy      samples  p50 ms  p95 ms  max ms",
     `weighted    ${result.weightedLatency.samples}  ${formatLatency(result.weightedLatency.p50Ms)}  ${formatLatency(result.weightedLatency.p95Ms)}  ${formatLatency(result.weightedLatency.maxMs)}`,
     `structural  ${result.structuralLatency.samples}  ${formatLatency(result.structuralLatency.p50Ms)}  ${formatLatency(result.structuralLatency.p95Ms)}  ${formatLatency(result.structuralLatency.maxMs)}`,
     "",
     "Wall-clock latency is comparable only within this single-concurrency run on the same machine.",
+    "Only ordinary-standard decisions use structural play; all excluded routes use weighted fallback.",
     "This report does not change production policy and does not prove win probability or terminal EV.",
   ].join("\n");
 

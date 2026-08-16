@@ -34,7 +34,10 @@ export {
   type StructuralTurnResult,
 } from "./structural-turn.ts";
 export {
+  classifyOrdinaryStructuralGate,
   evaluateStructuralRoutes,
+  type OrdinaryStructuralGate,
+  type OrdinaryStructuralGateRoute,
   type StructuralRoute,
   type StructuralRouteResult,
 } from "./structural-routes.ts";

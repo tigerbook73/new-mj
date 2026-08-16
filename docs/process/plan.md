@@ -4,7 +4,7 @@
 
 ## 当前任务
 
-当前专题是把已经验证的普通标准型结构策略纳入 Junk 生产入口。先完成统一影子 facade、全合法动作覆盖、性能门禁和 weighted/structural A/B，再用独立提交切换默认；生产当前仍是现有加权策略，`isolationPotential` 保持 `1.5`。
+当前专题是评估普通标准型结构策略能否纳入 Junk 生产入口。生产当前仍是现有 weighted 策略，`isolationPotential` 保持 `1.5`；只有普通型路线门禁与后续组件定位通过后，才会另行决定是否切换。
 
 ## 当前状态
 
@@ -44,10 +44,12 @@
 - 独立顶层 seed `20260817` 的扩大验证覆盖 50 seeds / 100 场换位 match，仍无失败或步数上限；structural P50/P95/max 为 `0.260/26.590/46.935ms`，weighted 为 `0.250/22.894/337.735ms`，性能结论稳定。structural/weighted 总分 `-181/181`、胜场 `28/61`、11 平；50 个配对 seed 中 structural 净正 14、净负 35、1 平。structural-even/odd 分别为 `-90/-91`，说明大样本质量落后并非先前 split 不对称造成。筛选 2-ply 性能足够，但当前纯结构普通型策略明确未通过质量门禁，生产继续使用 weighted。
 - evaluation 新增 `structural trace`，在真实 mixed-policy 轨迹的同一个 `PlayerView + legalActions` 上同时计算 weighted/structural，并保存全部分歧的 round/step/seat、driver、完整 view、合法动作和两路选择；shadow 动作不应用到 core，因此只比较当前节点，不声称后续轨迹相同。seed `2889165442` 两个 split 精确复现 structural `-15/-4`，665 个决策点中有 170 个分歧（25.6%）：148 个 discard->discard、18 个 pass->peng、3 个 pass->chi、1 个 chi->chi，无 win/draw/gang 分歧。
 - 目标 trace 未发现违反现有结构排序的实现错误：首个弃牌分歧中两路条件期望向听相同，结构选择的进张种类/张数更高；18 个 pass->peng 中 13 个降低 1 向听、5 个同向听扩大进张，3 个 pass->chi 中 2 个降低 1 向听、1 个同向听扩大进张。当前证据不能把失分归因给某个节点，较可能是纯结构目标遗漏价值或 discard/claim 组件交互；报告位于 `/tmp/new-mj-structural-trace`，不归档。
+- 普通型生产门禁现在按路线分层而非混算。`classifyOrdinaryStructuralGate` 不使用权重：普通型结构必须严格优于七对，且不得出现单一数牌花色（可带字牌）的清/混一色信号，或“无 chi 且非 chi 副露数加手牌对子/刻子种数至少 4”的碰碰胡信号；七对严格占优、两路线打平和其他特殊路线只记录。`structural compare` 的候选在这些排除节点调用 weighted fallback，因此终局分差只来自普通型节点的结构决策；生产入口仍未改变。
+- 顶层 seed `20260818` 的路线门禁 A/B 覆盖 15 seeds / 30 场换位 match，无失败或步数上限；候选决策中普通型 `2374` 个、七对 `250` 个、其他特殊路线 `142` 个、不明确 `8` 个。候选 P50/P95/max 为 `0.311/26.577/45.504ms`，通过 50ms 性能线；候选/weighted 总分 `-36/36`，胜场 `9/20`、1 平，普通型质量门禁仍失败。这说明先前退化不能只归因于七对或已识别特殊路线，当前不得切生产。报告位于 `/tmp/new-mj-route-gated-ab`，不归档。
 
 ## 下一步第一个具体动作
 
-建立普通型结构组件消融 slice brief：新增两个仅供 evaluation 的混合 facade——weighted claim + structural turn/discard，以及 structural claim + weighted turn/discard；先用独立 15 seeds / 各 30 场换位 match 与全 weighted 基线比较，保持 win/draw 路由一致，分别报告分数、胜场、失败和逐 split 结果，以定位质量损失主要来自 discard 还是 claim，不调权重、不改结构算法且不切生产默认入口。
+建立路线门禁后的普通型组件消融 slice brief：在 `ordinary-standard` 节点分别比较“weighted claim + structural turn/discard”和“structural claim + weighted turn/discard”，其余路线继续 weighted fallback；先用独立 15 seeds / 各 30 场换位 match 报告分数、胜场、失败和逐 split 结果，以定位普通型质量损失主要来自 discard 还是 claim，不调权重、不改结构算法且不切生产默认入口。
 
 ## 阻塞与遗留问题
 

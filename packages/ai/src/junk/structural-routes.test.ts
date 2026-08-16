@@ -1,6 +1,6 @@
 import { tileIdOf, type JunkPlayerView, type TileKind } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
-import { evaluateStructuralRoutes } from "./structural-routes.ts";
+import { classifyOrdinaryStructuralGate, evaluateStructuralRoutes } from "./structural-routes.ts";
 
 const ids = (kinds: readonly TileKind[]) => {
   const copies = new Map<TileKind, number>();
@@ -37,6 +37,34 @@ describe("structural hand routes", () => {
     expect(evaluateStructuralRoutes(view, hand.slice(3), 1)).toMatchObject({
       selectedRoute: "standard",
       sevenPairs: null,
+    });
+  });
+
+  it("keeps an explicit seven-pairs preference outside the ordinary gate", () => {
+    expect(classifyOrdinaryStructuralGate(view)).toMatchObject({
+      route: "seven-pairs",
+    });
+  });
+
+  it("keeps a flush route outside the ordinary gate without using weights", () => {
+    const flushView = {
+      ...view,
+      hand: ids(["1m", "1m", "2m", "3m", "4m", "4m", "5m", "6m", "7m", "8m", "9m", "1z", "2z"]),
+    };
+    expect(classifyOrdinaryStructuralGate(flushView)).toMatchObject({
+      route: "other-special",
+      specialSignals: ["flush"],
+    });
+  });
+
+  it("admits a clearly standard multi-suit hand to the ordinary gate", () => {
+    const ordinaryView = {
+      ...view,
+      hand: ids(["1m", "2m", "3m", "4m", "5m", "6m", "2p", "3p", "4p", "6s", "7s", "8s", "1z"]),
+    };
+    expect(classifyOrdinaryStructuralGate(ordinaryView)).toMatchObject({
+      route: "ordinary-standard",
+      specialSignals: [],
     });
   });
 });

@@ -132,11 +132,14 @@ P50/P95。首个门槛固定为两组一致率均不低于 `99%`，且 bounded/f
 `0.6`；门槛只判断当前 shortlist 近似是否值得继续评估，不证明牌理、胜率或终局 EV，
 也不切换生产入口。默认每组 1000 个样本；这是人工慢速 evaluation 命令，不进入 `verify`。
 
-`structural compare` 固定比较当前 weighted 生产策略与普通型 structural 影子 facade。每个
-seed 运行两场相同牌墙/庄家序列的换位配对：structural 先坐 0/2，再坐 1/3；报告按策略累计
-分数和胜场，并分别记录单次决策 P50/P95/max。执行固定为单进程单并发，使墙钟耗时只在同一
-次运行、同一机器内比较；全部 seed、split、失败和 `STEP_LIMIT_EXCEEDED` 都写入临时报告。
-它不进入 `verify`、不改默认入口，小样本也不证明胜率或终局 EV；牌理反例必须另行固化 fixture。
+`structural compare` 固定比较当前 weighted 生产策略与路线门禁后的普通型 structural 影子
+facade。候选仅在普通型严格占优、且没有清/混一色或碰碰胡离散信号的节点使用 structural；
+七对严格占优、普通型/七对打平和其他特殊路线节点均回退到 weighted，并分别计数。因此终局
+分差只由普通型节点的策略变化产生。每个 seed 运行两场相同牌墙/庄家序列的换位配对：候选先
+坐 0/2，再坐 1/3；报告按策略累计分数和胜场，并分别记录单次决策 P50/P95/max。执行固定为
+单进程单并发，使墙钟耗时只在同一次运行、同一机器内比较；全部 seed、split、失败和
+`STEP_LIMIT_EXCEEDED` 都写入临时报告。它不进入 `verify`、不改默认入口，小样本也不证明
+胜率或终局 EV；牌理反例必须另行固化 fixture。
 
 `structural trace` 对一个明确 match seed 重放 structural-even/odd 两个 mixed-policy split；
 实际策略继续驱动 core，另一策略只在完全相同的 `PlayerView + legalActions` 上 shadow 推荐。
