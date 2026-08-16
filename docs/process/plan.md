@@ -38,10 +38,12 @@
 - 普通型生产化采用两阶段切换：先新增 `recommendStructuralJunkAction` 统一编排 hu/zimo、claim、self-turn/discard 和 draw 等流程动作，并在真实 core 对局中证明对每个非空 legalActions 都返回其中一个合法动作；再测完整对局 P50/P95 与 weighted/structural 同 seed A/B。A/B 用于发现严重退化、死循环和明确普通牌理反例，不把七对、番型或防守差异误判为本轮实现 bug。
 - 统一 facade 通过合法性、性能与 A/B 门禁后，才在独立提交把 `recommendJunkAction`/`chooseJunkAction` 默认切到普通型结构策略；旧 weighted 策略及 `default-weights.json` 保留为显式 legacy/evaluation 基线，暂不删除，确保可重复对照和安全回退。
 - `recommendStructuralJunkAction` 已作为公开但不接管默认的完整影子 facade 落地：空动作返回 undefined，hu/zimo 优先，draw 直接透传，claim 上下文路由 `structural-claim`，playing 上下文路由 `structural-turn`；子策略异常缺失时仅回退到传入列表首项，不构造动作。真实 core seed `20260816` 完整对局逐决策验证了非空 legalActions 均返回其中一个动作且可被 core 接受；该跨模块用例标记为 slow。
+- evaluation 新增单进程 `structural compare`：每个 seed 复用相同牌墙/庄家序列跑两场换位 match，structural 分别坐 0/2 与 1/3，按策略汇总分数、胜场、失败、步数上限及 weighted/structural 单次决策 P50/P95/max；报告保存全部 seed/split，写临时目录且不改生产入口。固定筛查门槛为 15 seeds / 30 场无失败、structural P95 不高于 50ms、总分不低于 weighted，且 canonical 普通型 fixture 无明确回退。
+- 顶层 seed `20260816` 的 3 seeds / 6 场小样本全部完成且无步数上限；structural/weighted 总分 `1/-1`、胜场 `3/3`，质量信号不确定。单次决策 structural P50/P95/max 为 `0.445/27.618/43.735ms`，weighted 为 `0.260/21.469/340.294ms`；结构 P95 慢约 29%，但低于 50ms 筛查线，也未出现 full 2-ply 式失控。报告位于 `/tmp/new-mj-structural-ab`，不归档。
 
 ## 下一步第一个具体动作
 
-建立普通型结构 facade 的性能与 A/B slice brief：把 `recommendStructuralJunkAction` 接入仅供 evaluation 使用的 seat policy，固定同 seed 的 weighted/structural 换位配对和逐决策耗时采样契约，先用小样本确定完整对局 P50/P95、是否触发 500 步上限及明确普通牌理反例；仍不切换生产默认入口。
+运行固定门禁样本：用顶层 seed `20260815` 执行 `structural compare --seeds 15 --rounds 4` 的 30 场换位 match，核对失败/500 步上限、structural P95 ≤ 50ms、双方总分和逐 split 结果；随后复跑 canonical 普通型 fixture，门禁结论写回计划，仍不切换生产默认入口。
 
 ## 阻塞与遗留问题
 

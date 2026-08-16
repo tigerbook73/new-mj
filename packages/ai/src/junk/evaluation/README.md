@@ -50,6 +50,7 @@ pnpm --filter @new-mj/ai evaluate scenario batch manifest.json snapshots.jsonl \
   --checkpoint checkpoint.json --run-id snapshot-batch-001
 pnpm --filter @new-mj/ai evaluate policy diff --help
 pnpm --filter @new-mj/ai evaluate policy capture --help
+pnpm --filter @new-mj/ai evaluate structural compare --seed 20260816 --seeds 3 --rounds 4
 pnpm --filter @new-mj/ai evaluate weights compare --help
 pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
@@ -129,6 +130,12 @@ teacher 相对 bounded 的立即完成/条件期望向听/进张种类与张数�
 P50/P95。首个门槛固定为两组一致率均不低于 `99%`，且 bounded/full 的 P95 比值均不高于
 `0.6`；门槛只判断当前 shortlist 近似是否值得继续评估，不证明牌理、胜率或终局 EV，
 也不切换生产入口。默认每组 1000 个样本；这是人工慢速 evaluation 命令，不进入 `verify`。
+
+`structural compare` 固定比较当前 weighted 生产策略与普通型 structural 影子 facade。每个
+seed 运行两场相同牌墙/庄家序列的换位配对：structural 先坐 0/2，再坐 1/3；报告按策略累计
+分数和胜场，并分别记录单次决策 P50/P95/max。执行固定为单进程单并发，使墙钟耗时只在同一
+次运行、同一机器内比较；全部 seed、split、失败和 `STEP_LIMIT_EXCEEDED` 都写入临时报告。
+它不进入 `verify`、不改默认入口，小样本也不证明胜率或终局 EV；牌理反例必须另行固化 fixture。
 
 batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable batch 契约，负责
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI

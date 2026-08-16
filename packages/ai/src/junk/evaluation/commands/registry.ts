@@ -5,6 +5,7 @@ import { runDecisionDiffCli } from "./policy-diff.ts";
 import { runBatchCalibrationCli } from "./scenario-batch.ts";
 import { runGenerateSamplesCli } from "./scenario-generate.ts";
 import { runCalibrationCli } from "./scenario.ts";
+import { runStructuralCompareCli } from "./structural-compare.ts";
 import { runPairedStructuralValidationCli } from "./scenario-validate.ts";
 import { runStructuralTeacherAuditCli } from "./scenario-teacher-audit.ts";
 import { runCompareWeightsCli } from "./weights-compare.ts";
@@ -50,6 +51,11 @@ const registry = createEvaluationCommandRegistry([
     path: ["policy", "diff"],
     summary: "Compare policy decisions on paired self-play states",
     run: runDecisionDiffCli,
+  },
+  {
+    path: ["structural", "compare"],
+    summary: "Compare ordinary structural and weighted Junk policies",
+    run: runStructuralCompareCli,
   },
   {
     path: ["weights", "compare"],
