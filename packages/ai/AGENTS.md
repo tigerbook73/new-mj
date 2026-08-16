@@ -32,7 +32,7 @@
 - provider 校验来源 schema/版本并构造规范化输入与 `contentHash`；evaluator 只计算；runner 只编排；report/comparator 只持久化和比较。不得把领域评分、并发或文件 I/O 混入 evaluator。
 - canonical manifest、fixture 和固定 snapshot 使用版本化 JSON；批量 generated/snapshot/replay 输入使用带 header 的自包含 JSONL。reader 只做流式语法/基础字段校验，领域合法性由 provider 负责，结果始终按 `scenarioId` 稳定排序。
 - baseline 是只读版本化资产，绑定 scenario/content hash/evaluator 与可比较决策；运行结果不得覆盖 baseline，耗时等易波动指标只作信息记录。
-- policy loader 默认加载模块自己的 `chooseJunkAction`，并以可选 export 名支持 baseline/candidate；不得把默认加载语义重新绑定到权重文件或 legacy 导出。通用 worker pool 不理解任务字段或策略范式。
+- policy loader 默认加载模块自己的 `chooseJunkAction`，并以可选 export 名支持 baseline/candidate；通用 worker pool 不理解任务字段或策略范式。
 - `executor.ts`/`worker.ts` 只负责执行；`batch.ts` 负责 manifest/header 校验、chunk、checkpoint schema/store 与 hash-safe resume。确定性失败写入结果，不自动 retry；玩法 CLI 只绑定 resolver、task 与输出命名。
 - CLI 顶层副作用只放在 `cli-entry.ts`；`commands/` handler 可直接测试，算法放 `policy/` 或 `match/`。evaluation 工具不从公共 package barrel 导出。
 - 通用契约测试放 `src/evaluation/`；Junk provider/CLI 单测放 `src/junk/evaluation/`；真实 evaluator/baseline/worker 接线放 `test/`；策略牌理 fixture 留在 `strategy.test.ts`，结构指标留在独立测试文件。

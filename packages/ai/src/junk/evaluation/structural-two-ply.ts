@@ -87,7 +87,7 @@ export const evaluateStructuralTwoPlyAll = (
       let drawProbabilityMass = 0;
       let immediateCompletionMass = 0;
       let continuationMass = 0;
-      let weightedBestShanten = 0;
+      let expectedBestShanten = 0;
       let secondDiscardCandidateCount = 0;
       let secondDiscardFrontierCount = 0;
 
@@ -131,7 +131,7 @@ export const evaluateStructuralTwoPlyAll = (
             ({ standardShanten }) => standardShanten === bestShanten,
           );
           continuationMass += probability;
-          weightedBestShanten += probability * bestShanten;
+          expectedBestShanten += probability * bestShanten;
           secondDiscardCandidateCount += leafMetrics.length;
           secondDiscardFrontierCount += bestLayer.filter(
             ({ sameShantenParetoFrontier }) => sameShantenParetoFrontier,
@@ -146,7 +146,7 @@ export const evaluateStructuralTwoPlyAll = (
         immediateCompletionMass,
         continuationMass,
         conditionalExpectedBestShanten:
-          continuationMass > 0 ? weightedBestShanten / continuationMass : null,
+          continuationMass > 0 ? expectedBestShanten / continuationMass : null,
         secondDiscardCandidateCount,
         secondDiscardFrontierCount,
       };

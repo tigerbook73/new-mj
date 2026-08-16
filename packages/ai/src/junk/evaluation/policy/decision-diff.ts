@@ -58,15 +58,12 @@ const runOneDirection = (
 };
 
 /**
- * Compares two policies by *decision*, not by score — self-play win-rate is too
- * noisy to judge formula-level changes (see packages/ai/AGENTS.md's A/B rule;
- * confirmed by three seeds of weights tuning converging on noise). One policy actually
- * drives each match (all 4 seats), the other is only asked "what would you do
+ * Compares two policies by *decision*, not by score. One policy actually drives
+ * each match (all 4 seats), the other is only asked "what would you do
  * here" at every decision point without ever being applied — this sidesteps the
  * "two policies disagree, which state is now real" branching problem, at the
  * cost of only sampling states the driver would reach. Running once with each
- * side driving covers both distributions, mirroring evaluateCandidate's
- * duplicate-deal "run both directions to cancel bias" spirit (see tune.ts).
+ * side driving covers both distributions.
  */
 export const runDecisionDiff = (
   seeds: readonly number[],

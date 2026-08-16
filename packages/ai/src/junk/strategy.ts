@@ -33,12 +33,6 @@ export {
   recommendStructuralBaselineV1Action,
 } from "./structural-baseline.ts";
 
-/**
- * Softmax temperature knob for action sampling. Omitted or <= 0 reproduces the
- * previous deterministic argmax bit-for-bit. `random` defaults to Math.random for
- * zero-config production use (bot autoplay / advice); inject a seeded generator
- * for reproducible self-play/arena runs.
- */
 /** Complete ordinary-standard structural policy facade and production baseline. */
 export const recommendStructuralJunkAction = (
   view: JunkPlayerView,

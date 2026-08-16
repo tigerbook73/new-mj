@@ -106,10 +106,8 @@ export const resolveModulePath = (source: PolicySource): string => {
 };
 
 /**
- * The import half of loading a policy — given an already-resolved module path
- * (see resolveModulePath) and an optional weights-file override, imports the
- * module and returns a SeatPolicy. Callable from any thread (main or worker):
- * it never touches git, only `import()` and an optional local JSON read.
+ * The import half of loading a policy imports one export from an already-resolved
+ * module path. Callable from any thread: it never touches Git.
  */
 export const buildPolicy = async (modulePath: string, exportName?: string): Promise<SeatPolicy> => {
   const imported: unknown = await import(pathToFileURL(modulePath).href);

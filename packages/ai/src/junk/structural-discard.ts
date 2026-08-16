@@ -152,9 +152,9 @@ export const evaluateStructuralContinuation = (
   let leafCount = 0;
   let completionMass = 0;
   let continuationMass = 0;
-  let weightedShanten = 0;
-  let weightedKinds = 0;
-  let weightedTiles = 0;
+  let expectedShanten = 0;
+  let expectedKinds = 0;
+  let expectedTiles = 0;
   for (const kind of STANDARD_TILE_SET.kinds) {
     const remaining = Math.max(0, STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0));
     if (remaining === 0) continue;
@@ -195,20 +195,20 @@ export const evaluateStructuralContinuation = (
     if (!bestLeaf) continue;
     leafCount += 1;
     continuationMass += probability;
-    weightedShanten += probability * bestLeaf.shape.standardShanten;
-    weightedKinds += probability * bestLeaf.shape.liveImprovingKindCount;
-    weightedTiles += probability * bestLeaf.shape.liveImprovingTileCount;
+    expectedShanten += probability * bestLeaf.shape.standardShanten;
+    expectedKinds += probability * bestLeaf.shape.liveImprovingKindCount;
+    expectedTiles += probability * bestLeaf.shape.liveImprovingTileCount;
   }
   return {
     drawKindCount,
     leafCount,
     immediateCompletionMass: completionMass,
     conditionalExpectedBestShanten:
-      continuationMass > 0 ? weightedShanten / continuationMass : null,
+      continuationMass > 0 ? expectedShanten / continuationMass : null,
     conditionalExpectedBestLiveImprovingKindCount:
-      continuationMass > 0 ? weightedKinds / continuationMass : null,
+      continuationMass > 0 ? expectedKinds / continuationMass : null,
     conditionalExpectedBestLiveImprovingTileCount:
-      continuationMass > 0 ? weightedTiles / continuationMass : null,
+      continuationMass > 0 ? expectedTiles / continuationMass : null,
   };
 };
 
