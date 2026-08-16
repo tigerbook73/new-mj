@@ -4,7 +4,7 @@
 
 ## 当前任务
 
-当前专题是逐步建立新的纯结构 Junk 策略。自回合 anGang/buGang 结构 slice 已完成；生产默认仍是现有加权策略，`isolationPotential` 保持 `1.5`。
+当前专题是逐步建立新的纯结构 Junk 策略。七对显式结构路线模型已建立，尚未接入 bounded 2-ply；生产默认仍是现有加权策略，`isolationPotential` 保持 `1.5`。
 
 ## 当前状态
 
@@ -34,10 +34,11 @@
 - snapshot provider 已支持版本化 `chi/peng/minGang/hu/pass/anGang/buGang/zimo` legal action；四条 claim 边界已升级为 canonical snapshot。`structural-claim@v1` adapter 已接入当前九路 `scenario run`、batch allowlist 和 worker task，并报告 minGang 补牌分支数、叶子数和聚合结构。`claim-mingang-replacement-001` 中 3s 四张均可见，候选枚举其余 33 种补牌、31 个非完成叶子，立即完成质量 `0.06557377049180328`，条件结构为 0 向听、2 种/8 张；结构候选用约 `9.28ms` 选择 minGang，当前生产仍选择 pass。报告位于临时目录，不归档。
 - `structural-turn.ts` 提供未接入默认入口的 `zimo + anGang/buGang + discard` 影子候选。anGang 移除四张同 kind 暗牌并新增副露，buGang 移除 action tile 并升级既有 peng；两者共用固定最多 `34 × 11` 的补牌 continuation，同时必须严格胜过 bounded 最佳弃牌及各自等价弃牌，避免五候选截断制造虚假 gang 优势。zimo 始终优先，打平时 discard。
 - `self-gang-equivalence-001` canonical 同时覆盖 anGang 和 buGang：32 种补牌下，buGang 与打掉第四张的聚合结构完全相同；anGang 因锁死可拆暗刻，条件期望进张结构反而弱于直接弃一张。生产和结构候选均选择弃 `1m`；`structural-turn@v1` 报告全部 13 个动作并用约 `42.03ms` 完成，九路 CLI 全成功。报告位于临时目录，不归档；这证明纯标准结构不会主动 gang，未来若要选择 gang，必须在独立 slice 显式加入番型、抢杠或行动时机价值，而非恢复固定权重奖励。
+- Core 的 `sevenPairs: true` 是 standard 与 seven-pairs 取最小值的合并开关，不保留路线身份。`structural-routes.ts` 因此显式保留两路各自的向听、可见存活进张种类和张数，仅无副露时生成 seven-pairs 路线，并用向听、种类、张数固定字典序选择；完全打平时 standard，不消费 `qiduiPotential`。六对加单张 fixture 固定选择 seven-pairs 的 0 向听、1 种/3 张，已有副露时该路线为 null；该模型尚未接入弃牌搜索或生产入口。
 
 ## 下一步第一个具体动作
 
-建立七对结构路线 slice brief：仅对无副露暗手定义 standard 与 seven-pairs 两路向听/进张事实的保留方式、弃牌候选比较和 canonical fixture；先证明路线选择不需要连续权重，再实现，生产入口保持不变。
+建立七对弃牌接入 slice brief：固定一条七对路线改变首弃、一条 standard 路线保持原选择的 canonical fixture，并定义双路线进入一层支配、五候选 shortlist 和 2-ply 叶子的统一字段；实现前保持现有 structural-bounded 与生产入口不变。
 
 ## 阻塞与遗留问题
 

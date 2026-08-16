@@ -32,6 +32,11 @@ export {
   type StructuralTurnResult,
 } from "./structural-turn.ts";
 export {
+  evaluateStructuralRoutes,
+  type StructuralRoute,
+  type StructuralRouteResult,
+} from "./structural-routes.ts";
+export {
   probeSelfDrawTwoPly,
   type SelfDrawTwoPlyOutcome,
   type SelfDrawTwoPlyProbe,

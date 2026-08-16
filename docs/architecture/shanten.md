@@ -134,3 +134,10 @@ anGang 从暗手移除同 kind 四张并新增一个副露；buGang 从暗手移
 
 gang 补牌预算固定为至多 34 个 draw kind × 每分支至多 11 个 discard kind，直接弃牌仍使用
 最多 5 个首弃预算。该路径同样只作为影子候选，不改变生产入口或默认权重。
+
+### 七对结构路线
+
+Core 的 `sevenPairs: true` 是 standard/seven-pairs 取最小值的合并开关，不保留路线身份。AI
+若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手允许
+seven-pairs。路线按上述三项固定字典序选择，完全打平时 standard，不使用 `qiduiPotential`
+或其他连续权重。当前仅建立独立路线模型，尚未接入 bounded 2-ply 或生产入口。
