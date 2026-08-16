@@ -1,6 +1,8 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import type { JunkAnalysisCache } from "./analysis.ts";
 import { scoreLegalActions, type ScoredAction } from "./action-scoring.ts";
+import { recommendStructuralClaim } from "./structural-claim.ts";
+import { recommendStructuralTurn } from "./structural-turn.ts";
 import { DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "./weights.ts";
 
 export { createJunkAnalysisCache, type JunkAnalysisCache } from "./analysis.ts";
@@ -53,6 +55,30 @@ export type JunkStrengthConfig = {
   temperature?: number;
   random?: () => number;
   analysisCache?: JunkAnalysisCache;
+};
+
+const isClaimContext = (legalActions: readonly JunkAction[]): boolean =>
+  legalActions.some((action) => ["chi", "peng", "minGang", "hu", "pass"].includes(action.type));
+
+/**
+ * Complete ordinary-standard structural policy facade. This remains an explicit
+ * shadow entry point until its legality, runtime and A/B gates have passed; the
+ * production recommendJunkAction path below is intentionally unchanged.
+ */
+export const recommendStructuralJunkAction = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+): JunkAction | undefined => {
+  if (legalActions.length === 0) return undefined;
+  const winning = legalActions.find((action) => action.type === "hu" || action.type === "zimo");
+  if (winning) return winning;
+  const draw = legalActions.find((action) => action.type === "draw");
+  if (draw) return draw;
+
+  const recommended = isClaimContext(legalActions)
+    ? recommendStructuralClaim(view, legalActions)
+    : recommendStructuralTurn(view, legalActions);
+  return recommended && legalActions.includes(recommended) ? recommended : legalActions[0];
 };
 
 const argmaxAction = (scored: readonly ScoredAction[]): JunkAction | undefined => {

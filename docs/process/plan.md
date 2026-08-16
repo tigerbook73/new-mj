@@ -37,10 +37,11 @@
 - Core 的 `sevenPairs: true` 是 standard 与 seven-pairs 取最小值的合并开关，不保留路线身份。已建立的 `structural-routes.ts` 及六对单张单测只保留为后续可复用的独立诊断资产；按当前范围决定，它不接入 bounded 2-ply、统一 facade 或生产入口，七对生产化转入 backlog。
 - 普通型生产化采用两阶段切换：先新增 `recommendStructuralJunkAction` 统一编排 hu/zimo、claim、self-turn/discard 和 draw 等流程动作，并在真实 core 对局中证明对每个非空 legalActions 都返回其中一个合法动作；再测完整对局 P50/P95 与 weighted/structural 同 seed A/B。A/B 用于发现严重退化、死循环和明确普通牌理反例，不把七对、番型或防守差异误判为本轮实现 bug。
 - 统一 facade 通过合法性、性能与 A/B 门禁后，才在独立提交把 `recommendJunkAction`/`chooseJunkAction` 默认切到普通型结构策略；旧 weighted 策略及 `default-weights.json` 保留为显式 legacy/evaluation 基线，暂不删除，确保可重复对照和安全回退。
+- `recommendStructuralJunkAction` 已作为公开但不接管默认的完整影子 facade 落地：空动作返回 undefined，hu/zimo 优先，draw 直接透传，claim 上下文路由 `structural-claim`，playing 上下文路由 `structural-turn`；子策略异常缺失时仅回退到传入列表首项，不构造动作。真实 core seed `20260816` 完整对局逐决策验证了非空 legalActions 均返回其中一个动作且可被 core 接受；该跨模块用例标记为 slow。
 
 ## 下一步第一个具体动作
 
-建立普通型统一 facade slice brief：定义 phase/legalActions 到 `structural-claim`、`structural-turn`、hu/zimo 和 draw 的完整路由及 fallback 契约；随后实现 `recommendStructuralJunkAction`，增加真实 core 对局合法动作覆盖测试，在该 slice 内仍不切换 `recommendJunkAction` 默认入口。
+建立普通型结构 facade 的性能与 A/B slice brief：把 `recommendStructuralJunkAction` 接入仅供 evaluation 使用的 seat policy，固定同 seed 的 weighted/structural 换位配对和逐决策耗时采样契约，先用小样本确定完整对局 P50/P95、是否触发 500 步上限及明确普通牌理反例；仍不切换生产默认入口。
 
 ## 阻塞与遗留问题
 
