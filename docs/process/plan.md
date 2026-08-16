@@ -46,10 +46,11 @@
 - 目标 trace 未发现违反现有结构排序的实现错误：首个弃牌分歧中两路条件期望向听相同，结构选择的进张种类/张数更高；18 个 pass->peng 中 13 个降低 1 向听、5 个同向听扩大进张，3 个 pass->chi 中 2 个降低 1 向听、1 个同向听扩大进张。当前证据不能把失分归因给某个节点，较可能是纯结构目标遗漏价值或 discard/claim 组件交互；报告位于 `/tmp/new-mj-structural-trace`，不归档。
 - 普通型生产门禁现在按路线分层而非混算。`classifyOrdinaryStructuralGate` 不使用权重：普通型结构必须严格优于七对，且不得出现单一数牌花色（可带字牌）的清/混一色信号，或“无 chi 且非 chi 副露数加手牌对子/刻子种数至少 4”的碰碰胡信号；七对严格占优、两路线打平和其他特殊路线只记录。`structural compare` 的候选在这些排除节点调用 weighted fallback，因此终局分差只来自普通型节点的结构决策；生产入口仍未改变。
 - 顶层 seed `20260818` 的路线门禁 A/B 覆盖 15 seeds / 30 场换位 match，无失败或步数上限；候选决策中普通型 `2374` 个、七对 `250` 个、其他特殊路线 `142` 个、不明确 `8` 个。候选 P50/P95/max 为 `0.311/26.577/45.504ms`，通过 50ms 性能线；候选/weighted 总分 `-36/36`，胜场 `9/20`、1 平，普通型质量门禁仍失败。这说明先前退化不能只归因于七对或已识别特殊路线，当前不得切生产。报告位于 `/tmp/new-mj-route-gated-ab`，不归档。
+- `structural compare` 新增 `--component all|turn|claim` 消融开关和 candidate even/odd split 汇总；所有模式共用普通型路线门禁，未选组件与排除路线均回退 weighted。`turn` 使用顶层 seed `20260819` 的 15 seeds / 30 场，无失败，候选/weighted 总分 `22/-22`、胜场 `14/13`、3 平，candidate even/odd `83/-61`，P95 `25.787ms`；`claim` 使用独立顶层 seed `20260820`，候选/weighted `40/-40`、胜场 `17/10`、3 平，candidate even/odd `18/22`，P95 `24.337ms`。两组件单独均通过首轮筛查，不能把完整候选退化归因于任一单组件；两组 seed 不同且 turn split 方差很大，尚不能排除抽样波动或组件交互。报告位于 `/tmp/new-mj-structural-ablation`，不归档。
 
 ## 下一步第一个具体动作
 
-建立路线门禁后的普通型组件消融 slice brief：在 `ordinary-standard` 节点分别比较“weighted claim + structural turn/discard”和“structural claim + weighted turn/discard”，其余路线继续 weighted fallback；先用独立 15 seeds / 各 30 场换位 match 报告分数、胜场、失败和逐 split 结果，以定位普通型质量损失主要来自 discard 还是 claim，不调权重、不改结构算法且不切生产默认入口。
+扩展当前组件消融为同 seed 配对矩阵：选一批新的 15 seeds，依次运行 `component=turn`、`claim`、`all`，逐 seed/split 对齐三路 candidate 分数并报告 `all - turn - claim` 的交互残差；保持路线门禁、weighted 基线、单进程与 4 rounds 不变，用同一输入区分组件交互和跨样本波动，不调权重且不切生产入口。
 
 ## 阻塞与遗留问题
 

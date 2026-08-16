@@ -11,6 +11,10 @@ describe("structural compare", () => {
     expect(result.structuralLatency.samples).toBeGreaterThan(0);
     expect(result.weightedLatency.samples).toBeGreaterThan(0);
     expect(result.structuralLatency.p95Ms).toBe(0.25);
+    expect(result.component).toBe("all");
+    expect(result.splitScores["structural-even"] + result.splitScores["structural-odd"]).toBe(
+      result.structuralScore,
+    );
     expect(
       Object.values(result.routeDecisions).reduce((sum, count) => sum + count, 0),
     ).toBeGreaterThan(0);
@@ -27,6 +31,8 @@ describe("structural compare", () => {
         "1",
         "--rounds",
         "1",
+        "--component",
+        "claim",
         "--output-dir",
         "/tmp/structural-compare",
         "--run-id",
@@ -36,7 +42,8 @@ describe("structural compare", () => {
         now: () => new Date("2026-08-16T00:00:00.000Z"),
         monotonicNow: () => (clock += 0.25),
         gitSha: () => "abc123",
-        evaluate: (seeds) => ({
+        evaluate: (seeds, _rounds, _now, component) => ({
+          component: component ?? "all",
           matches: seeds.flatMap((seed) => [
             { seed, split: "structural-even", structuralScore: 1, weightedScore: -1 },
             { seed, split: "structural-odd", structuralScore: -1, weightedScore: 1 },
@@ -56,6 +63,7 @@ describe("structural compare", () => {
             "other-special": 1,
             ambiguous: 3,
           },
+          splitScores: { "structural-even": 1, "structural-odd": -1 },
         }),
         exists: (filePath) => files.has(filePath),
         makeDirectory: () => undefined,
@@ -64,6 +72,8 @@ describe("structural compare", () => {
     );
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("1 seeds x 2 seat splits");
+    expect(result.output).toContain("component: claim");
+    expect(result.output).toContain("candidate split scores: even=1  odd=-1");
     expect(result.output).toContain("ordinary=10  seven-pairs=2  other-special=1  ambiguous=3");
     const artifact = JSON.parse(
       files.get("/tmp/structural-compare/junk-structural-compare-compare-001.json")!,

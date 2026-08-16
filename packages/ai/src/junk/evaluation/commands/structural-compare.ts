@@ -18,12 +18,14 @@ type Arguments = {
   seed: number;
   seeds: number;
   rounds: number;
+  component: StructuralComponent;
   outputDir: string;
   runId?: string;
 };
 
 type TimedPolicy = Readonly<{ policy: SeatPolicy; timingsMs: number[] }>;
 type Split = "structural-even" | "structural-odd";
+export type StructuralComponent = "all" | "turn" | "claim";
 type RouteDecisionCounts = Record<OrdinaryStructuralGateRoute, number>;
 
 export type StructuralCompareMatch = Readonly<{
@@ -35,6 +37,7 @@ export type StructuralCompareMatch = Readonly<{
 }>;
 
 export type StructuralCompareResult = Readonly<{
+  component: StructuralComponent;
   matches: StructuralCompareMatch[];
   structuralScore: number;
   weightedScore: number;
@@ -46,6 +49,7 @@ export type StructuralCompareResult = Readonly<{
   structuralLatency: LatencySummary;
   weightedLatency: LatencySummary;
   routeDecisions: RouteDecisionCounts;
+  splitScores: Record<Split, number>;
 }>;
 
 type LatencySummary = Readonly<{
@@ -64,6 +68,7 @@ type Runtime = TextArtifactRuntime &
       seeds: readonly number[],
       rounds: number,
       now?: () => number,
+      component?: StructuralComponent,
     ) => StructuralCompareResult;
   }>;
 
@@ -71,11 +76,17 @@ const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const defaultOutputDir = path.join(packageRoot, ".evaluation-runs");
 const usage =
   "Usage: pnpm --filter @new-mj/ai evaluate structural compare " +
-  "[--seed <int>] [--seeds <int>] [--rounds <int>] " +
+  "[--seed <int>] [--seeds <int>] [--rounds <int>] [--component <all|turn|claim>] " +
   "[--output-dir <dir>] [--run-id <id>]\n";
 
 const parseArguments = (argv: readonly string[]): Arguments => {
-  const result: Arguments = { seed: 1, seeds: 15, rounds: 4, outputDir: defaultOutputDir };
+  const result: Arguments = {
+    seed: 1,
+    seeds: 15,
+    rounds: 4,
+    component: "all",
+    outputDir: defaultOutputDir,
+  };
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];
     const value = argv[index + 1];
@@ -83,6 +94,8 @@ const parseArguments = (argv: readonly string[]): Arguments => {
     if (flag === "--seed") result.seed = Number(value);
     else if (flag === "--seeds") result.seeds = Number(value);
     else if (flag === "--rounds") result.rounds = Number(value);
+    else if (flag === "--component" && ["all", "turn", "claim"].includes(value))
+      result.component = value as StructuralComponent;
     else if (flag === "--output-dir") result.outputDir = value;
     else if (flag === "--run-id") result.runId = value;
     else throw new Error("UNKNOWN_ARGUMENT");
@@ -132,7 +145,13 @@ const emptyRouteDecisionCounts = (): RouteDecisionCounts => ({
   ambiguous: 0,
 });
 
-const structuralPolicy = (routeDecisions: RouteDecisionCounts): SeatPolicy => {
+const isClaimContext = (legalActions: readonly { type: string }[]): boolean =>
+  legalActions.some((action) => ["chi", "peng", "minGang", "hu", "pass"].includes(action.type));
+
+const structuralPolicy = (
+  routeDecisions: RouteDecisionCounts,
+  component: StructuralComponent,
+): SeatPolicy => {
   const weighted = strengthPolicy();
   const policy = ((view, legalActions) => {
     const isRouteDecision =
@@ -142,6 +161,9 @@ const structuralPolicy = (routeDecisions: RouteDecisionCounts): SeatPolicy => {
       const classification = classifyOrdinaryStructuralGate(view);
       routeDecisions[classification.route] += 1;
       if (classification.route !== "ordinary-standard") return weighted(view, legalActions);
+      const claimContext = isClaimContext(legalActions);
+      if ((component === "turn" && claimContext) || (component === "claim" && !claimContext))
+        return weighted(view, legalActions);
     }
     const action = recommendStructuralJunkAction(view, legalActions);
     if (!action) throw new Error("structural policy called with no legal actions");
@@ -155,6 +177,7 @@ export const evaluateStructuralCompare = (
   seeds: readonly number[],
   rounds: number,
   now: () => number = () => performance.now(),
+  component: StructuralComponent = "all",
 ): StructuralCompareResult => {
   const matches: StructuralCompareMatch[] = [];
   const structuralTimings: number[] = [];
@@ -165,10 +188,11 @@ export const evaluateStructuralCompare = (
   let weightedWins = 0;
   let ties = 0;
   const routeDecisions = emptyRouteDecisionCounts();
+  const splitScores: Record<Split, number> = { "structural-even": 0, "structural-odd": 0 };
 
   for (const seed of seeds) {
     for (const split of ["structural-even", "structural-odd"] as const) {
-      const structural = timedPolicy(structuralPolicy(routeDecisions), now);
+      const structural = timedPolicy(structuralPolicy(routeDecisions, component), now);
       const weighted = timedPolicy(strengthPolicy(), now);
       const structuralSeats: readonly SeatId[] = split === "structural-even" ? [0, 2] : [1, 3];
       const policies = [0, 1, 2, 3].map((seat) =>
@@ -184,6 +208,7 @@ export const evaluateStructuralCompare = (
       const candidate = structuralSeats.reduce<number>((sum, seat) => sum + result.scores[seat], 0);
       const baseline = -candidate;
       structuralScore += candidate;
+      splitScores[split] += candidate;
       weightedScore += baseline;
       if (candidate > baseline) structuralWins += 1;
       else if (candidate < baseline) weightedWins += 1;
@@ -194,6 +219,7 @@ export const evaluateStructuralCompare = (
 
   const failures = matches.filter((match) => match.error !== undefined);
   return {
+    component,
     matches,
     structuralScore,
     weightedScore,
@@ -205,6 +231,7 @@ export const evaluateStructuralCompare = (
     structuralLatency: summarizeLatency(structuralTimings),
     weightedLatency: summarizeLatency(weightedTimings),
     routeDecisions,
+    splitScores,
   };
 };
 
@@ -213,11 +240,13 @@ const formatLatency = (value: number | null): string => (value === null ? "n/a" 
 const formatReport = (args: Arguments, seeds: readonly number[], result: StructuralCompareResult) =>
   [
     "=== Junk route-gated ordinary structural A/B ===",
+    `component: ${result.component}`,
     `seed: ${args.seed}  matches: ${result.matches.length} (${seeds.length} seeds x 2 seat splits)  rounds/match: ${args.rounds}`,
     `failures: ${result.failures}  step-limit failures: ${result.stepLimitFailures}`,
     "",
     `weighted score: ${result.weightedScore}  structural score: ${result.structuralScore}`,
     `structural/weighted/tied matches: ${result.structuralWins}/${result.weightedWins}/${result.ties}`,
+    `candidate split scores: even=${result.splitScores["structural-even"]}  odd=${result.splitScores["structural-odd"]}`,
     `route decisions: ordinary=${result.routeDecisions["ordinary-standard"]}  seven-pairs=${result.routeDecisions["seven-pairs"]}  other-special=${result.routeDecisions["other-special"]}  ambiguous=${result.routeDecisions.ambiguous}`,
     "",
     "policy      samples  p50 ms  p95 ms  max ms",
@@ -225,7 +254,7 @@ const formatReport = (args: Arguments, seeds: readonly number[], result: Structu
     `structural  ${result.structuralLatency.samples}  ${formatLatency(result.structuralLatency.p50Ms)}  ${formatLatency(result.structuralLatency.p95Ms)}  ${formatLatency(result.structuralLatency.maxMs)}`,
     "",
     "Wall-clock latency is comparable only within this single-concurrency run on the same machine.",
-    "Only ordinary-standard decisions use structural play; all excluded routes use weighted fallback.",
+    "Only the selected component of ordinary-standard decisions uses structural play; all others use weighted fallback.",
     "This report does not change production policy and does not prove win probability or terminal EV.",
   ].join("\n");
 
@@ -259,6 +288,7 @@ export const runStructuralCompareCli = async (
       seeds,
       args.rounds,
       runtime.monotonicNow,
+      args.component,
     );
     const report = `${formatReport(args, seeds, result)}\n`;
     const paths = writeTextEvaluationArtifacts(
