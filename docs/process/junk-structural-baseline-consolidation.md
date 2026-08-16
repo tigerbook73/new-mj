@@ -10,6 +10,10 @@
 删除 weighted 专用闭包。任何整理提交不得改变当前结构决策、提前接入七对/番型/防守，或把
 生成样本当牌理真值。
 
+文档收敛不是最后一步才开始：每个 slice 必须同步更新其影响到的 `plan.md`、README、架构、
+测试策略、命令说明、代码注释和待办，删除或改写已经失效的 legacy 默认语义。第 6 步仍保留，
+用于对全仓库做一次 top-down 最终审计，发现并清除跨 slice 遗留的过期命名、链接和叙述。
+
 ## 目标依赖图
 
 ```text
@@ -84,6 +88,9 @@ scenario fixtures ┘
 3. `reusable-designs`：逐项记录动态筛选、cliff/hurdle、缓存和概率工具的独立契约与取舍。
 4. `remove-weighted-tuning`：删除权重调参、isolation 专项和对应测试/待办。
 5. `remove-weighted-runtime`：删除 weighted 生产闭包与 legacy facade，收窄公共 API。
-6. `docs-and-names`：收敛 evaluator/fixture/README/architecture/plan 的过期命名并做依赖审计。
+6. `docs-and-names`：在各 slice 已同步维护文档的基础上，对 evaluator/fixture/README、架构、
+   测试策略、命令说明、注释、backlog 和 plan 做 top-down 最终审计，收敛遗漏的过期命名、链接
+   与叙述，并完成依赖审计。
 
-每一步独立提交。若通用化工具尚不能复现 baseline/candidate 对比，禁止进入相应删除步骤。
+每一步独立提交，并把相关文档更新纳入该步 DoD。若通用化工具尚不能复现 baseline/candidate
+对比，禁止进入相应删除步骤。

@@ -50,6 +50,7 @@
 - 同 seed 消融矩阵使用顶层 seed `20260821` 的同一批 15 seeds，turn/claim/all 各 30 场且均无失败；候选总分分别为 `-57/-18/-20`，even/odd 分别为 `-30/-27`、`8/-26`、`4/-24`，P95 均低于 28ms。逐 seed/split 的 `all - turn - claim` 候选分数残差合计 `+55`；因三路策略会产生不同后续轨迹，这只是同初始随机输入的诊断而非可加因果效应。此前“没有稳定替换证据”的结论现作为主动接受的风险记录，不再阻止结构基线成立。报告位于 `/tmp/new-mj-structural-matrix`，不归档。
 - 产品决策已改变评价基准：选择完整普通标准型结构策略作为新的可解释生产基线，明确接受它相对旧 weighted 的已知自对弈强度风险，不再继续调旧权重。`recommendJunkAction`/`chooseJunkAction` 默认调用结构 facade；旧 weighted 以 `recommendLegacyWeightedJunkAction`/`chooseLegacyWeightedJunkAction` 显式保留，evaluation arena、调权与历史 policy loader 固定使用 legacy，避免对照随生产入口漂移。七对、番型和防守仍未进入构牌目标。
 - 已建立专题清理 brief 和文件级资产清单，目标树只保留 structural production、通用 baseline/candidate evaluation，以及从旧实现提取后可独立复用的机制。动态筛选、cliff/hurdle、缓存和有限总体概率先记录中性契约与场景，再决定是否重实现；权重搜索、isolation 专项、weighted evaluator/baseline、旧评分闭包及仅验证其内部数值的测试按依赖顺序删除。Git 历史承担旧版本回溯，不把完整 legacy 策略作为当前树长期维护目标。
+- 专项文档采用逐 slice 收敛加最终审计：每个实施 slice 同步维护其影响到的 plan、README、架构、测试策略、命令说明、注释和 backlog；最后的 `docs-and-names` 再做一次全仓库 top-down 审计，不把所有文档债务推迟到清理末尾。
 
 ## 下一步第一个具体动作
 
