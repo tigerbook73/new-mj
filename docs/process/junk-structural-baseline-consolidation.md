@@ -85,8 +85,8 @@ scenario fixtures ┘
 1. [完成] `baseline-v1`：固定当前 production structural 的版本身份、canonical 行为资产、完整对局合法性
    与性能边界；明确 candidate 从该版本派生。
 2. [完成] `neutral-evaluation`：通用化 policy loader、arena、diff/capture 和 worker 命名/API。
-3. [下一步] `reusable-designs`：逐项记录动态筛选、cliff/hurdle、缓存和概率工具的独立契约与取舍。
-4. `remove-weighted-tuning`：删除权重调参、isolation 专项和对应测试/待办。
+3. [完成] `reusable-designs`：逐项记录动态筛选、cliff/hurdle、缓存和概率工具的独立契约与取舍。
+4. [下一步] `remove-weighted-tuning`：删除权重调参、isolation 专项和对应测试/待办。
 5. `remove-weighted-runtime`：删除 weighted 生产闭包与 legacy facade，收窄公共 API。
 6. `docs-and-names`：在各 slice 已同步维护文档的基础上，对 evaluator/fixture/README、架构、
    测试策略、命令说明、注释、backlog 和 plan 做 top-down 最终审计，收敛遗漏的过期命名、链接

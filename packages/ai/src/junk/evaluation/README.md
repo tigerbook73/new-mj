@@ -83,6 +83,10 @@ arena 的核心输入始终是四个 `SeatPolicy`，不预设评分范式；旧 
 同时复制当前 structural 与 legacy 的完整生产闭包，首选用 `policy diff` 对照，旧 weights compare
 命令仍可在清理完成前使用。
 
+旧 dynamic cliff、claim hurdle、跨决策 analysis LRU 和有限总体概率函数的可复用性审计已固定
+在 `docs/architecture/shanten.md`。结论是保留设计意图和重建场景，不保留其 weighted 载体；
+当前 structural 的固定预算、严格结构比较和 teacher audit 已覆盖可复用部分。
+
 `scenario run` 对同一个规范化输入执行九路 evaluator，并写入同一份 JSON/Markdown 报告：
 
 - `production-weighted`：显式 legacy weighted 路径，暂作历史行为诊断；

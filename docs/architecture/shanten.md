@@ -142,3 +142,66 @@ Core 的 `sevenPairs: true` 是 standard/seven-pairs 取最小值的合并开关
 若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手允许
 seven-pairs。路线按上述三项固定字典序选择，完全打平时 standard，不使用 `qiduiPotential`
 或其他连续权重。当前仅建立独立路线模型，尚未接入 bounded 2-ply 或生产入口。
+
+## Junk legacy 搜索机制的可复用边界
+
+旧 weighted 路径中的机制不能因为“将来可能有用”而整段保留。下面固定可重建的设计意图和
+验收边界；旧载体可删除，未来 candidate 需要时根据这些契约重新实现，并与进入 slice 前的
+`structural-baseline@1` 比较。
+
+### Dynamic shortlist 与 cliff
+
+旧实现先用加权一层分数和清/混一色加成排序首弃，再按全体分数跨度归一化相邻 gap：upper
+cliff 至少保留 2、至多保留 4 个首弃；lower cliff 至少保留 1 个第二弃牌 kind，遇到从尾部
+计算的 gap 时截断，否则可能保留全部。它的意图是“便宜排序缩小昂贵搜索”，但不可复用其
+实现：候选身份依赖 `JunkWeights`，相对 gap 会随无关分数项和极值变化，阈值附近不连续，
+分数全等时又退化到最大范围。
+
+保留的中性契约是：先计算便宜且可解释的结构事实；只删除被明确支配的候选；其余候选用稳定
+字典序排列并施加固定数量上限；用同一输入的 full teacher 记录一致率、所有差异 seed 和 P95
+比值。当前 structural bounded 2-ply 的“支配过滤 + 最多 5 个首弃”已经实现该契约，因此旧
+cliff 不迁移为公共工具。可重建场景包括 canonical `discard-001`、`discard-snapshot-001`，以及
+截断边界 seed `1077643932`、`1351392336`、`537634752`、teacher 差异 seed `3520660970`。
+
+### Claim hurdle
+
+旧 chi/peng hurdle 从 claim 后最佳加权分数中减去固定常数，表达“副露不能只因微小分差成立”。
+该目标已经由结构 claim 的严格比较取代：先模拟 claim 与下一弃牌，再按向听、存活进张种类和
+张数比较 pass；完全相同则 pass。固定数值 hurdle 与分数量纲绑定，不提取。未来若需要风险
+缓冲，必须定义为离散结构 margin（例如至少降低一向听），作为独立 candidate 由
+`claim-chi-breaks-tenpai-001`、`claim-peng-reaches-tenpai-001` 和
+`claim-chi-tied-pass-001` 验证，不能恢复连续权重扣分。
+
+### 预算与提前停止
+
+生产决策预算只能由候选数、分支数或迭代数决定，不得按墙钟时间截断；相同输入在不同机器上
+必须得到同一动作。当前弃牌最多搜索 5 个首弃，gang continuation 最多搜索 34 个 draw kind ×
+11 个 discard kind。旧 cliff 的动态宽度不保留；权重 optimizer 的 sigma/stagnation 提前停止
+只属于离线调参流程，也不迁入策略搜索。未来增加 ply 时必须同时提供固定 hard cap、完成/截断
+标记、full 或更宽 teacher 差异，以及独立 P95 证据。
+
+### Analysis LRU
+
+旧 `analysis.ts` 的 key 是“副露数 / 是否允许七对 / 34 种暗手计数”，有意不含牌河、公开副露
+或 wallCount，因为缓存值仅是 `evaluateUkeire` 的暗手结构事实。缓存容量默认为 32，每个座位
+跨决策复用、每手开始清空；实时分数和存活张数不得缓存。当前消费者全部位于 legacy
+`hand-quality → two-ply → action-scoring` 及其诊断路径，structural production 使用 core 批量
+API，没有消费者。
+
+Node `v24.18.0`、canonical `discard-001` 的只读重复 benchmark（预热后每轮 50 次，共 3 轮）中，
+共享 32 项 LRU 每轮均为 `7,189 hits / 60,211 misses`；shared/fresh 耗时分别为
+`1352.3/1323.4ms`、`1337.0/1324.2ms`、`1286.8/1303.7ms`，没有稳定收益且呈明显容量抖动。
+因此不迁为 structural 能力，随 legacy 删除。若未来 profile 再次定位到相同 shape 重算，应在
+实际消费者旁建立局部 cache，以完整语义 key、明确生命周期、容量和命中 benchmark 重新验收。
+
+### 有限总体抽样
+
+`probabilityAtLeastOneDraw` 计算有限总体无放回抽样“至少命中一次”；当前唯一生产消费者是旧
+`handQuality`，它先把可见进张按 wall 在未知池中的份额折算成可能为非整数的 `wallShare`，再
+估算本人剩余摸牌次数。这个总体既不是真实牌墙，也不是条件终局模型。structural 路径只在
+“下一次未知摸牌”分支上按可见剩余副本聚合，不调用该函数。
+
+因此数学公式及“总体、成功数、抽取次数必须同属一个明确定义的信息集”的约束保留在本文，
+函数本身不迁为中性工具并随 legacy 删除。未来若引入多次摸牌概率，必须先定义谁能摸、未知池
+包含哪些容器、公开信息如何去重、是否条件于对手行动，并用枚举小总体和实战边界 fixture
+验证；不得直接复用旧 `wallShare` 近似并称为胡牌概率或 EV。
