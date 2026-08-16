@@ -7,7 +7,7 @@ import {
   writeTextEvaluationArtifacts,
   type TextArtifactRuntime,
 } from "../../../evaluation/text-artifacts.ts";
-import { chooseJunkAction, recommendStructuralJunkAction } from "../../strategy.ts";
+import { chooseLegacyWeightedJunkAction, recommendStructuralJunkAction } from "../../strategy.ts";
 import { playJunkMatch, strengthPolicy, type SeatPolicy } from "../match/arena.ts";
 
 type Split = "structural-even" | "structural-odd";
@@ -90,7 +90,7 @@ export const evaluateStructuralTrace = (seed: number, rounds: number): Structura
     ) as [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
     const result = playJunkMatch(seed, policies, rounds, (info) => {
       decisionPoints += 1;
-      const weightedAction = chooseJunkAction(info.view, info.legalActions);
+      const weightedAction = chooseLegacyWeightedJunkAction(info.view, info.legalActions);
       const structuralAction = recommendStructuralJunkAction(info.view, info.legalActions);
       if (!structuralAction) throw new Error("structural shadow called with no legal actions");
       const driver = structuralSeats.includes(info.seat) ? "structural" : "weighted";

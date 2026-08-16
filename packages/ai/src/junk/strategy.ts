@@ -63,11 +63,7 @@ export type JunkStrengthConfig = {
 const isClaimContext = (legalActions: readonly JunkAction[]): boolean =>
   legalActions.some((action) => ["chi", "peng", "minGang", "hu", "pass"].includes(action.type));
 
-/**
- * Complete ordinary-standard structural policy facade. This remains an explicit
- * shadow entry point until its legality, runtime and A/B gates have passed; the
- * production recommendJunkAction path below is intentionally unchanged.
- */
+/** Complete ordinary-standard structural policy facade and production baseline. */
 export const recommendStructuralJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
@@ -115,7 +111,8 @@ const sampleSoftmax = (
   return scored[scored.length - 1]!.action;
 };
 
-export const recommendJunkAction = (
+/** Explicit legacy weighted policy retained for evaluation and rollback only. */
+export const recommendLegacyWeightedJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
   strength: JunkStrengthConfig = {},
@@ -128,6 +125,29 @@ export const recommendJunkAction = (
   if (temperature <= 0) return argmaxAction(scored);
   return sampleSoftmax(scored, temperature, strength.random ?? Math.random);
 };
+
+export const chooseLegacyWeightedJunkAction = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+  strength: JunkStrengthConfig = {},
+  weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+): JunkAction => {
+  const action = recommendLegacyWeightedJunkAction(view, legalActions, strength, weights);
+  if (!action) throw new Error("chooseLegacyWeightedJunkAction called with no legal actions");
+  return action;
+};
+
+/**
+ * Production Junk recommendation. Strength and weights remain in the signature
+ * for source compatibility during the post-switch cleanup, but no longer affect
+ * the deterministic structural baseline.
+ */
+export const recommendJunkAction = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+  _strength: JunkStrengthConfig = {},
+  _weights: JunkWeights = DEFAULT_JUNK_WEIGHTS,
+): JunkAction | undefined => recommendStructuralJunkAction(view, legalActions);
 
 export const chooseJunkAction = (
   view: JunkPlayerView,

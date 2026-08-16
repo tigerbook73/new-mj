@@ -10,11 +10,11 @@ import {
 } from "@new-mj/core";
 import { describe, expect, it, vi } from "vitest";
 import {
-  chooseJunkAction,
+  chooseLegacyWeightedJunkAction,
   createJunkAnalysisCache,
   DEFAULT_JUNK_WEIGHTS,
   probeSelfDrawTwoPly,
-  recommendJunkAction,
+  recommendLegacyWeightedJunkAction,
   scoreLegalActions,
   scoreHandShapeAfterDiscard,
   type GameProgress,
@@ -187,7 +187,7 @@ describe("junk strategy", () => {
   describe("production behavior fixtures", () => {
     it("always takes a legal win and preserves its original reference", () => {
       const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
-      expect(recommendJunkAction(view(["1m"]), actions)).toBe(actions[1]);
+      expect(recommendLegacyWeightedJunkAction(view(["1m"]), actions)).toBe(actions[1]);
     });
 
     it("reuses bounded structural analysis across calls without reusing live-state scores", () => {
@@ -271,7 +271,7 @@ describe("junk strategy", () => {
         "1s",
       ]);
       const actions: JunkAction[] = player.hand.map((tile) => ({ type: "discard", tile }));
-      const result = chooseJunkAction(player, actions);
+      const result = chooseLegacyWeightedJunkAction(player, actions);
       expect(result.type).toBe("discard");
       if (result.type !== "discard") throw new Error("expected discard");
       expect(actions).toContain(result);
@@ -298,7 +298,7 @@ describe("junk strategy", () => {
         { type: "chi", tiles: [tileIdOf("3m", 0), tileIdOf("5m", 0)] },
         { type: "pass" },
       ];
-      expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+      expect(recommendLegacyWeightedJunkAction(player, actions)).toBe(actions[1]);
     });
 
     it("still pengs when doing so reaches tenpai (regression guard: tenpaiProbabilityWeight's endgame-awareness must not make claiming too conservative)", () => {
@@ -318,7 +318,7 @@ describe("junk strategy", () => {
         lastDiscard: { seat: 1, tile: tileIdOf("3s", 2) },
       };
       const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
-      expect(recommendJunkAction(player, actions)).toBe(actions[0]);
+      expect(recommendLegacyWeightedJunkAction(player, actions)).toBe(actions[0]);
     });
 
     it("declines a chi that only trades one tanki wait for an equally-wide one (chiHurdle regression)", () => {
@@ -359,9 +359,9 @@ describe("junk strategy", () => {
       };
       const chi: JunkAction = { type: "chi", tiles: [hand[3]!, hand[4]!] }; // 7s, 8s
       const actions: JunkAction[] = [chi, { type: "pass" }];
-      expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+      expect(recommendLegacyWeightedJunkAction(player, actions)).toBe(actions[1]);
       const noHurdle: JunkWeights = { ...DEFAULT_JUNK_WEIGHTS, chiHurdle: 0 };
-      expect(recommendJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
+      expect(recommendLegacyWeightedJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
     });
 
     it("declines a thin-margin peng that only trades a wide wait for a narrower one (pengHurdle regression, mined from self-play seed=5 step=75)", () => {
@@ -465,9 +465,9 @@ describe("junk strategy", () => {
         lastDiscard: { seat: 3, tile: 83 },
       };
       const actions: JunkAction[] = [{ type: "peng" }, { type: "pass" }];
-      expect(recommendJunkAction(player, actions)).toBe(actions[1]);
+      expect(recommendLegacyWeightedJunkAction(player, actions)).toBe(actions[1]);
       const noHurdle: JunkWeights = { ...DEFAULT_JUNK_WEIGHTS, pengHurdle: 0 };
-      expect(recommendJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
+      expect(recommendLegacyWeightedJunkAction(player, actions, {}, noHurdle)).toBe(actions[0]);
     });
 
     it("uses visible discards as a safety tie-break", () => {
@@ -539,7 +539,7 @@ describe("junk strategy", () => {
         { type: "anGang", kind: "1m" },
         { type: "buGang", tile: tileIdOf("9s", 3) },
       ];
-      expect(recommendJunkAction(player, actions)).toBe(actions[0]);
+      expect(recommendLegacyWeightedJunkAction(player, actions)).toBe(actions[0]);
     });
 
     it("prefers discarding an isolated honor over an isolated number tile at equal shanten (plan.md AI Bot blind spot)", () => {
@@ -567,7 +567,9 @@ describe("junk strategy", () => {
       ]);
       const discardNumber: JunkAction = { type: "discard", tile: player.hand[12]! };
       const discardHonor: JunkAction = { type: "discard", tile: player.hand[11]! };
-      expect(recommendJunkAction(player, [discardNumber, discardHonor])).toBe(discardHonor);
+      expect(recommendLegacyWeightedJunkAction(player, [discardNumber, discardHonor])).toBe(
+        discardHonor,
+      );
     });
 
     it("scores a lone honor above breaking a live number-tile cluster in the base scorer", () => {
@@ -644,8 +646,12 @@ describe("junk strategy", () => {
       ]);
       const discardTatsuTile: JunkAction = { type: "discard", tile: player.hand[7]! }; // 6p
       const discardHonor: JunkAction = { type: "discard", tile: player.hand[12]! }; // 1z
-      expect(recommendJunkAction(player, [discardTatsuTile, discardHonor])).toBe(discardHonor);
-      expect(recommendJunkAction(player, [discardHonor, discardTatsuTile])).toBe(discardHonor);
+      expect(recommendLegacyWeightedJunkAction(player, [discardTatsuTile, discardHonor])).toBe(
+        discardHonor,
+      );
+      expect(recommendLegacyWeightedJunkAction(player, [discardHonor, discardTatsuTile])).toBe(
+        discardHonor,
+      );
     });
 
     it("prefers keeping a live wait over a dead one (theoretical -> practical ukeire)", () => {
@@ -684,7 +690,7 @@ describe("junk strategy", () => {
       };
       const keepLive9p: JunkAction = { type: "discard", tile: hand[11]! }; // discards 9s
       const keepDead9s: JunkAction = { type: "discard", tile: hand[12]! }; // discards 9p
-      expect(recommendJunkAction(player, [keepDead9s, keepLive9p])).toBe(keepLive9p);
+      expect(recommendLegacyWeightedJunkAction(player, [keepDead9s, keepLive9p])).toBe(keepLive9p);
     });
 
     it("values the same live wait less as the wall runs low (tenpaiProbabilityWeight reads GameProgress, not just the raw live-tile count)", () => {
@@ -830,7 +836,7 @@ describe("junk strategy", () => {
     });
 
     it("throws only when there is no legal action", () => {
-      expect(() => chooseJunkAction(view([]), [])).toThrow("no legal actions");
+      expect(() => chooseLegacyWeightedJunkAction(view([]), [])).toThrow("no legal actions");
     });
   });
 
@@ -862,36 +868,41 @@ describe("junk strategy", () => {
     const gapActions: JunkAction[] = [discardA, discardB];
 
     it("temperature 0 matches the omitted-parameter default", () => {
-      expect(recommendJunkAction(tiedView, tiedActions, { temperature: 0 })).toBe(
-        recommendJunkAction(tiedView, tiedActions),
+      expect(recommendLegacyWeightedJunkAction(tiedView, tiedActions, { temperature: 0 })).toBe(
+        recommendLegacyWeightedJunkAction(tiedView, tiedActions),
       );
     });
 
     it("temperature 0 ignores an injected random source", () => {
       const hostileRandom = () => 0.999;
       expect(
-        recommendJunkAction(gapView, gapActions, { temperature: 0, random: hostileRandom }),
-      ).toBe(recommendJunkAction(gapView, gapActions));
+        recommendLegacyWeightedJunkAction(gapView, gapActions, {
+          temperature: 0,
+          random: hostileRandom,
+        }),
+      ).toBe(recommendLegacyWeightedJunkAction(gapView, gapActions));
     });
 
     it("a legal win bypasses temperature/random entirely", () => {
       const random = vi.fn(() => 0.5);
       const actions: JunkAction[] = [{ type: "pass" }, { type: "hu" }];
-      expect(recommendJunkAction(view(["1m"]), actions, { temperature: 1000, random })).toBe(
-        actions[1],
-      );
+      expect(
+        recommendLegacyWeightedJunkAction(view(["1m"]), actions, { temperature: 1000, random }),
+      ).toBe(actions[1]);
       expect(random).not.toHaveBeenCalled();
     });
 
     it("returns the only legal action regardless of temperature/random", () => {
       const random = () => 0.5;
-      expect(recommendJunkAction(tiedView, [discardA], { temperature: 5, random })).toBe(discardA);
+      expect(
+        recommendLegacyWeightedJunkAction(tiedView, [discardA], { temperature: 5, random }),
+      ).toBe(discardA);
     });
 
     it("low temperature converges to the higher-scoring action", () => {
       const random = seededRandom(1);
       const results = Array.from({ length: 200 }, () =>
-        recommendJunkAction(gapView, gapActions, { temperature: 0.01, random }),
+        recommendLegacyWeightedJunkAction(gapView, gapActions, { temperature: 0.01, random }),
       );
       expect(results.every((result) => result === discardA)).toBe(true);
     });
@@ -899,7 +910,7 @@ describe("junk strategy", () => {
     it("moderate temperature produces a mixed outcome for near-tied scores", () => {
       const random = seededRandom(1);
       const results = Array.from({ length: 200 }, () =>
-        recommendJunkAction(gapView, gapActions, { temperature: 100, random }),
+        recommendLegacyWeightedJunkAction(gapView, gapActions, { temperature: 100, random }),
       );
       const countA = results.filter((result) => result === discardA).length;
       expect(countA).toBeGreaterThan(40);
@@ -908,29 +919,35 @@ describe("junk strategy", () => {
 
     it("a fixed seed reproduces the exact same sampled action", () => {
       const random = seededRandom(42);
-      const result = recommendJunkAction(tiedView, tiedActions, { temperature: 1, random });
+      const result = recommendLegacyWeightedJunkAction(tiedView, tiedActions, {
+        temperature: 1,
+        random,
+      });
       // Pinned from an actual run — this is a reproducibility lock, not a hand-derived value.
       expect(result).toBe(discardA);
     });
 
-    it("chooseJunkAction forwards the strength config", () => {
+    it("chooseLegacyWeightedJunkAction forwards the strength config", () => {
       const random = seededRandom(7);
       const strength = { temperature: 0.5, random };
-      expect(chooseJunkAction(gapView, gapActions, strength)).toBe(
-        recommendJunkAction(gapView, gapActions, { temperature: 0.5, random: seededRandom(7) }),
+      expect(chooseLegacyWeightedJunkAction(gapView, gapActions, strength)).toBe(
+        recommendLegacyWeightedJunkAction(gapView, gapActions, {
+          temperature: 0.5,
+          random: seededRandom(7),
+        }),
       );
     });
   });
 
   describe("weight overrides", () => {
-    it("recommendJunkAction with DEFAULT_JUNK_WEIGHTS matches the omitted-weights default", () => {
+    it("recommendLegacyWeightedJunkAction with DEFAULT_JUNK_WEIGHTS matches the omitted-weights default", () => {
       const player = view(["1m", "1m", "2m", "2m"]);
       const actions: JunkAction[] = [
         { type: "discard", tile: player.hand[0]! },
         { type: "discard", tile: player.hand[2]! },
       ];
-      expect(recommendJunkAction(player, actions, {}, DEFAULT_JUNK_WEIGHTS)).toBe(
-        recommendJunkAction(player, actions),
+      expect(recommendLegacyWeightedJunkAction(player, actions, {}, DEFAULT_JUNK_WEIGHTS)).toBe(
+        recommendLegacyWeightedJunkAction(player, actions),
       );
     });
 

@@ -1,4 +1,4 @@
-import { chooseJunkAction, type JunkStrengthConfig } from "../strategy.ts";
+import { chooseLegacyWeightedJunkAction, type JunkStrengthConfig } from "../strategy.ts";
 import type { CalibrationEvaluationResult } from "../../evaluation/types.ts";
 import type { JunkProductionFixtureInput } from "./fixture-provider.ts";
 
@@ -18,7 +18,7 @@ export const evaluateProductionFixture = (
   options: ProductionEvaluatorOptions = {},
 ): CalibrationEvaluationResult => {
   const startedAt = performance.now();
-  const action = chooseJunkAction(input.view, input.legalActions, options.strength);
+  const action = chooseLegacyWeightedJunkAction(input.view, input.legalActions, options.strength);
   const selectedCandidateId = JSON.stringify(action);
   return {
     scenarioId,

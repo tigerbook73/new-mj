@@ -40,6 +40,12 @@ type StrategyModuleShape = Readonly<{
     strength: JunkStrengthConfig,
     weights: JunkWeights,
   ) => JunkAction;
+  chooseLegacyWeightedJunkAction?: (
+    view: JunkPlayerView,
+    legalActions: readonly JunkAction[],
+    strength: JunkStrengthConfig,
+    weights: JunkWeights,
+  ) => JunkAction;
   DEFAULT_JUNK_WEIGHTS: JunkWeights;
 }>;
 
@@ -147,9 +153,10 @@ export const buildPolicy = async (
   const weights = weightsPath
     ? loadWeightsFile(weightsPath, Object.keys(imported.DEFAULT_JUNK_WEIGHTS))
     : imported.DEFAULT_JUNK_WEIGHTS;
-  // strength={} is deterministic argmax (see recommendJunkAction's temperature<=0
-  // branch) — comparisons across policies must stay noise-free, no randomness.
-  return (view, legalActions) => imported.chooseJunkAction(view, legalActions, {}, weights);
+  // Current modules expose the weighted implementation explicitly; historical
+  // modules fall back to their then-production chooseJunkAction export.
+  const chooseWeighted = imported.chooseLegacyWeightedJunkAction ?? imported.chooseJunkAction;
+  return (view, legalActions) => chooseWeighted(view, legalActions, {}, weights);
 };
 
 export const loadPolicy = async (

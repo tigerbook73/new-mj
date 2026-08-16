@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { tileIdOf, type JunkAction, type JunkPlayerView } from "@new-mj/core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  chooseJunkAction,
+  chooseLegacyWeightedJunkAction,
   DEFAULT_JUNK_WEIGHTS,
   scoreHandShapeAfterDiscard,
 } from "../src/junk/strategy.ts";
@@ -37,7 +37,7 @@ describe("loadPolicy", () => {
     const { policy, modulePath } = await loadPolicy({}, "default");
     expect(modulePath).toBe(currentStrategyPath);
     expect(policy(view, legalActions)).toEqual(
-      chooseJunkAction(view, legalActions, {}, DEFAULT_JUNK_WEIGHTS),
+      chooseLegacyWeightedJunkAction(view, legalActions, {}, DEFAULT_JUNK_WEIGHTS),
     );
   });
 

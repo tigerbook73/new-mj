@@ -1,14 +1,14 @@
 import { STANDARD_TILE_SET } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
-import { chooseJunkAction, DEFAULT_JUNK_WEIGHTS } from "../strategy.ts";
+import { chooseLegacyWeightedJunkAction, DEFAULT_JUNK_WEIGHTS } from "../strategy.ts";
 import { CANONICAL_PRODUCTION_SELECTION } from "./canonical-fixtures.ts";
 import { evaluateStructuralMetrics } from "./structural-metrics.ts";
 
 describe("isolationPotential removal candidate", () => {
   it("rejects direct removal because it makes discard-001 choose a strictly dominated shape", () => {
     const { scenario, input } = CANONICAL_PRODUCTION_SELECTION;
-    const baseline = chooseJunkAction(input.view, input.legalActions);
-    const withoutIsolation = chooseJunkAction(
+    const baseline = chooseLegacyWeightedJunkAction(input.view, input.legalActions);
+    const withoutIsolation = chooseLegacyWeightedJunkAction(
       input.view,
       input.legalActions,
       {},

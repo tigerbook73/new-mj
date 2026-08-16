@@ -1,4 +1,8 @@
-import { chooseJunkAction, DEFAULT_JUNK_WEIGHTS, type JunkWeights } from "../strategy.ts";
+import {
+  chooseLegacyWeightedJunkAction,
+  DEFAULT_JUNK_WEIGHTS,
+  type JunkWeights,
+} from "../strategy.ts";
 import { generateJunkSamples, normalizeGeneratedJunkSample } from "./generated-samples.ts";
 import { contentHashOf } from "./hash.ts";
 import { evaluateStructuralMetrics } from "./structural-metrics.ts";
@@ -67,8 +71,11 @@ const evaluateSplit = (
   const candidateDominatedScenarioSeeds: number[] = [];
   for (const sample of generated.samples) {
     const normalized = normalizeGeneratedJunkSample(sample.scenario, sample.data);
-    const baseline = chooseJunkAction(normalized.input.view, normalized.input.legalActions);
-    const candidate = chooseJunkAction(
+    const baseline = chooseLegacyWeightedJunkAction(
+      normalized.input.view,
+      normalized.input.legalActions,
+    );
+    const candidate = chooseLegacyWeightedJunkAction(
       normalized.input.view,
       normalized.input.legalActions,
       {},

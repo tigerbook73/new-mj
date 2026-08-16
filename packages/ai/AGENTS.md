@@ -10,8 +10,8 @@
 ## 生产代码
 
 - 决策函数只消费 core 的 view/actions；强度与随机性通过可选参数注入，默认 `Math.random`，测试与自对弈注入基于 core PRNG 的闭包。
-- Junk 默认生产依赖保持 `weights + analysis → hand-quality → two-ply → action-scoring → strategy facade` 单向流动；`strategy.ts` 是兼容加载根，只保留最终动作选择并重导既有诊断 API。普通型无权重结构候选只依赖 core，`recommendStructuralJunkAction` 是尚未接入默认入口的完整影子 facade。生产路径不得 import `evaluation/`。
-- 默认权重只存于 `src/junk/default-weights.json`，由 `weights.ts` 加载并冻结；只有人工显式执行且 held-out 未变差的 `evaluate weights tune --write` 可以更新它。
+- Junk 默认生产使用普通标准型无权重结构 facade；`strategy.ts` 是兼容加载根，只保留最终动作选择并重导既有诊断 API。旧 `weights + analysis → hand-quality → two-ply → action-scoring` 路径只作为显式 legacy/evaluation 对照与回退资产。生产路径不得 import `evaluation/`。
+- legacy 默认权重只存于 `src/junk/default-weights.json`，由 `weights.ts` 加载并冻结；不得再把调权重作为生产演进路径。
 - `scoreLegalActions` 每回合共享一个 `standardShanten` memo；新增同回合候选分析应复用该模式，不建立重复 memo 或跨局缓存。
 
 ## 测试与性能

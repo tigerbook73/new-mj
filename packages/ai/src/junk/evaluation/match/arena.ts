@@ -11,7 +11,7 @@ import {
   type SeatId,
 } from "@new-mj/core";
 import {
-  chooseJunkAction,
+  chooseLegacyWeightedJunkAction,
   createJunkAnalysisCache,
   type JunkStrengthConfig,
   type JunkWeights,
@@ -35,7 +35,12 @@ export const strengthPolicy = (
 ): SeatPolicy => {
   const analysisCache = strength.analysisCache ?? createJunkAnalysisCache();
   const policy = ((view, legalActions) =>
-    chooseJunkAction(view, legalActions, { ...strength, analysisCache }, weights)) as SeatPolicy;
+    chooseLegacyWeightedJunkAction(
+      view,
+      legalActions,
+      { ...strength, analysisCache },
+      weights,
+    )) as SeatPolicy;
   policy.resetAnalysisContext = () => analysisCache.clear();
   return policy;
 };

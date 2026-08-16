@@ -6,6 +6,8 @@ export const coreDependency = corePackageName;
 export * from "./strategy.ts";
 export {
   chooseJunkAction,
+  chooseLegacyWeightedJunkAction,
+  recommendLegacyWeightedJunkAction,
   recommendJunkAction,
   recommendStructuralJunkAction,
   type JunkStrengthConfig,
