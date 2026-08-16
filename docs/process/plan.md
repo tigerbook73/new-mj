@@ -4,7 +4,7 @@
 
 ## 当前任务
 
-当前专题是把 Junk 生产基线切换到完整普通标准型结构策略，并在切换稳定后进行一次 top-down 代码与文档整理。旧 weighted 策略不再作为产品演进基线，只保留为显式 legacy/evaluation 对照和安全回退。
+当前专题是 Junk AI structural baseline consolidation：固定当前普通标准型结构生产基线，把可复用评估与搜索机制从 weighted legacy 中剥离，再删除纯 weighted 运行时、调参设施、测试和过期待办。后续特性只与进入该 slice 前的 structural baseline 比较，不再要求与 legacy 比较。
 
 ## 当前状态
 
@@ -49,10 +49,11 @@
 - `structural compare` 新增 `--component all|turn|claim` 消融开关和 candidate even/odd split 汇总；所有模式共用普通型路线门禁，未选组件与排除路线均回退 weighted。`turn` 使用顶层 seed `20260819` 的 15 seeds / 30 场，无失败，候选/weighted 总分 `22/-22`、胜场 `14/13`、3 平，candidate even/odd `83/-61`，P95 `25.787ms`；`claim` 使用独立顶层 seed `20260820`，候选/weighted `40/-40`、胜场 `17/10`、3 平，candidate even/odd `18/22`，P95 `24.337ms`。两组件单独均通过首轮筛查，不能把完整候选退化归因于任一单组件；两组 seed 不同且 turn split 方差很大，尚不能排除抽样波动或组件交互。报告位于 `/tmp/new-mj-structural-ablation`，不归档。
 - 同 seed 消融矩阵使用顶层 seed `20260821` 的同一批 15 seeds，turn/claim/all 各 30 场且均无失败；候选总分分别为 `-57/-18/-20`，even/odd 分别为 `-30/-27`、`8/-26`、`4/-24`，P95 均低于 28ms。逐 seed/split 的 `all - turn - claim` 候选分数残差合计 `+55`；因三路策略会产生不同后续轨迹，这只是同初始随机输入的诊断而非可加因果效应。此前“没有稳定替换证据”的结论现作为主动接受的风险记录，不再阻止结构基线成立。报告位于 `/tmp/new-mj-structural-matrix`，不归档。
 - 产品决策已改变评价基准：选择完整普通标准型结构策略作为新的可解释生产基线，明确接受它相对旧 weighted 的已知自对弈强度风险，不再继续调旧权重。`recommendJunkAction`/`chooseJunkAction` 默认调用结构 facade；旧 weighted 以 `recommendLegacyWeightedJunkAction`/`chooseLegacyWeightedJunkAction` 显式保留，evaluation arena、调权与历史 policy loader 固定使用 legacy，避免对照随生产入口漂移。七对、番型和防守仍未进入构牌目标。
+- 已建立专题清理 brief 和文件级资产清单，目标树只保留 structural production、通用 baseline/candidate evaluation，以及从旧实现提取后可独立复用的机制。动态筛选、cliff/hurdle、缓存和有限总体概率先记录中性契约与场景，再决定是否重实现；权重搜索、isolation 专项、weighted evaluator/baseline、旧评分闭包及仅验证其内部数值的测试按依赖顺序删除。Git 历史承担旧版本回溯，不把完整 legacy 策略作为当前树长期维护目标。
 
 ## 下一步第一个具体动作
 
-在结构生产切换提交稳定后建立 top-down 整理 slice brief：按 `docs/architecture + package AGENTS → public facade/API → production/legacy/evaluation 依赖与命名 → fixture/baseline/README → plan/backlog` 顺序审计当前事实，先输出保留/重命名/删除清单和依赖图，再分小提交整理；不得在整理提交中改变结构策略行为、删除 legacy 回退或提前接入七对/番型/防守。
+建立 `structural-baseline-v1` slice：为当前 production structural 固定版本标识和 baseline manifest，选择覆盖 discard、claim、self-turn/gang、hu/zimo/draw 的 canonical 行为资产，并让完整 core 对局测试断言生产 facade 等于该 baseline；同时记录现有 bounded/full 一致率和 P95 性能边界。该 slice 不重命名 evaluation、不删除 legacy，也不改变任何结构决策。
 
 ## 阻塞与遗留问题
 
