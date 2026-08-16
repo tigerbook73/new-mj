@@ -29,25 +29,24 @@ export type PolicySource = Readonly<{
   ref?: string;
   /** Mutually exclusive with ref. Defaults to this package's current ./strategy.ts. */
   modulePath?: string;
-  /** Overrides the loaded module's own DEFAULT_JUNK_WEIGHTS. */
+  /** Named policy export. Defaults to chooseJunkAction. */
+  exportName?: string;
+  /** Legacy compatibility: overrides DEFAULT_JUNK_WEIGHTS and selects the weighted export. */
   weightsPath?: string;
 }>;
 
-type StrategyModuleShape = Readonly<{
-  chooseJunkAction: (
-    view: JunkPlayerView,
-    legalActions: readonly JunkAction[],
-    strength: JunkStrengthConfig,
-    weights: JunkWeights,
-  ) => JunkAction;
-  chooseLegacyWeightedJunkAction?: (
-    view: JunkPlayerView,
-    legalActions: readonly JunkAction[],
-    strength: JunkStrengthConfig,
-    weights: JunkWeights,
-  ) => JunkAction;
-  DEFAULT_JUNK_WEIGHTS: JunkWeights;
-}>;
+type PolicyFunction = (
+  view: JunkPlayerView,
+  legalActions: readonly JunkAction[],
+  strength?: JunkStrengthConfig,
+  weights?: JunkWeights,
+) => JunkAction | undefined;
+
+type StrategyModuleShape = Readonly<Record<string, unknown>> & {
+  chooseJunkAction: PolicyFunction;
+  chooseLegacyWeightedJunkAction?: PolicyFunction;
+  DEFAULT_JUNK_WEIGHTS?: JunkWeights;
+};
 
 const packageRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const scratchRoot = path.join(packageRoot, ".compare-scratch");
@@ -94,8 +93,7 @@ const snapshotRefToScratch = (ref: string): string => {
 const isStrategyModuleShape = (value: unknown): value is StrategyModuleShape =>
   typeof value === "object" &&
   value !== null &&
-  typeof (value as Record<string, unknown>).chooseJunkAction === "function" &&
-  typeof (value as Record<string, unknown>).DEFAULT_JUNK_WEIGHTS === "object";
+  typeof (value as Record<string, unknown>).chooseJunkAction === "function";
 
 /** Shared by weights-compare.ts and policy-diff.ts: `expectedKeys` is
  * the *loaded module's own* weight key set (not necessarily the current working
@@ -143,20 +141,35 @@ export const resolveModulePath = (source: PolicySource): string => {
 export const buildPolicy = async (
   modulePath: string,
   weightsPath?: string,
+  exportName?: string,
 ): Promise<SeatPolicy> => {
   const imported: unknown = await import(pathToFileURL(modulePath).href);
   if (!isStrategyModuleShape(imported)) {
+    throw new Error(`POLICY_SOURCE_INVALID_MODULE: ${modulePath} does not export chooseJunkAction`);
+  }
+  const selectedExport =
+    exportName ??
+    (weightsPath && imported.chooseLegacyWeightedJunkAction
+      ? "chooseLegacyWeightedJunkAction"
+      : "chooseJunkAction");
+  const choose = imported[selectedExport];
+  if (typeof choose !== "function") {
     throw new Error(
-      `POLICY_SOURCE_INVALID_MODULE: ${modulePath} does not export chooseJunkAction/DEFAULT_JUNK_WEIGHTS`,
+      `POLICY_SOURCE_INVALID_EXPORT: ${modulePath} does not export ${selectedExport}`,
     );
   }
-  const weights = weightsPath
-    ? loadWeightsFile(weightsPath, Object.keys(imported.DEFAULT_JUNK_WEIGHTS))
-    : imported.DEFAULT_JUNK_WEIGHTS;
-  // Current modules expose the weighted implementation explicitly; historical
-  // modules fall back to their then-production chooseJunkAction export.
-  const chooseWeighted = imported.chooseLegacyWeightedJunkAction ?? imported.chooseJunkAction;
-  return (view, legalActions) => chooseWeighted(view, legalActions, {}, weights);
+  let weights: JunkWeights | undefined;
+  if (weightsPath) {
+    if (!imported.DEFAULT_JUNK_WEIGHTS) {
+      throw new Error(`POLICY_SOURCE_WEIGHTS_UNSUPPORTED: ${modulePath}`);
+    }
+    weights = loadWeightsFile(weightsPath, Object.keys(imported.DEFAULT_JUNK_WEIGHTS));
+  }
+  return (view, legalActions) => {
+    const action = (choose as PolicyFunction)(view, legalActions, {}, weights);
+    if (!action) throw new Error(`POLICY_RETURNED_NO_ACTION: ${selectedExport}`);
+    return action;
+  };
 };
 
 export const loadPolicy = async (
@@ -164,6 +177,6 @@ export const loadPolicy = async (
   label: string,
 ): Promise<{ policy: SeatPolicy; label: string; modulePath: string }> => {
   const modulePath = resolveModulePath(source);
-  const policy = await buildPolicy(modulePath, source.weightsPath);
+  const policy = await buildPolicy(modulePath, source.weightsPath, source.exportName);
   return { policy, label, modulePath };
 };

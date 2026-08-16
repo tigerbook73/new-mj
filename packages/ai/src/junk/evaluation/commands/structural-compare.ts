@@ -12,7 +12,7 @@ import {
   recommendStructuralJunkAction,
   type OrdinaryStructuralGateRoute,
 } from "../../strategy.ts";
-import { playJunkMatch, strengthPolicy, type SeatPolicy } from "../match/arena.ts";
+import { legacyWeightedPolicy, playJunkMatch, type SeatPolicy } from "../match/arena.ts";
 
 type Arguments = {
   seed: number;
@@ -152,7 +152,7 @@ const structuralPolicy = (
   routeDecisions: RouteDecisionCounts,
   component: StructuralComponent,
 ): SeatPolicy => {
-  const weighted = strengthPolicy();
+  const weighted = legacyWeightedPolicy();
   const policy = ((view, legalActions) => {
     const isRouteDecision =
       legalActions.length > 1 &&
@@ -193,7 +193,7 @@ export const evaluateStructuralCompare = (
   for (const seed of seeds) {
     for (const split of ["structural-even", "structural-odd"] as const) {
       const structural = timedPolicy(structuralPolicy(routeDecisions, component), now);
-      const weighted = timedPolicy(strengthPolicy(), now);
+      const weighted = timedPolicy(legacyWeightedPolicy(), now);
       const structuralSeats: readonly SeatId[] = split === "structural-even" ? [0, 2] : [1, 3];
       const policies = [0, 1, 2, 3].map((seat) =>
         structuralSeats.includes(seat as SeatId) ? structural.policy : weighted.policy,

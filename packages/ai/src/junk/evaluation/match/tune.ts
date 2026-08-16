@@ -116,7 +116,11 @@ export const runMatchTask = (task: MatchTask): MatchTaskResult => {
  * policy-loader.ts's resolveModulePath) — the currency runPolicyMatchTask and
  * evaluateCandidatePolicies pass around, since a live SeatPolicy closure can't
  * cross a worker_thread postMessage boundary. */
-export type ResolvedPolicySource = Readonly<{ modulePath: string; weightsPath?: string }>;
+export type ResolvedPolicySource = Readonly<{
+  modulePath: string;
+  weightsPath?: string;
+  exportName?: string;
+}>;
 
 /** Policy-based counterpart to runMatchTask: imports both sides (buildPolicy
  * caches via Node's own module cache, so repeated calls with the same
@@ -126,8 +130,8 @@ export type ResolvedPolicySource = Readonly<{ modulePath: string; weightsPath?: 
  * sequential fallback below calls directly on the main thread. */
 export const runPolicyMatchTask = async (task: PolicyMatchTask): Promise<MatchTaskResult> => {
   const [baselinePolicy, candidatePolicy] = await Promise.all([
-    buildPolicy(task.baselineModulePath, task.baselineWeightsPath),
-    buildPolicy(task.candidateModulePath, task.candidateWeightsPath),
+    buildPolicy(task.baselineModulePath, task.baselineWeightsPath, task.baselineExportName),
+    buildPolicy(task.candidateModulePath, task.candidateWeightsPath, task.candidateExportName),
   ]);
   const policies = SEAT_IDS.map((seat) =>
     task.candidateSeats.includes(seat) ? candidatePolicy : baselinePolicy,
@@ -147,8 +151,10 @@ const policyMatchTask = (
   candidateSeats,
   baselineModulePath: baseline.modulePath,
   ...(baseline.weightsPath !== undefined ? { baselineWeightsPath: baseline.weightsPath } : {}),
+  ...(baseline.exportName !== undefined ? { baselineExportName: baseline.exportName } : {}),
   candidateModulePath: candidate.modulePath,
   ...(candidate.weightsPath !== undefined ? { candidateWeightsPath: candidate.weightsPath } : {}),
+  ...(candidate.exportName !== undefined ? { candidateExportName: candidate.exportName } : {}),
 });
 
 /**

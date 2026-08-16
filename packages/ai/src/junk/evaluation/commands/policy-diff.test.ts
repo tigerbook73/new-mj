@@ -62,4 +62,39 @@ describe("decision diff CLI", () => {
     expect(result.output).toContain("OUTPUT_ALREADY_EXISTS");
     expect(loadCount).toBe(0);
   });
+
+  it("passes explicit baseline and candidate exports to the generic loader", async () => {
+    const sources: unknown[] = [];
+    const result = await runDecisionDiffCli(
+      [
+        "--baseline-export",
+        "recommendStructuralBaselineV1Action",
+        "--candidate-export",
+        "recommendCandidateAction",
+        "--seeds",
+        "1",
+        "--sample-size",
+        "0",
+        "--run-id",
+        "exports",
+      ],
+      () => undefined,
+      {
+        load: async (source, label) => {
+          sources.push(source);
+          return { policy, label, modulePath: `${label}.ts` };
+        },
+        evaluate: () => ({ decisionPoints: 0, divergences: [] }),
+        exists: () => false,
+        makeDirectory: () => undefined,
+        write: () => undefined,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(sources).toEqual([
+      { exportName: "recommendStructuralBaselineV1Action" },
+      { exportName: "recommendCandidateAction" },
+    ]);
+  });
 });

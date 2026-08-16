@@ -69,21 +69,35 @@ pnpm --filter @new-mj/ai evaluate weights tune --help
 pnpm --filter @new-mj/ai evaluate arena run --help
 ```
 
+## Baseline/candidate policy 契约
+
+通用 policy source 由 `ref` 或 `modulePath`、可选 `exportName` 组成；默认导出是模块自己的
+`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@1`，不再隐式改用 legacy
+weighted。`policy diff` 可用 `--baseline-export`/`--candidate-export` 比较同一模块中的显式策略
+导出；跨版本 match worker 也携带相同 export 字段。`weightsPath` 只为旧权重命令兼容保留：提供
+它时，当前模块会选择显式 weighted 导出，历史模块则使用它当时的 `chooseJunkAction`。
+
+arena 的核心输入始终是四个 `SeatPolicy`，不预设评分范式；旧 weighted 包装器明确命名为
+`legacyWeightedPolicy`。通用 worker pool 位于 `match/worker-pool.ts`，要求调用方提供任务类型、
+结果类型和 worker 失败结果；`tune-pool.ts` 仅保留权重任务以及向后兼容重导。`policy capture`
+同时复制当前 structural 与 legacy 的完整生产闭包，首选用 `policy diff` 对照，旧 weights compare
+命令仍可在清理完成前使用。
+
 `scenario run` 对同一个规范化输入执行九路 evaluator，并写入同一份 JSON/Markdown 报告：
 
-- `production-weighted`：当前生产混合路径，作为行为基线；
+- `production-weighted`：显式 legacy weighted 路径，暂作历史行为诊断；
 - `standard-only`：全部合法弃牌的只读普通标准型结构指标，不加权、不选动作；
 - `one-ply-all`：全部合法动作的一轮生产加权评分，不执行 2-ply/cliff；
 - `two-ply-all`：全部合法弃牌进入现有生产加权 continuation，首层/第二次弃牌均不执行
   cliff，并选择加权值最高者；
 - `two-ply-structural-all`：全部合法弃牌进入纯标准型结构续行，每个自摸分支报告最低向听
   层的 Pareto 前沿和聚合指标；不把偏序压成分数，因此不选择首层动作。
-- `structural-bounded`：未接入默认生产的纯结构弃牌候选；报告一层支配标记、是否进入固定
+- `structural-bounded`：当前生产基线的纯结构弃牌组件；报告一层支配标记、是否进入固定
   五候选搜索预算、2-ply 聚合指标和最终选择，用于与 full teacher 做显式对照。
-- `structural-claim`：未接入默认生产的 `hu + chi/peng/minGang + pass` 结构候选；报告每个动作
+- `structural-claim`：当前生产基线的 `hu + chi/peng/minGang + pass` 结构组件；报告每个动作
   是否已建模、普通结构指标和 claim 后最佳弃牌。minGang 额外报告至多 34 种可见剩余补牌、
   立即完成质量和非完成分支的条件期望最佳结构；结构打平或没有补牌分支时 pass。
-- `structural-turn`：未接入默认生产的 `zimo + anGang/buGang + discard` 结构候选；gang 复用
+- `structural-turn`：当前生产基线的 `zimo + anGang/buGang + discard` 结构组件；gang 复用
   补牌聚合，并同时对比 bounded 最佳弃牌及各自等价弃牌。纯结构打平时 discard，不为杠本身
   增加固定奖励；报告所有候选是否进入搜索及聚合指标。
 - `isolation-boundary`：用默认权重和仅关闭 `isolationPotential` 的权重做 one-ply/two-ply

@@ -29,7 +29,7 @@ export type SeatPolicy = ((
 
 /** Wraps a strength config (and optional weight override) as a SeatPolicy backed by
  * the production decision function; omitting `weights` uses DEFAULT_JUNK_WEIGHTS. */
-export const strengthPolicy = (
+export const legacyWeightedPolicy = (
   strength: JunkStrengthConfig = {},
   weights?: JunkWeights,
 ): SeatPolicy => {
@@ -44,6 +44,9 @@ export const strengthPolicy = (
   policy.resetAnalysisContext = () => analysisCache.clear();
   return policy;
 };
+
+/** @deprecated Weighted-tuning compatibility alias; generic arena callers pass SeatPolicy directly. */
+export const strengthPolicy = legacyWeightedPolicy;
 
 export type JunkMatchResult = {
   /** Cumulative score deltas across all played hands, one per seat. */

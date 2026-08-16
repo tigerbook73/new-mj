@@ -5,8 +5,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { tileIdOf, type JunkAction, type JunkPlayerView } from "@new-mj/core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  chooseLegacyWeightedJunkAction,
   DEFAULT_JUNK_WEIGHTS,
+  recommendJunkAction,
   scoreHandShapeAfterDiscard,
 } from "../src/junk/strategy.ts";
 import { loadPolicy, loadWeightsFile } from "../src/junk/evaluation/policy/policy-loader.ts";
@@ -36,9 +36,7 @@ describe("loadPolicy", () => {
   it("defaults to this package's current strategy.ts", async () => {
     const { policy, modulePath } = await loadPolicy({}, "default");
     expect(modulePath).toBe(currentStrategyPath);
-    expect(policy(view, legalActions)).toEqual(
-      chooseLegacyWeightedJunkAction(view, legalActions, {}, DEFAULT_JUNK_WEIGHTS),
-    );
+    expect(policy(view, legalActions)).toEqual(recommendJunkAction(view, legalActions));
   });
 
   it("accepts an explicit modulePath pointing at the same file", async () => {
@@ -71,6 +69,17 @@ describe("loadPolicy", () => {
 
     const { policy: customPolicy } = await loadPolicy({ weightsPath }, "custom");
     expect(legalActions).toContainEqual(customPolicy(view, legalActions));
+  });
+
+  it("loads an explicit named policy export without requiring weights", async () => {
+    const { policy } = await loadPolicy(
+      {
+        modulePath: currentStrategyPath,
+        exportName: "recommendStructuralBaselineV1Action",
+      },
+      "structural-v1",
+    );
+    expect(policy(view, legalActions)).toEqual(recommendJunkAction(view, legalActions));
   });
 
   it("loads a historical version with the pre-probability weight shape", async () => {

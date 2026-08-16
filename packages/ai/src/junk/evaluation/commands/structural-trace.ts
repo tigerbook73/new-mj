@@ -8,7 +8,7 @@ import {
   type TextArtifactRuntime,
 } from "../../../evaluation/text-artifacts.ts";
 import { chooseLegacyWeightedJunkAction, recommendStructuralJunkAction } from "../../strategy.ts";
-import { playJunkMatch, strengthPolicy, type SeatPolicy } from "../match/arena.ts";
+import { legacyWeightedPolicy, playJunkMatch, type SeatPolicy } from "../match/arena.ts";
 
 type Split = "structural-even" | "structural-odd";
 
@@ -86,7 +86,7 @@ export const evaluateStructuralTrace = (seed: number, rounds: number): Structura
   for (const split of ["structural-even", "structural-odd"] as const) {
     const structuralSeats: readonly SeatId[] = split === "structural-even" ? [0, 2] : [1, 3];
     const policies = [0, 1, 2, 3].map((seat) =>
-      structuralSeats.includes(seat as SeatId) ? structuralPolicy() : strengthPolicy(),
+      structuralSeats.includes(seat as SeatId) ? structuralPolicy() : legacyWeightedPolicy(),
     ) as [SeatPolicy, SeatPolicy, SeatPolicy, SeatPolicy];
     const result = playJunkMatch(seed, policies, rounds, (info) => {
       decisionPoints += 1;

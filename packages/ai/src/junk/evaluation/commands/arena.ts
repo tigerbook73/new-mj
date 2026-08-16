@@ -9,7 +9,7 @@ import {
   type TextArtifactRuntime,
 } from "../../../evaluation/text-artifacts.ts";
 import { type ArenaTask, type ArenaTaskResult } from "../match/arena-worker.ts";
-import { MatchWorkerPool } from "../match/tune-pool.ts";
+import { MatchWorkerPool } from "../match/worker-pool.ts";
 
 type Arguments = {
   seed: number;

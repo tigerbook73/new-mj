@@ -1,6 +1,6 @@
-import { Worker } from "node:worker_threads";
 import type { SeatId } from "@new-mj/core";
 import type { JunkWeights } from "../../strategy.ts";
+import { MatchWorkerPool as EvaluationWorkerPool } from "./worker-pool.ts";
 
 /** Weight-based match task (weights tune / weights-compare.ts's same-code
  * path, dispatched to tune-worker.ts). See policy-match-worker.ts's
@@ -37,81 +37,23 @@ export type PolicyMatchTask = {
   candidateSeats: readonly SeatId[];
   baselineModulePath: string;
   baselineWeightsPath?: string;
+  baselineExportName?: string;
   candidateModulePath: string;
   candidateWeightsPath?: string;
+  candidateExportName?: string;
 };
 
-type PendingResolve<TResult> = (result: TResult) => void;
-
-/**
- * Fixed-size worker_threads pool dedicated to running one task per message.
- * Generic over the task shape (`TTask`) so multiple task kinds that all reduce
- * to the same MatchTaskResult can share this implementation instead of each
- * hand-rolling their own pool. Matches are pure, independent, and CPU-bound
- * (the real cost is shanten computation in the production scoring closure, not I/O), which
- * makes them embarrassingly parallel across cores. The pool is meant to be
- * created once and reused for an entire run — not spawned per generation/task
- * — so thread-startup cost is amortized across many matches instead of paid
- * repeatedly.
- *
- * No external worker-pool library: same "hand-write it" call as tune.ts's
- * optimizer itself (see AGENTS.md) — this pool only ever does "post a plain
- * object, get a plain object back", none of the task priority/cancellation/
- * backpressure needs that would make a dependency pay for itself.
- */
-export class MatchWorkerPool<TTask, TResult = MatchTaskResult> {
-  private readonly workers: Worker[] = [];
-  private readonly idle: Worker[] = [];
-  private readonly pending = new Map<Worker, PendingResolve<TResult>>();
-  private readonly queue: Array<{ task: TTask; resolve: PendingResolve<TResult> }> = [];
-
+/** @deprecated Import MatchWorkerPool from worker-pool.ts for non-weighted evaluation. */
+export class MatchWorkerPool<TTask, TResult = MatchTaskResult> extends EvaluationWorkerPool<
+  TTask,
+  TResult
+> {
   constructor(
     size: number,
     workerUrl: URL,
     workerErrorResult: (error: unknown) => TResult = () =>
       ({ ok: false, candidateTotal: 0, baselineTotal: 0 }) as TResult,
   ) {
-    for (let index = 0; index < Math.max(1, size); index += 1) {
-      const worker = new Worker(workerUrl);
-      worker.on("message", (result: TResult) => this.onSettled(worker, result));
-      worker.on("error", (error) => {
-        process.stderr.write(`[tune-pool] worker error: ${String(error)}\n`);
-        this.onSettled(worker, workerErrorResult(error));
-      });
-      this.workers.push(worker);
-      this.idle.push(worker);
-    }
-  }
-
-  private onSettled(worker: Worker, result: TResult): void {
-    const resolve = this.pending.get(worker);
-    this.pending.delete(worker);
-    this.idle.push(worker);
-    resolve?.(result);
-    this.dispatchNext();
-  }
-
-  private dispatchNext(): void {
-    if (this.queue.length === 0 || this.idle.length === 0) return;
-    const worker = this.idle.pop();
-    const next = this.queue.shift();
-    if (!worker || !next) return;
-    this.pending.set(worker, next.resolve);
-    worker.postMessage(next.task);
-  }
-
-  run(task: TTask): Promise<TResult> {
-    return new Promise((resolve) => {
-      this.queue.push({ task, resolve });
-      this.dispatchNext();
-    });
-  }
-
-  runAll(tasks: readonly TTask[]): Promise<TResult[]> {
-    return Promise.all(tasks.map((task) => this.run(task)));
-  }
-
-  async close(): Promise<void> {
-    await Promise.all(this.workers.map((worker) => worker.terminate()));
+    super(size, workerUrl, workerErrorResult);
   }
 }

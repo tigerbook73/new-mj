@@ -52,10 +52,11 @@
 - 已建立专题清理 brief 和文件级资产清单，目标树只保留 structural production、通用 baseline/candidate evaluation，以及从旧实现提取后可独立复用的机制。动态筛选、cliff/hurdle、缓存和有限总体概率先记录中性契约与场景，再决定是否重实现；权重搜索、isolation 专项、weighted evaluator/baseline、旧评分闭包及仅验证其内部数值的测试按依赖顺序删除。Git 历史承担旧版本回溯，不把完整 legacy 策略作为当前树长期维护目标。
 - 专项文档采用逐 slice 收敛加最终审计：每个实施 slice 同步维护其影响到的 plan、README、架构、测试策略、命令说明、注释和 backlog；最后的 `docs-and-names` 再做一次全仓库 top-down 审计，不把所有文档债务推迟到清理末尾。
 - `structural-baseline@1` 已成为当前普通标准型生产策略的稳定身份：生产 facade 明确委托给版本化 v1 实现，行为 manifest 绑定 `canonical-baseline@1`，覆盖 discard、claim、self-turn/gang 以及 hu/zimo/draw。7 个 canonical 场景逐项锁定语义动作，完整 core 对局逐决策断言生产 facade 与 v1 返回同一合法动作；未来有意改变行为必须建立新 baseline 版本。既有 1000+1000 bounded/full teacher 一致率与 P95、50 seeds / 100 场完整策略 P95 作为 v1 建立时的环境证据记录在 evaluation README，不作为跨机器测试断言。
+- evaluation 已采用中性 baseline/candidate policy 契约：loader 默认加载模块自己的 `chooseJunkAction`，可用显式 export 名选择同模块候选；只有提供 `weightsPath` 时才进入 legacy 权重兼容路径。policy diff、Git ref/module loader、capture、跨线程 match task 和 arena 可直接承载 `structural-baseline@1` 与候选；通用 worker pool 已迁出 tune 命名，`tune-pool.ts` 只保留权重任务和兼容重导。`legacyWeightedPolicy` 名称显式标识历史包装器，现有 weights CLI 入口暂时保留。
 
 ## 下一步第一个具体动作
 
-建立 `neutral-evaluation` slice：先审计 policy loader、capture、decision diff、arena 和 worker 对 weighted export、默认权重与 legacy 命名的具体耦合，定义最小的 baseline/candidate policy 契约；随后让这些通用设施能够直接加载和比较 `structural-baseline@1` 与显式 candidate。该 slice 先保持现有 CLI 兼容入口，不删除 weighted tuning/runtime，也不改变生产结构决策。
+建立 `reusable-designs` slice：分别审计动态首弃筛选、cliff/hurdle、硬预算/提前停止、analysis LRU 和有限总体牌种抽样，提取不依赖 weighted 总分的输入、输出、不变量、失败模式与可重建场景；对缓存和概率工具补固定 benchmark/消费者证据后，逐项决定“迁为中性能力”或“只留设计结论后随 legacy 删除”。该 slice 不把这些机制接回生产，不删除 weighted runtime，也不改变 `structural-baseline@1`。
 
 ## 阻塞与遗留问题
 
