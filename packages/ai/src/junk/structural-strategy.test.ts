@@ -2,11 +2,14 @@ import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
 import { recommendJunkAction, recommendStructuralJunkAction } from "./strategy.ts";
 
-const view = (phase: JunkPlayerView["phase"]): JunkPlayerView => ({
+const view = (
+  phase: JunkPlayerView["phase"],
+  hand: JunkPlayerView["hand"] = [],
+): JunkPlayerView => ({
   seat: 0,
   currentSeat: 0,
   dealer: 0,
-  hand: [],
+  hand,
   seats: [0, 1, 2, 3].map(() => ({ melds: [], discards: [], handCount: 0, justDrawn: false })),
   wallCount: 20,
   phase,
@@ -16,8 +19,8 @@ describe("recommendStructuralJunkAction", () => {
   it("is the production facade", () => {
     const discard: JunkAction = { type: "discard", tile: 0 };
     const actions = [discard];
-    expect(recommendJunkAction(view("playing"), actions)).toBe(
-      recommendStructuralJunkAction(view("playing"), actions),
+    expect(recommendJunkAction(view("playing", [0]), actions)).toBe(
+      recommendStructuralJunkAction(view("playing", [0]), actions),
     );
   });
 
@@ -38,6 +41,6 @@ describe("recommendStructuralJunkAction", () => {
     expect(recommendStructuralJunkAction(view("awaiting-claims"), [pass])).toBe(pass);
 
     const discard: JunkAction = { type: "discard", tile: 0 };
-    expect(recommendStructuralJunkAction(view("playing"), [discard])).toBe(discard);
+    expect(recommendStructuralJunkAction(view("playing", [0]), [discard])).toBe(discard);
   });
 });

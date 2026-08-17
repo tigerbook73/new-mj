@@ -2,11 +2,13 @@ import {
   STANDARD_TILE_SET,
   computeShanten,
   evaluateUkeire,
+  evaluateUkeireAfterDiscards,
   tileIdOf,
   type JunkAction,
   type JunkPlayerView,
   type TileId,
   type TileKind,
+  type UkeireEvaluation,
 } from "@new-mj/core";
 
 export type StructuralShape = Readonly<{
@@ -70,12 +72,15 @@ export const structuralVisibleKindCounts = (tiles: ReadonlySet<TileId>): Map<Til
   return counts;
 };
 
-export const structuralShapeOf = (
-  hand: readonly TileId[],
+/**
+ * Shared by both the single-hand path (`evaluateUkeire`) and the batched
+ * discard-candidate path (`evaluateUkeireAfterDiscards`): both return the same
+ * `{ shanten, improvingKinds }` shape, only the live-copy discount differs.
+ */
+const structuralShapeFromUkeire = (
+  analysis: UkeireEvaluation,
   visibleCounts: ReadonlyMap<TileKind, number>,
-  existingMelds: number,
 ): StructuralShape => {
-  const analysis = evaluateUkeire(hand, { sevenPairs: false }, STANDARD_TILE_SET, existingMelds);
   const liveCopies = analysis.improvingKinds.map((kind) =>
     Math.max(0, STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0)),
   );
@@ -85,6 +90,16 @@ export const structuralShapeOf = (
     liveImprovingTileCount: liveCopies.reduce((sum, copies) => sum + copies, 0),
   };
 };
+
+export const structuralShapeOf = (
+  hand: readonly TileId[],
+  visibleCounts: ReadonlyMap<TileKind, number>,
+  existingMelds: number,
+): StructuralShape =>
+  structuralShapeFromUkeire(
+    evaluateUkeire(hand, { sevenPairs: false }, STANDARD_TILE_SET, existingMelds),
+    visibleCounts,
+  );
 
 /** Standard-only shape under the player's current visible information set. */
 export const evaluateVisibleStructuralShape = (
@@ -178,14 +193,23 @@ export const evaluateStructuralContinuation = (
       continue;
     }
     const leafCounts = structuralVisibleKindCounts(new Set(occupied).add(drawnTile));
-    const bestLeaf = uniqueDiscardActions(afterDraw)
-      .map((action) => ({
-        action,
-        shape: structuralShapeOf(
-          afterDraw.filter((tile) => tile !== action.tile),
-          leafCounts,
-          existingMelds,
-        ),
+    // Batched over one shared createTwoChangeShantenProber build instead of one
+    // full evaluateUkeire (fresh 4-suit DP) per second-discard candidate — see
+    // docs/architecture/shanten.md "2-ply 批量结构 API".
+    const secondDiscardActions = uniqueDiscardActions(afterDraw);
+    const secondDiscardBatch = evaluateUkeireAfterDiscards(
+      afterDraw,
+      secondDiscardActions.map((action) =>
+        STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
+      ),
+      { sevenPairs: false },
+      STANDARD_TILE_SET,
+      existingMelds,
+    );
+    const bestLeaf = secondDiscardBatch
+      .map((analysis, index) => ({
+        action: secondDiscardActions[index]!,
+        shape: structuralShapeFromUkeire(analysis, leafCounts),
       }))
       .sort(
         (left, right) =>
@@ -275,13 +299,33 @@ export const evaluateStructuralDiscard = (
   const discards = legalActions.filter(
     (action): action is Extract<JunkAction, { type: "discard" }> => action.type === "discard",
   );
+  // One shared createTwoChangeShantenProber build over view.hand instead of one
+  // full evaluateUkeire per discard candidate; results depend only on tile kind,
+  // so duplicate-kind legal actions (rare with legalActions.length > 1 per kind)
+  // share the same batch entry.
+  const firstDiscardKindIndexes = [
+    ...new Set(
+      discards.map((action) => STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile))),
+    ),
+  ];
+  const firstDiscardBatch = evaluateUkeireAfterDiscards(
+    view.hand,
+    firstDiscardKindIndexes,
+    { sevenPairs: false },
+    STANDARD_TILE_SET,
+    existingMelds,
+  );
+  const onePlyByKindIndex = new Map(
+    firstDiscardBatch.map((analysis) => [
+      analysis.discardKindIndex,
+      structuralShapeFromUkeire(analysis, visibleCounts),
+    ]),
+  );
   const base = discards.map((action) => ({
     action,
-    onePly: structuralShapeOf(
-      view.hand.filter((tile) => tile !== action.tile),
-      visibleCounts,
-      existingMelds,
-    ),
+    onePly: onePlyByKindIndex.get(
+      STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
+    )!,
   }));
   const applyGuardrail = options.applyDominanceGuardrail ?? true;
   const withDominance = base.map((candidate) => ({
