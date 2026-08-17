@@ -135,7 +135,7 @@ const extractResult = (table: SuitTable, counts: readonly number[], pair: 0 | 1)
   const out = new Int8Array(10).fill(-1);
   const compactIndex = table.indexMap[indexMapSlotOf(counts)]!;
   if (compactIndex < 0) return out;
-  const base = compactIndex * SLOTS_PER_VECTOR;
+  const base = compactIndex << 4;
   const data = table.data;
   if (pair === 1) {
     for (let dm = 0; dm <= 4; dm += 1) out[5 + dm] = data[base + dm]!; // withEntryPair1
@@ -266,6 +266,14 @@ test("buildSuitTable: vectors with total tile count over 14 are left as sentinel
   for (const pair of [0, 1] as const) {
     assert.deepEqual([...extractResult(table, maxedOut, pair)], ALL_SENTINEL);
   }
+});
+
+test("buildSuitTable: records use a zeroed 16-byte stride", () => {
+  const table = buildSuitTable(HONOR_SUIT_LENGTH, false);
+  assert.equal(SLOTS_PER_VECTOR, 16);
+  assert.equal(table.data.length % SLOTS_PER_VECTOR, 0);
+  for (let base = 0; base < table.data.length; base += SLOTS_PER_VECTOR)
+    assert.equal(table.data[base + 15], 0);
 });
 
 /**

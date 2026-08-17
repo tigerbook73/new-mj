@@ -27,6 +27,10 @@
   意图、拒绝理由和回归场景已记录在 `docs/architecture/shanten.md`。旧代码由 Git 历史承担回溯。
 - `docs-and-names` 最终审计已收敛 public exports、Junk 源码根、evaluation CLI/fixture/test、README、
   架构、backlog 和本计划中的当前语义；历史术语只保留在明确标注的历史取舍中。
+- onboarding 专题（Windows + WSL + VS Code 新成员上手）已完成并入 main：分步指南、非破坏性
+  bootstrap、doctor 脚本、README/doc-map 入口均已就绪；完整 Supabase doctor 仍需在 Docker Desktop
+  WSL Integration 可用的机器上验收。同批带入的 shanten 热路径优化（16-slot stride、two-change batch）
+  已保留，过度展开的 `applyTransition`/四 block 单独展开方案已验证无收益并撤回。
 
 ## 下一步第一个具体动作
 
@@ -35,4 +39,5 @@
 
 ## 阻塞与遗留问题
 
-- 当前没有阻塞；尚未选定的工作统一保留在 `backlog.md`。
+- 完整 Supabase doctor 需要在 Docker Desktop WSL Integration 可用的机器上验收。
+- 尚未选定的工作统一保留在 `backlog.md`。

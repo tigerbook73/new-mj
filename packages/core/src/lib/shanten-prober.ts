@@ -43,7 +43,7 @@ export const createShantenProber = (
   for (const block of blocks) {
     prefix.push(state);
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     const next = new Int16Array(10);
     applyTransition(state, next, block.table.data, base);
     state = next;
@@ -53,7 +53,7 @@ export const createShantenProber = (
   for (let i = blocks.length - 1; i >= 1; i -= 1) {
     const block = blocks[i]!;
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     const out = new Int8Array(SLOTS_PER_VECTOR);
     composeTransitions(block.table.data, base, suffix[i + 1]!, 0, out);
     suffix[i] = out;
@@ -67,7 +67,7 @@ export const createShantenProber = (
     counts[kindIndex] = (counts[kindIndex] ?? 0) + 1;
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
     counts[kindIndex] = (counts[kindIndex] ?? 0) - 1;
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     applyTransition(prefix[blockIndex]!, mid, block.table.data, base);
     applyTransition(mid, fin, suffix[blockIndex + 1]!, 0);
     return finalizeDp(fin, existingMelds);
@@ -92,7 +92,7 @@ export const createTwoChangeShantenProber = (
   for (const block of blocks) {
     basePrefix.push(state);
     const slot = indexMapSlotOfRange(baseCounts, block.start, block.table.suitLength);
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     baseBases.push(base);
     const next = new Int16Array(10);
     applyTransition(state, next, block.table.data, base);
@@ -104,7 +104,7 @@ export const createTwoChangeShantenProber = (
   for (let i = blocks.length - 1; i >= 1; i -= 1) {
     const block = blocks[i]!;
     const slot = indexMapSlotOfRange(baseCounts, block.start, block.table.suitLength);
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     const out = new Int8Array(SLOTS_PER_VECTOR);
     composeTransitions(block.table.data, base, baseSuffix[i + 1]!, 0, out);
     baseSuffix[i] = out;
@@ -136,7 +136,7 @@ export const createTwoChangeShantenProber = (
       prefix.push(state);
       const block = blocks[blockIndex]!;
       const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
-      const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+      const base = block.table.indexMap[slot]! << 4;
       const next = new Int16Array(10);
       applyTransition(state, next, block.table.data, base);
       state = next;
@@ -155,7 +155,7 @@ export const createTwoChangeShantenProber = (
         removeTable.start,
         removeTable.table.suitLength,
       );
-      const removeBase = removeTable.table.indexMap[removeSlot]! * SLOTS_PER_VECTOR;
+      const removeBase = removeTable.table.indexMap[removeSlot]! << 4;
       const afterRemove = new Int8Array(SLOTS_PER_VECTOR);
       composeTransitions(
         removeTable.table.data,
@@ -193,7 +193,7 @@ export const createTwoChangeShantenProber = (
     counts[addKindIndex] = (counts[addKindIndex] ?? 0) + 1;
     const block = blocks[addBlock]!;
     const slot = indexMapSlotOfRange(counts, block.start, block.table.suitLength);
-    const base = block.table.indexMap[slot]! * SLOTS_PER_VECTOR;
+    const base = block.table.indexMap[slot]! << 4;
     if (addBlock >= removeBlock) {
       applyTransition(context.prefix[addBlock]!, first, block.table.data, base);
       applyTransition(first, second, baseSuffix[addBlock + 1]!, 0);
