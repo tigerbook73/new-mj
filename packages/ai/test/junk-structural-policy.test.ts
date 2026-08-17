@@ -8,6 +8,7 @@ import {
   type SeatId,
 } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
+import { JunkBotAgent } from "../src/junk/bot-agent.ts";
 import { recommendJunkAction, recommendStructuralBaselineV1Action } from "../src/junk/strategy.ts";
 
 describe("structural Junk policy against the real core engine", () => {
@@ -16,6 +17,11 @@ describe("structural Junk policy against the real core engine", () => {
     if ("error" in started) throw new Error(started.error.code);
     let state = started.state;
     let prng = createPrng(20260816 ^ 0x9e37_79b9);
+    // One JunkBotAgent per seat, held across the whole hand — the only way to exercise
+    // whatever rolling state the agent accumulates across consecutive decisions, not just a
+    // single isolated call. See packages/ai/AGENTS.md on why this doesn't affect the stateless
+    // facade's own determinism (agents are opt-in, caller-owned, checked here for parity only).
+    const agents = SEAT_IDS.map(() => new JunkBotAgent());
 
     for (let step = 0; step < 500 && state.phase !== "finished"; step += 1) {
       const eligible =
@@ -34,6 +40,8 @@ describe("structural Junk policy against the real core engine", () => {
       expect(action).toBe(baselineAction);
       expect(action).toBeDefined();
       expect(legalActions).toContain(action);
+      const agentAction = agents[seat]!.decide(playerView, legalActions);
+      expect(agentAction).toBe(action);
       const result = junkRuleSet.applyAction(state, seat, action!);
       if ("error" in result) throw new Error(`step ${step}: ${result.error.code}`);
       state = result.state;

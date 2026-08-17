@@ -7,7 +7,11 @@ export * from "./strategy.ts";
 export {
   chooseJunkAction,
   JUNK_STRUCTURAL_BASELINE,
+  JunkBotAgent,
   recommendJunkAction,
   recommendStructuralBaselineV1Action,
+  recommendStructuralBaselineV1ActionWithDiagnostics,
   recommendStructuralJunkAction,
+  type JunkBotAgentSnapshot,
+  type StructuralDecisionDiagnostics,
 } from "./junk/strategy.ts";

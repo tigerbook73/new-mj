@@ -4,7 +4,7 @@
 
 ## package 职责
 
-- 纯策略层：给定 core 的 `PlayerView`/`legalActions`，返回推荐动作；不实现任何规则，不缓存/持有 core state。
+- 纯策略层：给定 core 的 `PlayerView`/`legalActions`，返回推荐动作；不实现任何规则。决策函数本身保持纯函数、不隐式持有跨调用状态；允许提供调用方显式实例化、显式持有生命周期的有状态封装（如 `JunkBotAgent`），但这类封装不能是模块级单例或藏在纯函数内部的隐藏缓存，底层纯函数入口必须始终可以脱离它独立调用并保持确定性。评估/自对弈框架（`src/evaluation/`、arena、policy-loader）只消费纯函数，不依赖、不感知这类封装。
 - 依赖方向单向 `ai → core`；`core` 不得反向依赖本包。
 
 ## 代码约定
@@ -17,6 +17,7 @@
 - Junk 默认生产只使用普通标准型无权重结构 facade；`strategy.ts` 是稳定加载根，只保留最终动作选择并重导结构诊断 API。生产路径不得 import `evaluation/`。
 - 当前生产策略身份由 `JUNK_STRUCTURAL_BASELINE` 固定；有意改变 canonical 行为时新建 baseline 版本及对照资产，不静默改写既有版本。
 - 不保留生产权重、旧加权评分闭包或调权入口；后续演进通过结构 baseline/candidate 比较完成。
+- `junk/bot-agent.ts` 的 `JunkBotAgent` 是生产诊断用的有状态封装（每座位一个实例，由 `apps/server` 创建/持有/清理），内部只调用 `structural-baseline.ts` 的纯函数；新增字段前先确认调用方（server）真的需要，不预先占位。
 
 ## 测试与性能
 

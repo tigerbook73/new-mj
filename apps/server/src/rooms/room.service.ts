@@ -1,6 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { Injectable } from "@nestjs/common";
-import { chooseAction, chooseJunkAction, recommendAction, recommendJunkAction } from "@new-mj/ai";
+import { Injectable, Logger } from "@nestjs/common";
+import {
+  chooseAction,
+  JunkBotAgent,
+  recommendAction,
+  recommendJunkAction,
+} from "@new-mj/ai";
 import {
   eventsVisibleTo,
   type ApplyResult,
@@ -77,6 +82,7 @@ export class RoomService {
    * session finished).
    */
   private readonly playerRooms = new Map<string, string>();
+  private readonly logger = new Logger(RoomService.name);
 
   constructor(
     private readonly gameService: GameService,
@@ -119,6 +125,7 @@ export class RoomService {
       currentGameEvents: [],
       currentGameSeatUserIds: [null, null, null, null],
       finishedGames: [],
+      botAgents: [undefined, undefined, undefined, undefined],
     };
     this.rooms.set(room.id, room);
     this.seatPlayer(room, hostUserId, hostNickname, false, undefined, avatar);
@@ -244,6 +251,7 @@ export class RoomService {
       return;
     }
     room.players[seat] = null;
+    room.botAgents[seat as SeatId] = undefined;
     this.playerRooms.delete(userId);
     this.eventBus.emit("room:playerLeft", { roomId, seat: seat as SeatId });
   }
@@ -389,6 +397,7 @@ export class RoomService {
       throw new RoomServiceError("UNAUTHORIZED", "the host cannot be removed");
     }
     room.players[seat] = null;
+    room.botAgents[seat] = undefined;
     if (!player.isBot) this.playerRooms.delete(player.userId);
     this.eventBus.emit("room:playerLeft", { roomId, seat });
     return { userId: player.userId, isBot: player.isBot };
@@ -510,11 +519,13 @@ export class RoomService {
   /** Schedules at most one server-owned bot/autopilot action for this room. */
   private autoPlayBots(room: Room): void {
     if (room.phase !== "in-game" || this.botActionTimers.has(room.id)) return;
-    if (!this.nextBotAction(room)) return;
+    // Computed once and reused for the zero-delay branch below — nextBotAction now has a
+    // real side effect (JunkBotAgent state + optional diagnostic log), not just a pure
+    // computation, so it must not be called twice for what's conceptually one decision.
+    const next = this.nextBotAction(room);
+    if (!next) return;
     const [minDelayMs, maxDelayMs] = this.configService.botActionDelayRangeMs;
     if (maxDelayMs === 0) {
-      const next = this.nextBotAction(room);
-      if (!next) return;
       this.runAction(room, next.seat, next.action);
       this.autoPlayBots(room);
       return;
@@ -525,10 +536,11 @@ export class RoomService {
       const current = this.rooms.get(room.id);
       if (!current || current.phase !== "in-game") return;
       // Re-read after the wait: a human action, claim timeout, or room close
-      // may have changed control while this timer was pending.
-      const next = this.nextBotAction(current);
-      if (!next) return;
-      this.runAction(current, next.seat, next.action);
+      // may have changed control while this timer was pending — this fresh
+      // call is necessary, not redundant with the guard above.
+      const freshNext = this.nextBotAction(current);
+      if (!freshNext) return;
+      this.runAction(current, freshNext.seat, freshNext.action);
       this.autoPlayBots(current);
     }, delayMs);
     timer.unref();
@@ -549,12 +561,35 @@ export class RoomService {
         const view = this.gameService.getPlayerView(room.gameState, seat as SeatId);
         const action =
           room.rulesetId === "junk" && view && "phase" in view && "dealer" in view
-            ? chooseJunkAction(view as JunkPlayerView, legalActions as JunkAction[])
+            ? this.decideJunkBotAction(room, seat as SeatId, view as JunkPlayerView, legalActions as JunkAction[])
             : chooseAction(legalActions);
         return { seat: seat as SeatId, action };
       }
     }
     return undefined;
+  }
+
+  /**
+   * Routes through a per-seat `JunkBotAgent` (packages/ai/AGENTS.md: explicit, caller-owned
+   * stateful wrapper around the stateless structural baseline). The agent is the standard
+   * production path now, not a toggled side branch — `botDecisionContextEnabled` only gates
+   * whether its diagnostic snapshot gets logged, never the decision itself or which function
+   * computes it. Diagnostic-only: `agent.snapshot` must never reach PlayerView, protocol
+   * messages, or any other client-visible response (apps/server/AGENTS.md).
+   */
+  private decideJunkBotAction(
+    room: Room,
+    seat: SeatId,
+    view: JunkPlayerView,
+    legalActions: JunkAction[],
+  ): JunkAction {
+    const agent = room.botAgents[seat] ?? new JunkBotAgent();
+    room.botAgents[seat] = agent;
+    const action = agent.decide(view, legalActions);
+    if (this.configService.botDecisionContextEnabled && agent.snapshot) {
+      this.logger.debug({ roomId: room.id, seat, ...agent.snapshot });
+    }
+    return action;
   }
 
   /**
@@ -856,6 +891,10 @@ export class RoomService {
     this.clearDrawRevealTimer(room.id);
     room.gameNumber += 1;
     room.seed = this.configService.testGameSeed ?? randomInt(MAX_SEED);
+    // A new hand's visible information set is unrelated to the last one's — an agent's rolling
+    // state has no cross-hand value, same as the decision functions it wraps recomputing
+    // everything fresh each hand.
+    room.botAgents = [undefined, undefined, undefined, undefined];
     if (room.gameNumber === 1) {
       room.dealer = this.gameService.computeInitialDealer(room.config, room.seed);
       room.dealerStreak = 1;

@@ -31,7 +31,10 @@ export {
 export {
   JUNK_STRUCTURAL_BASELINE,
   recommendStructuralBaselineV1Action,
+  recommendStructuralBaselineV1ActionWithDiagnostics,
+  type StructuralDecisionDiagnostics,
 } from "./structural-baseline.ts";
+export { JunkBotAgent, type JunkBotAgentSnapshot } from "./bot-agent.ts";
 
 /** Complete ordinary-standard structural policy facade and production baseline. */
 export const recommendStructuralJunkAction = (

@@ -4,8 +4,10 @@
 
 ## 当前任务
 
-当前没有进行中的专题。Junk AI structural baseline consolidation 已完成；结构算法与旧机制的
-耐久取舍见 `docs/architecture/shanten.md`，未选定候选见 `backlog.md`。
+当前没有进行中的专题。Junk AI structural baseline consolidation 已完成；shanten/ukeire 已从
+`packages/core` 迁移到 `packages/ai/src/junk/shanten/`（唯一消费者一直是 AI，core 自己的三个
+ruleset 从不用它，迁移决定见 `docs/architecture/shanten.md`）；新增 `JunkBotAgent` 生产诊断上下文
+（设计决定见 `packages/ai/AGENTS.md`/`apps/server/AGENTS.md`）。未选定候选见 `backlog.md`。
 
 ## 当前状态
 
@@ -31,6 +33,15 @@
   bootstrap、doctor 脚本、README/doc-map 入口均已就绪；完整 Supabase doctor 仍需在 Docker Desktop
   WSL Integration 可用的机器上验收。同批带入的 shanten 热路径优化（16-slot stride、two-change batch）
   已保留，过度展开的 `applyTransition`/四 block 单独展开方案已验证无收益并撤回。
+- shanten/ukeire（`computeShanten`/`evaluateUkeire`/批量 API 等）已整体迁移到
+  `packages/ai/src/junk/shanten/`，`packages/core` 不再公开导出；纯搬迁无行为变化。
+- `JunkBotAgent`（`packages/ai/src/junk/bot-agent.ts`）是每座位一个的有状态封装，包一层无状态的
+  `recommendStructuralBaselineV1ActionWithDiagnostics`；由 `apps/server` 的 `RoomService`
+  实例化持有（`Room.botAgents`），每手开始重置，只服务 junk ruleset 的 bot/auto-piloted 座位。
+  `ConfigService.botDecisionContextEnabled`（默认关闭）只控制诊断快照是否写进结构化日志，不影响
+  决策本身；快照禁止进入 `PlayerView`/协议/客户端。`packages/ai/AGENTS.md` 的"不缓存/持有 core
+  state"规则已收窄为：决策纯函数本身保持无状态，允许调用方显式实例化、显式管理生命周期的有状态
+  封装。
 
 ## 下一步第一个具体动作
 

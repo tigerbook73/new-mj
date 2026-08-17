@@ -23,6 +23,7 @@
 - 可见性过滤一律用 `@new-mj/core` 导出的 `eventsVisibleTo()`，server 不自行判断规则可见性。
 - 声明超时只通过 `getLegalActions` 中是否存在 `{type:"pass"}` 跨玩法识别；timer/deadline 留在 RoomService，不写进 core state、Room 或 PlayerView。同一窗口不得因部分响应而续期。
 - `game:advice` 是只读查询：座位只取 ConnectionRegistry，RoomService 只把该 seat 的 PlayerView + legalActions 交给 `recommendAction`；不得把 gameState 传进 AI、推进状态、更新 timer 或广播事件。
+- `Room.botAgents`（每座位一个 `@new-mj/ai` 的 `JunkBotAgent` 实例，仅 junk ruleset 的 bot/auto-piloted 座位使用）是生产诊断状态：只能通过 `RoomService` 内部逻辑和 Nest `Logger` 输出访问，禁止进入 `PlayerView`、协议消息、`game:snapshot`/`game:event`、`game:advice` 响应或任何客户端可见通道；`ConfigService.botDecisionContextEnabled` 只控制是否把 `agent.snapshot` 写进日志，不控制决策本身。`beginGame()` 每手重置为全 `undefined`（其滚动状态没有跨手价值）。`game:advice` 不接入这个能力——它服务任意玩家而非"AiBot"，且已限定只读、无副作用。
 
 ## 代码地图
 

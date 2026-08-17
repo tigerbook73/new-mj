@@ -1,4 +1,5 @@
 import type { GameConfig, GameEvent, SeatId } from "@new-mj/core";
+import type { JunkBotAgent } from "@new-mj/ai";
 import type { SessionFormat, SessionResult } from "@new-mj/protocol";
 
 export type RoomPhase = "waiting" | "in-game" | "finished";
@@ -91,4 +92,17 @@ export interface Room {
   currentGameEvents: GameEvent[];
   currentGameSeatUserIds: [string | null, string | null, string | null, string | null];
   finishedGames: FinishedGameLog[];
+  /**
+   * Per-seat AI decision agent (junk only; other rulesets fall back to `chooseAction` and never
+   * populate this). Reset to all-`undefined` on `beginGame()` — an agent's rolling state has no
+   * value across hands, same as the decision functions it wraps recomputing everything from the
+   * current visible information set — and cleared for a seat when its player leaves. Diagnostic
+   * only: never serialized into PlayerView, protocol messages, or any client-visible response.
+   */
+  botAgents: [
+    JunkBotAgent | undefined,
+    JunkBotAgent | undefined,
+    JunkBotAgent | undefined,
+    JunkBotAgent | undefined,
+  ];
 }

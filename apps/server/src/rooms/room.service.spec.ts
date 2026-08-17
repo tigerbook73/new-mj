@@ -1,10 +1,11 @@
+import { Logger } from "@nestjs/common";
 import {
   computeInitialDealer,
   computeNextDealer,
   playHangzhouGame,
   playJunkGame,
 } from "@new-mj/core";
-import type { HangzhouGameResult } from "@new-mj/core";
+import type { HangzhouGameResult, SeatId } from "@new-mj/core";
 import { ConfigService } from "../config/config.service";
 import { GameService } from "../core/game.service";
 // GameService is used directly (not via RoomService) so the acceptance test
@@ -52,6 +53,7 @@ const makeRoom = (overrides: Partial<Room> = {}): Room => ({
   currentGameEvents: [],
   currentGameSeatUserIds: [null, null, null, null],
   finishedGames: [],
+  botAgents: [undefined, undefined, undefined, undefined],
   ...overrides,
 });
 
@@ -882,6 +884,110 @@ describe("RoomService — bot auto-play (phase 4 acceptance criterion)", () => {
 
     expect(room.phase).toBe("finished");
     expect(room.result?.gamesPlayed).toBe(4);
+  });
+});
+
+describe("RoomService — JunkBotAgent decision context", () => {
+  // start()/nextRound() only auto-play bot seats — if seat 0 (the host) goes
+  // first, no bot has decided anything yet. Drive seat-0 actions (its own
+  // trailing autoPlayBots call keeps advancing every bot turn in between)
+  // until some bot seat has a recorded agent, same driving pattern as the
+  // "single human plus 3 bots" acceptance test above.
+  const setupThreeBotRoom = (config = new ConfigService()) => {
+    const gameService = new GameService();
+    const service = new RoomService(gameService, new EventBus(), fakePersistenceService(), config);
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+    let steps = 0;
+    while (
+      room.phase === "in-game" &&
+      room.botAgents.every((agent) => agent === undefined) &&
+      steps < 500
+    ) {
+      steps += 1;
+      const legalActions = gameService.getLegalActions(room.gameState, 0);
+      if (legalActions.length === 0) break;
+      service.applyPlayerAction(room.id, 0, legalActions[0]);
+    }
+    return { service, room };
+  };
+
+  it("records a snapshot for a bot seat after it decides, and leaves the chosen action untouched by the toggle", () => {
+    // Same fixed seed on both configs so the two rooms deal identically —
+    // isolates "does the toggle change the decision" from "different rooms
+    // get different random walls".
+    const configOff = new ConfigService();
+    Object.defineProperty(configOff, "testGameSeed", { value: 20260817 });
+    const off = setupThreeBotRoom(configOff);
+
+    const configOn = new ConfigService();
+    Object.defineProperty(configOn, "testGameSeed", { value: 20260817 });
+    Object.defineProperty(configOn, "botDecisionContextEnabled", { value: true });
+    const debugSpy = jest.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined);
+    const on = setupThreeBotRoom(configOn);
+    debugSpy.mockRestore();
+
+    const botSeat = off.room.botAgents.findIndex((agent) => agent !== undefined) as SeatId;
+    expect(botSeat).toBeGreaterThanOrEqual(0);
+    const agentOff = off.room.botAgents[botSeat];
+    const agentOn = on.room.botAgents[botSeat];
+    expect(agentOff?.snapshot).toMatchObject({
+      strategyId: "structural-baseline",
+      strategyVersion: 1,
+    });
+    // The toggle must only affect whether the snapshot gets logged, never
+    // the decision itself.
+    expect(agentOn?.snapshot?.lastAction).toEqual(agentOff?.snapshot?.lastAction);
+  });
+
+  it("logs the snapshot only when botDecisionContextEnabled is on", () => {
+    const configOff = new ConfigService();
+    const debugOff = jest.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined);
+    setupThreeBotRoom(configOff);
+    expect(debugOff).not.toHaveBeenCalled();
+    debugOff.mockRestore();
+
+    const configOn = new ConfigService();
+    Object.defineProperty(configOn, "botDecisionContextEnabled", { value: true });
+    const debugOn = jest.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined);
+    const { room } = setupThreeBotRoom(configOn);
+    expect(debugOn).toHaveBeenCalled();
+    const botSeat = room.botAgents.findIndex((agent) => agent !== undefined);
+    expect(debugOn.mock.calls.some(([entry]) => (entry as { seat: number }).seat === botSeat)).toBe(
+      true,
+    );
+    debugOn.mockRestore();
+  });
+
+  it("resets every seat's agent at the start of the next hand", () => {
+    const service = newRoomService();
+    const gameService = new GameService();
+    const room = service.create("host", "Host", "junk", { rulesetId: "junk" });
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.addBot(room.id, "host");
+    service.ready(room.id, "host", true);
+    service.start(room.id);
+
+    let steps = 0;
+    while (room.phase === "in-game" && !room.awaitingNextRound && steps < 500) {
+      steps += 1;
+      const legalActions = gameService.getLegalActions(room.gameState, 0);
+      if (legalActions.length === 0) break;
+      service.applyPlayerAction(room.id, 0, legalActions[0]);
+    }
+    expect(room.awaitingNextRound).toBe(true);
+    const botSeat = room.players.findIndex((player) => player?.isBot) as SeatId;
+    const agentAfterRound1 = room.botAgents[botSeat];
+    expect(agentAfterRound1).toBeDefined();
+
+    service.ready(room.id, "host", true);
+
+    expect(room.botAgents[botSeat]).not.toBe(agentAfterRound1);
   });
 });
 

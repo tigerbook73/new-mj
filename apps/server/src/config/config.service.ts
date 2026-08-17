@@ -33,6 +33,16 @@ export class ConfigService {
   }
 
   /**
+   * Gates structured `JunkBotAgent` decision-diagnostic logging (strategy version, candidate
+   * counts, timing — see room.service.ts's `nextBotAction`). Defaults off; unlike
+   * `allowDebugOmniscient` this is ops-facing diagnostic logging, not an omniscient-view leak, so
+   * it's allowed in production too.
+   */
+  get botDecisionContextEnabled(): boolean {
+    return process.env["BOT_DECISION_CONTEXT_ENABLED"] === "true";
+  }
+
+  /**
    * Phase 5 real Supabase Auth. Deliberately `undefined` (not a dev-only
    * fallback like jwtSecret above) when unset — auth.middleware.ts uses
    * their presence, not a separate flag, to decide whether to verify
