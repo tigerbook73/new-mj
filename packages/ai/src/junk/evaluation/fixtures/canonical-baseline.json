@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "canonical-baseline",
+  "version": 1,
+  "purpose": "canonical-baseline",
+  "description": "固定普通牌型输入，用于记录当前生产 Junk AI 的可重复决策基线。",
+  "scenarios": [
+    {
+      "id": "discard-001",
+      "version": 1,
+      "source": {
+        "kind": "fixture",
+        "fixtureId": "hand-shape-001"
+      },
+      "description": "含连续搭子、孤张和字牌的 14 张普通手牌弃牌选择。",
+      "tags": ["standard-only", "discard-selection", "hand-shape"]
+    },
+    {
+      "id": "discard-snapshot-001",
+      "version": 1,
+      "source": {
+        "kind": "snapshot",
+        "snapshotId": "midgame-shape-001"
+      },
+      "description": "带公开牌河、副露和摸牌上下文的中盘生产决策快照。",
+      "tags": ["standard-only", "discard-selection", "snapshot", "midgame"]
+    },
+    {
+      "id": "claim-chi-breaks-tenpai-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-chi-breaks-tenpai-001" },
+      "description": "吃牌会破坏已有听牌结构，结构策略应 pass。",
+      "tags": ["standard-only", "claim-selection", "chi", "pass"]
+    },
+    {
+      "id": "claim-peng-reaches-tenpai-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-peng-reaches-tenpai-001" },
+      "description": "碰牌并选择最佳弃牌后进入听牌，结构策略应 peng。",
+      "tags": ["standard-only", "claim-selection", "peng"]
+    },
+    {
+      "id": "claim-chi-tied-pass-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-chi-tied-pass-001" },
+      "description": "吃牌后的最佳结构与 pass 打平，结构策略应 pass。",
+      "tags": ["standard-only", "claim-selection", "chi", "pass", "existing-meld"]
+    },
+    {
+      "id": "claim-mingang-replacement-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-mingang-replacement-001" },
+      "description": "明杠补牌存在立即完成质量，结构策略应 minGang。",
+      "tags": ["standard-only", "claim-selection", "minGang", "replacement-draw"]
+    },
+    {
+      "id": "self-gang-equivalence-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "self-gang-equivalence-001" },
+      "description": "暗杠和补杠均与各自等价弃牌结构打平，纯结构策略应 discard。",
+      "tags": ["standard-only", "self-turn", "anGang", "buGang", "discard"]
+    }
+  ]
+}

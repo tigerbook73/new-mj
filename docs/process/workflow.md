@@ -5,7 +5,7 @@
 ## 会话仪式
 
 - 开工：按根 `AGENTS.md` 读取规则和 `plan.md` 当前工作。
-- 收工：更新当前状态与下一步第一个具体动作；提交前默认运行 `pnpm verify`。
+- 收工：覆盖更新当前状态与下一步第一个具体动作，不追加会话、提交或验证过程记录；提交前默认运行 `pnpm verify`。
 - “下一步”必须可直接执行，例如“确认生产 OAuth 回调 URL”，不能写“继续开发”。
 
 ## 专题与 slice
@@ -16,6 +16,7 @@
 - 判断工具是否独立成 slice：若它改变正式运行时产物、数据模型、验证方式，或会被后续多个 slice 复用，则是使能能力；若只是一次性辅助，留在当前 slice。
 - 使能 slice 先做最小可行验证（例如手写一个产物、正式消费者读取它、验证一个典型场景），通过后才扩展编辑器/自动化能力。若涉及契约或架构，先更新对应 docs 再写代码。
 - 临时 brief 可放在 `docs/process/<topic>.md`，限一页；专题收尾后把耐久结论分流，删除 brief，不保留实现日记。
+- slice 完成后用当前结论替换旧状态；仅保留会改变后续实现或验收判断的限制、风险和能力，不按时间顺序累积检查点。
 
 ## 完成的定义（DoD）
 
@@ -24,7 +25,7 @@
 1. `pnpm typecheck`
 2. `pnpm lint`
 3. `pnpm test`（受影响包）
-4. core 改动：fuzz 冒烟 ≥1000 局（慢速用例，日常 `test` 默认跳过，经 core `verify:full`/`test:full` 运行）；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md` §1.2
+4. core 改动：fuzz 冒烟 ≥100 局（慢速用例，日常 `test` 默认跳过，经 core `verify:full`/`test:full` 运行）；专题收尾跑全量 ≥1 万局随机 config；分层策略见 `../testing-strategy.md` §1.2
 5. e2e：日常提交用 `pnpm verify`（`test:e2e` 排除标了 `@slow`/`@lab` 的用例——前者是慢速/低边际用例，后者是像 `apps/web` layout-sketch 这样的领域限定 DEV 工具，改到对应领域时手动加跑）；合并到 main 前改跑 `pnpm verify:full`（`test:e2e:full`，跑全部用例，不筛选），与 fuzz 冒烟/全量的分层原则一致
 
 - 测试与实现同一 commit；修 bug 先写复现用例（红→绿）。

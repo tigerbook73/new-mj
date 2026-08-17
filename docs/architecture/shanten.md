@@ -7,7 +7,7 @@
 ## 分层（单向依赖，自下而上）
 
 ```
-Layer 3  玩法专属 AI 评分     packages/ai/src/<ruleset>/（如 junk 的 JunkWeights/fanPotential）
+Layer 3  玩法专属 AI 策略     packages/ai/src/<ruleset>/（如 Junk structural baseline）
    ↑ 消费
 Layer 2  财神/通配符装饰层    设计上预留，未实现（见下）
    ↑ 消费
@@ -72,7 +72,7 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
 3. **公开 prober/可变闭包**：直接导出 `createTwoChangeShantenProber`。性能接口简单，
    但会把当前 DP scratch、调用顺序和实现细节变成公共契约，拒绝作为首选。
 4. **新增高层 2-ply API**：由 core 返回概率加权的最佳下一次弃牌。拒绝；概率池、
-   清一色/七对子路线和 `JunkWeights` 属于 AI，不应进入玩法无关 core。
+   清一色/七对子路线和策略选择属于 AI，不应进入玩法无关 core。
 
 ### 已确认边界与当前状态
 
@@ -84,5 +84,123 @@ kind 索引、加入牌 kind 索引、`ShantenOptions`、`TileSet` 和 `existing
 摸牌后的进张列表，继续组合现有 `evaluateUkeireBatch`。矩阵大小由调用方传入的两个
 kind 列表控制，不在 core 内隐式扩展到所有 34 种牌。
 
-下一步只在 AI 诊断路径评估是否消费该 API；在 A/B/profile 证明有收益前，不改默认 AI
-策略，也不把概率或 JunkWeights 下沉到 core。
+AI 结构策略已经消费该 API；概率聚合和最终动作选择仍留在 AI，不下沉到 core。
+
+## Junk 纯结构策略分层
+
+新的 Junk 策略从弃牌决策开始独立建立，不在旧加权公式上继续调参：
+
+- `structural full 2-ply` 是离线 teacher，允许搜索全部合法首弃，用于测量近似误差；
+- `structural bounded 2-ply` 是运行时候选，先删除同向听层被进张种类/张数严格支配的
+  首弃，再以固定结构顺序保留至多 5 个；预算按候选数确定，不依赖机器速度；该上限由固定
+  开发/留出样本与 full teacher 的截断差异确定，不随单局动态扩张；
+- 第二层叶子依次比较普通牌型向听、存活进张种类、存活进张张数；首层依次比较立即完成
+  质量、条件期望最佳向听、条件期望进张结构及一层结构，最后以牌种和 `TileId` 稳定破同；
+- 所有比较均为确定性字典序，不提供统一可调权重。可见剩余张数消费手牌、公开牌河和副露，
+  按 `TileId` 去重，是信息集估计而非真实牌墙概率。
+- 概率加权聚合产生的浮点结果在比较时使用固定 `1e-12` 容差，仅消除不同累加路径的舍入噪声；
+  它不是质量权重，容差内继续比较下一项结构指标。
+
+该 bounded 路径是 Junk 普通标准型生产弃牌基线，也是当前树唯一生产实现。旧加权策略已由
+Git 历史承担回溯；番型、七对和防守必须在后续独立 slice 中用 fixture/A-B 证据逐项加入，
+不能借此边界隐式改变。
+
+### Claim/pass 的结构比较
+
+chi/peng 与 pass 不能直接比较动作发生瞬间的手牌张数：pass 比较当前 13 张保留结构；
+chi/peng 必须先模拟副露、枚举随后的合法弃牌，再取最佳普通牌型结构。两边依次比较向听、
+存活进张种类和存活进张张数，claim 只有严格更好才成立，完全打平时 pass。该规则替代的是
+固定 claim hurdle，不引入新的连续权重。
+
+minGang 会进入补牌而非立即弃牌：结构候选先移除三张同 kind 手牌并增加一个副露，再按
+可见信息集的剩余副本枚举至多 34 种补牌；补牌后立即完成的质量优先，其余分支枚举所有不同
+kind 弃牌并聚合条件期望最佳向听、进张种类和张数。pass 以零立即完成质量和当前保留结构
+参与同一确定性字典序，minGang 只有严格更好才成立，打平或无可枚举补牌时 pass。搜索预算
+固定为至多 34 个补牌 kind × 每分支至多 11 个弃牌 kind，不按墙钟时间截断。
+
+该补牌质量仍是可见剩余副本的信息集估计，不读取真实杠尾或对手暗手，也不等同真实胡牌概率
+或终局 EV。胡牌动作始终优先。该 claim 路径已由统一结构 facade 接入生产默认。
+
+### 自回合 gang 的结构比较
+
+anGang 从暗手移除同 kind 四张并新增一个副露；buGang 从暗手移除 action tile 并升级本人既有
+同 kind peng，副露数不变。两者随后复用 minGang 的可见剩余补牌搜索。自回合基线不是 pass，
+而是 bounded structural discard 选出的最佳直接弃牌；gang 还必须对比其等价弃牌（anGang 打掉
+四张中的一张、buGang 打掉 action tile），避免 shortlist 截断产生虚假优势。各方使用相同的
+立即完成质量、条件期望最佳向听、进张种类和张数字典序。gang 必须同时严格更好，打平时
+直接弃牌，zimo 始终优先。不计番型、抢杠和行动时机时，buGang 与已锁定 peng 的等价弃牌
+结构相同；anGang 因锁死原本仍可拆分的暗刻，可能与等价弃牌相同或更差。这个影子策略不会
+为“杠”本身凭空增加奖励。
+
+gang 补牌预算固定为至多 34 个 draw kind × 每分支至多 11 个 discard kind，直接弃牌仍使用
+最多 5 个首弃预算。该路径已由统一结构 facade 接入生产默认，不消费 legacy 权重。
+
+### 七对结构路线
+
+Core 的 `sevenPairs: true` 是 standard/seven-pairs 取最小值的合并开关，不保留路线身份。AI
+若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手允许
+seven-pairs。路线按上述三项固定字典序选择，完全打平时 standard，不使用 `qiduiPotential`
+或其他连续权重。当前仅建立独立路线模型，尚未接入 bounded 2-ply 或生产入口。
+
+## Junk legacy 搜索机制的可复用边界
+
+旧 weighted 路径中的机制不能因为“将来可能有用”而整段保留。下面固定可重建的设计意图和
+验收边界；旧载体可删除，未来 candidate 需要时根据这些契约重新实现，并与进入 slice 前的
+`structural-baseline@1` 比较。
+
+### Dynamic shortlist 与 cliff
+
+旧实现先用加权一层分数和清/混一色加成排序首弃，再按全体分数跨度归一化相邻 gap：upper
+cliff 至少保留 2、至多保留 4 个首弃；lower cliff 至少保留 1 个第二弃牌 kind，遇到从尾部
+计算的 gap 时截断，否则可能保留全部。它的意图是“便宜排序缩小昂贵搜索”，但不可复用其
+实现：候选身份依赖 `JunkWeights`，相对 gap 会随无关分数项和极值变化，阈值附近不连续，
+分数全等时又退化到最大范围。
+
+保留的中性契约是：先计算便宜且可解释的结构事实；只删除被明确支配的候选；其余候选用稳定
+字典序排列并施加固定数量上限；用同一输入的 full teacher 记录一致率、所有差异 seed 和 P95
+比值。当前 structural bounded 2-ply 的“支配过滤 + 最多 5 个首弃”已经实现该契约，因此旧
+cliff 不迁移为公共工具。可重建场景包括 canonical `discard-001`、`discard-snapshot-001`，以及
+截断边界 seed `1077643932`、`1351392336`、`537634752`、teacher 差异 seed `3520660970`。
+
+### Claim hurdle
+
+旧 chi/peng hurdle 从 claim 后最佳加权分数中减去固定常数，表达“副露不能只因微小分差成立”。
+该目标已经由结构 claim 的严格比较取代：先模拟 claim 与下一弃牌，再按向听、存活进张种类和
+张数比较 pass；完全相同则 pass。固定数值 hurdle 与分数量纲绑定，不提取。未来若需要风险
+缓冲，必须定义为离散结构 margin（例如至少降低一向听），作为独立 candidate 由
+`claim-chi-breaks-tenpai-001`、`claim-peng-reaches-tenpai-001` 和
+`claim-chi-tied-pass-001` 验证，不能恢复连续权重扣分。
+
+### 预算与提前停止
+
+生产决策预算只能由候选数、分支数或迭代数决定，不得按墙钟时间截断；相同输入在不同机器上
+必须得到同一动作。当前弃牌最多搜索 5 个首弃，gang continuation 最多搜索 34 个 draw kind ×
+11 个 discard kind。旧 cliff 的动态宽度不保留；权重 optimizer 的 sigma/stagnation 提前停止
+只属于离线调参流程，也不迁入策略搜索。未来增加 ply 时必须同时提供固定 hard cap、完成/截断
+标记、full 或更宽 teacher 差异，以及独立 P95 证据。
+
+### Analysis LRU
+
+旧 `analysis.ts` 的 key 是“副露数 / 是否允许七对 / 34 种暗手计数”，有意不含牌河、公开副露
+或 wallCount，因为缓存值仅是 `evaluateUkeire` 的暗手结构事实。缓存容量默认为 32，每个座位
+跨决策复用、每手开始清空；实时分数和存活张数不得缓存。删除前的消费者全部位于 legacy
+`hand-quality → two-ply → action-scoring` 及其诊断路径；structural production 使用 core 批量
+API，因此当前树不保留该缓存。
+
+Node `v24.18.0`、canonical `discard-001` 的只读重复 benchmark（预热后每轮 50 次，共 3 轮）中，
+共享 32 项 LRU 每轮均为 `7,189 hits / 60,211 misses`；shared/fresh 耗时分别为
+`1352.3/1323.4ms`、`1337.0/1324.2ms`、`1286.8/1303.7ms`，没有稳定收益且呈明显容量抖动。
+因此未迁为 structural 能力，已随 legacy 删除。若未来 profile 再次定位到相同 shape 重算，应在
+实际消费者旁建立局部 cache，以完整语义 key、明确生命周期、容量和命中 benchmark 重新验收。
+
+### 有限总体抽样
+
+已删除的 `probabilityAtLeastOneDraw` 计算有限总体无放回抽样“至少命中一次”；其唯一消费者是旧
+`handQuality`，它先把可见进张按 wall 在未知池中的份额折算成可能为非整数的 `wallShare`，再
+估算本人剩余摸牌次数。这个总体既不是真实牌墙，也不是条件终局模型。structural 路径只在
+“下一次未知摸牌”分支上按可见剩余副本聚合，不调用该函数。
+
+因此数学公式及“总体、成功数、抽取次数必须同属一个明确定义的信息集”的约束保留在本文，
+函数本身未迁为中性工具，已随 legacy 删除。未来若引入多次摸牌概率，必须先定义谁能摸、未知池
+包含哪些容器、公开信息如何去重、是否条件于对手行动，并用枚举小总体和实战边界 fixture
+验证；不得直接复用旧 `wallShare` 近似并称为胡牌概率或 EV。

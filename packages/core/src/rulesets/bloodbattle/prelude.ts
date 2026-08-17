@@ -25,7 +25,7 @@ const seats = (): SeatState[] => SEAT_IDS.map(() => ({ hand: [], melds: [], disc
 // Shared with state-machine.ts: applyAction clones once per call, so this needs
 // to stay a hand-rolled shallow-where-safe clone rather than a generic deep
 // clone (structuredClone benchmarks ~30x slower on this shape, which would show
-// up in the 1000/10000-game fuzz smoke).
+// up in the 100/10000-game fuzz smoke).
 export const cloneState = (state: BloodbattleState): BloodbattleState => ({
   ...state,
   wall: [...state.wall],

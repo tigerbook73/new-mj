@@ -1,0 +1,87 @@
+{
+  "view": {
+    "seat": 0,
+    "hand": [
+      { "kind": "2m", "copy": 0 },
+      { "kind": "3m", "copy": 0 },
+      { "kind": "4m", "copy": 0 },
+      { "kind": "6m", "copy": 0 },
+      { "kind": "7m", "copy": 0 },
+      { "kind": "2p", "copy": 0 },
+      { "kind": "3p", "copy": 0 },
+      { "kind": "4p", "copy": 0 },
+      { "kind": "6p", "copy": 0 },
+      { "kind": "7p", "copy": 0 },
+      { "kind": "8p", "copy": 0 },
+      { "kind": "3s", "copy": 0 },
+      { "kind": "4s", "copy": 0 },
+      { "kind": "1z", "copy": 0 }
+    ],
+    "wallCount": 43,
+    "currentSeat": 0,
+    "dealer": 2,
+    "phase": "playing",
+    "seats": [
+      {
+        "handCount": 14,
+        "melds": [],
+        "discards": [
+          { "tile": { "kind": "9m", "copy": 0 } },
+          { "tile": { "kind": "9s", "copy": 0 } }
+        ],
+        "justDrawn": true
+      },
+      {
+        "handCount": 13,
+        "melds": [],
+        "discards": [
+          { "tile": { "kind": "1m", "copy": 0 } },
+          { "tile": { "kind": "1z", "copy": 1 } }
+        ],
+        "justDrawn": false
+      },
+      {
+        "handCount": 10,
+        "melds": [
+          {
+            "type": "peng",
+            "tiles": [
+              { "kind": "5s", "copy": 0 },
+              { "kind": "5s", "copy": 1 },
+              { "kind": "5s", "copy": 2 }
+            ],
+            "from": 3
+          }
+        ],
+        "discards": [{ "tile": { "kind": "9p", "copy": 0 } }],
+        "justDrawn": false
+      },
+      {
+        "handCount": 13,
+        "melds": [],
+        "discards": [
+          { "tile": { "kind": "1s", "copy": 0 } },
+          { "tile": { "kind": "2z", "copy": 0 } }
+        ],
+        "justDrawn": false
+      }
+    ],
+    "justDrawn": { "kind": "1z", "copy": 0 }
+  },
+  "legalActions": [
+    { "type": "discard", "tile": { "kind": "2m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "3m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "4m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "6m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "7m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "2p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "3p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "4p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "6p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "7p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "8p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "3s", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "4s", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "1z", "copy": 0 } }
+  ]
+}

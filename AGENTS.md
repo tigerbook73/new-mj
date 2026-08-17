@@ -6,7 +6,7 @@
 ## 会话仪式
 
 - 开工：读 docs/process/plan.md 状态区
-- 收工：把进度与"下一步第一个具体动作"写回 docs/process/plan.md 并 commit
+- 收工：覆盖更新 docs/process/plan.md 的当前状态与"下一步第一个具体动作"并 commit；不追加会话、提交或验证过程记录
 
 ## Ground Truth（冲突以 docs 为准）
 
@@ -26,7 +26,7 @@
 
 ## DoD（细则见 workflow.md）
 
-默认执行 `pnpm verify` 并全绿，提交时**贴出运行结果**；core 改动加 fuzz 冒烟（≥1000 局，标记为慢速用例、经 core `verify:full` 运行，见 `docs/testing-strategy.md` §1.2）。测试与实现同 commit；修 bug 先写复现用例。测试文件位置（全 package 统一）：单元测试贴近实现放 `src/`；集成/契约/fuzz/e2e 等跨模块测试放独立 `test/`；具体后缀/框架差异见各目录 `AGENTS.md`，细则见 `docs/testing-strategy.md`。依赖维护细则见 `workflow.md`「依赖维护」节，不在此复述。
+默认执行 `pnpm verify` 并全绿，提交时**贴出运行结果**；core 改动加 fuzz 冒烟（≥100 局，标记为慢速用例、经 core `verify:full` 运行，见 `docs/testing-strategy.md` §1.2）。测试与实现同 commit；修 bug 先写复现用例。测试文件位置（全 package 统一）：单元测试贴近实现放 `src/`；集成/契约/fuzz/e2e 等跨模块测试放独立 `test/`；具体后缀/框架差异见各目录 `AGENTS.md`，细则见 `docs/testing-strategy.md`。依赖维护细则见 `workflow.md`「依赖维护」节，不在此复述。
 
 ## 护栏
 
