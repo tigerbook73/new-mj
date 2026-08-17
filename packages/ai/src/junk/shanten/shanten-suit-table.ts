@@ -30,8 +30,7 @@
  * 约 0.8µs；表是进程内懒加载单例（原因见 `getNumberSuitTable`）。
  */
 
-import type { TileId } from "./ids.ts";
-import type { TileSet } from "./tiles.ts";
+import type { TileId, TileSet } from "@new-mj/core";
 
 export const NUMBER_SUIT_LENGTH = 9;
 export const HONOR_SUIT_LENGTH = 7;

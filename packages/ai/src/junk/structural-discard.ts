@@ -1,15 +1,17 @@
 import {
   STANDARD_TILE_SET,
-  computeShanten,
-  evaluateUkeire,
-  evaluateUkeireAfterDiscards,
   tileIdOf,
   type JunkAction,
   type JunkPlayerView,
   type TileId,
   type TileKind,
-  type UkeireEvaluation,
 } from "@new-mj/core";
+import {
+  computeShanten,
+  evaluateUkeire,
+  evaluateUkeireAfterDiscards,
+  type UkeireEvaluation,
+} from "./shanten/index.ts";
 
 export type StructuralShape = Readonly<{
   standardShanten: number;
@@ -305,7 +307,9 @@ export const evaluateStructuralDiscard = (
   // share the same batch entry.
   const firstDiscardKindIndexes = [
     ...new Set(
-      discards.map((action) => STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile))),
+      discards.map((action) =>
+        STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
+      ),
     ),
   ];
   const firstDiscardBatch = evaluateUkeireAfterDiscards(

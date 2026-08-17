@@ -1,21 +1,28 @@
 # Shanten 计算架构
 
 > 向听/ukeire 计算的分层设计与长期取舍。算法推导、不变量与存储布局细节在
-> `packages/core/src/lib/shanten-suit-table.ts` 顶部注释；性能演进过程见
-> git history（`perf(core):` 系列 commit），本文件不记录历史数字。
+> `packages/ai/src/junk/shanten/shanten-suit-table.ts` 顶部注释；性能演进过程见
+> git history（`perf(core):`/`perf(ai):` 系列 commit），本文件不记录历史数字。
+>
+> 这套计算最初建在 `packages/core`，2026 迁移到 `packages/ai/src/junk/shanten/`：
+> 它是"手牌离胡牌还有多远"的启发式评估，不是规则合法性判断——core 自己的三个
+> ruleset（junk/hangzhou/血战到底）各自有独立的听牌/胡牌实现，从不引用这套计算；
+> 唯一消费者一直是 AI。迁移前它是 core 的公共导出，AI 每次需要新的批量接口形状
+> 都要先在 core 里过一轮"公共契约"设计（见下"2-ply 批量结构 API"一节的历史记录）；
+> 迁移后这些都是包内实现细节。
 
-## 分层（单向依赖，自下而上）
+## 分层（单向依赖，自下而上，均在 `packages/ai/src/junk/shanten/` 内）
 
 ```
-Layer 3  玩法专属 AI 策略     packages/ai/src/<ruleset>/（如 Junk structural baseline）
+Layer 3  Junk structural baseline   packages/ai/src/junk/（消费 Layer 1 的策略代码）
    ↑ 消费
 Layer 2  财神/通配符装饰层    设计上预留，未实现（见下）
    ↑ 消费
-Layer 1  标准形状算法         packages/core/src/lib/shanten.ts（standardShanten /
-                              sevenPairsShanten / ukeire / isTingpai /
-                              shantenWithExposedMelds / computeShanten，纯数学，玩法无关）
+Layer 1  标准形状算法         shanten.ts（standardShanten / sevenPairsShanten /
+                              ukeire / isTingpai / shantenWithExposedMelds /
+                              computeShanten，纯数学，玩法无关）
    ↑ 消费
-Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts（纯数学，玩法无关）
+Layer 0  单花色预计算表       shanten-suit-table.ts（纯数学，玩法无关）
 ```
 
 - Layer 1 仅在 `tileSet === STANDARD_TILE_SET`（引用相等）时走 Layer 0 查表
@@ -23,14 +30,16 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
 - 当前量级：数牌表（m/p/s 共用）建表约 280ms、总内存约 1.9MB，字牌表约
   20ms、约 78KB；单次整手查询约 0.8µs，`ukeire`（约 34 种候选批量试探，
   经 `createShantenProber` 的前缀/后缀 DP 分解）约 14µs。
+- 这套模块现在是 `packages/ai` 内部实现，不是任何跨包公共契约；对外只通过
+  `junk/shanten/index.ts` 重导出的公共函数消费，`shanten-suit-table.ts`/
+  `shanten-prober.ts` 不进这个 barrel。
 
 ## 长期决策
 
-1. **懒加载内存单例，不落盘**。放弃"离线生成 + 持久化二进制"：core 禁止
-   I/O（`packages/core/AGENTS.md`），且落盘需要解决 schema 自解释/版本失效
-   一整套问题；不在模块 import 时建表是因为 Vitest 按测试文件隔离模块注册
-   表，import 时建会让用不到 shanten 的测试文件各自付一次成本。多线程建表
-   按需再加，目前不值得这层复杂度。
+1. **懒加载内存单例，不落盘**。放弃"离线生成 + 持久化二进制"：落盘需要解决
+   schema 自解释/版本失效一整套问题；不在模块 import 时建表是因为 Vitest 按
+   测试文件隔离模块注册表，import 时建会让用不到 shanten 的测试文件各自付
+   一次成本。多线程建表按需再加，目前不值得这层复杂度。
 2. **表结构按增量扩展设计，不预先猜字段**。基础距离表是唯一稳定、所有消费
    方共用的核心产物；若某玩法需要结构信息（刻子/顺子数目、是否用了对子等，
    建表搜索的天然副产品），加一个**共用同一套下标方案的并行数组**，不合并
@@ -43,26 +52,30 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
 
 ## 未来方向（非承诺）
 
-- hangzhou/血战到底重做时迁移到 Layer 1（hangzhou 财神走 Layer 2）：两者
-  目前是各自独立的布尔回溯实现（只回答"能不能胡/是否听牌"，不产出向听
-  数字），迁移属于对应玩法重做阶段的决定。
+- hangzhou/血战到底 AI 若未来需要这套计算，是 `packages/ai` 包内提升（挪出
+  `junk/` 子目录、原地推广给多个 ruleset），不是跨包迁移；hangzhou/血战到底
+  core 侧目前是各自独立的布尔回溯实现（只回答"能不能胡/是否听牌"，不产出
+  向听数字），这与本模块的迁移无关。
 - Layer 3 的远期方向是概率/期望值驱动评分（Monte Carlo rollout 等），
   Layer 0 的结构化并行数组是为此留的扩展点。
 
 ## 2-ply 批量结构 API
 
-当前 core 已有两层批量能力：`evaluateUkeireBatch` 可批量分析多组完整手牌，
+当前已有两层批量能力：`evaluateUkeireBatch` 可批量分析多组完整手牌，
 `evaluateUkeireAfterDiscards` 可对同一组手牌批量计算“先弃一种牌后”的向听与进张；
 内部 `createTwoChangeShantenProber` 还可复用一次删牌/加牌的花色 DP。AI 的 2-ply
 目前在这些 API 之上自行枚举摸牌、概率和下一次弃牌。
 
-因此候选不是把 AI 评分搬进 core，而是评估是否需要公开一个更贴近“删一张、再加一张”
-的结构批量接口。
+因此候选不是把 AI 评分搬进玩法无关层，而是评估是否需要公开一个更贴近“删一张、
+再加一张”的结构批量接口。
 
 ### 备选形状
 
+以下分析形成于模块仍是 core 公共导出、AI 需要跨包调用的阶段，保留作为接口
+形状为什么长这样的历史记录：
+
 1. **保持现有接口，不新增 API**：AI 继续组合现有两个批量函数。优点是契约稳定；
-   缺点是 AI 不能直接复用 core 内部的双变化 prober，但当前动态第二轮方案已达到
+   缺点是 AI 不能直接复用内部的双变化 prober，但当时的动态第二轮方案已达到
    约 24.33ms/case，尚未证明接口缺口造成了实际瓶颈。
 2. **新增纯结构矩阵 API**：输入一组 13/14 张手牌、可弃牌 kind 和可加入 kind，
    返回每个 `(discardKind, addKind)` 的 `shanten`；不包含概率、进张列表、番型权重、
@@ -70,21 +83,28 @@ Layer 0  单花色预计算表       packages/core/src/lib/shanten-suit-table.ts
    的进张列表仍由现有 `evaluateUkeireBatch` 处理，避免把第三次变化错误地算成免费副产品。
    结果矩阵规模约为候选数 × 34，调用方还要处理去重、非法牌和副露语义。
 3. **公开 prober/可变闭包**：直接导出 `createTwoChangeShantenProber`。性能接口简单，
-   但会把当前 DP scratch、调用顺序和实现细节变成公共契约，拒绝作为首选。
-4. **新增高层 2-ply API**：由 core 返回概率加权的最佳下一次弃牌。拒绝；概率池、
-   清一色/七对子路线和策略选择属于 AI，不应进入玩法无关 core。
+   但当时会把 DP scratch、调用顺序和实现细节变成 core 的公共契约，拒绝作为首选。
+4. **新增高层 2-ply API**：由玩法无关层返回概率加权的最佳下一次弃牌。拒绝；概率池、
+   清一色/七对子路线和策略选择属于 AI 策略，不应进入玩法无关的 Layer 0/1。
 
 ### 已确认边界与当前状态
 
 已确认采用备选 2 的收窄形状：`evaluateUkeireAfterDiscardDraws` 输入手牌、弃牌
 kind 索引、加入牌 kind 索引、`ShantenOptions`、`TileSet` 和 `existingMelds`，返回
-每个 `(discardKind, drawKind)` 的向听数。该 API 已实现并由 core 完整验证覆盖。
+每个 `(discardKind, drawKind)` 的向听数。该 API 已实现并有完整测试覆盖。
 
 它只提供结构事实，不负责概率、进张枚举、番型权重、最终弃牌选择或玩法语义；AI 若需
 摸牌后的进张列表，继续组合现有 `evaluateUkeireBatch`。矩阵大小由调用方传入的两个
-kind 列表控制，不在 core 内隐式扩展到所有 34 种牌。
+kind 列表控制，不隐式扩展到所有 34 种牌。
 
-AI 结构策略已经消费该 API；概率聚合和最终动作选择仍留在 AI，不下沉到 core。
+AI 结构策略已经消费该 API；概率聚合和最终动作选择仍留在 AI 策略代码，不下沉到
+Layer 0/1。
+
+**迁移后备注**：上面"备选形状"权衡的是"值不值得把 DP 实现细节变成 core 的
+公共契约"这个成本——模块迁移到 `packages/ai` 后，调用方和实现同属一个包，
+这层公共契约成本不再存在。本节保留作为当前接口形状（拒绝直接导出裸 prober、
+选择收窄的批量矩阵）的历史依据，不是仍在生效的跨包约束；未来同包内的接口
+调整只是普通实现改动，不需要重走这套分析。
 
 ## Junk 纯结构策略分层
 

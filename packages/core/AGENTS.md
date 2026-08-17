@@ -19,7 +19,7 @@
 - 仅在模块内部使用、语义一次性且不会成为跨包契约的简单结果，允许使用内联返回类型；不为形式统一而制造无意义类型名。
 - 注释只补充代码无法表达的算法、不变量、敏感性或边界语义；契约和规则正文仍以 `contracts/`、`variants/` 为准，不在代码注释中复制整段规格。
 - 本包新增或修改的代码注释统一使用中文；不引用会被清理的 `docs/process/plan.md`，稳定规则分流到契约或玩法文档。
-- 牌种反查用 `TileSet.kindIndexOf(kind)`（O(1)），不要在热路径（如递归搜索）里用 `tileSet.kinds.indexOf(kind)`（O(kinds.length) 线性扫描）——`packages/ai` 的自对弈调参对 `lib/shanten.ts` 做过 profiling，这个模式曾占单次运行 ~11% 的自耗时。
+- 牌种反查用 `TileSet.kindIndexOf(kind)`（O(1)），不要在热路径（如递归搜索）里用 `tileSet.kinds.indexOf(kind)`（O(kinds.length) 线性扫描）。
 
 ## 代码地图
 

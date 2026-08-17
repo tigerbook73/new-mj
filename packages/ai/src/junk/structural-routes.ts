@@ -1,11 +1,11 @@
 import {
   STANDARD_TILE_SET,
-  sevenPairsShanten,
   tileIdOf,
   type JunkPlayerView,
   type TileId,
   type TileKind,
 } from "@new-mj/core";
+import { sevenPairsShanten } from "./shanten/index.ts";
 import {
   compareStructuralShape,
   structuralShapeOf,

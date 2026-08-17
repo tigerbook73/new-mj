@@ -1,11 +1,11 @@
 import {
   STANDARD_TILE_SET,
-  computeShanten,
   tileIdOf,
   type JunkAction,
   type TileId,
   type TileKind,
 } from "@new-mj/core";
+import { computeShanten } from "../shanten/index.ts";
 import type { CalibrationEvaluationResult } from "../../evaluation/types.ts";
 import type { JunkProductionFixtureInput } from "./fixture-provider.ts";
 import { evaluateStructuralMetrics, type StructuralMetrics } from "./structural-metrics.ts";

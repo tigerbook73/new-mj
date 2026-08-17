@@ -1,4 +1,5 @@
-import { STANDARD_TILE_SET, evaluateUkeire, type TileId, type TileKind } from "@new-mj/core";
+import { STANDARD_TILE_SET, type TileId, type TileKind } from "@new-mj/core";
+import { evaluateUkeire } from "../shanten/index.ts";
 import type { CalibrationEvaluationResult } from "../../evaluation/types.ts";
 import type { JunkProductionFixtureInput } from "./fixture-provider.ts";
 import { annotateStructuralPareto } from "./structural-pareto.ts";

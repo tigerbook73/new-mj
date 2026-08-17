@@ -10,7 +10,6 @@ export * from "./lib/tiles.ts";
 export * from "./lib/prng.ts";
 export * from "./lib/wall.ts";
 export * from "./lib/standard-hand.ts";
-export * from "./lib/shanten.ts";
 export * from "./lib/invariants.ts";
 export * from "./lib/omniscient.ts";
 export * from "./rulesets/junk/index.ts";

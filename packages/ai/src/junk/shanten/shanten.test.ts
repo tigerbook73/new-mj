@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { createPrng, nextInt, shuffle } from "./prng.ts";
+import {
+  createPrng,
+  createTileSet,
+  isSevenPairsWinningHand,
+  isStandardWinningHand,
+  nextInt,
+  shuffle,
+  STANDARD_TILE_SET,
+  TILE_KINDS,
+  allTileIds,
+  tileIdOf,
+} from "@new-mj/core";
 import {
   computeShanten,
   evaluateUkeireAfterDiscards,
@@ -13,8 +24,6 @@ import {
   standardShanten,
   ukeire,
 } from "./shanten.ts";
-import { isSevenPairsWinningHand, isStandardWinningHand } from "./standard-hand.ts";
-import { createTileSet, STANDARD_TILE_SET, TILE_KINDS, allTileIds, tileIdOf } from "./tiles.ts";
 
 const id = (kind: (typeof TILE_KINDS)[number], copy = 0) => tileIdOf(kind, copy);
 const ids = (kinds: readonly (typeof TILE_KINDS)[number][]) => {

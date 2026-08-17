@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { createPrng, nextInt } from "./prng.ts";
+import { createPrng, nextInt } from "@new-mj/core";
 import {
   buildSuitTable,
   HONOR_SUIT_LENGTH,

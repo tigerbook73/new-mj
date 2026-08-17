@@ -7,6 +7,10 @@
 - 纯策略层：给定 core 的 `PlayerView`/`legalActions`，返回推荐动作；不实现任何规则，不缓存/持有 core state。
 - 依赖方向单向 `ai → core`；`core` 不得反向依赖本包。
 
+## 代码约定
+
+- `junk/shanten/` 是从 `packages/core` 迁移来的向听/进张计算（手牌质量启发式，不是规则合法性判断，core 自己的 ruleset 从不消费它）；牌种反查用 `TileSet.kindIndexOf(kind)`（O(1)），不要在热路径（如 `junk/shanten/` 内的递归/DP 搜索）里用 `tileSet.kinds.indexOf(kind)`（O(kinds.length) 线性扫描）——自对弈调参对 `junk/shanten/shanten.ts` 做过 profiling，这个模式曾占单次运行 ~11% 的自耗时。
+
 ## 生产代码
 
 - 决策函数只消费 core 的 view/actions；强度与随机性通过可选参数注入，默认 `Math.random`，测试与自对弈注入基于 core PRNG 的闭包。
