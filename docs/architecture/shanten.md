@@ -28,8 +28,9 @@ Layer 0  单花色预计算表       shanten-suit-table.ts（纯数学，玩法�
 - Layer 1 仅在 `tileSet === STANDARD_TILE_SET`（引用相等）时走 Layer 0 查表
   快路径；任何非标准 `TileSet` 回退到保留的递归实现，保持通用性。
 - 当前量级：数牌表（m/p/s 共用）建表约 280ms、总内存约 1.9MB，字牌表约
-  20ms、约 78KB；单次整手查询约 0.8µs，`ukeire`（约 34 种候选批量试探，
-  经 `createShantenProber` 的前缀/后缀 DP 分解）约 14µs。
+  20ms、约 78KB；单次整手查询约 0.6µs，`ukeire`（约 34 种候选批量试探，
+  经 `createShantenProber` 的前缀/后缀 DP 分解 + `isReachable` 局部性剪枝，
+  见下文"标准型局部性剪枝"）约 12µs。
 - 这套模块现在是 `packages/ai` 内部实现，不是任何跨包公共契约；对外只通过
   `junk/shanten/index.ts` 重导出的公共函数消费，`shanten-suit-table.ts`/
   `shanten-prober.ts` 不进这个 barrel。
@@ -105,6 +106,43 @@ Layer 0/1。
 这层公共契约成本不再存在。本节保留作为当前接口形状（拒绝直接导出裸 prober、
 选择收窄的批量矩阵）的历史依据，不是仍在生效的跨包约束；未来同包内的接口
 调整只是普通实现改动，不需要重走这套分析。
+
+## 标准型局部性剪枝
+
+`evaluateUkeire`/`evaluateUkeireAfterDiscards`/`evaluateUkeireAfterDiscardDraws`
+对 34 种候选摸牌逐个探测前，先用 `isReachable`（`shanten.ts`）做一次 O(1) 必要
+条件过滤：候选牌种要么本身已持有，要么（数牌）同花色 rank 距离 ≤2 内已持有；
+否则可证明该候选不可能让标准型向听下降——反证：把它当"单张"塞进任意最优
+分解，面子/搭子/雀头数不变，而它自身缺组合对象不可能被并入任何分解，分数
+也不可能因它变好（完整论证见 `isReachable` 函数注释）。不可达时直接复用剪枝
+前已经算好的基准向听，跳过这次 DP 探测。七对分支不受此约束（全新孤立牌种
+仍可能让 `kindsHeld` 增加、降低七对向听），调用方照常独立计算，不受剪枝影响。
+
+**为什么这条值得做、而"跨摸牌共享 prober 构建"不值得**：`evaluateStructural
+Discard`（生产 2-ply 弃牌决策入口）用 `--cpu-prof` 做过调用树分析（区分
+`applyTransition`/`composeTransitions` 的耗时具体来自哪个调用点，不只是扁平
+self-time）——两者总耗时里 86.6% 来自 34 种候选的探测闭包本身（`isReachable`
+直接砍这部分的调用次数），只有 1.0% 来自 `createTwoChangeShantenProber` 自己
+的基础前缀/后缀建表、11.8% 来自 `makeRemoveContext`；后两项是"每种摸牌各建
+一次 prober"的固定开销，理论上可以在 34 种摸牌之间共享（旧的加权流水线
+`two-ply.ts` 曾经这样做过，随 `refactor(ai): remove weighted runtime` 整体删除，
+不是因为这个技巧本身有问题，是连着它所在的整个加权打分范式一起清掉的）。
+但重新评估过：可摊销的份额上限只有约决策总耗时的 4%，且要求先给
+`evaluateUkeireAfterDiscardDraws` 加上 `improvingKinds` 返回值（现在只返回
+`shanten`）、再倒转 `evaluateStructuralContinuation` 的摸牌循环嵌套顺序（弃牌
+外层、摸牌内层），改动量和这条剪枝相当，但要动 `createTwoChangeShantenProber`/
+`makeRemoveContext` 这些被大量依赖、测试覆盖的内部结构，风险不成比例，未采纳。
+
+**测量方法**：孤立的单函数微基准（比如只测 `evaluateUkeire`）对真实决策耗时
+没有代表性——`evaluateUkeire` 本身在生产 profile 里占比可以忽略，真正的热点
+是 `evaluateUkeireAfterDiscards`（`evaluateStructuralDiscard` 的 2-ply 搜索实际
+在用的那条），两者内部结构相似但调用频率差几个数量级。要测对真实影响，用
+生产 self-play 策略（`evaluateStructuralDiscard`）而非孤立函数：
+`pnpm --filter @new-mj/ai evaluate scenario generate --seed 424242 --count 400`
+生成场景，`evaluate scenario batch <manifest> <jsonl> --evaluator
+structural-bounded` 测 `durationMs`/p50/p95（每轮跑 2 次重复确认不是噪声）。
+具体数字见 commit `b8fd0a1`（`perf(ai): skip redundant shanten DP probes in
+ukeire scans`）的提交信息，本文件不重复记录历史数字（见文件顶部约定）。
 
 ## Junk 纯结构策略分层
 

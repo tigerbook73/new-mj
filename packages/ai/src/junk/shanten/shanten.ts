@@ -435,9 +435,14 @@ export const evaluateUkeireAfterDiscardDraws = (
     if ((counts[discardKindIndex] ?? 0) <= 0) throw new Error("INVALID_DISCARD_KIND");
     const leafCounts = [...counts];
     leafCounts[discardKindIndex] = (leafCounts[discardKindIndex] ?? 0) - 1;
+    // `probe(discardKindIndex)` 单参调用即 makeRemoveContext 的缓存结果（O(1)
+    // 摊销），不可达时的标准型候选必然等于它（见 isReachable 文档），跳过双参探测。
+    const currentStandard = probe(discardKindIndex);
     return drawKindIndexes.flatMap((drawKindIndex) => {
       if ((leafCounts[drawKindIndex] ?? 0) >= tileSet.copiesPerKind) return [];
-      const standard = probe(discardKindIndex, drawKindIndex);
+      const standard = isReachable(leafCounts, drawKindIndex)
+        ? probe(discardKindIndex, drawKindIndex)
+        : currentStandard;
       leafCounts[drawKindIndex] = (leafCounts[drawKindIndex] ?? 0) + 1;
       const sevenPairs = options.sevenPairs
         ? sevenPairsShantenFromCounts(leafCounts)
