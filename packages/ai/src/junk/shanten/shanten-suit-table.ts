@@ -538,8 +538,11 @@ export const computeShantenViaTable = (
     countsScratch = new Array<number>(kindCount);
   const counts = countsScratch;
   counts.fill(0);
+  // `kindIndexOf(kindOf(tile))` 等价于 `tile / copiesPerKind`（TileId 编码本身就是
+  // `kindIndex * copiesPerKind + copy`，见 core `tiles.ts`），跳过字符串往返直接算。
+  const copiesPerKind = tileSet.copiesPerKind;
   for (const tile of tiles) {
-    const index = tileSet.kindIndexOf(tileSet.kindOf(tile));
+    const index = Math.floor(tile / copiesPerKind);
     counts[index] = (counts[index] ?? 0) + 1;
   }
   return computeShantenFromCounts(counts, existingMelds);

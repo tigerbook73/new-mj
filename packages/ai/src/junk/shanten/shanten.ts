@@ -1,6 +1,34 @@
 import { STANDARD_TILE_SET, type TileId, type TileKind, type TileSet } from "@new-mj/core";
-import { computeShantenFromCounts, computeShantenViaTable } from "./shanten-suit-table.ts";
+import {
+  computeShantenFromCounts,
+  computeShantenViaTable,
+  NUMBER_SUIT_LENGTH,
+} from "./shanten-suit-table.ts";
 import { createShantenProber, createTwoChangeShantenProber } from "./shanten-prober.ts";
+
+const HONOR_START = NUMBER_SUIT_LENGTH * 3; // 27：STANDARD_TILE_SET 里 m/p/s 各 9 张之后是字牌
+
+/**
+ * 标准型局部性剪枝:给 `index` 摸一张能让标准型向听下降,必要条件是它在原手牌里
+ * 已经跟某张牌"挨得上"——本身已持有 ≥1 张(配对/凑刻子),或（数牌）同花色距离
+ * ≤2 内已持有 ≥1 张(凑搭子/顺子)。证明:反证之,任取原手牌一个最优分解,把新摸的
+ * 这张记成"单张"整体拼进去,面子/搭子/雀头数不变，分数不降；而它自身缺组合对象，
+ * 不可能在任何分解里被并进面子/搭子/雀头，所以分数也不可能因为它而变好——即
+ * `probe(index)` 的返回值必然等于剪枝前的基准向听。只对标准型成立，七对分支
+ * (`kindsHeld` 计数)不受此约束，摸全新孤立牌种也可能让七对向听下降，故调用方仍需
+ * 独立算七对分支，这里只负责跳过标准型那次 DP 探测。
+ */
+const isReachable = (counts: readonly number[], index: number): boolean => {
+  if ((counts[index] ?? 0) >= 1) return true;
+  if (index >= HONOR_START) return false;
+  const suitStart = Math.floor(index / NUMBER_SUIT_LENGTH) * NUMBER_SUIT_LENGTH;
+  const suitEnd = suitStart + NUMBER_SUIT_LENGTH - 1;
+  for (const delta of [-2, -1, 1, 2]) {
+    const neighbor = index + delta;
+    if (neighbor >= suitStart && neighbor <= suitEnd && (counts[neighbor] ?? 0) >= 1) return true;
+  }
+  return false;
+};
 
 export type ShantenOptions = Readonly<{
   sevenPairs: boolean;
@@ -32,10 +60,18 @@ export type UkeireAfterDiscardDrawEvaluation = Readonly<{
 const isSuit = (kind: string): boolean =>
   kind.endsWith("m") || kind.endsWith("p") || kind.endsWith("s");
 
+/**
+ * `tileSet.kindIndexOf(tileSet.kindOf(tile))` 等价于 `Math.floor(tile /
+ * tileSet.copiesPerKind)`——TileId 的编码本身就是 `kindIndex * copiesPerKind
+ * + copy`（`createTileSet` 保证，见 core `tiles.ts` 顶部注释，core 自己的
+ * `sortTileIdsForDisplay` 也是这样直接算的），走 kind 字符串再查一次 Map 纯属
+ * 多余的中间往返。这里是 ukeire 系列批量接口的必经入口，按牌直接算下标。
+ */
 const countsOf = (tiles: readonly TileId[], tileSet: TileSet): number[] => {
-  const counts = tileSet.kinds.map(() => 0);
+  const counts = new Array<number>(tileSet.kinds.length).fill(0);
+  const copiesPerKind = tileSet.copiesPerKind;
   for (const tile of tiles) {
-    const index = tileSet.kindIndexOf(tileSet.kindOf(tile));
+    const index = Math.floor(tile / copiesPerKind);
     counts[index] = (counts[index] ?? 0) + 1;
   }
   return counts;
@@ -231,7 +267,8 @@ const evaluateUkeireInternal = (
     const improvingKinds = tileSet.kinds.filter((kind, index) => {
       const held = counts[index] ?? 0;
       if (held >= tileSet.copiesPerKind) return false;
-      let candidate = probe(index);
+      // 不可达时标准型候选必然等于 standardCurrent，跳过这次 DP 探测（见 isReachable 文档）。
+      let candidate = isReachable(counts, index) ? probe(index) : standardCurrent;
       if (options.sevenPairs) {
         const sevenPairsCandidate =
           6 - (pairs + (held === 1 ? 1 : 0)) + Math.max(0, 7 - (kindsHeld + (held === 0 ? 1 : 0)));
@@ -342,7 +379,10 @@ export const evaluateUkeireAfterDiscards = (
     const improvingKinds: TileKind[] = [];
     for (let addKindIndex = 0; addKindIndex < tileSet.kinds.length; addKindIndex += 1) {
       if ((leafCounts[addKindIndex] ?? 0) >= tileSet.copiesPerKind) continue;
-      const standard = probe(discardKindIndex, addKindIndex);
+      // 不可达时标准型候选必然等于 currentStandard，跳过这次 DP 探测（见 isReachable 文档）。
+      const standard = isReachable(leafCounts, addKindIndex)
+        ? probe(discardKindIndex, addKindIndex)
+        : currentStandard;
       leafCounts[addKindIndex] = (leafCounts[addKindIndex] ?? 0) + 1;
       const sevenPairs = options.sevenPairs
         ? sevenPairsShantenFromCounts(leafCounts)
