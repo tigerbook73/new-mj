@@ -7,7 +7,9 @@
 当前没有进行中的专题。Junk AI structural baseline consolidation 已完成；shanten/ukeire 已从
 `packages/core` 迁移到 `packages/ai/src/junk/shanten/`（唯一消费者一直是 AI，core 自己的三个
 ruleset 从不用它，迁移决定见 `docs/architecture/shanten.md`）；新增 `JunkBotAgent` 生产诊断上下文
-（设计决定见 `packages/ai/AGENTS.md`/`apps/server/AGENTS.md`）。未选定候选见 `backlog.md`。
+（设计决定见 `packages/ai/AGENTS.md`/`apps/server/AGENTS.md`）。backlog 里「跨回合 2-ply 结果复用」
+已评估并否决：理论天花板仅约决策耗时的 0.6%（0.74% 可复用步骤占比 × 83.5% 链条命中率），低于此前
+已否决的同类优化门槛，不划算，已从 backlog 移除。其余未选定候选见 `backlog.md`。
 
 ## 当前状态
 
