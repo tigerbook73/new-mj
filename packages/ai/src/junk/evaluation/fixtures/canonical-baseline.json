@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "canonical-baseline",
-  "version": 2,
+  "version": 3,
   "purpose": "canonical-baseline",
   "description": "固定普通牌型输入，用于记录当前生产 Junk AI 的可重复决策基线。",
   "scenarios": [
@@ -66,6 +66,13 @@
       "source": { "kind": "snapshot", "snapshotId": "claim-pass-preserves-seven-pairs-001" },
       "description": "5 个暗对、七对一向听；碰牌能小幅改善标准型（3→2 向听）但会把 existingMelds 变成 1，永久报废更好的七对路线，结构策略应 pass。",
       "tags": ["seven-pairs", "claim-selection", "peng", "pass"]
+    },
+    {
+      "id": "claim-pass-preserves-menqing-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-pass-preserves-menqing-001" },
+      "description": "吃牌后与 pass 向听打平（都是 2），只靠存活进张种类/张数的字典序 tiebreak 才会赢，不构成真正的向听改善；门清仍存活时不足以抵消永久报废门清 ×2，结构策略应 pass。",
+      "tags": ["menqing", "claim-selection", "chi", "pass"]
     }
   ]
 }

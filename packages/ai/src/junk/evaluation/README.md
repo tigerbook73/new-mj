@@ -20,8 +20,8 @@ provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snap
 `*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
 副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
 
-`fixtures/structural-baseline-v2.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
-`structural-baseline@2` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
+`fixtures/structural-baseline-v3.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
+`structural-baseline@3` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
 期望动作以及 hu/zimo/draw 流程动作。生产 facade 与完整 core 对局测试都对照同一个版本化实现；
 有意改变这些行为时必须建立新版本，不能静默改写当前版本。
 
@@ -42,8 +42,19 @@ prober 批量优化（首个原型 P50 一度到 `30.24ms`，约 87% 开销）�
 map/filter/reduce"改成单趟遍历直接累加两个标量，省掉的主要是每候选反复分配/丢弃中间
 数组的 GC 压力（profiling 显示这一步一度和标准型 DP 本身耗时相当）。三轮优化经
 `evaluate policy diff` 对已提交版本做过 20 局种子 12828 决策点全量比对，`0` 处不同，
-确认是纯实现重构、不改变任何决策。这些数值描述 v2 建立时的边界；后续 candidate 应在同
-环境重跑并与进入 slice 前的 structural baseline 比较。
+确认是纯实现重构、不改变任何决策。
+
+v3 在 v2 基础上给 claim 加了"门清 claim 阈值"（取舍与阈值扫描证据见 `docs/architecture/
+shanten.md`"门清 claim 阈值"节）：chi/peng 需要严格领先 pass 至少 1 级向听才允许打破仍
+存活的门清，minGang 不受影响。`evaluate policy diff`（baseline = v2，candidate = v3）在
+同一 seed `20260814` 的 20 局种子、12346 个决策点中有 183 处（1.5%）动作不同（pass 98、
+chi 50、peng 35）。生产自对弈胜率对照（同一 A/B 协议，v3 vs v2）：v3 胜 186 场（46.5%）、
+总分 +83（v2 为 -83）；对齐到七对合入前的原始基线（v3 vs v1）：v3 胜 188 场（47.0%）、
+总分 +130，与两次增量效果（+72、+83）方向一致、量级相近，没有相互抵消的信号。单次
+claim 决策耗时无可测量差异（v3 p50 `0.17ms` vs v2 `0.18ms`，差异在噪声范围内——claim
+比较本身不是像弃牌/2-ply 那样的高频热路径，门槛只是加了一个 O(1) filter）。这些数值
+描述 v3 建立时的边界；后续 candidate 应在同环境重跑并与进入 slice 前的 structural
+baseline 比较。
 
 `fixtures/canonical-structural-expectations.json` 独立记录人工确认的候选关系、精确结构
 指标和理由；它不进入生产 fixture schema，也不让 `standard-only` 选择动作。加载时会
@@ -77,7 +88,7 @@ pnpm --filter @new-mj/ai evaluate arena run --help
 ## Baseline/candidate policy 契约
 
 通用 policy source 由 `ref` 或 `modulePath`、可选 `exportName` 组成；默认导出是模块自己的
-`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@2`。`policy diff` 可用
+`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@3`。`policy diff` 可用
 `--baseline-export`/`--candidate-export` 比较同一模块中的显式策略导出；跨版本 match worker
 也携带相同 export 字段。当前树不加载权重资产。
 
@@ -147,7 +158,7 @@ batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
 只是薄 adapter，绑定 snapshot resolver、Junk evaluator worker 和 `junk-` 输出前缀。
 
-结构生产行为由 `fixtures/structural-baseline-v2.json` 固定。通用 comparator 和
+结构生产行为由 `fixtures/structural-baseline-v3.json` 固定。通用 comparator 和
 `scenario run --baseline <file>` 仍可对未来 baseline/candidate 资产做只读比较；命令不会创建
 或更新 baseline。
 

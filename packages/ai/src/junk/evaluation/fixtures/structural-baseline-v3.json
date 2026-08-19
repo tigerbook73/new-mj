@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "structural-baseline",
-  "version": 2,
-  "scope": "ordinary-standard+seven-pairs",
-  "inputManifest": { "id": "canonical-baseline", "version": 2 },
+  "version": 3,
+  "scope": "ordinary-standard+seven-pairs+menqing-claim-threshold",
+  "inputManifest": { "id": "canonical-baseline", "version": 3 },
   "behavior": [
     { "scenarioId": "discard-001", "expectedAction": { "type": "discard", "kind": "5p" } },
     {
@@ -24,8 +24,12 @@
     {
       "scenarioId": "claim-pass-preserves-seven-pairs-001",
       "expectedAction": { "type": "pass" }
+    },
+    {
+      "scenarioId": "claim-pass-preserves-menqing-001",
+      "expectedAction": { "type": "pass" }
     }
   ],
   "flowActions": ["hu", "zimo", "draw"],
-  "excludedObjectives": ["fan-value", "defense"]
+  "excludedObjectives": ["fan-value-beyond-menqing", "defense"]
 }

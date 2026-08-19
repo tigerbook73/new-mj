@@ -1,7 +1,7 @@
 import { tileIdOf, type JunkAction, type JunkPlayerView, type TileKind } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
 import { JunkBotAgent } from "./bot-agent.ts";
-import { recommendStructuralBaselineV2Action } from "./structural-baseline.ts";
+import { recommendStructuralBaselineV3Action } from "./structural-baseline.ts";
 
 const ids = (kinds: readonly TileKind[]) => {
   const copies = new Map<TileKind, number>();
@@ -50,7 +50,7 @@ describe("JunkBotAgent", () => {
     ];
     const view = turnView(hand);
     const legalActions = discards(hand);
-    const expected = recommendStructuralBaselineV2Action(view, legalActions);
+    const expected = recommendStructuralBaselineV3Action(view, legalActions);
 
     const agent = new JunkBotAgent();
     expect(agent.snapshot).toBeNull();
@@ -59,7 +59,7 @@ describe("JunkBotAgent", () => {
     expect(action).toEqual(expected);
     expect(agent.snapshot).toMatchObject({
       strategyId: "structural-baseline",
-      strategyVersion: 2,
+      strategyVersion: 3,
       decisionKind: "turn",
       lastAction: action,
     });

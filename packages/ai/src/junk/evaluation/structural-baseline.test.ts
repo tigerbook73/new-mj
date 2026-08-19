@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   JUNK_STRUCTURAL_BASELINE,
   recommendJunkAction,
-  recommendStructuralBaselineV2Action,
+  recommendStructuralBaselineV3Action,
 } from "../strategy.ts";
-import manifestData from "./fixtures/structural-baseline-v2.json" with { type: "json" };
+import manifestData from "./fixtures/structural-baseline-v3.json" with { type: "json" };
 import {
   CANONICAL_JUNK_SCENARIO_PROVIDER,
   JUNK_CALIBRATION_MANIFEST,
@@ -37,7 +37,7 @@ const flowView = (phase: JunkPlayerView["phase"]): JunkPlayerView => ({
   phase,
 });
 
-describe("structural-baseline-v2 manifest", () => {
+describe("structural-baseline-v3 manifest", () => {
   it("matches the production baseline identity and canonical input manifest", () => {
     expect(manifestData).toMatchObject(JUNK_STRUCTURAL_BASELINE);
     expect(manifestData.inputManifest).toEqual({
@@ -49,7 +49,7 @@ describe("structural-baseline-v2 manifest", () => {
   it.each(manifestData.behavior)("locks $scenarioId", ({ scenarioId, expectedAction }) => {
     const scenario = JUNK_CALIBRATION_MANIFEST.scenarios.find(({ id }) => id === scenarioId)!;
     const { input } = CANONICAL_JUNK_SCENARIO_PROVIDER.resolve(scenario);
-    const baseline = recommendStructuralBaselineV2Action(input.view, input.legalActions);
+    const baseline = recommendStructuralBaselineV3Action(input.view, input.legalActions);
     const production = recommendJunkAction(input.view, input.legalActions);
 
     expect(actionIdentity(baseline)).toEqual(expectedAction);
@@ -65,7 +65,7 @@ describe("structural-baseline-v2 manifest", () => {
         : type === "zimo"
           ? [{ type: "discard", tile: 0 }, action]
           : [action];
-    const baseline = recommendStructuralBaselineV2Action(flowView(phase), alternatives);
+    const baseline = recommendStructuralBaselineV3Action(flowView(phase), alternatives);
 
     expect(baseline).toBe(action);
     expect(recommendJunkAction(flowView(phase), alternatives)).toBe(baseline);
