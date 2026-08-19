@@ -220,7 +220,10 @@ const combineWithSevenPairsHandicap = (
     const combinedAfter = Math.min(standardAfter, sevenPairsAfter + handicap);
     if (combinedAfter >= combinedCurrent) continue;
     const kind = STANDARD_TILE_SET.kinds[index]!;
-    const liveCopies = Math.max(0, STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0));
+    const liveCopies = Math.max(
+      0,
+      STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0),
+    );
     if (liveCopies > 0) liveImprovingKindCount += 1;
     liveImprovingTileCount += liveCopies;
   }
@@ -372,7 +375,9 @@ export const evaluateStructuralContinuation = (
       existingMelds,
     );
     const afterDrawCounts = canPursueSevenPairs ? kindIndexCountsOf(afterDraw) : undefined;
-    const afterDrawPairsAndKinds = afterDrawCounts ? pairsAndKindsHeldOf(afterDrawCounts) : undefined;
+    const afterDrawPairsAndKinds = afterDrawCounts
+      ? pairsAndKindsHeldOf(afterDrawCounts)
+      : undefined;
     const bestLeaf = standardSecondDiscardBatch
       .map((analysis, index) => {
         const action = secondDiscardActions[index]!;
@@ -503,7 +508,10 @@ export const evaluateStructuralDiscard = (
   const onePlyByKindIndex = new Map(
     standardFirstDiscardBatch.map((analysis) => {
       if (!(handCounts && handPairsAndKinds)) {
-        return [analysis.discardKindIndex, structuralShapeFromUkeire(analysis, visibleCounts)] as const;
+        return [
+          analysis.discardKindIndex,
+          structuralShapeFromUkeire(analysis, visibleCounts),
+        ] as const;
       }
       return [
         analysis.discardKindIndex,

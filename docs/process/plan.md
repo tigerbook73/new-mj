@@ -44,7 +44,7 @@ backlog 移除。其余未选定候选见 `backlog.md`。
   `packages/ai/src/junk/shanten/`，`packages/core` 不再公开导出；纯搬迁无行为变化。
 - shanten ukeire 系列新增 `isReachable` 标准型局部性剪枝，经生产 self-play 路径
   （`evaluateStructuralDiscard`，非孤立单函数微基准）用 `evaluate scenario batch
-  --evaluator structural-bounded` 验证过实际收益；评估过跨摸牌共享 prober 构建/
+--evaluator structural-bounded` 验证过实际收益；评估过跨摸牌共享 prober 构建/
   删除上下文（旧 `two-ply.ts` 曾经这样做，随权重流水线一起删除），测出天花板
   约 4%、风险不成比例，未采纳。细节与复现方式见 `docs/architecture/shanten.md`
   "标准型局部性剪枝"节与 commit `b8fd0a1`。

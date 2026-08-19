@@ -27,7 +27,8 @@ const turnView = (hand: readonly TileKind[]): JunkPlayerView => ({
   })),
 });
 
-const discards = (hand: readonly TileKind[]): JunkAction[] => ids(hand).map((tile) => ({ type: "discard", tile }));
+const discards = (hand: readonly TileKind[]): JunkAction[] =>
+  ids(hand).map((tile) => ({ type: "discard", tile }));
 
 describe("JunkBotAgent", () => {
   it("returns the same action as the stateless facade and records a turn snapshot", () => {

@@ -23,7 +23,8 @@ const isClaimContext = (legalActions: readonly JunkAction[]): boolean =>
 export const recommendStructuralBaselineV2Action = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-): JunkAction | undefined => recommendStructuralBaselineV2ActionWithDiagnostics(view, legalActions).action;
+): JunkAction | undefined =>
+  recommendStructuralBaselineV2ActionWithDiagnostics(view, legalActions).action;
 
 /**
  * Diagnostic-only summary of a claim/turn decision, meant for production observability

@@ -39,7 +39,8 @@ export class JunkBotAgent {
       decisionKind: diagnostics?.decisionKind ?? null,
       candidateCount: diagnostics?.candidateCount ?? null,
       searchedCandidateCount: diagnostics?.searchedCandidateCount ?? null,
-      chosenConditionalExpectedBestShanten: diagnostics?.chosenConditionalExpectedBestShanten ?? null,
+      chosenConditionalExpectedBestShanten:
+        diagnostics?.chosenConditionalExpectedBestShanten ?? null,
       lastAction: action,
       decisionDurationMs: performance.now() - startedAt,
     };
