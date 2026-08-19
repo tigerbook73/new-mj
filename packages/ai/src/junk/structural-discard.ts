@@ -19,6 +19,22 @@ export type StructuralShape = Readonly<{
   liveImprovingTileCount: number;
 }>;
 
+/**
+ * Seven pairs at a given raw shanten generally completes less reliably than
+ * standard at the same shanten (narrower per-step ukeire — each pair only
+ * accepts its own kind, vs standard's runs and triplets), so comparing the two
+ * shanten numbers at face value overrates seven pairs, particularly early when
+ * the hand isn't yet committed to the shape. Below 4 concealed pairs, seven
+ * pairs must beat standard by more than 2 levels to win the comparison; at 4
+ * the bar drops to 1 level; at/above 5 the raw (unhandicapped) minimum is
+ * used, since by then the hand is a real enough bet that hedging it further
+ * just throws away completions that would have paid off. Tiers chosen by
+ * arena A/B (200-seed position-swapped self-play, `evaluateCandidatePolicies`)
+ * against the unhandicapped and single-threshold variants — see
+ * `docs/architecture/shanten.md`'s seven-pairs handicap note for the sweep.
+ */
+const sevenPairsHandicapFor = (pairs: number): number => (pairs < 4 ? 2 : pairs < 5 ? 1 : 0);
+
 export type StructuralDiscardCandidate = Readonly<{
   action: Extract<JunkAction, { type: "discard" }>;
   onePly: StructuralShape;
@@ -115,6 +131,71 @@ export const evaluateVisibleStructuralShape = (
     existingMelds,
   );
 
+/**
+ * Combined standard/seven-pairs shape. `sevenPairsHandicapFor(pairs)` gets
+ * added to the seven-pairs side before the minimum — it must beat standard by
+ * more than the handicap to change the comparison; the handicap shrinks to 0
+ * once the hand is a real enough bet on the shape (see that function's doc).
+ * The handicap is fixed from *this* hand's current pair count for the whole
+ * call, including every `improvingKinds` candidate — it does not get
+ * re-evaluated per candidate even if a candidate would cross a threshold.
+ * Reimplements the combine loop by hand (O(1) incremental pairs/kinds update,
+ * mirroring `shanten.ts`'s own internal fast path) instead of using
+ * `evaluateUkeire`'s built-in `{ sevenPairs: true }` option, which has no
+ * handicap parameter and always takes the raw, unhandicapped minimum.
+ */
+const bestRouteShapeWithHandicap = (
+  hand: readonly TileId[],
+  visibleCounts: ReadonlyMap<TileKind, number>,
+  existingMelds: number,
+): StructuralShape => {
+  const standardAnalysis = evaluateUkeire(hand, { sevenPairs: false }, STANDARD_TILE_SET, existingMelds);
+  const heldCounts = new Map<TileKind, number>();
+  for (const tile of hand) {
+    const kind = STANDARD_TILE_SET.kindOf(tile);
+    heldCounts.set(kind, (heldCounts.get(kind) ?? 0) + 1);
+  }
+  let pairs = 0;
+  const kindsHeld = heldCounts.size;
+  for (const count of heldCounts.values()) if (count >= 2) pairs += 1;
+  const handicap = sevenPairsHandicapFor(pairs);
+  const sevenPairsCurrent = 6 - pairs + Math.max(0, 7 - kindsHeld);
+  const combinedCurrent = Math.min(standardAnalysis.shanten, sevenPairsCurrent + handicap);
+  const standardImproving = new Set(standardAnalysis.improvingKinds);
+  const improvingKinds = STANDARD_TILE_SET.kinds.filter((kind) => {
+    const held = heldCounts.get(kind) ?? 0;
+    if (held >= STANDARD_TILE_SET.copiesPerKind) return false;
+    const standardAfter = standardImproving.has(kind)
+      ? standardAnalysis.shanten - 1
+      : standardAnalysis.shanten;
+    const sevenPairsAfter =
+      6 - (pairs + (held === 1 ? 1 : 0)) + Math.max(0, 7 - (kindsHeld + (held === 0 ? 1 : 0)));
+    const combinedAfter = Math.min(standardAfter, sevenPairsAfter + handicap);
+    return combinedAfter < combinedCurrent;
+  });
+  return structuralShapeFromUkeire({ shanten: combinedCurrent, improvingKinds }, visibleCounts);
+};
+
+/**
+ * Same as `evaluateVisibleStructuralShape`, but folds in the (handicapped)
+ * seven-pairs route while `existingMelds === 0` still leaves it eligible (see
+ * `evaluateStructuralContinuation`'s `canPursueSevenPairs` doc). Only meant for
+ * comparisons where the action being ranked does not itself create a meld (e.g.
+ * the claim `pass` candidate) — an action that does (chi/peng/minGang/gang) must
+ * keep using the standard-only shape above, since taking it forecloses seven
+ * pairs regardless of what this comparison says.
+ */
+export const evaluateVisibleStructuralShapeBestRoute = (
+  view: JunkPlayerView,
+  hand: readonly TileId[],
+  existingMelds: number,
+): StructuralShape => {
+  const visibleCounts = structuralVisibleKindCounts(visibleStructuralTileIds(view));
+  return existingMelds === 0
+    ? bestRouteShapeWithHandicap(hand, visibleCounts, existingMelds)
+    : structuralShapeOf(hand, visibleCounts, existingMelds);
+};
+
 export const compareStructuralShape = (left: StructuralShape, right: StructuralShape): number =>
   left.standardShanten - right.standardShanten ||
   right.liveImprovingKindCount - left.liveImprovingKindCount ||
@@ -165,6 +246,12 @@ export const evaluateStructuralContinuation = (
       conditionalExpectedBestLiveImprovingTileCount: null,
     };
   }
+  // Any meld (claim or self-declared gang) permanently forecloses the seven-pairs
+  // route (core's own.melds.length === 0 win gate, docs/variants/junk.md §3) — a
+  // fully concealed hand (existingMelds === 0) can still pursue either route, so
+  // completion/continuation search below folds seven pairs in via the shanten
+  // module's own combined-route option instead of only ever probing standard.
+  const canPursueSevenPairs = existingMelds === 0;
   let drawKindCount = 0;
   let leafCount = 0;
   let completionMass = 0;
@@ -185,7 +272,7 @@ export const evaluateStructuralContinuation = (
     if (
       computeShanten(
         afterDraw,
-        { sevenPairs: false },
+        { sevenPairs: canPursueSevenPairs },
         STANDARD_TILE_SET,
         undefined,
         existingMelds,
@@ -195,29 +282,47 @@ export const evaluateStructuralContinuation = (
       continue;
     }
     const leafCounts = structuralVisibleKindCounts(new Set(occupied).add(drawnTile));
-    // Batched over one shared createTwoChangeShantenProber build instead of one
-    // full evaluateUkeire (fresh 4-suit DP) per second-discard candidate — see
-    // docs/architecture/shanten.md "2-ply 批量结构 API".
     const secondDiscardActions = uniqueDiscardActions(afterDraw);
-    const secondDiscardBatch = evaluateUkeireAfterDiscards(
-      afterDraw,
-      secondDiscardActions.map((action) =>
-        STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
-      ),
-      { sevenPairs: false },
-      STANDARD_TILE_SET,
-      existingMelds,
-    );
-    const bestLeaf = secondDiscardBatch
-      .map((analysis, index) => ({
-        action: secondDiscardActions[index]!,
-        shape: structuralShapeFromUkeire(analysis, leafCounts),
-      }))
-      .sort(
-        (left, right) =>
-          compareStructuralShape(left.shape, right.shape) ||
-          compareAction(left.action, right.action),
-      )[0];
+    // Every concealed-hand candidate is re-evaluated individually here (loses
+    // the shared-prober batching the standard-only branch below gets from
+    // evaluateUkeireAfterDiscards) because the handicap needs each candidate's
+    // own post-discard pair count, which the batched API has no hook for.
+    const bestLeaf = canPursueSevenPairs
+      ? secondDiscardActions
+          .map((action) => ({
+            action,
+            shape: bestRouteShapeWithHandicap(
+              afterDraw.filter((tile) => tile !== action.tile),
+              leafCounts,
+              existingMelds,
+            ),
+          }))
+          .sort(
+            (left, right) =>
+              compareStructuralShape(left.shape, right.shape) ||
+              compareAction(left.action, right.action),
+          )[0]
+      : // Batched over one shared createTwoChangeShantenProber build instead of one
+        // full evaluateUkeire (fresh 4-suit DP) per second-discard candidate — see
+        // docs/architecture/shanten.md "2-ply 批量结构 API".
+        evaluateUkeireAfterDiscards(
+          afterDraw,
+          secondDiscardActions.map((action) =>
+            STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
+          ),
+          { sevenPairs: false },
+          STANDARD_TILE_SET,
+          existingMelds,
+        )
+          .map((analysis, index) => ({
+            action: secondDiscardActions[index]!,
+            shape: structuralShapeFromUkeire(analysis, leafCounts),
+          }))
+          .sort(
+            (left, right) =>
+              compareStructuralShape(left.shape, right.shape) ||
+              compareAction(left.action, right.action),
+          )[0];
     if (!bestLeaf) continue;
     leafCount += 1;
     continuationMass += probability;
@@ -312,19 +417,36 @@ export const evaluateStructuralDiscard = (
       ),
     ),
   ];
-  const firstDiscardBatch = evaluateUkeireAfterDiscards(
-    view.hand,
-    firstDiscardKindIndexes,
-    { sevenPairs: false },
-    STANDARD_TILE_SET,
-    existingMelds,
-  );
-  const onePlyByKindIndex = new Map(
-    firstDiscardBatch.map((analysis) => [
-      analysis.discardKindIndex,
-      structuralShapeFromUkeire(analysis, visibleCounts),
-    ]),
-  );
+  // A discard never creates a meld, so it can't foreclose seven pairs on its own —
+  // eligibility only depends on melds already declared before this decision.
+  const canPursueSevenPairs = existingMelds === 0;
+  // Same per-candidate re-evaluation tradeoff as evaluateStructuralContinuation's
+  // bestLeaf above: each discard kind needs its own post-discard pair count for
+  // the handicap, which evaluateUkeireAfterDiscards' batched API has no hook for.
+  const onePlyByKindIndex = canPursueSevenPairs
+    ? new Map(
+        firstDiscardKindIndexes.map((kindIndex) => {
+          const kind = STANDARD_TILE_SET.kinds[kindIndex]!;
+          const tileToRemove = view.hand.find((tile) => STANDARD_TILE_SET.kindOf(tile) === kind)!;
+          const resultingHand = view.hand.filter((tile) => tile !== tileToRemove);
+          return [
+            kindIndex,
+            bestRouteShapeWithHandicap(resultingHand, visibleCounts, existingMelds),
+          ] as const;
+        }),
+      )
+    : new Map(
+        evaluateUkeireAfterDiscards(
+          view.hand,
+          firstDiscardKindIndexes,
+          { sevenPairs: false },
+          STANDARD_TILE_SET,
+          existingMelds,
+        ).map((analysis) => [
+          analysis.discardKindIndex,
+          structuralShapeFromUkeire(analysis, visibleCounts),
+        ]),
+      );
   const base = discards.map((action) => ({
     action,
     onePly: onePlyByKindIndex.get(

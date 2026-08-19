@@ -9,6 +9,7 @@ import {
   compareStructuralShape,
   evaluateStructuralContinuation,
   evaluateVisibleStructuralShape,
+  evaluateVisibleStructuralShapeBestRoute,
   type StructuralShape,
 } from "./structural-discard.ts";
 
@@ -195,10 +196,14 @@ export const evaluateStructuralClaim = (
       return { action, supported: true, shape: null, bestDiscard: null, ...emptyAggregate };
     }
     if (action.type === "pass") {
+      // Passing doesn't create a meld, so it keeps whichever route (standard or
+      // seven pairs) is currently ahead alive — chi/peng/minGang below always
+      // create one and must stay standard-only, since taking them forecloses
+      // seven pairs regardless of this comparison.
       return {
         action,
         supported: true,
-        shape: evaluateVisibleStructuralShape(view, view.hand, currentMeldCount),
+        shape: evaluateVisibleStructuralShapeBestRoute(view, view.hand, currentMeldCount),
         bestDiscard: null,
         ...emptyAggregate,
       };

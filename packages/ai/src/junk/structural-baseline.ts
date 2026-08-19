@@ -5,18 +5,25 @@ import { evaluateStructuralTurn } from "./structural-turn.ts";
 /** Stable identity of the current production policy; bump the version for intentional behavior changes. */
 export const JUNK_STRUCTURAL_BASELINE = Object.freeze({
   id: "structural-baseline",
-  version: 1,
-  scope: "ordinary-standard",
+  version: 2,
+  scope: "ordinary-standard+seven-pairs",
 } as const);
 
 const isClaimContext = (legalActions: readonly JunkAction[]): boolean =>
   legalActions.some((action) => ["chi", "peng", "minGang", "hu", "pass"].includes(action.type));
 
-/** Frozen v1 ordinary-standard policy used by production and baseline tests. */
-export const recommendStructuralBaselineV1Action = (
+/**
+ * Frozen v2 policy used by production and baseline tests: same ordinary-standard
+ * discard/claim/gang pipeline as v1, now folding the seven-pairs route into every
+ * comparison that doesn't itself create a meld (discard, pass) — see
+ * `structural-discard.ts`'s `canPursueSevenPairs`/`evaluateVisibleStructuralShapeBestRoute`
+ * doc for the eligibility rule. Fan value, defense and other special routes
+ * (flush, all-pungs) remain out of scope.
+ */
+export const recommendStructuralBaselineV2Action = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-): JunkAction | undefined => recommendStructuralBaselineV1ActionWithDiagnostics(view, legalActions).action;
+): JunkAction | undefined => recommendStructuralBaselineV2ActionWithDiagnostics(view, legalActions).action;
 
 /**
  * Diagnostic-only summary of a claim/turn decision, meant for production observability
@@ -34,12 +41,12 @@ export type StructuralDecisionDiagnostics = Readonly<{
 }>;
 
 /**
- * Same policy as `recommendStructuralBaselineV1Action`, plus a lightweight diagnostics summary
+ * Same policy as `recommendStructuralBaselineV2Action`, plus a lightweight diagnostics summary
  * for the claim/turn branch actually taken. Reuses `evaluateStructuralClaim`/`evaluateStructuralTurn`'s
  * already-computed candidates — no extra search. hu/zimo/draw short-circuits and the
  * no-candidates-available fallback both carry `diagnostics: null` (there was nothing to search).
  */
-export const recommendStructuralBaselineV1ActionWithDiagnostics = (
+export const recommendStructuralBaselineV2ActionWithDiagnostics = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
 ): { action: JunkAction | undefined; diagnostics: StructuralDecisionDiagnostics | null } => {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "canonical-baseline",
-  "version": 1,
+  "version": 2,
   "purpose": "canonical-baseline",
   "description": "固定普通牌型输入，用于记录当前生产 Junk AI 的可重复决策基线。",
   "scenarios": [
@@ -59,6 +59,13 @@
       "source": { "kind": "snapshot", "snapshotId": "self-gang-equivalence-001" },
       "description": "暗杠和补杠均与各自等价弃牌结构打平，纯结构策略应 discard。",
       "tags": ["standard-only", "self-turn", "anGang", "buGang", "discard"]
+    },
+    {
+      "id": "claim-pass-preserves-seven-pairs-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "claim-pass-preserves-seven-pairs-001" },
+      "description": "5 个暗对、七对一向听；碰牌能小幅改善标准型（3→2 向听）但会把 existingMelds 变成 1，永久报废更好的七对路线，结构策略应 pass。",
+      "tags": ["seven-pairs", "claim-selection", "peng", "pass"]
     }
   ]
 }

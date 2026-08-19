@@ -160,8 +160,8 @@ ukeire scans`）的提交信息，本文件不重复记录历史数字（见文�
   它不是质量权重，容差内继续比较下一项结构指标。
 
 该 bounded 路径是 Junk 普通标准型生产弃牌基线，也是当前树唯一生产实现。旧加权策略已由
-Git 历史承担回溯；番型、七对和防守必须在后续独立 slice 中用 fixture/A-B 证据逐项加入，
-不能借此边界隐式改变。
+Git 历史承担回溯；七对已按下文"七对结构路线"一节的证据流程加入生产；番型和防守仍必须在
+后续独立 slice 中用 fixture/A-B 证据逐项加入，不能借此边界隐式改变。
 
 ### Claim/pass 的结构比较
 
@@ -196,9 +196,30 @@ gang 补牌预算固定为至多 34 个 draw kind × 每分支至多 11 个 disc
 ### 七对结构路线
 
 Core 的 `sevenPairs: true` 是 standard/seven-pairs 取最小值的合并开关，不保留路线身份。AI
-若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手允许
-seven-pairs。路线按上述三项固定字典序选择，完全打平时 standard，不使用 `qiduiPotential`
-或其他连续权重。当前仅建立独立路线模型，尚未接入 bounded 2-ply 或生产入口。
+若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手
+（`existingMelds === 0`）允许 seven-pairs——任何吃/碰/明杠/暗杠/补杠都会让 `existingMelds`
+变成 >0，从此这手牌永久失去七对资格（`packages/core/src/rulesets/junk/state-machine.ts` 的
+`own.melds.length === 0` 门槛，`docs/variants/junk.md` §3）。`structural-routes.ts` 的
+`evaluateStructuralRoutes`/`classifyOrdinaryStructuralGate` 是这套路线判定最早的纯诊断版本，
+只做只读分类，不接入任何生产决策。
+
+七对已接入生产弃牌 shortlist、2-ply 叶子和 claim `pass` 比较（`structural-discard.ts`/
+`structural-claim.ts`），接入规则不对称：任何会让 `existingMelds` 增加的动作（chi/peng/
+minGang/anGang/buGang）必须只用标准型 shape 比较，因为选它必然报废七对，比较两路线取优
+毫无意义；不改变 `existingMelds` 的动作（discard、pass）才允许在两路线间取优。
+
+直接拿两路向听数字打 min 比较（无差别合并）在生产自对弈 A/B（`evaluateCandidatePolicies`，
+200 seed 位置互换换位对局）中明显跑负，原因是七对同向听数通常比标准型更难真正兑现——
+每一步能吃的牌种更窄（只能凑自己那张对子，标准型还能吃顺子/刻子两种结构），无差别合并
+系统性高估了七对、导致弃牌/2-ply 过度偏向追七对。最终生产实现给七对侧加一个随暗对数
+递减的整数级差惩罚（`structural-discard.ts` 的 `sevenPairsHandicapFor`）：暗对越少、离
+"真的赌七对"越远，要求它领先标准型的差距就越大；暗对数够多（当前门槛 5）后不再打折，
+直接用未惩罚的原始 min，此时继续压制会白白丢掉本该兑现的完成。三档惩罚（对数 <4/<5/≥5）
+经同一 A/B 协议对比无惩罚、单一固定惩罚、单一硬阈值等多个变体确认为当前最优，具体分数
+见 commit 提交信息（本文件不重复记录历史数字）。该实现每个候选需要各自独立的对数才能算
+惩罚，因此走逐候选单独 `evaluateUkeire` 路径，放弃了标准型分支享有的共享 prober 批量优化
+（`evaluateUkeireAfterDiscards`）——生产自对弈耗时 P50 因此明显上升，接受该代价是因为
+声明窗口默认超时是秒级、bot 决策本身也带随机延迟，毫秒级增量在这个预算内可忽略。
 
 ## Junk legacy 搜索机制的可复用边界
 

@@ -1,5 +1,5 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
-import { recommendStructuralBaselineV1Action } from "./structural-baseline.ts";
+import { recommendStructuralBaselineV2Action } from "./structural-baseline.ts";
 export {
   evaluateStructuralDiscard,
   recommendStructuralDiscard,
@@ -30,17 +30,17 @@ export {
 } from "./structural-routes.ts";
 export {
   JUNK_STRUCTURAL_BASELINE,
-  recommendStructuralBaselineV1Action,
-  recommendStructuralBaselineV1ActionWithDiagnostics,
+  recommendStructuralBaselineV2Action,
+  recommendStructuralBaselineV2ActionWithDiagnostics,
   type StructuralDecisionDiagnostics,
 } from "./structural-baseline.ts";
 export { JunkBotAgent, type JunkBotAgentSnapshot } from "./bot-agent.ts";
 
-/** Complete ordinary-standard structural policy facade and production baseline. */
+/** Complete ordinary-standard + seven-pairs structural policy facade and production baseline. */
 export const recommendStructuralJunkAction = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
-): JunkAction | undefined => recommendStructuralBaselineV1Action(view, legalActions);
+): JunkAction | undefined => recommendStructuralBaselineV2Action(view, legalActions);
 
 export const recommendJunkAction = (
   view: JunkPlayerView,
