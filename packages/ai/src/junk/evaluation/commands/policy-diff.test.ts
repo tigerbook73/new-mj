@@ -68,7 +68,7 @@ describe("decision diff CLI", () => {
     const result = await runDecisionDiffCli(
       [
         "--baseline-export",
-        "recommendStructuralBaselineV2Action",
+        "recommendStructuralBaselineV3Action",
         "--candidate-export",
         "recommendCandidateAction",
         "--seeds",
@@ -93,7 +93,7 @@ describe("decision diff CLI", () => {
 
     expect(result.exitCode).toBe(0);
     expect(sources).toEqual([
-      { exportName: "recommendStructuralBaselineV2Action" },
+      { exportName: "recommendStructuralBaselineV3Action" },
       { exportName: "recommendCandidateAction" },
     ]);
   });

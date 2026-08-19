@@ -46,6 +46,42 @@ const emptyAggregate = {
 
 const kindOf = (tile: TileId): TileKind => STANDARD_TILE_SET.kindOf(tile);
 
+/** Whether the player has already declared any non-anGang meld — menqing (门清,
+ * scoring.ts's `isMenqing`) is permanently broken by chi/peng/minGang/buGang but
+ * not by anGang, and once broken never recovers. Only meaningful for chi/peng
+ * here: minGang is scoped out of the menqing gate below (see its doc). */
+const hasOpenMeld = (view: JunkPlayerView): boolean =>
+  view.seats[view.seat]!.melds.some((meld) => meld.type !== "anGang");
+
+/**
+ * Menqing (门清, ×2 at showdown) and a claim's structural gain are different
+ * units — there is no principled conversion rate between "shanten levels" and
+ * "score multiplier", so instead of inventing one, chi/peng is only allowed to
+ * break still-alive menqing when it beats pass's shanten by at least this
+ * margin, not merely any strict improvement (margin=0 is exactly the
+ * unguarded pre-menqing-gate behavior — any strict improvement wins).
+ *
+ * Value chosen by 200-seed position-swapped self-play arena
+ * (`evaluateCandidatePolicies`), mirroring `sevenPairsHandicapFor`'s
+ * methodology (`docs/architecture/shanten.md`"七对结构路线"节): margin=1 scored
+ * best (net +83 over margin=0's baseline); margin=2 was clearly negative
+ * (net -457). Two tiered variants keyed on pass's own shanten were also tried
+ * — relaxing the margin to 0 near tenpai, and/or raising it to 2 far from
+ * tenpai — neither beat the flat margin=1 on net score (one landed at -37,
+ * the other's higher win-rate came with a lower net score, i.e. within noise
+ * at this sample size); not adopted. A flat margin keeps this simpler than
+ * seven pairs' pair-count tiering, which had a clear monotonic signal this
+ * axis didn't reproduce.
+ *
+ * Scoped to chi/peng only, not minGang: minGang's rank carries a real
+ * `completionMass` (immediate-win probability on the replacement draw) that
+ * chi/peng's rank never has (always 0) — that's a qualitatively different,
+ * already-partially-self-justifying value proposition for giving up menqing,
+ * not a pure shanten trade. Folding it into the same margin needs its own
+ * evaluation; left as a follow-up, not assumed safe by extension.
+ */
+const REQUIRED_MENQING_BREAKING_SHANTEN_MARGIN = 1;
+
 const removeTiles = (hand: readonly TileId[], removed: readonly TileId[]): TileId[] | undefined => {
   const result = [...hand];
   for (const tile of removed) {
@@ -176,7 +212,12 @@ const compareRank = (left: ClaimRank, right: ClaimRank): number => {
   );
 };
 
-/** Shadow structural claim policy. Claims must strictly improve over pass. */
+/**
+ * Shadow structural claim policy. Claims must strictly improve over pass;
+ * chi/peng additionally needs to clear `REQUIRED_MENQING_BREAKING_SHANTEN_MARGIN`
+ * when it would be the first meld to break still-alive menqing (see that
+ * constant's doc) — minGang is exempt for now.
+ */
 export const evaluateStructuralClaim = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
@@ -215,6 +256,7 @@ export const evaluateStructuralClaim = (
 
   const pass = candidates.find((candidate) => candidate.action.type === "pass");
   const passRank = pass ? rankOf(pass) : undefined;
+  const menqingAlive = !hasOpenMeld(view);
   const bestClaim = candidates
     .filter(
       (candidate) =>
@@ -223,6 +265,12 @@ export const evaluateStructuralClaim = (
         candidate.action.type === "minGang",
     )
     .filter((candidate) => rankOf(candidate) !== undefined)
+    .filter((candidate) => {
+      if (candidate.action.type === "minGang" || !menqingAlive || !passRank) return true;
+      return (
+        passRank.shanten - rankOf(candidate)!.shanten >= REQUIRED_MENQING_BREAKING_SHANTEN_MARGIN
+      );
+    })
     .sort(
       (left, right) =>
         compareRank(rankOf(left)!, rankOf(right)!) || compareAction(left.action, right.action),

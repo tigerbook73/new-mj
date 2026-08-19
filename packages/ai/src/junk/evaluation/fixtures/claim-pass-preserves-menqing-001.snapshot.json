@@ -1,0 +1,46 @@
+{
+  "view": {
+    "seat": 0,
+    "hand": [
+      { "kind": "2m", "copy": 0 },
+      { "kind": "3m", "copy": 0 },
+      { "kind": "3m", "copy": 1 },
+      { "kind": "6m", "copy": 0 },
+      { "kind": "3p", "copy": 0 },
+      { "kind": "4p", "copy": 0 },
+      { "kind": "5p", "copy": 0 },
+      { "kind": "7p", "copy": 0 },
+      { "kind": "5s", "copy": 0 },
+      { "kind": "5s", "copy": 1 },
+      { "kind": "7s", "copy": 0 },
+      { "kind": "8s", "copy": 0 },
+      { "kind": "9s", "copy": 0 }
+    ],
+    "wallCount": 50,
+    "currentSeat": 1,
+    "dealer": 0,
+    "phase": "awaiting-claims",
+    "lastDiscard": { "seat": 1, "tile": { "kind": "8s", "copy": 1 } },
+    "seats": [
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false },
+      {
+        "handCount": 13,
+        "melds": [],
+        "discards": [{ "tile": { "kind": "8s", "copy": 1 } }],
+        "justDrawn": false
+      },
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false },
+      { "handCount": 13, "melds": [], "discards": [], "justDrawn": false }
+    ]
+  },
+  "legalActions": [
+    {
+      "type": "chi",
+      "tiles": [
+        { "kind": "7s", "copy": 0 },
+        { "kind": "9s", "copy": 0 }
+      ]
+    },
+    { "type": "pass" }
+  ]
+}

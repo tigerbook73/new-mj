@@ -1,7 +1,7 @@
 import type { JunkAction, JunkPlayerView } from "@new-mj/core";
 import {
   JUNK_STRUCTURAL_BASELINE,
-  recommendStructuralBaselineV2ActionWithDiagnostics,
+  recommendStructuralBaselineV3ActionWithDiagnostics,
   type StructuralDecisionDiagnostics,
 } from "./structural-baseline.ts";
 
@@ -28,7 +28,7 @@ export class JunkBotAgent {
 
   decide(view: JunkPlayerView, legalActions: readonly JunkAction[]): JunkAction {
     const startedAt = performance.now();
-    const { action, diagnostics } = recommendStructuralBaselineV2ActionWithDiagnostics(
+    const { action, diagnostics } = recommendStructuralBaselineV3ActionWithDiagnostics(
       view,
       legalActions,
     );
