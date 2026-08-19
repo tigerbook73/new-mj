@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "canonical-baseline",
-  "version": 4,
+  "version": 5,
   "purpose": "canonical-baseline",
   "description": "固定普通牌型输入，用于记录当前生产 Junk AI 的可重复决策基线。",
   "scenarios": [
@@ -80,6 +80,13 @@
       "source": { "kind": "snapshot", "snapshotId": "discard-pengpenghu-tiebreak-001" },
       "description": "碰后无摸牌直接弃牌；两个候选在标准型 onePly 与 2-ply continuation 上完全打平，只有碰碰胡向听（此时=2，达到 tiebreak 门槛）能分出胜负，结构策略应弃 4z。",
       "tags": ["pengpenghu", "discard-selection", "tiebreak"]
+    },
+    {
+      "id": "discard-flush-tiebreak-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "discard-flush-tiebreak-001" },
+      "description": "真实自对弈捕获：弃 4p 与弃 6p 的 2-ply continuation 完全打平（含七对路线，此手牌 5 个暗对使 onePly 已经是七对 1-shanten，标准型仅 2-shanten）；flush（本 slice 仅标准型路线，不与七对组合）在 tiebreak 层面区分出弃 6p 保留 4p 时筒子花色定向的存活进张更宽，结构策略应弃 6p。锁定七对与 flush 两个信号共存时互不干扰。",
+      "tags": ["flush", "discard-selection", "snapshot", "seven-pairs"]
     }
   ]
 }

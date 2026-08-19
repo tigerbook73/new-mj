@@ -20,8 +20,8 @@ provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snap
 `*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
 副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
 
-`fixtures/structural-baseline-v4.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
-`structural-baseline@4` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
+`fixtures/structural-baseline-v5.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
+`structural-baseline@5` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
 期望动作以及 hu/zimo/draw 流程动作。生产 facade 与完整 core 对局测试都对照同一个版本化实现；
 有意改变这些行为时必须建立新版本，不能静默改写当前版本。
 
@@ -70,6 +70,25 @@ v4 在 v3 基础上把碰碰胡（全刻子）接入弃牌 shortlist 的最终 t
 continuation 的内层循环。这些数值描述各版本建立时的边界；后续 candidate 应在同环境重跑并与
 进入 slice 前的 structural baseline 比较。
 
+v5 把清一色/混一色（合并分析，取舍见 `docs/architecture/shanten.md`"清一色/混一色弃牌
+方向"节）接入弃牌 shortlist 的 onePly 排序和最终 tiebreak（不碰 claim，不与七对组合）。
+本 slice 与 v4（碰碰胡）并行开发，自对弈证据在当时的 v3 基线上采集，`evaluate policy
+diff`（baseline = v3，candidate = 当时原型）在同一 seed `20260814` 的 20 局种子、11825
+个决策点中有 36 处（0.3%）动作不同，全部是弃牌——比七对（3.5%）、门清（1.5%）都窄，
+符合"只在窄 tiebreak 生效"的预期。生产自对弈胜率对照（同一 A/B 协议，候选 vs v3）：
+候选胜 191 场（47.8%）、总分 +92（v3 为 -92）。原计划仿七对做暗对数式分档惩罚，扫了
+`handicap ∈ {0,1,2}` 发现三个值产生完全相同的决策——花色信号只作用于"2-ply 已打平的
+候选"这个窄 tiebreak，小整数惩罚在这个接入点上是惰性的，因此直接移除、用无惩罚的 min。
+单次弃牌决策耗时无可测量差异（p50 `17.86ms` vs v3 `17.62ms`）——花色信号被有意限制在
+最多 5 个已进入 shortlist 的候选上调用，不进入 2-ply continuation 每叶子调用一次的内层
+循环，从设计上就避开了七对惩罚最初版本"每候选单独调未批量 DP"的性能陷阱，不需要事后
+分轮优化。落地顺序上 v4（碰碰胡）先合并入生产并占用了 v4 版本号，本 slice rebase 到
+v4 之上后把 structural baseline 标识改记为 v5；`compareFinal` 中两个 tiebreak（flush、
+pengpenghu）各自独立生效、互不干扰（顺序为 continuation → flush → onePly → pengpenghu，
+见 `structural-discard.ts` 该函数合并后的文档），rebase 未重跑二者组合的专门 A/B，
+后续如需验证组合效应应作为单独 candidate 评估。这些数值描述本 slice 建立时的边界；
+后续 candidate 应在同环境重跑并与进入 slice 前的 structural baseline 比较。
+
 `fixtures/canonical-structural-expectations.json` 独立记录人工确认的候选关系、精确结构
 指标和理由；它不进入生产 fixture schema，也不让 `standard-only` 选择动作。加载时会
 校验 schema、scenario、比较牌种和重复 ID，`structural-metrics.test.ts` 对真实 evaluator
@@ -102,7 +121,7 @@ pnpm --filter @new-mj/ai evaluate arena run --help
 ## Baseline/candidate policy 契约
 
 通用 policy source 由 `ref` 或 `modulePath`、可选 `exportName` 组成；默认导出是模块自己的
-`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@4`。`policy diff` 可用
+`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@5`。`policy diff` 可用
 `--baseline-export`/`--candidate-export` 比较同一模块中的显式策略导出；跨版本 match worker
 也携带相同 export 字段。当前树不加载权重资产。
 
@@ -172,7 +191,7 @@ batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
 只是薄 adapter，绑定 snapshot resolver、Junk evaluator worker 和 `junk-` 输出前缀。
 
-结构生产行为由 `fixtures/structural-baseline-v4.json` 固定。通用 comparator 和
+结构生产行为由 `fixtures/structural-baseline-v5.json` 固定。通用 comparator 和
 `scenario run --baseline <file>` 仍可对未来 baseline/candidate 资产做只读比较；命令不会创建
 或更新 baseline。
 
