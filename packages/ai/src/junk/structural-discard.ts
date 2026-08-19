@@ -132,48 +132,119 @@ export const evaluateVisibleStructuralShape = (
   );
 
 /**
- * Combined standard/seven-pairs shape. `sevenPairsHandicapFor(pairs)` gets
- * added to the seven-pairs side before the minimum — it must beat standard by
- * more than the handicap to change the comparison; the handicap shrinks to 0
- * once the hand is a real enough bet on the shape (see that function's doc).
- * The handicap is fixed from *this* hand's current pair count for the whole
- * call, including every `improvingKinds` candidate — it does not get
- * re-evaluated per candidate even if a candidate would cross a threshold.
- * Reimplements the combine loop by hand (O(1) incremental pairs/kinds update,
- * mirroring `shanten.ts`'s own internal fast path) instead of using
- * `evaluateUkeire`'s built-in `{ sevenPairs: true }` option, which has no
- * handicap parameter and always takes the raw, unhandicapped minimum.
+ * `tileSet.kindIndexOf(tileSet.kindOf(tile))` equals `Math.floor(tile /
+ * copiesPerKind)` (TileId encoding, see core `tiles.ts`) — same shortcut
+ * `shanten.ts`'s own `countsOf` uses, to avoid the redundant kind-string round
+ * trip in a loop that runs per candidate hand.
  */
-const bestRouteShapeWithHandicap = (
-  hand: readonly TileId[],
-  visibleCounts: ReadonlyMap<TileKind, number>,
-  existingMelds: number,
-): StructuralShape => {
-  const standardAnalysis = evaluateUkeire(hand, { sevenPairs: false }, STANDARD_TILE_SET, existingMelds);
-  const heldCounts = new Map<TileKind, number>();
-  for (const tile of hand) {
-    const kind = STANDARD_TILE_SET.kindOf(tile);
-    heldCounts.set(kind, (heldCounts.get(kind) ?? 0) + 1);
-  }
+const kindIndexCountsOf = (hand: readonly TileId[]): Uint8Array => {
+  const counts = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+  for (const tile of hand) counts[Math.floor(tile / STANDARD_TILE_SET.copiesPerKind)]! += 1;
+  return counts;
+};
+
+const pairsAndKindsHeldOf = (counts: Uint8Array): { pairs: number; kindsHeld: number } => {
   let pairs = 0;
-  const kindsHeld = heldCounts.size;
-  for (const count of heldCounts.values()) if (count >= 2) pairs += 1;
+  let kindsHeld = 0;
+  for (const count of counts) {
+    if (count >= 2) pairs += 1;
+    if (count > 0) kindsHeld += 1;
+  }
+  return { pairs, kindsHeld };
+};
+
+/**
+ * Combines an *already-computed* standard-only analysis with the (handicapped)
+ * seven-pairs route for one candidate hand — `parentCounts` minus one copy of
+ * `removedKindIndex` (or `parentCounts` as-is when `removedKindIndex < 0`, for
+ * a caller with nothing to remove, e.g. the claim `pass` comparison). Pure
+ * O(kinds) arithmetic on a shared counts array — no DP call, no per-candidate
+ * allocation or rebuild from the tile list — so batched callers (discard
+ * shortlist, 2-ply leaves) can share one `evaluateUkeireAfterDiscards` prober
+ * build *and* one counts/pairs/kindsHeld computation of the pre-removal hand
+ * across every candidate, paying only an O(1) delta per candidate instead of
+ * re-scanning the whole hand (this combine step showed up as expensive as the
+ * DP itself in profiling when it was rebuilding a fresh `Map` per candidate —
+ * see the commit that introduced this counts-array version).
+ *
+ * `sevenPairsHandicapFor(pairs)` gets added to the seven-pairs side before the
+ * minimum — it must beat standard by more than the handicap to change the
+ * comparison; the handicap shrinks to 0 once the hand is a real enough bet on
+ * the shape (see that function's doc). The handicap is fixed from *this*
+ * candidate's own resulting pair count, not the pre-removal parent's.
+ * Reimplements the seven-pairs side of the combine by hand (O(1) incremental
+ * pairs/kinds update, mirroring `shanten.ts`'s own internal fast path) instead
+ * of using `evaluateUkeire`'s built-in `{ sevenPairs: true }` option, which has
+ * no handicap parameter and always takes the raw, unhandicapped minimum.
+ */
+const combineWithSevenPairsHandicap = (
+  standardAnalysis: UkeireEvaluation,
+  parentCounts: Uint8Array,
+  parentPairs: number,
+  parentKindsHeld: number,
+  removedKindIndex: number,
+  visibleCounts: ReadonlyMap<TileKind, number>,
+): StructuralShape => {
+  const removedCount = removedKindIndex >= 0 ? parentCounts[removedKindIndex]! : 0;
+  const pairs = removedCount === 2 ? parentPairs - 1 : parentPairs;
+  const kindsHeld = removedCount === 1 ? parentKindsHeld - 1 : parentKindsHeld;
   const handicap = sevenPairsHandicapFor(pairs);
   const sevenPairsCurrent = 6 - pairs + Math.max(0, 7 - kindsHeld);
   const combinedCurrent = Math.min(standardAnalysis.shanten, sevenPairsCurrent + handicap);
-  const standardImproving = new Set(standardAnalysis.improvingKinds);
-  const improvingKinds = STANDARD_TILE_SET.kinds.filter((kind) => {
-    const held = heldCounts.get(kind) ?? 0;
-    if (held >= STANDARD_TILE_SET.copiesPerKind) return false;
-    const standardAfter = standardImproving.has(kind)
+  // Index-keyed flag array instead of `new Set(improvingKinds)` + string
+  // membership checks — both allocation and lookup are hashless, and this
+  // combine runs once per 2-ply leaf candidate (thousands of times per
+  // decision), where Set's per-call construction overhead is what showed up
+  // in profiling (see this function's doc for the profiling note).
+  const standardImproving = new Uint8Array(STANDARD_TILE_SET.kinds.length);
+  for (const kind of standardAnalysis.improvingKinds) {
+    standardImproving[STANDARD_TILE_SET.kindIndexOf(kind)] = 1;
+  }
+  // Inlined instead of building an improvingKinds array and handing it to
+  // structuralShapeFromUkeire (that helper's own .map/.filter/.reduce over
+  // it) — StructuralShape only keeps two scalar aggregates, so materializing
+  // the intermediate TileKind[] here just to immediately throw it away wastes
+  // two more array allocations per candidate on top of this function's own
+  // 34-kind scan (same profiling note as above: cheap in isolation, but this
+  // scan runs per 2-ply leaf candidate, thousands of times per decision).
+  let liveImprovingKindCount = 0;
+  let liveImprovingTileCount = 0;
+  for (let index = 0; index < STANDARD_TILE_SET.kinds.length; index += 1) {
+    const held = parentCounts[index]! - (index === removedKindIndex ? 1 : 0);
+    if (held >= STANDARD_TILE_SET.copiesPerKind) continue;
+    const standardAfter = standardImproving[index]
       ? standardAnalysis.shanten - 1
       : standardAnalysis.shanten;
     const sevenPairsAfter =
       6 - (pairs + (held === 1 ? 1 : 0)) + Math.max(0, 7 - (kindsHeld + (held === 0 ? 1 : 0)));
     const combinedAfter = Math.min(standardAfter, sevenPairsAfter + handicap);
-    return combinedAfter < combinedCurrent;
-  });
-  return structuralShapeFromUkeire({ shanten: combinedCurrent, improvingKinds }, visibleCounts);
+    if (combinedAfter >= combinedCurrent) continue;
+    const kind = STANDARD_TILE_SET.kinds[index]!;
+    const liveCopies = Math.max(0, STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0));
+    if (liveCopies > 0) liveImprovingKindCount += 1;
+    liveImprovingTileCount += liveCopies;
+  }
+  return { standardShanten: combinedCurrent, liveImprovingKindCount, liveImprovingTileCount };
+};
+
+/** Single-hand convenience wrapper — for call sites with exactly one candidate
+ * and no discard to remove (e.g. the claim `pass` comparison), where there's
+ * nothing to batch or delta from. */
+const bestRouteShapeWithHandicap = (
+  hand: readonly TileId[],
+  visibleCounts: ReadonlyMap<TileKind, number>,
+  existingMelds: number,
+): StructuralShape => {
+  const counts = kindIndexCountsOf(hand);
+  const { pairs, kindsHeld } = pairsAndKindsHeldOf(counts);
+  return combineWithSevenPairsHandicap(
+    evaluateUkeire(hand, { sevenPairs: false }, STANDARD_TILE_SET, existingMelds),
+    counts,
+    pairs,
+    kindsHeld,
+    -1,
+    visibleCounts,
+  );
 };
 
 /**
@@ -283,46 +354,46 @@ export const evaluateStructuralContinuation = (
     }
     const leafCounts = structuralVisibleKindCounts(new Set(occupied).add(drawnTile));
     const secondDiscardActions = uniqueDiscardActions(afterDraw);
-    // Every concealed-hand candidate is re-evaluated individually here (loses
-    // the shared-prober batching the standard-only branch below gets from
-    // evaluateUkeireAfterDiscards) because the handicap needs each candidate's
-    // own post-discard pair count, which the batched API has no hook for.
-    const bestLeaf = canPursueSevenPairs
-      ? secondDiscardActions
-          .map((action) => ({
-            action,
-            shape: bestRouteShapeWithHandicap(
-              afterDraw.filter((tile) => tile !== action.tile),
-              leafCounts,
-              existingMelds,
-            ),
-          }))
-          .sort(
-            (left, right) =>
-              compareStructuralShape(left.shape, right.shape) ||
-              compareAction(left.action, right.action),
-          )[0]
-      : // Batched over one shared createTwoChangeShantenProber build instead of one
-        // full evaluateUkeire (fresh 4-suit DP) per second-discard candidate — see
-        // docs/architecture/shanten.md "2-ply 批量结构 API".
-        evaluateUkeireAfterDiscards(
-          afterDraw,
-          secondDiscardActions.map((action) =>
-            STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
-          ),
-          { sevenPairs: false },
-          STANDARD_TILE_SET,
-          existingMelds,
-        )
-          .map((analysis, index) => ({
-            action: secondDiscardActions[index]!,
-            shape: structuralShapeFromUkeire(analysis, leafCounts),
-          }))
-          .sort(
-            (left, right) =>
-              compareStructuralShape(left.shape, right.shape) ||
-              compareAction(left.action, right.action),
-          )[0];
+    const secondDiscardKindIndexes = secondDiscardActions.map((action) =>
+      Math.floor(action.tile / STANDARD_TILE_SET.copiesPerKind),
+    );
+    // Batched over one shared createTwoChangeShantenProber build instead of one
+    // full evaluateUkeire (fresh 4-suit DP) per second-discard candidate — see
+    // docs/architecture/shanten.md "2-ply 批量结构 API". The seven-pairs
+    // handicap combine (when eligible) reuses this same standard-only batch and
+    // one afterDraw counts/pairs/kindsHeld computation shared across every
+    // candidate — pure O(1) delta per candidate, no extra DP call or per-
+    // candidate hand rebuild.
+    const standardSecondDiscardBatch = evaluateUkeireAfterDiscards(
+      afterDraw,
+      secondDiscardKindIndexes,
+      { sevenPairs: false },
+      STANDARD_TILE_SET,
+      existingMelds,
+    );
+    const afterDrawCounts = canPursueSevenPairs ? kindIndexCountsOf(afterDraw) : undefined;
+    const afterDrawPairsAndKinds = afterDrawCounts ? pairsAndKindsHeldOf(afterDrawCounts) : undefined;
+    const bestLeaf = standardSecondDiscardBatch
+      .map((analysis, index) => {
+        const action = secondDiscardActions[index]!;
+        const shape =
+          afterDrawCounts && afterDrawPairsAndKinds
+            ? combineWithSevenPairsHandicap(
+                analysis,
+                afterDrawCounts,
+                afterDrawPairsAndKinds.pairs,
+                afterDrawPairsAndKinds.kindsHeld,
+                secondDiscardKindIndexes[index]!,
+                leafCounts,
+              )
+            : structuralShapeFromUkeire(analysis, leafCounts);
+        return { action, shape };
+      })
+      .sort(
+        (left, right) =>
+          compareStructuralShape(left.shape, right.shape) ||
+          compareAction(left.action, right.action),
+      )[0];
     if (!bestLeaf) continue;
     leafCount += 1;
     continuationMass += probability;
@@ -411,42 +482,42 @@ export const evaluateStructuralDiscard = (
   // so duplicate-kind legal actions (rare with legalActions.length > 1 per kind)
   // share the same batch entry.
   const firstDiscardKindIndexes = [
-    ...new Set(
-      discards.map((action) =>
-        STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(action.tile)),
-      ),
-    ),
+    ...new Set(discards.map((action) => Math.floor(action.tile / STANDARD_TILE_SET.copiesPerKind))),
   ];
   // A discard never creates a meld, so it can't foreclose seven pairs on its own —
   // eligibility only depends on melds already declared before this decision.
   const canPursueSevenPairs = existingMelds === 0;
-  // Same per-candidate re-evaluation tradeoff as evaluateStructuralContinuation's
-  // bestLeaf above: each discard kind needs its own post-discard pair count for
-  // the handicap, which evaluateUkeireAfterDiscards' batched API has no hook for.
-  const onePlyByKindIndex = canPursueSevenPairs
-    ? new Map(
-        firstDiscardKindIndexes.map((kindIndex) => {
-          const kind = STANDARD_TILE_SET.kinds[kindIndex]!;
-          const tileToRemove = view.hand.find((tile) => STANDARD_TILE_SET.kindOf(tile) === kind)!;
-          const resultingHand = view.hand.filter((tile) => tile !== tileToRemove);
-          return [
-            kindIndex,
-            bestRouteShapeWithHandicap(resultingHand, visibleCounts, existingMelds),
-          ] as const;
-        }),
-      )
-    : new Map(
-        evaluateUkeireAfterDiscards(
-          view.hand,
-          firstDiscardKindIndexes,
-          { sevenPairs: false },
-          STANDARD_TILE_SET,
-          existingMelds,
-        ).map((analysis) => [
+  const standardFirstDiscardBatch = evaluateUkeireAfterDiscards(
+    view.hand,
+    firstDiscardKindIndexes,
+    { sevenPairs: false },
+    STANDARD_TILE_SET,
+    existingMelds,
+  );
+  // The seven-pairs handicap combine (when eligible) reuses this same
+  // standard-only batch and one view.hand counts/pairs/kindsHeld computation
+  // shared across every candidate kind — pure O(1) delta per candidate, no
+  // extra DP call or per-candidate hand rebuild.
+  const handCounts = canPursueSevenPairs ? kindIndexCountsOf(view.hand) : undefined;
+  const handPairsAndKinds = handCounts ? pairsAndKindsHeldOf(handCounts) : undefined;
+  const onePlyByKindIndex = new Map(
+    standardFirstDiscardBatch.map((analysis) => {
+      if (!(handCounts && handPairsAndKinds)) {
+        return [analysis.discardKindIndex, structuralShapeFromUkeire(analysis, visibleCounts)] as const;
+      }
+      return [
+        analysis.discardKindIndex,
+        combineWithSevenPairsHandicap(
+          analysis,
+          handCounts,
+          handPairsAndKinds.pairs,
+          handPairsAndKinds.kindsHeld,
           analysis.discardKindIndex,
-          structuralShapeFromUkeire(analysis, visibleCounts),
-        ]),
-      );
+          visibleCounts,
+        ),
+      ] as const;
+    }),
+  );
   const base = discards.map((action) => ({
     action,
     onePly: onePlyByKindIndex.get(
