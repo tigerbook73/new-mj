@@ -14,7 +14,7 @@
 ## 生产代码
 
 - 决策函数只消费 core 的 view/actions；强度与随机性通过可选参数注入，默认 `Math.random`，测试与自对弈注入基于 core PRNG 的闭包。
-- Junk 默认生产只使用普通标准型无权重结构 facade；`strategy.ts` 是稳定加载根，只保留最终动作选择并重导结构诊断 API。生产路径不得 import `evaluation/`。
+- Junk 默认生产使用普通标准型 + 七对无权重结构 facade（七对接入范围与惩罚设计见 `docs/architecture/shanten.md`"七对结构路线"节）；`strategy.ts` 是稳定加载根，只保留最终动作选择并重导结构诊断 API。生产路径不得 import `evaluation/`。
 - 当前生产策略身份由 `JUNK_STRUCTURAL_BASELINE` 固定；有意改变 canonical 行为时新建 baseline 版本及对照资产，不静默改写既有版本。
 - 不保留生产权重、旧加权评分闭包或调权入口；后续演进通过结构 baseline/candidate 比较完成。
 - `junk/bot-agent.ts` 的 `JunkBotAgent` 是生产诊断用的有状态封装（每座位一个实例，由 `apps/server` 创建/持有/清理），内部只调用 `structural-baseline.ts` 的纯函数；新增字段前先确认调用方（server）真的需要，不预先占位。

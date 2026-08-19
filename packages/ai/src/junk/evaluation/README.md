@@ -20,17 +20,30 @@ provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snap
 `*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
 副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
 
-`fixtures/structural-baseline-v1.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
-`structural-baseline@1` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
-期望动作以及 hu/zimo/draw 流程动作。生产 facade 与完整 core 对局测试都对照同一个版本化 v1
-实现；有意改变这些行为时必须建立新版本，不能静默改写 v1。
+`fixtures/structural-baseline-v2.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
+`structural-baseline@2` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
+期望动作以及 hu/zimo/draw 流程动作。生产 facade 与完整 core 对局测试都对照同一个版本化实现；
+有意改变这些行为时必须建立新版本，不能静默改写当前版本。
 
-该版本建立时沿用已经完成的固定环境证据，不把耗时写成跨机器硬断言：bounded/full teacher
-在 seed `20260814` 的 1000 个开发场景一致 `1000/1000`，P95 为 `33.85/95.41ms`；seed
-`20260815` 的 1000 个留出场景一致 `999/1000`，P95 为 `33.41/94.51ms`。完整策略在 seed
-`20260817` 的 50 seeds / 100 场运行中无失败或步数上限，单次结构决策 P95 为 `26.590ms`。
-这些数值描述 v1 建立时的边界；后续 candidate 应在同环境重跑并与进入 slice 前的 structural
-baseline 比较。
+v1（`structural-baseline@1`，仅普通标准型）建立时的固定环境证据：bounded/full teacher 在
+seed `20260814` 的 1000 个开发场景一致 `1000/1000`，P95 为 `33.85/95.41ms`；seed `20260815`
+的 1000 个留出场景一致 `999/1000`，P95 为 `33.41/94.51ms`。完整策略在 seed `20260817` 的
+50 seeds / 100 场运行中无失败或步数上限，单次结构决策 P95 为 `26.590ms`。
+
+v2 在 v1 基础上把七对路线接入生产弃牌 shortlist、2-ply 叶子和 claim `pass` 比较（取舍与惩罚
+设计见 `docs/architecture/shanten.md`"七对结构路线"节）。`evaluate policy diff`（baseline
+= main 的 v1，candidate = 当前 v2）在 seed `20260814` 的 20 局种子、12736 个决策点中有
+148 处（1.2%）动作不同，主要是弃牌（115）。生产自对弈胜率对照（`evaluateCandidatePolicies`，
+200 局种子 × 位置互换 = 400 场，v2 vs v1）：v2 胜 178 场（44.5%）、总分 +72（v1 为 -72）。
+单次结构弃牌决策耗时 P50 从 v1 的 `16.40ms` 升到 `17.23ms`、P95 从 `21.18ms` 升到
+`22.07ms`（约 5%）——七对惩罚需要逐候选各自的对数，最初实现为此丢弃了标准型分支的共享
+prober 批量优化（首个原型 P50 一度到 `30.24ms`，约 87% 开销）；后续三轮优化把对数计算
+改成共享一次父手牌计数、每候选只做 O(1) 增量，并把结果聚合从"建 `TileKind[]` 数组再
+map/filter/reduce"改成单趟遍历直接累加两个标量，省掉的主要是每候选反复分配/丢弃中间
+数组的 GC 压力（profiling 显示这一步一度和标准型 DP 本身耗时相当）。三轮优化经
+`evaluate policy diff` 对已提交版本做过 20 局种子 12828 决策点全量比对，`0` 处不同，
+确认是纯实现重构、不改变任何决策。这些数值描述 v2 建立时的边界；后续 candidate 应在同
+环境重跑并与进入 slice 前的 structural baseline 比较。
 
 `fixtures/canonical-structural-expectations.json` 独立记录人工确认的候选关系、精确结构
 指标和理由；它不进入生产 fixture schema，也不让 `standard-only` 选择动作。加载时会
@@ -64,7 +77,7 @@ pnpm --filter @new-mj/ai evaluate arena run --help
 ## Baseline/candidate policy 契约
 
 通用 policy source 由 `ref` 或 `modulePath`、可选 `exportName` 组成；默认导出是模块自己的
-`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@1`。`policy diff` 可用
+`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@2`。`policy diff` 可用
 `--baseline-export`/`--candidate-export` 比较同一模块中的显式策略导出；跨版本 match worker
 也携带相同 export 字段。当前树不加载权重资产。
 
@@ -134,7 +147,7 @@ batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
 只是薄 adapter，绑定 snapshot resolver、Junk evaluator worker 和 `junk-` 输出前缀。
 
-结构生产行为由 `fixtures/structural-baseline-v1.json` 固定。通用 comparator 和
+结构生产行为由 `fixtures/structural-baseline-v2.json` 固定。通用 comparator 和
 `scenario run --baseline <file>` 仍可对未来 baseline/candidate 资产做只读比较；命令不会创建
 或更新 baseline。
 

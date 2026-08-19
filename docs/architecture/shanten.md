@@ -160,8 +160,8 @@ ukeire scans`）的提交信息，本文件不重复记录历史数字（见文�
   它不是质量权重，容差内继续比较下一项结构指标。
 
 该 bounded 路径是 Junk 普通标准型生产弃牌基线，也是当前树唯一生产实现。旧加权策略已由
-Git 历史承担回溯；番型、七对和防守必须在后续独立 slice 中用 fixture/A-B 证据逐项加入，
-不能借此边界隐式改变。
+Git 历史承担回溯；七对已按下文"七对结构路线"一节的证据流程加入生产；番型和防守仍必须在
+后续独立 slice 中用 fixture/A-B 证据逐项加入，不能借此边界隐式改变。
 
 ### Claim/pass 的结构比较
 
@@ -196,9 +196,38 @@ gang 补牌预算固定为至多 34 个 draw kind × 每分支至多 11 个 disc
 ### 七对结构路线
 
 Core 的 `sevenPairs: true` 是 standard/seven-pairs 取最小值的合并开关，不保留路线身份。AI
-若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手允许
-seven-pairs。路线按上述三项固定字典序选择，完全打平时 standard，不使用 `qiduiPotential`
-或其他连续权重。当前仅建立独立路线模型，尚未接入 bounded 2-ply 或生产入口。
+若需解释和比较路线，必须分别保留两路向听、可见存活进张种类和张数；仅无副露暗手
+（`existingMelds === 0`）允许 seven-pairs——任何吃/碰/明杠/暗杠/补杠都会让 `existingMelds`
+变成 >0，从此这手牌永久失去七对资格（`packages/core/src/rulesets/junk/state-machine.ts` 的
+`own.melds.length === 0` 门槛，`docs/variants/junk.md` §3）。`structural-routes.ts` 的
+`evaluateStructuralRoutes`/`classifyOrdinaryStructuralGate` 是这套路线判定最早的纯诊断版本，
+只做只读分类，不接入任何生产决策。
+
+七对已接入生产弃牌 shortlist、2-ply 叶子和 claim `pass` 比较（`structural-discard.ts`/
+`structural-claim.ts`），接入规则不对称：任何会让 `existingMelds` 增加的动作（chi/peng/
+minGang/anGang/buGang）必须只用标准型 shape 比较，因为选它必然报废七对，比较两路线取优
+毫无意义；不改变 `existingMelds` 的动作（discard、pass）才允许在两路线间取优。
+
+直接拿两路向听数字打 min 比较（无差别合并）在生产自对弈 A/B（`evaluateCandidatePolicies`，
+200 seed 位置互换换位对局）中明显跑负，原因是七对同向听数通常比标准型更难真正兑现——
+每一步能吃的牌种更窄（只能凑自己那张对子，标准型还能吃顺子/刻子两种结构），无差别合并
+系统性高估了七对、导致弃牌/2-ply 过度偏向追七对。最终生产实现给七对侧加一个随暗对数
+递减的整数级差惩罚（`structural-discard.ts` 的 `sevenPairsHandicapFor`）：暗对越少、离
+"真的赌七对"越远，要求它领先标准型的差距就越大；暗对数够多（当前门槛 5）后不再打折，
+直接用未惩罚的原始 min，此时继续压制会白白丢掉本该兑现的完成。三档惩罚（对数 <4/<5/≥5）
+经同一 A/B 协议对比无惩罚、单一固定惩罚、单一硬阈值等多个变体确认为当前最优，具体分数
+见 commit 提交信息（本文件不重复记录历史数字）。
+
+`combineWithSevenPairsHandicap` 是这个惩罚组合逻辑的纯算术实现（不含 DP、O(kinds) 复杂度），
+但按摸牌种类×次弃候选的搜索结构，单次弃牌决策里它会被调用上千次，早期实现为每个候选单独
+调 `evaluateUkeire` 现算标准型分析，等于放弃了标准型分支原本就有的共享 prober 批量优化
+（`evaluateUkeireAfterDiscards`），一度让 P50 从 v1 的 `16.40ms` 涨到 `30.24ms`（约 87%）。
+经三轮性能重构收窄：改为共享一次父手牌的计数/对数/持牌种类数、每候选只做 O(1) 增量而非
+重新扫描整手牌；再把结果聚合从"筛出 `TileKind[]` 数组再交给通用 helper 做 map/filter/reduce"
+改成单趟遍历直接累加两个标量，省掉每候选反复分配/丢弃中间数组的 GC 压力（这一步的收益
+远超预期——profiling 显示它一度和标准型 DP 本身耗时相当）。最终 P50 收窄到 `17.23ms`
+（约 5% 开销），`evaluate policy diff` 对已提交版本做过 20 局种子 12828 决策点全量比对确认
+`0` 处不同，三轮重构纯粹是实现层面优化，不改变任何决策。
 
 ## Junk legacy 搜索机制的可复用边界
 
