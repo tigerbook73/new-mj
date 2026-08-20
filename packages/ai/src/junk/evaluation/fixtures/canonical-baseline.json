@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "canonical-baseline",
-  "version": 3,
+  "version": 4,
   "purpose": "canonical-baseline",
   "description": "固定普通牌型输入，用于记录当前生产 Junk AI 的可重复决策基线。",
   "scenarios": [
@@ -73,6 +73,13 @@
       "source": { "kind": "snapshot", "snapshotId": "claim-pass-preserves-menqing-001" },
       "description": "吃牌后与 pass 向听打平（都是 2），只靠存活进张种类/张数的字典序 tiebreak 才会赢，不构成真正的向听改善；门清仍存活时不足以抵消永久报废门清 ×2，结构策略应 pass。",
       "tags": ["menqing", "claim-selection", "chi", "pass"]
+    },
+    {
+      "id": "discard-pengpenghu-tiebreak-001",
+      "version": 1,
+      "source": { "kind": "snapshot", "snapshotId": "discard-pengpenghu-tiebreak-001" },
+      "description": "碰后无摸牌直接弃牌；两个候选在标准型 onePly 与 2-ply continuation 上完全打平，只有碰碰胡向听（此时=2，达到 tiebreak 门槛）能分出胜负，结构策略应弃 4z。",
+      "tags": ["pengpenghu", "discard-selection", "tiebreak"]
     }
   ]
 }

@@ -10,8 +10,15 @@ import {
   computeShanten,
   evaluateUkeire,
   evaluateUkeireAfterDiscards,
+  pengPengHuShanten,
   type UkeireEvaluation,
 } from "./shanten/index.ts";
+
+/** `JunkPlayerView["seats"][number]["melds"][number]`'s `type` isn't
+ * re-exported from core's public barrel on its own, so index into the view
+ * shape to name it — same trick used wherever meld-type checks are needed
+ * outside core. */
+type JunkMeld = JunkPlayerView["seats"][number]["melds"][number];
 
 export type StructuralShape = Readonly<{
   standardShanten: number;
@@ -38,6 +45,9 @@ const sevenPairsHandicapFor = (pairs: number): number => (pairs < 4 ? 2 : pairs 
 export type StructuralDiscardCandidate = Readonly<{
   action: Extract<JunkAction, { type: "discard" }>;
   onePly: StructuralShape;
+  /** Only populated for searched candidates while pengpenghu is still live
+   * (see `canPursuePengPengHu`); `null` otherwise. */
+  pengPengHu: StructuralShape | null;
   searched: boolean;
   dominated: boolean;
   immediateCompletionMass: number | null;
@@ -151,6 +161,50 @@ const pairsAndKindsHeldOf = (counts: Uint8Array): { pairs: number; kindsHeld: nu
     if (count > 0) kindsHeld += 1;
   }
   return { pairs, kindsHeld };
+};
+
+/** Any declared chi permanently forecloses pengpenghu (core's scoring.ts
+ * `isPengPengHu`); peng/minGang/anGang/buGang stay compatible, unlike seven
+ * pairs (any meld forecloses it) — so this route needs its own liveness check. */
+const canPursuePengPengHu = (melds: readonly JunkMeld[]): boolean =>
+  melds.every((meld) => meld.type !== "chi");
+
+/**
+ * All-triplets (pengpenghu) route shape for one candidate hand. Unlike the
+ * seven-pairs combine above, `pengPengHuShanten` is a closed-form formula
+ * (no DP, see its doc in shanten.ts), so there's no batched-prober version to
+ * reuse here — this recomputes per candidate kind directly, mirroring
+ * `structural-routes.ts`'s `sevenPairsShapeOf`. Scoped to the discard
+ * shortlist only (this function's only call site), matching every other
+ * route added here's discipline of keeping new signals out of the 2-ply
+ * continuation loop, not because this one specifically measured expensive.
+ */
+const pengPengHuShapeOf = (
+  hand: readonly TileId[],
+  visibleCounts: ReadonlyMap<TileKind, number>,
+  existingMelds: number,
+): StructuralShape => {
+  const shanten = pengPengHuShanten(hand, STANDARD_TILE_SET, existingMelds);
+  const heldCounts = new Map<TileKind, number>();
+  for (const tile of hand) {
+    const kind = STANDARD_TILE_SET.kindOf(tile);
+    heldCounts.set(kind, (heldCounts.get(kind) ?? 0) + 1);
+  }
+  let liveImprovingKindCount = 0;
+  let liveImprovingTileCount = 0;
+  for (const kind of STANDARD_TILE_SET.kinds) {
+    const held = heldCounts.get(kind) ?? 0;
+    if (held >= STANDARD_TILE_SET.copiesPerKind) continue;
+    const afterDraw = [...hand, tileIdOf(kind, held)];
+    if (pengPengHuShanten(afterDraw, STANDARD_TILE_SET, existingMelds) >= shanten) continue;
+    const liveCopies = Math.max(
+      0,
+      STANDARD_TILE_SET.copiesPerKind - (visibleCounts.get(kind) ?? 0),
+    );
+    if (liveCopies > 0) liveImprovingKindCount += 1;
+    liveImprovingTileCount += liveCopies;
+  }
+  return { standardShanten: shanten, liveImprovingKindCount, liveImprovingTileCount };
 };
 
 /**
@@ -456,13 +510,30 @@ export const compareStructuralContinuation = (
   );
 };
 
+/**
+ * Below this pengpenghu shanten, the route is far enough away that using it
+ * to break an otherwise-genuine standard-route tie adds noise rather than
+ * signal (see the arena sweep note next to this constant's test coverage) —
+ * same shape of problem `sevenPairsHandicapFor` solves for seven pairs, chosen
+ * by the same A/B methodology (200-seed position-swapped self-play).
+ */
+const PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD = 2;
+
 const compareFinal = (
   left: StructuralDiscardCandidate,
   right: StructuralDiscardCandidate,
 ): number => {
+  const pengPengHuTiebreakEligible =
+    left.pengPengHu &&
+    right.pengPengHu &&
+    left.pengPengHu.standardShanten <= PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD &&
+    right.pengPengHu.standardShanten <= PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD;
   return (
     compareStructuralContinuation(left, right) ||
     compareStructuralShape(left.onePly, right.onePly) ||
+    (pengPengHuTiebreakEligible
+      ? compareStructuralShape(left.pengPengHu!, right.pengPengHu!)
+      : 0) ||
     compareAction(left.action, right.action)
   );
 };
@@ -479,6 +550,7 @@ export const evaluateStructuralDiscard = (
   const occupied = visibleStructuralTileIds(view);
   const visibleCounts = structuralVisibleKindCounts(occupied);
   const existingMelds = view.seats[view.seat]!.melds.length;
+  const pengPengHuViable = canPursuePengPengHu(view.seats[view.seat]!.melds);
   const discards = legalActions.filter(
     (action): action is Extract<JunkAction, { type: "discard" }> => action.type === "discard",
   );
@@ -556,6 +628,7 @@ export const evaluateStructuralDiscard = (
     if (!searchedActions.has(candidate.action.tile)) {
       return {
         ...candidate,
+        pengPengHu: null,
         searched: false,
         immediateCompletionMass: null,
         conditionalExpectedBestShanten: null,
@@ -568,6 +641,9 @@ export const evaluateStructuralDiscard = (
     leafCount += continuation.leafCount;
     return {
       ...candidate,
+      pengPengHu: pengPengHuViable
+        ? pengPengHuShapeOf(afterFirstDiscard, visibleCounts, existingMelds)
+        : null,
       searched: true,
       immediateCompletionMass: continuation.immediateCompletionMass,
       conditionalExpectedBestShanten: continuation.conditionalExpectedBestShanten,

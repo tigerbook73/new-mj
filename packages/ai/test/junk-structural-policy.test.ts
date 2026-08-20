@@ -9,7 +9,7 @@ import {
 } from "@new-mj/core";
 import { describe, expect, it } from "vitest";
 import { JunkBotAgent } from "../src/junk/bot-agent.ts";
-import { recommendJunkAction, recommendStructuralBaselineV3Action } from "../src/junk/strategy.ts";
+import { recommendJunkAction, recommendStructuralBaselineV4Action } from "../src/junk/strategy.ts";
 
 describe("structural Junk policy against the real core engine", () => {
   it("finishes a hand using only actions returned by core", { tags: ["slow"] }, () => {
@@ -35,7 +35,7 @@ describe("structural Junk policy against the real core engine", () => {
       const legalActions = junkRuleSet.getLegalActions(state, seat) as JunkAction[];
       expect(legalActions.length).toBeGreaterThan(0);
       const playerView = junkRuleSet.getPlayerView(state, seat) as JunkPlayerView;
-      const baselineAction = recommendStructuralBaselineV3Action(playerView, legalActions);
+      const baselineAction = recommendStructuralBaselineV4Action(playerView, legalActions);
       const action = recommendJunkAction(playerView, legalActions);
       expect(action).toBe(baselineAction);
       expect(action).toBeDefined();

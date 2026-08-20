@@ -6,6 +6,7 @@ export {
   evaluateUkeireAfterDiscardDraws,
   standardShanten,
   sevenPairsShanten,
+  pengPengHuShanten,
   shantenWithExposedMelds,
   isTingpai,
   ukeire,

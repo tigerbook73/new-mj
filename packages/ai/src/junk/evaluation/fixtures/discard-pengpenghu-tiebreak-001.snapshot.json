@@ -1,0 +1,93 @@
+{
+  "view": {
+    "seat": 2,
+    "hand": [
+      { "kind": "4m", "copy": 3 },
+      { "kind": "4m", "copy": 2 },
+      { "kind": "4m", "copy": 0 },
+      { "kind": "8m", "copy": 3 },
+      { "kind": "8m", "copy": 0 },
+      { "kind": "2p", "copy": 2 },
+      { "kind": "4p", "copy": 0 },
+      { "kind": "5p", "copy": 1 },
+      { "kind": "4z", "copy": 2 },
+      { "kind": "6z", "copy": 0 },
+      { "kind": "6z", "copy": 3 }
+    ],
+    "dealer": 0,
+    "seats": [
+      {
+        "melds": [],
+        "discards": [
+          { "tile": { "kind": "1z", "copy": 0 } },
+          { "tile": { "kind": "2z", "copy": 0 } },
+          { "tile": { "kind": "3z", "copy": 2 } },
+          { "tile": { "kind": "5z", "copy": 1 } }
+        ],
+        "handCount": 13,
+        "justDrawn": false
+      },
+      {
+        "melds": [],
+        "discards": [
+          { "tile": { "kind": "2z", "copy": 2 } },
+          { "tile": { "kind": "2z", "copy": 1 } },
+          { "tile": { "kind": "3z", "copy": 3 } },
+          { "tile": { "kind": "5z", "copy": 3 } }
+        ],
+        "handCount": 13,
+        "justDrawn": false
+      },
+      {
+        "melds": [
+          {
+            "type": "peng",
+            "tiles": [
+              { "kind": "2m", "copy": 3 },
+              { "kind": "2m", "copy": 0 },
+              { "kind": "2m", "copy": 1 }
+            ],
+            "from": 3
+          }
+        ],
+        "discards": [
+          { "tile": { "kind": "1z", "copy": 3 } },
+          { "tile": { "kind": "2z", "copy": 3 } },
+          { "tile": { "kind": "1m", "copy": 3 } },
+          { "tile": { "kind": "1p", "copy": 3 } }
+        ],
+        "handCount": 11,
+        "justDrawn": true
+      },
+      {
+        "melds": [],
+        "discards": [
+          { "tile": { "kind": "4z", "copy": 0 } },
+          { "tile": { "kind": "2m", "copy": 1 }, "claimedBy": 2 },
+          { "tile": { "kind": "9s", "copy": 2 } },
+          { "tile": { "kind": "9m", "copy": 3 } }
+        ],
+        "handCount": 13,
+        "justDrawn": false
+      }
+    ],
+    "wallCount": 68,
+    "currentSeat": 2,
+    "phase": "playing",
+    "lastDiscard": { "seat": 1, "tile": { "kind": "5z", "copy": 3 } },
+    "justDrawn": { "kind": "4z", "copy": 2 }
+  },
+  "legalActions": [
+    { "type": "discard", "tile": { "kind": "4m", "copy": 3 } },
+    { "type": "discard", "tile": { "kind": "5p", "copy": 1 } },
+    { "type": "discard", "tile": { "kind": "2p", "copy": 2 } },
+    { "type": "discard", "tile": { "kind": "4p", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "4m", "copy": 2 } },
+    { "type": "discard", "tile": { "kind": "8m", "copy": 3 } },
+    { "type": "discard", "tile": { "kind": "6z", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "6z", "copy": 3 } },
+    { "type": "discard", "tile": { "kind": "4m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "8m", "copy": 0 } },
+    { "type": "discard", "tile": { "kind": "4z", "copy": 2 } }
+  ]
+}
