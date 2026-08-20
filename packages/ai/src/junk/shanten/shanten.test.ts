@@ -19,6 +19,7 @@ import {
   evaluateUkeire,
   evaluateUkeireBatch,
   isTingpai,
+  pengPengHuShanten,
   sevenPairsShanten,
   shantenWithExposedMelds,
   standardShanten,
@@ -66,6 +67,103 @@ test("sevenPairsShanten: formula handles distinct kinds and a seven-pairs hand",
   assert.equal(sevenPairsShanten(hand), -1);
   assert.equal(sevenPairsShanten(hand.slice(0, -1)), 0);
 });
+
+test("pengPengHuShanten: complete all-triplets hand is -1, one-away is 0", () => {
+  const winning = [
+    id("1m", 0),
+    id("1m", 1),
+    id("1m", 2),
+    id("5p", 0),
+    id("5p", 1),
+    id("5p", 2),
+    id("9s", 0),
+    id("9s", 1),
+    id("9s", 2),
+    id("1z", 0),
+    id("1z", 1),
+    id("1z", 2),
+    id("2z", 0),
+    id("2z", 1),
+  ];
+  assert.equal(pengPengHuShanten(winning), -1);
+  assert.equal(pengPengHuShanten(winning.slice(0, -1)), 0);
+});
+
+test("pengPengHuShanten: a run-heavy hand is much worse under the triplet-only route than standard", () => {
+  const hand = ids([
+    "1m",
+    "2m",
+    "3m",
+    "4m",
+    "5m",
+    "6m",
+    "7m",
+    "8m",
+    "9m",
+    "1p",
+    "2p",
+    "3p",
+    "4p",
+    "5p",
+  ]);
+  assert.ok(pengPengHuShanten(hand) > standardShanten(hand));
+});
+
+test("pengPengHuShanten: existingMelds caps the remaining triplet slots", () => {
+  const twoPairs = ids(["1m", "1m", "5p", "5p"]);
+  assert.equal(pengPengHuShanten(twoPairs, STANDARD_TILE_SET, 3), 8 - 2 * 3 - 1 - 1);
+});
+
+/**
+ * Independent recursive ground truth for pengPengHuShanten: per-kind, either
+ * skip it, use it as a meld (needs count>=3), use it as a partial toward a
+ * meld (needs count>=2), or use it as the head pair (needs count>=2, at most
+ * once) — no rank-adjacency branch at all, since triplets never care about
+ * neighboring ranks. Cross-checked against the closed-form implementation
+ * across random hands below; kept in the test file only (not production
+ * code) since the closed-form is what actually ships.
+ */
+const bruteForcePengPengHuShanten = (counts: readonly number[], existingMelds: number): number => {
+  const search = (index: number, melds: number, tatsu: number, pair: number): number => {
+    if (index === counts.length) {
+      const usableTatsu = Math.min(tatsu, 4 - melds);
+      return 8 - melds * 2 - usableTatsu - pair;
+    }
+    const count = counts[index] ?? 0;
+    let best = search(index + 1, melds, tatsu, pair);
+    if (count >= 3 && melds < 4) best = Math.min(best, search(index + 1, melds + 1, tatsu, pair));
+    if (count >= 2) {
+      best = Math.min(best, search(index + 1, melds, tatsu + 1, pair));
+      if (pair === 0) best = Math.min(best, search(index + 1, melds, tatsu, 1));
+    }
+    return best;
+  };
+  return search(0, existingMelds, 0, 0);
+};
+
+test(
+  "pengPengHuShanten matches an independent triplet/pair-only recursive brute force across random hands",
+  { tags: ["slow"] },
+  () => {
+    let prng = createPrng(20260820);
+    const allIds = allTileIds();
+    for (let trial = 0; trial < 1000; trial += 1) {
+      const shuffled = shuffle(allIds, prng);
+      prng = shuffled.prng;
+      const handSize = 1 + (trial % 14);
+      const hand = shuffled.items.slice(0, handSize);
+      const existingMelds = trial % 5;
+      const counts = new Array(STANDARD_TILE_SET.kinds.length).fill(0);
+      for (const tile of hand)
+        counts[STANDARD_TILE_SET.kindIndexOf(STANDARD_TILE_SET.kindOf(tile))] += 1;
+      assert.equal(
+        pengPengHuShanten(hand, STANDARD_TILE_SET, existingMelds),
+        bruteForcePengPengHuShanten(counts, existingMelds),
+        `handSize=${handSize} existingMelds=${existingMelds}`,
+      );
+    }
+  },
+);
 
 test("computeShanten: seven-pairs option changes the selected family", () => {
   const hand = ["1z", "2z", "3z", "4z", "5z", "6z", "7z"].flatMap((kind) => [

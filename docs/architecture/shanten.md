@@ -161,9 +161,10 @@ ukeire scans`）的提交信息，本文件不重复记录历史数字（见文�
 
 该 bounded 路径是 Junk 普通标准型生产弃牌基线，也是当前树唯一生产实现。旧加权策略已由
 Git 历史承担回溯；七对已按下文"七对结构路线"一节的证据流程加入生产；门清 claim 阈值
-（下文"门清 claim 阈值"节）是番型收益模型可行性专题的第一个 slice，已加入生产；清一色/
-混一色/碰碰胡/杠开等其余番型和防守仍必须在后续独立 slice 中用 fixture/A-B 证据逐项加入，
-不能借此边界隐式改变。
+（下文"门清 claim 阈值"节）是番型收益模型可行性专题的第一个 slice，已加入生产；碰碰胡
+弃牌 tiebreak（下文"碰碰胡结构路线"节）是第二个 slice，已加入生产（discard-only，不含
+claim）；清一色/混一色/杠开等其余番型和防守仍必须在后续独立 slice 中用 fixture/A-B 证据
+逐项加入，不能借此边界隐式改变。
 
 ### Claim/pass 的结构比较
 
@@ -269,6 +270,64 @@ backlog 警告的"把不可靠的胡牌概率伪装成诊断真值"那个坑，�
 `47.0%`；七对单独相对原始基线是净分 `+72`、胜场率 `44.5%`；门清阈值单独相对七对基线是净分
 `+83`、胜场率 `46.5%`。两次增量方向一致、量级相近（`72+83=155` 与累计 `130` 同一量级，
 不同批次跑测，不要求精确可加），没有出现叠加后相互抵消的异常信号。
+
+### 碰碰胡结构路线
+
+番型路线收益模型可行性专题的第二个 slice。`packages/core/src/rulesets/junk/scoring.ts` 的
+`isPengPengHu`（×2）判定是：`family === "standard"` 且没有 chi meld、且每个暗手三张组都是
+刻子——peng/minGang/anGang/buGang 都不影响它，只有 chi 会永久报废，这是三条已接入路线里
+第三种存活规则（七对：任何副露都破；门清：chi/peng/minGang/buGang 破、anGang 不破；碰碰胡：
+只有 chi 破）。
+
+碰碰胡向听（4 组刻子 + 1 雀头，不含顺子）不需要像标准型那样处理 rank 邻接——刻子只看"是否
+同种凑够 3 张"，不同牌种之间完全独立，因此不需要新建 Layer 0 DP 表，是一个闭式公式
+（`shanten.ts` 的 `pengPengHuShanten`/`pengPengHuShantenFromCounts`）：
+
+```
+melds = min(4 - existingMelds, 拥有 ≥3 张的牌种数)
+partialsUsed = min(4 - existingMelds - melds, 拥有恰好 2 张的牌种数)
+headBonus = 1，当还有未用作 partial 的对子牌种，或存在未计入 melds 的多余刻子（其
+            自身内含可拆出的对子）；否则 0
+shanten = 8 - 2*(existingMelds + melds) - partialsUsed - headBonus
+```
+
+与 `standardShantenByRecursion` 的终态公式 `8 - melds*2 - tatsu - pair` 同构，只是限制候选
+只能是刻子/对子分支（去掉顺子/搭子分支）。用 1000 个随机手牌对照一个独立的三元/对子专用
+递归 brute force（不共享任何实现，`shanten.test.ts`）逐一验证过，含 `existingMelds` 边界。
+
+只做弃牌方向：把碰碰胡向听接入弃牌 shortlist 的最终 tiebreak（`compareFinal`，onePly 之后、
+`compareAction` 之前），不碰 claim（chi 是否该被碰碰胡拦下留作后续 slice）。计算仅对已进入
+shortlist 的至多 5 个候选调用，不进入 2-ply continuation 每叶子调用一次的内层循环——这是
+从设计上直接复用七对惩罚重构后学到的教训，不是事后优化。
+
+第一版不加门槛、直接用两候选碰碰胡向听的裸比较打 tiebreak，200-seed 位置互换换位对局 A/B
+两批独立种子都是负分（`-40/400`、`-112/400`，合计 `-152/800`）。抽查分歧样本发现规律：
+触发这层 tiebreak 的两个候选在标准型 onePly 与 2-ply continuation 上永远是真平局（同向听、
+同听牌张——手算验证过至少两例：两种弃法本质上只是把两个完全对称的搭子换了个标签），而此时
+碰碰胡向听通常还有 4~5 级之遥，几乎不可能真正兑现。用一个这么远、这么不可能兑现的路线去
+打破一个各方面都对等的真平局，相当于在跟胜率无关的维度上做選擇，观察到的净负分被认为是
+这种“无信息量取舍”偶尔撞上标准型平局之外的细微差异（例如后续吃张点）导致的噪声偏置，不是
+碰碰胡信号本身在破坏标准型质量。
+
+修法是加一道门槛：只有当两个候选的碰碰胡向听都 ≤
+`PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD` 时才信这层 tiebreak，否则按 0（跳过）处理，
+让位给后面的 `compareAction`。同一 A/B 协议扫了 {4,3,2} 三档，净分随门槛收紧单调改善：
+阈值 4 为 `-34/800`，阈值 3 为 `0/800`，阈值 2 为 `+8/800`——採用阈值 2（当前树里唯一
+仍能捕捉到真实碰碰胡候选的门槛：`evaluate policy diff` 找到的分歧样本碰碰胡向听恰好是
+2）。`evaluate policy diff`（baseline = v3，candidate = v4）在同一 seed `20260814` 的
+20 局种子、11864 个决策点中，无门槛版本分歧 10 处（0.1%），阈值 2 版本收窄到 2 处
+（0.02%），全部是弃牌，其中一处（`discard-pengpenghu-tiebreak-001` fixture）确认是碰后
+无摸牌的直接弃牌决策：两候选在 onePly 与 continuation 上完全打平，碰碰胡向听恰为 2（已有
+一组明刻 + 一组暗刻 + 两组对子），tiebreak 选出正确弃牌。
+
+尝试过把 tiebreak 挪到 `compareFinal` 里 onePly 之前（更高优先级）而不是之后，结果与放在
+onePly 之后完全一致（byte-identical，同一批种子净分同为 `-152/800`）——数学上可预期：这层
+tiebreak 只在 onePly 已经打平时才可能改变比较结果（0 vs 非 0），一个恒为 0 的比较项插在
+序列中哪个位置都不影响整体结果，因此没有把它当成独立候选保留，位置放在 onePly 之后（更保守，
+只在标准型已经无法分辨时才生效）。
+
+由于覆盖率极窄（阈值 2 下约 0.02% 的决策点触发），800 场次的净分信号本身也接近噪声下限；
+这里采信的主要证据是四个门槛值净分随收紧方向单调变化的趋势，而不是任一单点的绝对值。
 
 ## Junk legacy 搜索机制的可复用边界
 

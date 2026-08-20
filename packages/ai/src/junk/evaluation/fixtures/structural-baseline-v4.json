@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "structural-baseline",
-  "version": 3,
-  "scope": "ordinary-standard+seven-pairs+menqing-claim-threshold",
-  "inputManifest": { "id": "canonical-baseline", "version": 3 },
+  "version": 4,
+  "scope": "ordinary-standard+seven-pairs+menqing-claim-threshold+pengpenghu-discard-tiebreak",
+  "inputManifest": { "id": "canonical-baseline", "version": 4 },
   "behavior": [
     { "scenarioId": "discard-001", "expectedAction": { "type": "discard", "kind": "5p" } },
     {
@@ -28,6 +28,10 @@
     {
       "scenarioId": "claim-pass-preserves-menqing-001",
       "expectedAction": { "type": "pass" }
+    },
+    {
+      "scenarioId": "discard-pengpenghu-tiebreak-001",
+      "expectedAction": { "type": "discard", "kind": "4z" }
     }
   ],
   "flowActions": ["hu", "zimo", "draw"],

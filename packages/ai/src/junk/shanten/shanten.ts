@@ -207,6 +207,50 @@ export const sevenPairsShanten = (
 ): number => sevenPairsShantenFromCounts(countsOf(tiles, tileSet));
 
 /**
+ * All-triplets (碰碰胡/toitoi) shanten: 4 melds + 1 pair, every meld a
+ * triplet — no sequences at all. Unlike standard shanten, triplet/pair
+ * eligibility never depends on rank adjacency (a triplet only ever needs 3
+ * of the *same* kind), so kinds don't interact with each other the way
+ * sequences force them to; this makes the optimal assignment a closed-form
+ * count rather than a search:
+ *
+ *   melds = min(existingMelds 之外的剩余名额, 拥有 ≥3 张的牌种数)
+ *   partialsUsed = min(剩余名额, 拥有恰好 2 张的牌种数)
+ *   headBonus = 1 当还剩至少一个未被用作 partial 的对子牌种，或存在一个
+ *     未被计入 melds 的多余刻子（它自身内含一个可拆出的对子）
+ *   shanten = 8 - 2*(existingMelds+melds) - partialsUsed - headBonus
+ *
+ * Same `8 - 2*melds - tatsu - pair` final-node formula as
+ * `standardShantenByRecursion`, specialized to only the triplet/pair
+ * branches (no run/tatsu branches). `headBonus` swapping a partial for the
+ * head when counts exactly saturate the remaining slots doesn't change the
+ * shanten number (both paths sum to the same `partialsUsed+headBonus`), so
+ * there's no extra case to special-case for the number itself — only which
+ * specific kind plays which role, which callers computing improving kinds
+ * handle by just recomputing the whole formula per candidate. Cross-checked
+ * against a triplet/pair-only recursive brute force in shanten.test.ts.
+ */
+const pengPengHuShantenFromCounts = (counts: readonly number[], existingMelds = 0): number => {
+  let triplets = 0;
+  let pairs = 0;
+  for (const count of counts) {
+    if (count >= 3) triplets += 1;
+    else if (count === 2) pairs += 1;
+  }
+  const remainingSlots = Math.max(0, 4 - existingMelds);
+  const melds = Math.min(remainingSlots, triplets);
+  const partialsUsed = Math.min(remainingSlots - melds, pairs);
+  const headBonus = pairs > partialsUsed || triplets > melds ? 1 : 0;
+  return 8 - 2 * (existingMelds + melds) - partialsUsed - headBonus;
+};
+
+export const pengPengHuShanten = (
+  tiles: readonly TileId[],
+  tileSet: TileSet = STANDARD_TILE_SET,
+  existingMelds = 0,
+): number => pengPengHuShantenFromCounts(countsOf(tiles, tileSet), existingMelds);
+
+/**
  * 玩法无关的标准型/七对二选一向听数：`sevenPairs` 只是一个开关，函数本身
  * 不含任何玩法专属逻辑（原名 `junkShanten` 是历史遗留，实际不只 junk 在用）。
  */

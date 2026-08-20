@@ -20,8 +20,8 @@ provider 会把牌种/牌副本转换为 TileId，并生成 `contentHash`。snap
 `*.snapshot.json` 保存某个玩家当时可见的完整生产决策边界（自己的手牌、公开牌河、
 副露、摸牌上下文和合法动作），不保存隐藏牌墙或其他玩家手牌。
 
-`fixtures/structural-baseline-v3.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
-`structural-baseline@3` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
+`fixtures/structural-baseline-v4.json` 是生产策略的行为 manifest，不是第二套场景输入：它绑定
+`structural-baseline@4` 与上述输入 manifest，固定 discard、claim、self-turn/gang 的 canonical
 期望动作以及 hu/zimo/draw 流程动作。生产 facade 与完整 core 对局测试都对照同一个版本化实现；
 有意改变这些行为时必须建立新版本，不能静默改写当前版本。
 
@@ -52,9 +52,23 @@ chi 50、peng 35）。生产自对弈胜率对照（同一 A/B 协议，v3 vs v2
 总分 +83（v2 为 -83）；对齐到七对合入前的原始基线（v3 vs v1）：v3 胜 188 场（47.0%）、
 总分 +130，与两次增量效果（+72、+83）方向一致、量级相近，没有相互抵消的信号。单次
 claim 决策耗时无可测量差异（v3 p50 `0.17ms` vs v2 `0.18ms`，差异在噪声范围内——claim
-比较本身不是像弃牌/2-ply 那样的高频热路径，门槛只是加了一个 O(1) filter）。这些数值
-描述 v3 建立时的边界；后续 candidate 应在同环境重跑并与进入 slice 前的 structural
-baseline 比较。
+比较本身不是像弃牌/2-ply 那样的高频热路径，门槛只是加了一个 O(1) filter）。
+
+v4 在 v3 基础上把碰碰胡（全刻子）接入弃牌 shortlist 的最终 tiebreak（不碰 claim；机制与
+门槛扫描见 `docs/architecture/shanten.md`"碰碰胡结构路线"节）。碰碰胡向听是闭式公式
+（`pengPengHuShanten`，牌种间互不干扰，不需要顺子那种 rank 邻接逻辑，也不需要新建 DP 表），
+用 1000 个随机手牌对照一个独立的三元/对子递归 brute force 交叉验证过（见
+`shanten.test.ts`）。第一版不加门槛直接接入 tiebreak，200-seed 换位对局 A/B 出现两批都为
+负（净分 -40、-112，共 -152/800）——诊断发现分歧样本大多是"标准型层面真平局、碰碰胡向听
+却有 4~5 级之遥"的场景，此时用它 tiebreak 相当于在两个标准型等价的选择间做一次跟胜率无关
+的取舍。加门槛只在碰碰胡向听 ≤ `PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD` 时生效后，
+扫了 {4,3,2} 三档：净分从 -34/800（阈值 4）到 0/800（阈值 3）到 +8/800（阈值 2），随门槛收紧
+单调改善，采用阈值 2。`evaluate policy diff`（baseline = v3，candidate = v4）在同一 seed
+`20260814` 的 20 局种子、11864 个决策点中，无门槛版本有 10 处（0.1%）分歧，阈值 2 版本收窄到
+2 处（0.02%），全部是弃牌。单次弃牌决策耗时无可测量差异（v4 p50 `17.91ms` vs v3 `17.76ms`，
+两次重复确认非噪声）——碰碰胡信号只在最多 5 个已进入 shortlist 的候选上调用，不进入 2-ply
+continuation 的内层循环。这些数值描述各版本建立时的边界；后续 candidate 应在同环境重跑并与
+进入 slice 前的 structural baseline 比较。
 
 `fixtures/canonical-structural-expectations.json` 独立记录人工确认的候选关系、精确结构
 指标和理由；它不进入生产 fixture schema，也不让 `standard-only` 选择动作。加载时会
@@ -88,7 +102,7 @@ pnpm --filter @new-mj/ai evaluate arena run --help
 ## Baseline/candidate policy 契约
 
 通用 policy source 由 `ref` 或 `modulePath`、可选 `exportName` 组成；默认导出是模块自己的
-`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@3`。`policy diff` 可用
+`chooseJunkAction`，因此当前工作树默认解析为 `structural-baseline@4`。`policy diff` 可用
 `--baseline-export`/`--candidate-export` 比较同一模块中的显式策略导出；跨版本 match worker
 也携带相同 export 字段。当前树不加载权重资产。
 
@@ -158,7 +172,7 @@ batch 的机制不属于 Junk：`src/evaluation/batch.ts` 定义通用 resumable
 manifest/JSONL header 校验、checkpoint schema/store、兼容性和恢复编排。这里的 Junk CLI
 只是薄 adapter，绑定 snapshot resolver、Junk evaluator worker 和 `junk-` 输出前缀。
 
-结构生产行为由 `fixtures/structural-baseline-v3.json` 固定。通用 comparator 和
+结构生产行为由 `fixtures/structural-baseline-v4.json` 固定。通用 comparator 和
 `scenario run --baseline <file>` 仍可对未来 baseline/candidate 资产做只读比较；命令不会创建
 或更新 baseline。
 
