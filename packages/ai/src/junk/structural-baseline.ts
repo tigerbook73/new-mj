@@ -5,27 +5,35 @@ import { evaluateStructuralTurn } from "./structural-turn.ts";
 /** Stable identity of the current production policy; bump the version for intentional behavior changes. */
 export const JUNK_STRUCTURAL_BASELINE = Object.freeze({
   id: "structural-baseline",
-  version: 4,
-  scope: "ordinary-standard+seven-pairs+menqing-claim-threshold+pengpenghu-discard-tiebreak",
+  version: 5,
+  scope:
+    "ordinary-standard+seven-pairs+menqing-claim-threshold+pengpenghu-discard-tiebreak+flush-discard-tiebreak",
 } as const);
 
 const isClaimContext = (legalActions: readonly JunkAction[]): boolean =>
   legalActions.some((action) => ["chi", "peng", "minGang", "hu", "pass"].includes(action.type));
 
 /**
- * Frozen v4 policy used by production and baseline tests: same v3 pipeline
- * (ordinary-standard + seven-pairs + menqing claim threshold), now additionally
- * breaking discard ties with a pengpenghu (all-triplets) route once both tied
- * candidates' pengpenghu shanten is within
- * `PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD` (see `structural-discard.ts`) —
- * discard-only, claim untouched. Fan value beyond menqing/pengpenghu, defense
- * and other special routes (flush, all-pungs) remain out of scope.
+ * Frozen v5 policy used by production and baseline tests: same v3 pipeline
+ * (ordinary-standard + seven pairs + menqing claim threshold), now additionally
+ * folding in two independent late discard tiebreaks — pengpenghu (all-triplets)
+ * once both tied candidates' pengpenghu shanten is within
+ * `PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD`, and flush (清一色/混一色 —
+ * analyzed together, see `structural-discard.ts`'s `bestFlushShapeOf` doc)
+ * folded into the discard shortlist's onePly ranking and the final tiebreak.
+ * Both are discard-only (claim untouched), standard route only (no combination
+ * with seven pairs), and sit below continuation (2-ply, the primary speed
+ * signal) in `compareFinal`'s tiebreak chain — see that function's doc for the
+ * full ordering. See `docs/architecture/shanten.md`"清一色/混一色弃牌方向"节
+ * and "碰碰胡结构路线"节 for the full scope rationale of each. Fan value beyond
+ * menqing/pengpenghu/flush, defense and other special routes (杠开, all-pungs
+ * as a primary pursuit) remain out of scope.
  */
-export const recommendStructuralBaselineV4Action = (
+export const recommendStructuralBaselineV5Action = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
 ): JunkAction | undefined =>
-  recommendStructuralBaselineV4ActionWithDiagnostics(view, legalActions).action;
+  recommendStructuralBaselineV5ActionWithDiagnostics(view, legalActions).action;
 
 /**
  * Diagnostic-only summary of a claim/turn decision, meant for production observability
@@ -43,12 +51,12 @@ export type StructuralDecisionDiagnostics = Readonly<{
 }>;
 
 /**
- * Same policy as `recommendStructuralBaselineV4Action`, plus a lightweight diagnostics summary
+ * Same policy as `recommendStructuralBaselineV5Action`, plus a lightweight diagnostics summary
  * for the claim/turn branch actually taken. Reuses `evaluateStructuralClaim`/`evaluateStructuralTurn`'s
  * already-computed candidates — no extra search. hu/zimo/draw short-circuits and the
  * no-candidates-available fallback both carry `diagnostics: null` (there was nothing to search).
  */
-export const recommendStructuralBaselineV4ActionWithDiagnostics = (
+export const recommendStructuralBaselineV5ActionWithDiagnostics = (
   view: JunkPlayerView,
   legalActions: readonly JunkAction[],
 ): { action: JunkAction | undefined; diagnostics: StructuralDecisionDiagnostics | null } => {

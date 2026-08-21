@@ -937,7 +937,7 @@ describe("RoomService — JunkBotAgent decision context", () => {
     const agentOn = on.room.botAgents[botSeat];
     expect(agentOff?.snapshot).toMatchObject({
       strategyId: "structural-baseline",
-      strategyVersion: 4,
+      strategyVersion: 5,
     });
     // The toggle must only affect whether the snapshot gets logged, never
     // the decision itself.

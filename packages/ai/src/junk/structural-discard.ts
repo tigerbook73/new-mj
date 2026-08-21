@@ -54,6 +54,9 @@ export type StructuralDiscardCandidate = Readonly<{
   conditionalExpectedBestShanten: number | null;
   conditionalExpectedBestLiveImprovingKindCount: number | null;
   conditionalExpectedBestLiveImprovingTileCount: number | null;
+  /** Only populated for searched candidates — see `compareFinal`'s doc for
+   * where this sits in the tiebreak chain. */
+  flush: StructuralShape | null;
 }>;
 
 export type StructuralDiscardResult = Readonly<{
@@ -329,6 +332,99 @@ export const compareStructuralShape = (left: StructuralShape, right: StructuralS
   right.liveImprovingKindCount - left.liveImprovingKindCount ||
   right.liveImprovingTileCount - left.liveImprovingTileCount;
 
+const NUMBER_SUITS = ["m", "p", "s"] as const;
+type NumberSuit = (typeof NUMBER_SUITS)[number];
+
+const suitOf = (kind: TileKind): NumberSuit | "z" =>
+  kind.endsWith("z") ? "z" : (kind.charAt(1) as NumberSuit);
+
+/**
+ * Unlike seven pairs (any meld at all forecloses it) or menqing (any non-anGang
+ * meld forecloses it), flush (清一色/混一色) only cares whether every already-
+ * declared meld's tiles are themselves within the target suit (honors always
+ * allowed either way — they're compatible with both the ×4 qingyise, no-honor
+ * outcome and the ×2 hunyise, has-honor outcome; which one the final hand lands
+ * on is a `scoring.ts`-time fact, not a pursuit-time choice, see
+ * `docs/architecture/shanten.md`"清一色/混一色弃牌方向"节). A claimed meld in a
+ * *different* suit permanently rules that suit out; melds already within the
+ * target suit (or honor-only, e.g. an anGang of a wind/dragon) don't.
+ */
+const meldsAllowFlush = (melds: readonly JunkMeld[], suit: NumberSuit): boolean =>
+  melds.every((meld) =>
+    meld.tiles.every((tile) => {
+      const tileSuit = suitOf(STANDARD_TILE_SET.kindOf(tile));
+      return tileSuit === suit || tileSuit === "z";
+    }),
+  );
+
+const filterToSuit = (hand: readonly TileId[], suit: NumberSuit): TileId[] =>
+  hand.filter((tile) => {
+    const tileSuit = suitOf(STANDARD_TILE_SET.kindOf(tile));
+    return tileSuit === suit || tileSuit === "z";
+  });
+
+/**
+ * Flush (清一色/混一色) shanten for a candidate target suit is standard shanten
+ * computed on the *filtered* subset of the hand (target suit + honors only,
+ * off-suit tiles simply omitted) — not a new algorithm: `evaluateUkeire` never
+ * assumed its input is exactly 13/14 tiles, so feeding it a shorter, filtered
+ * hand already answers "how many exchanges until this hand is confined to one
+ * suit" (verified: for a near-flush hand, discarding an off-suit tile leaves
+ * the filtered-subset shanten unchanged, discarding an on-suit tile makes it
+ * worse — exactly the direction a flush-pursuing discard ranking needs). No
+ * Layer 2 wildcard/joker extension needed (`docs/architecture/shanten.md`'s
+ * "长期决策" §3 — that layer is for actual joker tiles, junk has none per
+ * `docs/variants/junk.md` §1, and isn't what this needs anyway).
+ *
+ * Best of the standard route and the best-of-{m,p,s} flush route, for one
+ * candidate hand — raw min, no handicap. Unlike the seven-pairs route (see
+ * `sevenPairsHandicapFor`'s doc), which is wired pervasively into the
+ * *primary* onePly/2-ply search where an unhandicapped min measurably
+ * overrated it, flush here is only ever a late tiebreak among candidates the
+ * 2-ply search already judged equally fast (see the two call sites' own doc
+ * for exactly where — `evaluateStructuralDiscard`'s `candidates` map and
+ * `compareFinal`). A `handicap ∈ {0,1,2}` arena sweep (200-seed position-
+ * swapped self-play, `evaluateCandidatePolicies`) produced byte-identical
+ * decisions and match outcomes at every value tried — the handicap dimension
+ * is inert at this narrow integration scope, so it's dropped rather than kept
+ * as dead complexity. See `docs/architecture/shanten.md`"清一色/混一色弃牌
+ * 方向"节.
+ *
+ * Unlike seven pairs' O(1) incremental combine, flush shanten has no closed-
+ * form formula — this calls `evaluateUkeire` once per suit still allowed by
+ * the current melds (`meldsAllowFlush`), up to 3 extra shanten DPs per call.
+ * Deliberately not called from the 2-ply continuation's per-leaf loop
+ * (thousands of calls per decision) — that would repeat the seven-pairs
+ * handicap's original per-candidate-DP mistake at a strictly worse multiplier
+ * (a real DP per suit, not O(1) arithmetic); both actual call sites run at
+ * most `maxFirstCandidates` (5) times per decision. First slice scope:
+ * standard route only, no combination with seven pairs — flush and seven
+ * pairs can co-occur in real scoring, but combining both routes' pursuit
+ * logic in one slice was judged too much surface for a first cut.
+ */
+const bestFlushShapeOf = (
+  hand: readonly TileId[],
+  existingMelds: number,
+  melds: readonly JunkMeld[],
+  visibleCounts: ReadonlyMap<TileKind, number>,
+): StructuralShape => {
+  const standardShape = structuralShapeOf(hand, visibleCounts, existingMelds);
+  let bestFlush: StructuralShape | undefined;
+  for (const suit of NUMBER_SUITS) {
+    if (!meldsAllowFlush(melds, suit)) continue;
+    const analysis = evaluateUkeire(
+      filterToSuit(hand, suit),
+      { sevenPairs: false },
+      STANDARD_TILE_SET,
+      existingMelds,
+    );
+    const shape = structuralShapeFromUkeire(analysis, visibleCounts);
+    if (!bestFlush || compareStructuralShape(shape, bestFlush) < 0) bestFlush = shape;
+  }
+  if (!bestFlush) return standardShape;
+  return compareStructuralShape(bestFlush, standardShape) < 0 ? bestFlush : standardShape;
+};
+
 const compareAction = (
   left: Extract<JunkAction, { type: "discard" }>,
   right: Extract<JunkAction, { type: "discard" }>,
@@ -511,11 +607,19 @@ export const compareStructuralContinuation = (
 };
 
 /**
- * Below this pengpenghu shanten, the route is far enough away that using it
- * to break an otherwise-genuine standard-route tie adds noise rather than
- * signal (see the arena sweep note next to this constant's test coverage) —
- * same shape of problem `sevenPairsHandicapFor` solves for seven pairs, chosen
- * by the same A/B methodology (200-seed position-swapped self-play).
+ * `compareFinal`'s tiebreak chain, in order: continuation (2-ply, the primary
+ * speed signal) first; flush next — it only decides between candidates the
+ * 2-ply search already judged equally fast, never overrides a real speed
+ * advantage; onePly next; pengpenghu last, gated by
+ * `PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD` below. Below this pengpenghu
+ * shanten, the route is far enough away that using it to break an otherwise-
+ * genuine standard-route tie adds noise rather than signal (see the arena
+ * sweep note next to this constant's test coverage) — same shape of problem
+ * `sevenPairsHandicapFor` solves for seven pairs, chosen by the same A/B
+ * methodology (200-seed position-swapped self-play). Both sides of the flush
+ * comparison are always populated when this runs (only searched candidates
+ * reach `compareFinal`, and searched candidates always get a `flush` shape —
+ * see `evaluateStructuralDiscard`); the `null` fallback only guards the type.
  */
 const PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD = 2;
 
@@ -530,6 +634,7 @@ const compareFinal = (
     right.pengPengHu.standardShanten <= PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD;
   return (
     compareStructuralContinuation(left, right) ||
+    (left.flush && right.flush ? compareStructuralShape(left.flush, right.flush) : 0) ||
     compareStructuralShape(left.onePly, right.onePly) ||
     (pengPengHuTiebreakEligible
       ? compareStructuralShape(left.pengPengHu!, right.pengPengHu!)
@@ -623,6 +728,7 @@ export const evaluateStructuralDiscard = (
       .map(({ action }) => action.tile),
   );
   let leafCount = 0;
+  const melds = view.seats[view.seat]!.melds;
 
   const candidates: StructuralDiscardCandidate[] = withDominance.map((candidate) => {
     if (!searchedActions.has(candidate.action.tile)) {
@@ -634,11 +740,16 @@ export const evaluateStructuralDiscard = (
         conditionalExpectedBestShanten: null,
         conditionalExpectedBestLiveImprovingKindCount: null,
         conditionalExpectedBestLiveImprovingTileCount: null,
+        flush: null,
       };
     }
     const afterFirstDiscard = view.hand.filter((tile) => tile !== candidate.action.tile);
     const continuation = evaluateStructuralContinuation(view, afterFirstDiscard, existingMelds);
     leafCount += continuation.leafCount;
+    // Cheap here: at most maxFirstCandidates (5) searched candidates per
+    // decision, vs the 2-ply leaf loop's thousands — see bestFlushShapeOf's
+    // doc for why it's scoped out of that loop.
+    const flush = bestFlushShapeOf(afterFirstDiscard, existingMelds, melds, visibleCounts);
     return {
       ...candidate,
       pengPengHu: pengPengHuViable
@@ -651,6 +762,7 @@ export const evaluateStructuralDiscard = (
         continuation.conditionalExpectedBestLiveImprovingKindCount,
       conditionalExpectedBestLiveImprovingTileCount:
         continuation.conditionalExpectedBestLiveImprovingTileCount,
+      flush,
     };
   });
   const selected = candidates.filter(({ searched }) => searched).sort(compareFinal)[0];

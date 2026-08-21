@@ -27,7 +27,7 @@ describe("policy-based worker pool", () => {
     const seeds = [11];
     const baseline = {
       modulePath: currentStrategyPath,
-      exportName: "recommendStructuralBaselineV4Action",
+      exportName: "recommendStructuralBaselineV5Action",
     };
     const candidate = { modulePath: currentStrategyPath, exportName: "chooseJunkAction" };
 

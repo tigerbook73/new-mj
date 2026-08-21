@@ -4,22 +4,22 @@
 
 ## 当前任务
 
-当前没有进行中的专题。七对生产化、门清 claim 阈值、碰碰胡弃牌 tiebreak（番型路线收益模型
-可行性专题的第一、二个 slice）均已完成并入 `structural-baseline@4`；shanten/ukeire 已从
-`packages/core` 迁移到 `packages/ai/src/junk/shanten/`（唯一消费者一直是 AI，core 自己的三个
-ruleset 从不用它，迁移决定见 `docs/architecture/shanten.md`）；新增 `JunkBotAgent` 生产诊断
-上下文（设计决定见 `packages/ai/AGENTS.md`/`apps/server/AGENTS.md`）。backlog 里「跨回合 2-ply
-结果复用」已评估并否决：理论天花板仅约决策耗时的 0.6%，低于此前已否决的同类优化门槛，不划算，
-已从 backlog 移除。番型路线收益模型可行性专题剩余两个番型（清一色/混一色/杠开）仍在 backlog，
-未选定。其余未选定候选见 `backlog.md`。
+当前没有进行中的专题。七对生产化、门清 claim 阈值、碰碰胡弃牌 tiebreak、清一色/混一色弃牌
+方向（番型路线收益模型可行性专题的第一至四个 slice）均已完成并入 `structural-baseline@5`；
+shanten/ukeire 已从 `packages/core` 迁移到 `packages/ai/src/junk/shanten/`（唯一消费者一直是
+AI，core 自己的三个 ruleset 从不用它，迁移决定见 `docs/architecture/shanten.md`）；新增
+`JunkBotAgent` 生产诊断上下文（设计决定见 `packages/ai/AGENTS.md`/`apps/server/AGENTS.md`）。
+backlog 里「跨回合 2-ply 结果复用」已评估并否决：理论天花板仅约决策耗时的 0.6%，低于此前已
+否决的同类优化门槛，不划算，已从 backlog 移除。番型路线收益模型可行性专题剩余番型（杠开）
+仍在 backlog，未选定。其余未选定候选见 `backlog.md`。
 
 ## 当前状态
 
 - `recommendJunkAction`/`chooseJunkAction` 只接受 `PlayerView + legalActions`，固定委托给
-  `structural-baseline@4`；server 的 bot 和 advice 路径均通过该公共 facade 使用同一策略。
+  `structural-baseline@5`；server 的 bot 和 advice 路径均通过该公共 facade 使用同一策略。
 - 当前生产范围包括普通标准型 + 七对的 discard、claim、gang 与 hu/zimo/draw 流程动作，claim
-  阶段的门清保护，以及碰碰胡弃牌 tiebreak（discard-only，不含 claim）。清一色/混一色/杠开、
-  防守和其他玩法路线尚未进入生产构牌目标，候选见 `backlog.md`。
+  阶段的门清保护，以及碰碰胡、清一色/混一色两个弃牌 tiebreak（均 discard-only，不含 claim）。
+  杠开、防守和其他玩法路线尚未进入生产构牌目标，候选见 `backlog.md`。
 - 弃牌先在同向听层做进张种类/张数的严格支配过滤，再按固定结构顺序最多搜索 5 个首弃；
   continuation 和最终选择使用确定性字典序，不使用可调权重。claim 必须严格改善结构，打平 pass；
   gang 必须严格胜过直接弃牌及其等价弃牌，打平 discard。
@@ -37,10 +37,18 @@ ruleset 从不用它，迁移决定见 `docs/architecture/shanten.md`）；新�
   只在两候选碰碰胡向听都 ≤ `PENG_PENG_HU_TIEBREAK_SHANTEN_THRESHOLD=2` 时生效；无门槛裸比较
   在 A/B 里跑负，门槛值经扫描单调改善后选定，只做弃牌方向，不碰 claim。设计取舍、A/B 证据见
   `docs/architecture/shanten.md`"碰碰胡结构路线"节。
+- 清一色/混一色（合并分析，`structural-discard.ts` 的 `bestFlushShapeOf`）已接入弃牌 shortlist
+  的 onePly 排序和最终 tiebreak，不碰 claim、不与七对组合（第一版范围）。花色定向向听直接复用
+  `evaluateUkeire`（喂"目标花色+字牌"过滤子集，不要求输入正好 13/14 张），不需要新建 DP 或碰
+  Layer 2 财神装饰层。原计划仿七对做分档惩罚，扫过 `handicap∈{0,1,2}` 后发现三个值决策完全
+  相同（信号只在"2-ply 已打平的候选"这个窄 tiebreak 生效，小整数惩罚翻不动结果），已移除、
+  用无惩罚的 min。设计取舍、A/B 证据见 `docs/architecture/shanten.md`"清一色/混一色弃牌方向"节。
+  两个 tiebreak 在 `compareFinal` 中各自独立生效、互不干扰（顺序为 continuation → flush →
+  onePly → pengpenghu），但集成时未专门验证过二者组合场景的 A/B 效应。
 - 进张和 continuation 只消费本人手牌及公开牌河/副露，并按 `TileId` 去重；结果是玩家信息集下的
   结构估计，不是真实牌墙概率、整局胡牌概率或终局 EV。
-- `fixtures/structural-baseline-v4.json` 固定 canonical 行为；完整 core 对局测试逐决策断言生产 facade
-  与 v4 返回同一合法动作。有意改变行为时必须建立新 baseline 版本，不静默改写当前版本。
+- `fixtures/structural-baseline-v5.json` 固定 canonical 行为；完整 core 对局测试逐决策断言生产 facade
+  与 v5 返回同一合法动作。有意改变行为时必须建立新 baseline 版本，不静默改写当前版本。
 - evaluation 只保留通用 baseline/candidate 能力：scenario provider、structural evaluator、Pareto、
   bounded/full teacher、policy loader/capture/diff、换位 match、arena、worker、checkpoint 和 report。
   loader 只按 Git ref/module/export 加载策略，不加载权重资产；evaluation 不从公共 package 导出。
@@ -61,7 +69,7 @@ ruleset 从不用它，迁移决定见 `docs/architecture/shanten.md`）；新�
   约 4%、风险不成比例，未采纳。细节与复现方式见 `docs/architecture/shanten.md`
   "标准型局部性剪枝"节与 commit `b8fd0a1`。
 - `JunkBotAgent`（`packages/ai/src/junk/bot-agent.ts`）是每座位一个的有状态封装，包一层无状态的
-  `recommendStructuralBaselineV4ActionWithDiagnostics`；由 `apps/server` 的 `RoomService`
+  `recommendStructuralBaselineV5ActionWithDiagnostics`；由 `apps/server` 的 `RoomService`
   实例化持有（`Room.botAgents`），每手开始重置，只服务 junk ruleset 的 bot/auto-piloted 座位。
   `ConfigService.botDecisionContextEnabled`（默认关闭）只控制诊断快照是否写进结构化日志，不影响
   决策本身；快照禁止进入 `PlayerView`/协议/客户端。`packages/ai/AGENTS.md` 的"不缓存/持有 core

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "structural-baseline",
-  "version": 4,
-  "scope": "ordinary-standard+seven-pairs+menqing-claim-threshold+pengpenghu-discard-tiebreak",
-  "inputManifest": { "id": "canonical-baseline", "version": 4 },
+  "version": 5,
+  "scope": "ordinary-standard+seven-pairs+menqing-claim-threshold+pengpenghu-discard-tiebreak+flush-discard-tiebreak",
+  "inputManifest": { "id": "canonical-baseline", "version": 5 },
   "behavior": [
     { "scenarioId": "discard-001", "expectedAction": { "type": "discard", "kind": "5p" } },
     {
@@ -32,8 +32,12 @@
     {
       "scenarioId": "discard-pengpenghu-tiebreak-001",
       "expectedAction": { "type": "discard", "kind": "4z" }
+    },
+    {
+      "scenarioId": "discard-flush-tiebreak-001",
+      "expectedAction": { "type": "discard", "kind": "6p" }
     }
   ],
   "flowActions": ["hu", "zimo", "draw"],
-  "excludedObjectives": ["fan-value-beyond-menqing", "defense"]
+  "excludedObjectives": ["fan-value-beyond-menqing-pengpenghu-and-flush", "defense"]
 }
