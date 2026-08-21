@@ -19,5 +19,14 @@ export default defineConfig({
   // exposes VITE_-prefixed keys to client code either way, so this doesn't
   // leak server-only secrets (SUPABASE_SERVICE_KEY, DATABASE_URL, etc.).
   envDir: fileURLToPath(new URL("../..", import.meta.url)),
-  server,
+  server: {
+    ...server,
+    proxy: {
+      "/socket.io": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
 });

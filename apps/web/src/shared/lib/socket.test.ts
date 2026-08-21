@@ -44,6 +44,7 @@ beforeEach(() => {
 describe("connectWithTakeoverPrompt", () => {
   beforeEach(() => {
     ioMock.mockReset();
+    vi.resetModules();
     vi.stubGlobal("window", { confirm: vi.fn() });
   });
 
@@ -80,6 +81,22 @@ describe("connectWithTakeoverPrompt", () => {
       "http://localhost:3000",
       expect.objectContaining({ auth: expect.objectContaining({ takeover: true }) }),
     );
+  });
+
+  it("uses the current public origin so Vite can proxy Socket.IO", async () => {
+    vi.stubGlobal("window", {
+      confirm: vi.fn(),
+      location: {
+        hostname: "online-mj.tigerbook.top",
+        origin: "https://online-mj.tigerbook.top",
+      },
+    });
+    ioMock.mockReturnValue(makeSocket({ ok: true }));
+    const { connect } = await import("./socket");
+
+    await connect("token");
+
+    expect(ioMock).toHaveBeenCalledWith("https://online-mj.tigerbook.top", expect.anything());
   });
 
   it("does not retry when takeover is cancelled", async () => {

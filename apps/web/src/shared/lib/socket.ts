@@ -9,7 +9,26 @@ import {
 } from "@new-mj/protocol";
 import { getBrowserId, getTabId } from "./clientIdentity";
 
-const SERVER_URL = import.meta.env["VITE_SERVER_URL"] ?? "http://localhost:3000";
+const getServerUrl = (): string => {
+  const configuredServerUrl = import.meta.env["VITE_SERVER_URL"];
+  const browserLocation = typeof window === "undefined" ? undefined : window.location;
+
+  // The public Cloudflare URL only exposes Vite. Use the current origin so
+  // Vite can proxy Socket.IO to the local server instead of making the remote
+  // browser connect to its own localhost.
+  if (
+    browserLocation &&
+    browserLocation.hostname !== "localhost" &&
+    browserLocation.hostname !== "127.0.0.1" &&
+    browserLocation.hostname !== "[::1]"
+  ) {
+    return browserLocation.origin;
+  }
+
+  return configuredServerUrl ?? "http://localhost:3000";
+};
+
+const SERVER_URL = getServerUrl();
 
 export type ConnectResult = { ok: true; socket: Socket } | { ok: false; code: string };
 
